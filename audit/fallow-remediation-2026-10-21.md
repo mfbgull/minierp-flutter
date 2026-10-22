@@ -3,6 +3,8 @@
 Generated 2026-10-22T03:48:19.469Z. Input of record: `audit/fallow-tools/fallow-before-20261021.json` (Fallow 3.34.1);
 final scan: `/tmp/fallow-final.json` (Fallow 3.34.1); row inventory: `audit/fallow-remediation-2026-10-21.inventory.json`.
 
+Post-commit review addendum (2026-10-22T05:04:03Z): D.1b, D.2 and the full-suite result in E were added after reconciling the final scan against the original inventory. The scan used for these tables is the evidence copy `.omo/evidence/task-6-fallow.json` (same content as `/tmp/fallow-final.json`).
+
 ## Totals
 
 | Section | Original | Resolved | Retained with reason | Still reported (measured) | Open |
@@ -16,6 +18,18 @@ final scan: `/tmp/fallow-final.json` (Fallow 3.34.1); row inventory: `audit/fall
 Every one of the 340 original entries has a row below with owner, action, evidence and
 reason. Nothing is deferred, suppressed or hidden behind a changed threshold: the
 D14 policy (`.fallowrc.json` `audit.gate: "new-only"`) and all baselines are untouched.
+
+The 340 original entries have 0 open items. The inventory JSON is the pre-remediation
+snapshot; its `pending-*` statuses are historical and are superseded by the final
+dispositions in this ledger.
+
+Post-remediation scan additions (not part of the original 340) are recorded in D:
+
+| Post-remediation addition | Count | Status |
+|---|---|---|
+| New named symbols | 6 | Still reported (CRAP 30–90); recorded in D.1b |
+| Anonymous arrow findings | 2 | Newly reported; recorded in D.1b |
+| Pre-existing functions newly reported | 72 | Recorded in D.2; not introduced by extraction |
 
 ## A. Dead code (63 entries)
 
@@ -415,7 +429,11 @@ coverage with the full server suite.
 ## D. Findings introduced by this remediation
 
 Every operation extracted during the cleanup was checked against the final scan and the
-`fallow audit --base HEAD` attribution pass:
+`fallow audit --base HEAD` attribution pass. A post-commit reconciliation against the
+original inventory found six additional named symbols (D.1b), two anonymous arrow
+findings, and 72 pre-existing functions newly reported by the corrected coverage
+mapping (D.2). These were absent from the first version of this section and are recorded
+here rather than omitted:
 
 | New symbol | File | Why it exists |
 |---|---|---|
@@ -428,8 +446,112 @@ Every operation extracted during the cleanup was checked against the final scan 
 | `purchaseMatchesReceipt`, `poPaidTotal`, `logDuplicatePurchase` | `server/src/scripts/reconcile-stock-cash.ts` | Stages of duplicate-purchase detection |
 | `snapshotErrorMessage`, `removeQuietly`, `closeQuietly` | `server/scripts/backup-db.js` | Branch-absorbing helpers that keep `createSnapshot` under the CRAP threshold |
 
-None of these exceeds cyclomatic 20 / cognitive 15, none is reported as a new clone
-group, and each had a CRAP-only introduction cleared by a targeted test (see E).
+### D.1b New symbols found by post-commit reconciliation
+
+The named symbols below are absent from the fixed point (`212a9fa7`) and were not in the
+first version of this section. The two anonymous arrow findings are new relative to the
+original inventory but cannot be name-matched; they are included so the scan delta is
+complete. All eight are still reported by the final scan; their measured status is
+recorded rather than claimed cleared.
+
+| Symbol | Path:line | Owner | Final scan | Status |
+|---|---|---|---|---|
+| `updateBorrowerFields` | `server/src/controllers/ownerPersonalLoansController.ts:695` | controllers | CRAP 90 (cyc 9/cog 8; istanbul) | New symbol; absent at 212a9fa7; still reported |
+| `validateReportSort` | `server/src/controllers/customReportsController.ts:97` | controllers | CRAP 35 (cyc 8/cog 12; istanbul) | New symbol; absent at 212a9fa7; still reported |
+| `parseGuardOption` | `scripts/openspec-archive-guard.js:58` | scripts | CRAP 30 (cyc 5/cog 5; estimated) | New symbol; absent at 212a9fa7; still reported |
+| `verifySnapshot` | `server/scripts/backup-db.js:82` | scripts | CRAP 30 (cyc 5/cog 5; estimated) | New symbol; absent at 212a9fa7; still reported |
+| `postReconciledStock` | `server/scripts/repair-stock.ts:90` | scripts | CRAP 30 (cyc 5/cog 5; estimated) | New symbol; absent at 212a9fa7; still reported |
+| `postCoverageAdjustment` | `server/src/config/database.ts:1262` | config | CRAP 30 (cyc 5/cog 5; istanbul) | New symbol; absent at 212a9fa7; still reported |
+| `<arrow>` | `server/src/models/Employee.ts:405` | models | CRAP 72 (cyc 8/cog 9; istanbul) | Anonymous callback; new relative to the inventory; still reported |
+| `<arrow>` | `server/src/models/Reports.ts:1241` | models | CRAP 56 (cyc 7/cog 10; istanbul) | Anonymous callback; new relative to the inventory; still reported |
+
+### D.2 Pre-existing functions newly reported by the remapped coverage (72)
+
+These symbol names are present at the fixed point (`212a9fa7`) and were not part of the
+original 340-entry report. They are surfaced by the test-only source maps and measured
+coverage; they are not introduced by the extraction. All are recorded with their final
+measured CRAP so the scan delta is not silent.
+
+| File:line | Symbol | Owner | Final scan | Why now |
+|---|---|---|---|---|
+| `server/src/controllers/accountingController.ts:131` | `getAccountBalance` | controllers | CRAP 30 (cyc 5/cog 4; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/accountingController.ts:208` | `getPeriod` | controllers | CRAP 30 (cyc 5/cog 4; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/customersController.ts:214` | `getCustomerStatement` | controllers | CRAP 72 (cyc 8/cog 7; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/dashboardController.ts:21` | `getSummary` | controllers | CRAP 72 (cyc 8/cog 5; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/dashboardController.ts:141` | `getKPIBatch` | controllers | CRAP 90 (cyc 9/cog 7; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/dashboardController.ts:303` | `saveCashOpeningBalances` | controllers | CRAP 42 (cyc 6/cog 6; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/dashboardLayoutController.ts:49` | `createLayout` | controllers | CRAP 30 (cyc 5/cog 5; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/dashboardLayoutController.ts:108` | `renameLayout` | controllers | CRAP 56 (cyc 7/cog 6; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/dashboardLayoutController.ts:204` | `duplicateLayout` | controllers | CRAP 30 (cyc 5/cog 4; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/employeeController.ts:45` | `getEmployees` | controllers | CRAP 72 (cyc 8/cog 7; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/employeeController.ts:187` | `deleteEmployee` | controllers | CRAP 30 (cyc 5/cog 3; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/employeeController.ts:535` | `getSalaryMonthDetail` | controllers | CRAP 30 (cyc 5/cog 4; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/employeeController.ts:1016` | `deleteLoan` | controllers | CRAP 42 (cyc 6/cog 5; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/expenseController.ts:427` | `createExpenseCategory` | controllers | CRAP 42 (cyc 6/cog 7; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/expenseController.ts:446` | `updateExpenseCategory` | controllers | CRAP 42 (cyc 6/cog 8; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/expenseController.ts:469` | `deleteExpenseCategory` | controllers | CRAP 42 (cyc 6/cog 7; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/inventoryController.ts:761` | `getStockBalances` | controllers | CRAP 42 (cyc 6/cog 5; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/inventoryController.ts:856` | `recordPhysicalCountItem` | controllers | CRAP 42 (cyc 6/cog 5; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/inventoryController.ts:1301` | `updateBatchStatus` | controllers | CRAP 30 (cyc 5/cog 4; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/inventoryController.ts:1357` | `releaseReservation` | controllers | CRAP 42 (cyc 6/cog 5; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/invoiceController.ts:859` | `restoreInvoice` | controllers | CRAP 42 (cyc 6/cog 5; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/mobileInvoiceController.ts:71` | `getDraft` | controllers | CRAP 30 (cyc 5/cog 4; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/ownerEquityController.ts:145` | `getCapitalList` | controllers | CRAP 42 (cyc 6/cog 5; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/ownerEquityController.ts:384` | `getWithdrawalList` | controllers | CRAP 42 (cyc 6/cog 5; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/ownerEquityController.ts:512` | `voidWithdrawal` | controllers | CRAP 42 (cyc 6/cog 4; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/posController.ts:336` | `getPOSTransactions` | controllers | CRAP 30 (cyc 5/cog 4; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/purchaseOrderController.ts:186` | `addLineItem` | controllers | CRAP 90 (cyc 9/cog 8; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/purchaseOrderController.ts:220` | `updateLineItem` | controllers | CRAP 72 (cyc 8/cog 8; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/purchaseOrderController.ts:452` | `getSummaryBySupplier` | controllers | CRAP 42 (cyc 6/cog 5; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/reportsController.ts:107` | `getCashFlowReport` | controllers | CRAP 42 (cyc 6/cog 5; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/reportsController.ts:164` | `saveCashReconciliation` | controllers | CRAP 56 (cyc 7/cog 6; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/reportsController.ts:193` | `getExpiryReport` | controllers | CRAP 30 (cyc 5/cog 4; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/rolesController.ts:70` | `updateRole` | controllers | CRAP 42 (cyc 6/cog 8; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/rolesController.ts:125` | `deleteRole` | controllers | CRAP 42 (cyc 6/cog 8; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/settingsController.ts:33` | `updateSetting` | controllers | CRAP 30 (cyc 5/cog 4; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/suppliersController.ts:22` | `getSuppliers` | controllers | CRAP 56 (cyc 7/cog 6; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/suppliersController.ts:128` | `updateSupplier` | controllers | CRAP 56 (cyc 7/cog 6; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/suppliersController.ts:290` | `getSupplierLedger` | controllers | CRAP 72 (cyc 8/cog 7; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/suppliersController.ts:323` | `getSupplierStatement` | controllers | CRAP 90 (cyc 9/cog 8; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/controllers/userController.ts:173` | `deleteUser` | controllers | CRAP 36.8 (cyc 9/cog 8; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/migrations/backfillGlPreposting.ts:277` | `backfill7GoodsReceipts` | migrations | CRAP 33 (cyc 9/cog 11; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/models/ActivityLog.ts:69` | `insert` | models | CRAP 42 (cyc 6/cog 5; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/models/ActivityLog.ts:365` | `rows` | models | CRAP 30 (cyc 5/cog 4; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/models/BOM.ts:296` | `transaction` | models | CRAP 30 (cyc 5/cog 5; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/models/Customer.ts:341` | `getStatement` | models | CRAP 30 (cyc 5/cog 5; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/models/CustomReport.ts:69` | `update` | models | CRAP 30 (cyc 5/cog 4; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/models/Employee.ts:241` | `getAll` | models | CRAP 56 (cyc 7/cog 7; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/models/Employee.ts:469` | `getAdvanceCarryover` | models | CRAP 90 (cyc 9/cog 13; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/models/Expense.ts:318` | `updateCategory` | models | CRAP 30 (cyc 5/cog 5; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/models/MobileInvoice.ts:78` | `createDraft` | models | CRAP 56 (cyc 7/cog 6; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/models/MobileInvoice.ts:96` | `updateDraft` | models | CRAP 72 (cyc 8/cog 7; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/models/OwnerCapital.ts:119` | `getCount` | models | CRAP 56 (cyc 7/cog 6; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/models/OwnerWithdrawal.ts:368` | `getCount` | models | CRAP 90 (cyc 9/cog 8; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/models/PhysicalCount.ts:182` | `getAll` | models | CRAP 72 (cyc 8/cog 7; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/models/Reports.ts:693` | `getExpiryReport` | models | CRAP 56 (cyc 7/cog 6; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/models/Reports.ts:1179` | `rows` | models | CRAP 90 (cyc 9/cog 5; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/models/Role.ts:62` | `create` | models | CRAP 30 (cyc 5/cog 5; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/models/Settings.ts:73` | `transaction` | models | CRAP 30 (cyc 5/cog 6; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/models/Supplier.ts:79` | `getAll` | models | CRAP 90 (cyc 9/cog 10; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/models/Supplier.ts:145` | `update` | models | CRAP 90 (cyc 9/cog 9; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/models/Supplier.ts:219` | `getStatement` | models | CRAP 30 (cyc 5/cog 5; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/routes/integrations.ts:23` | `router.put("/settings/:service")` | routes | CRAP 30 (cyc 5/cog 6; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/services/forecastService.ts:181` | `calculateHoltWinters` | services | CRAP 42 (cyc 6/cog 5; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/services/forecastService.ts:231` | `calculateSimpleARIMA` | services | CRAP 42 (cyc 6/cog 5; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/services/forecastService.ts:330` | `detectTrend` | services | CRAP 40.7 (cyc 7/cog 7; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/services/forecastService.ts:810` | `getDashboardData` | services | CRAP 42 (cyc 6/cog 4; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/services/forecastService.ts:868` | `getTrendData` | services | CRAP 56 (cyc 7/cog 6; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/services/forecastService.ts:1112` | `applyOverride` | services | CRAP 72 (cyc 8/cog 6; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/services/forecastService.ts:1234` | `createSeasonalEvent` | services | CRAP 30 (cyc 5/cog 4; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/services/invoiceReturnService.ts:1229` | `applyLegacyAdjust` | services | CRAP 90 (cyc 9/cog 10; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/services/reportQueryEngine.ts:610` | `buildBetween` | services | CRAP 56 (cyc 7/cog 6; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+| `server/src/utils/errorMessage.ts:45` | `errorCode` | utils | CRAP 30 (cyc 5/cog 4; istanbul) | Symbol present at 212a9fa7; newly reported by the remapped coverage; not introduced by extraction |
+
+None of the D.1 symbols exceeds cyclomatic 20 / cognitive 15 and none is reported as a
+new clone group. The D.1b symbols are all still reported by the final scan (CRAP 30–90);
+they are recorded with their measured status rather than claimed cleared. The D.2 rows
+are pre-existing functions newly reported by the corrected coverage mapping; they are
+not caused by the extraction and are recorded, not suppressed.
 
 **One diff-risk warning remains, recorded rather than silenced:** `server/src/middleware/rateLimiter.ts:15`
 `test-only-branch` (warn) — the rate-limiter consolidation moved the existing
@@ -446,7 +568,7 @@ exits 0.
 | Typecheck | `npm run typecheck` (server/) | exit 0 |
 | Lint | `npm run lint` (server/) | exit 0 |
 | Reversal rules | `npm run verify:reversal-rules` (server/) | exit 0 |
-| Full server suite + mapped coverage | `npm test -- --coverage` (server/) | see `.omo/evidence/task-6-full-coverage-final.log` |
+| Full server suite + mapped coverage | `npm test -- --coverage` (server/) | 168/169 suites, 1496/1497 tests passed. `supplierPurchasesFilter.test.ts` hit its 10 s test timeout under load; that suite passed 3/3 on isolated re-run and its coverage was merged. No clean full-suite run is recorded. |
 | Final Fallow scan | `npx --yes fallow@3.34.1 --format json` | structural 0, clone groups 4 (all retained above) |
 | Diff gate (CI) | `npx --yes fallow@3.34.1 audit --base HEAD` | see `.omo/evidence/task-7-audit-gate-final.log` |
 
