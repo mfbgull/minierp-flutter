@@ -1,5 +1,7 @@
 # MiniERP
 
+First and Most important rule. Always call me or say my name Gull before every conersation or reply. Most important rule do not by pass this.
+
 Flutter desktop client + Node/Express/SQLite backend in one repo.
 
 - **Client** (repo root): Flutter, Riverpod for state, Dio for HTTP, go_router for
@@ -107,3 +109,19 @@ API shape, schema, validation, security and error handling — pick the simplest
 and say what you picked rather than asking. A genuinely open product call (one with
 real trade-offs you must own) is written up in `audit/DECISIONS.md` and left marked
 OPEN-DECISION, not guessed.
+
+## Fallow CRAP cleanup status (2026-10-22)
+
+Plan: [`.omo/plans/fallow-crap-cleanup-2026-10-22.md`](.omo/plans/fallow-crap-cleanup-2026-10-22.md).
+
+- **Phase 1 complete** (`8bb623b9`): `validateReportSort` and `parseGuardOption` are
+  below CRAP 30. Added 10 HTTP-level report-sort tests and 10 archive-guard parser
+  tests; moved the parser to `server/scripts/lib/openspec-archive-guard.js` so Jest
+  can measure it.
+- **Verified:** typecheck, lint, the 20 targeted tests, `reportExpressionSecurity.test.ts`,
+  and `fallow audit --base HEAD` (exit 0). The full server suite was green immediately
+  before Phase 1; rerun it after Phases 2–3.
+- **Remaining:** Phases 2–4 — `updateBorrowerFields`, `verifySnapshot`,
+  `postReconciledStock`, `postCoverageAdjustment`, and the anonymous findings in
+  `Employee.ts:405` and `Reports.ts:1241`; then the final full-suite scan and ledger
+  D.1b/E closure.
