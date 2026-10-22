@@ -402,39 +402,7 @@ class EmployeeModel {
       ORDER BY pay_period DESC
     `).all(employeeId) as SalaryHistoryDbRow[];
 
-    return rows.map((r) => {
-      let status: string;
-      if (r.total_paid >= salary && salary > 0) {
-        status = 'paid';
-      } else if (r.auto_advance_amount > 0 && r.auto_advance_amount === r.total_paid) {
-        // All payments are auto-advances from prior month overpayment
-        status = 'advance';
-      } else if (r.total_paid > 0) {
-        status = 'partial';
-      } else {
-        status = 'advance';
-      }
-
-      // Extract source month from ADV-YYYY-MM reference
-      let advanceSourcePeriod: string | null = null;
-      if (r.advance_reference) {
-        const match = r.advance_reference.match(/^ADV-(\d{4}-\d{2})$/);
-        if (match) advanceSourcePeriod = match[1];
-      }
-
-      return {
-        pay_period: r.pay_period,
-        employee_salary: salary,
-        total_paid: r.total_paid,
-        remaining: Math.max(0, salary - r.total_paid),
-        status,
-        payment_count: r.payment_count,
-        advance_carryover: r.auto_advance_amount,
-        advance_source_period: advanceSourcePeriod,
-        first_payment_date: r.first_payment_date,
-        last_payment_date: r.last_payment_date,
-      };
-    });
+    return rows.map((r) => toSalaryHistoryRow(r, salary));
   }
 
   /**
@@ -557,6 +525,40 @@ class EmployeeModel {
     );
     return result.lastInsertRowid as number;
   }
+}
+
+function toSalaryHistoryRow(r: SalaryHistoryDbRow, salary: number): SalaryHistoryRow {
+  let status: string;
+  if (r.total_paid >= salary && salary > 0) {
+    status = 'paid';
+  } else if (r.auto_advance_amount > 0 && r.auto_advance_amount === r.total_paid) {
+    // All payments are auto-advances from prior month overpayment
+    status = 'advance';
+  } else if (r.total_paid > 0) {
+    status = 'partial';
+  } else {
+    status = 'advance';
+  }
+
+  // Extract source month from ADV-YYYY-MM reference
+  let advanceSourcePeriod: string | null = null;
+  if (r.advance_reference) {
+    const match = r.advance_reference.match(/^ADV-(\d{4}-\d{2})$/);
+    if (match) advanceSourcePeriod = match[1];
+  }
+
+  return {
+    pay_period: r.pay_period,
+    employee_salary: salary,
+    total_paid: r.total_paid,
+    remaining: Math.max(0, salary - r.total_paid),
+    status,
+    payment_count: r.payment_count,
+    advance_carryover: r.auto_advance_amount,
+    advance_source_period: advanceSourcePeriod,
+    first_payment_date: r.first_payment_date,
+    last_payment_date: r.last_payment_date,
+  };
 }
 
 export default EmployeeModel;

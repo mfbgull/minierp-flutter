@@ -1209,6 +1209,40 @@ function getCashReconciliation(db: Database.Database, date: string): {
   };
 }
 
+type CashReconciliationEntry = {
+  key: string;
+  counted_balance: number | null;
+  notes?: string | null;
+};
+
+function upsertCashReconciliationEntries(
+  upsert: Database.Statement<unknown[]>,
+  date: string,
+  entries: CashReconciliationEntry[],
+  expected: Map<string, number>,
+  userId: number
+): void {
+  const validKeys = new Set(CASH_ACCOUNTS.map((a) => a.key));
+
+  for (const entry of entries) {
+    if (!validKeys.has(entry.key)) {
+      throw new Error(`Unknown account key: ${entry.key}`);
+    }
+    const counted = entry.counted_balance === null || entry.counted_balance === undefined
+      ? null
+      : Math.round(Number(entry.counted_balance) * 100) / 100;
+    const accountName = CASH_ACCOUNTS.find((a) => a.key === entry.key)!.name;
+    const expectedBalance = expected.get(entry.key)!;
+    const variance = counted === null ? null : Math.round((counted - expectedBalance) * 100) / 100;
+    upsert.run(
+      date, entry.key, accountName,
+      expectedBalance, counted, variance,
+      entry.notes?.trim() ? entry.notes.trim() : null,
+      userId
+    );
+  }
+}
+
 /**
  * Save the counted end-of-day amounts for `date` (upsert per account).
  * Expected balances are snapshotted into the row so the audit trail
@@ -1221,7 +1255,6 @@ function saveCashReconciliation(
   entries: Array<{ key: string; counted_balance: number | null; notes?: string | null }>,
   userId: number
 ): ReturnType<typeof getCashReconciliation> {
-  const validKeys = new Set(CASH_ACCOUNTS.map((a) => a.key));
   const expected = new Map(getCashAccountTotals(db, date).map((a) => [a.key, a.closing]));
 
   const upsert = db.prepare(`
@@ -1239,23 +1272,7 @@ function saveCashReconciliation(
   `);
 
   db.transaction(() => {
-    for (const entry of entries) {
-      if (!validKeys.has(entry.key)) {
-        throw new Error(`Unknown account key: ${entry.key}`);
-      }
-      const counted = entry.counted_balance === null || entry.counted_balance === undefined
-        ? null
-        : Math.round(Number(entry.counted_balance) * 100) / 100;
-      const accountName = CASH_ACCOUNTS.find((a) => a.key === entry.key)!.name;
-      const expectedBalance = expected.get(entry.key)!;
-      const variance = counted === null ? null : Math.round((counted - expectedBalance) * 100) / 100;
-      upsert.run(
-        date, entry.key, accountName,
-        expectedBalance, counted, variance,
-        entry.notes?.trim() ? entry.notes.trim() : null,
-        userId
-      );
-    }
+    upsertCashReconciliationEntries(upsert, date, entries, expected, userId);
   })();
 
   return getCashReconciliation(db, date);
