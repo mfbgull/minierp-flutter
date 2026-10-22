@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import StockMovementModel from './StockMovement';
 import ItemModel from './Item';
 import AccountingService from '../services/accountingService';
-import { generateDocNo, getNextSequenceNumber } from '../utils/sequence';
+import { generateDocNo, generateReceiptBatchNo } from '../utils/sequence';
 import { sanitizeSortParams, PURCHASE_ORDER_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import { StockBalance } from '../types';
 import logger from '../utils/logger';
@@ -224,12 +224,7 @@ class PurchaseOrderModel {
    * both purchase paths.
    */
   static generateBatchNo(db: Database.Database): string {
-    const now = new Date();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const year = String(now.getFullYear()).slice(-2);
-    const settingKey = `BATCH_last_no_${month}${year}`;
-    const nextNo = getNextSequenceNumber(db, settingKey);
-    return `BATCH-${month}${year}-PUR-${String(nextNo).padStart(5, '0')}`;
+    return generateReceiptBatchNo(db, 'PUR');
   }
 
   static getAll(filters: PurchaseOrderFilters = {}, db: Database.Database): PaginatedPurchaseOrders {
@@ -717,7 +712,7 @@ class PurchaseOrderModel {
       let totalQuantity = 0;
       let totalAmount = 0;
 
-      for (const item of items) {
+      const reverseGoodsReceiptItem = (item: typeof items[number]): void => {
         // Refuse if any of this receipt's batch layers were consumed.
         const batches = db.prepare(`
           SELECT id, quantity_original, quantity_remaining FROM stock_batches
@@ -774,6 +769,9 @@ class PurchaseOrderModel {
 
         totalQuantity += item.received_quantity;
         totalAmount += roundQty(item.received_quantity * item.unit_price);
+      };
+      for (const item of items) {
+        reverseGoodsReceiptItem(item);
       }
 
       // Recompute PO status (mirrors addReceipt).
@@ -975,7 +973,7 @@ class PurchaseOrderModel {
       let totalAmount = 0;
       let totalInputTax = 0;
 
-      for (const receiptItem of items) {
+      const postGoodsReceiptItem = (receiptItem: typeof items[number]): void => {
         const poItem = db.prepare(`
           SELECT * FROM purchase_order_items WHERE id = ?
         `).get(receiptItem.po_item_id) as { po_id: number; item_id: number; quantity: number; received_quantity: number; unit_price: number; input_tax_amount: number; expiry_date?: string | null };
@@ -1087,6 +1085,9 @@ class PurchaseOrderModel {
 
         totalQuantity += receiptItem.received_quantity;
         totalAmount += roundQty(receiptItem.received_quantity * poItem.unit_price);
+      };
+      for (const receiptItem of items) {
+        postGoodsReceiptItem(receiptItem);
       }
 
       // GL posting (PO receipt completeness): Dr 1200 Inventory Asset /

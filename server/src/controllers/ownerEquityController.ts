@@ -1,3 +1,5 @@
+import { respondToIdempotencyReplay } from '../utils/idempotency';
+import { positiveFiniteAmount } from '../utils/controllerValidation';
 import { Request, Response } from 'express';
 import { getQueryParam, getRouteParam } from '../utils/queryUtils';
 import { AuthRequest } from '../types';
@@ -88,8 +90,8 @@ function createCapital(req: AuthRequest, res: Response): void {
       res.status(400).json({ success: false, error: 'A valid capital_date (YYYY-MM-DD) is required' });
       return;
     }
-    const parsedAmount = Number(amount);
-    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+    const parsedAmount = positiveFiniteAmount(amount);
+    if (parsedAmount === null) {
       res.status(400).json({ success: false, error: 'Amount must be a positive number' });
       return;
     }
@@ -102,15 +104,10 @@ function createCapital(req: AuthRequest, res: Response): void {
     // response must replay rather than capitalise the bank twice.
     const hash = hashRequestPayload(req.body);
     const start = startIdempotentRequest(db, req.headers, IDEMPOTENCY_SCOPES.OWNER_CAPITAL, hash);
-    if (start.kind === 'error') {
-      res.status(start.status).json({ error: start.message });
-      return;
-    }
-    if (start.kind === 'replay') {
-      res.set('X-Idempotent-Replay', 'true');
-      res.status(201).json({ success: true, idempotentReplay: true, data: { id: start.resourceId } });
-      return;
-    }
+    if (respondToIdempotencyReplay(res, start, {
+      status: 201,
+      buildBody: (id) => ({ success: true, idempotentReplay: true, data: { id } }),
+    })) return;
 
     let capitalId: number;
     let capitalNo: string;
@@ -125,7 +122,7 @@ function createCapital(req: AuthRequest, res: Response): void {
         created_by: userId,
       };
       capitalId = OwnerCapitalModel.create(db, dto);
-      if (start.key) {
+      if (start.kind === 'proceed' && start.key) {
         claimIdempotencyKey(db, IDEMPOTENCY_SCOPES.OWNER_CAPITAL, start.key, hash, capitalId);
       }
     })();
@@ -281,6 +278,23 @@ function validateItemLines(raw: unknown): { lines?: WithdrawalItemInput[]; error
   return { lines };
 }
 
+function withdrawalValueError(kind: 'cash' | 'goods', amount: unknown, payment_method: string | undefined): string | null {
+  if (kind === 'cash') {
+    const parsedAmount = positiveFiniteAmount(amount);
+    if (parsedAmount === null) {
+      return 'Cash withdrawal amount must be a positive number';
+    }
+    if (payment_method !== undefined && !isValidPaymentMethod(payment_method)) {
+      return 'Invalid payment_method — use Cash, Bank, Easypaisa, JazzCash or Upaisa';
+    }
+  } else if (amount !== undefined) {
+    // Goods value is always server-calculated from batch costs.
+    return 'Goods withdrawal amount is system-calculated and cannot be supplied';
+  }
+
+  return null;
+}
+
 function createWithdrawal(req: AuthRequest, res: Response): void {
   try {
     const { withdrawal_date, kind, amount, payment_method, note, items } = req.body;
@@ -294,21 +308,8 @@ function createWithdrawal(req: AuthRequest, res: Response): void {
       res.status(400).json({ success: false, error: "kind must be 'cash' or 'goods'" });
       return;
     }
-    if (kind === 'cash') {
-      const parsedAmount = Number(amount);
-      if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
-        res.status(400).json({ success: false, error: 'Cash withdrawal amount must be a positive number' });
-        return;
-      }
-      if (payment_method !== undefined && !isValidPaymentMethod(payment_method)) {
-        res.status(400).json({ success: false, error: 'Invalid payment_method — use Cash, Bank, Easypaisa, JazzCash or Upaisa' });
-        return;
-      }
-    } else if (amount !== undefined) {
-      // Goods value is always server-calculated from batch costs.
-      res.status(400).json({ success: false, error: 'Goods withdrawal amount is system-calculated and cannot be supplied' });
-      return;
-    }
+    const valueError = withdrawalValueError(kind, amount, payment_method);
+    if (valueError) { res.status(400).json({ success: false, error: valueError }); return; }
 
     let lines: WithdrawalItemInput[] | undefined;
     if (kind === 'goods') {
@@ -324,15 +325,10 @@ function createWithdrawal(req: AuthRequest, res: Response): void {
     // must replay rather than reverse the same stock twice.
     const hash = hashRequestPayload(req.body);
     const start = startIdempotentRequest(db, req.headers, IDEMPOTENCY_SCOPES.OWNER_WITHDRAWAL, hash);
-    if (start.kind === 'error') {
-      res.status(start.status).json({ error: start.message });
-      return;
-    }
-    if (start.kind === 'replay') {
-      res.set('X-Idempotent-Replay', 'true');
-      res.status(201).json({ success: true, idempotentReplay: true, data: { id: start.resourceId } });
-      return;
-    }
+    if (respondToIdempotencyReplay(res, start, {
+      status: 201,
+      buildBody: (id) => ({ success: true, idempotentReplay: true, data: { id } }),
+    })) return;
 
     let withdrawalId: number;
     let withdrawalNo: string;
@@ -351,7 +347,7 @@ function createWithdrawal(req: AuthRequest, res: Response): void {
       });
       withdrawalId = result.id;
       recordedAmount = result.amount;
-      if (start.key) {
+      if (start.kind === 'proceed' && start.key) {
         claimIdempotencyKey(db, IDEMPOTENCY_SCOPES.OWNER_WITHDRAWAL, start.key, hash, withdrawalId);
       }
     })();
@@ -445,6 +441,23 @@ function getWithdrawalById(req: Request, res: Response): void {
   }
 }
 
+function withdrawalItemUpdate(kind: string, items: unknown): { lines?: WithdrawalItemInput[] | null; error?: string } {
+  let lines: WithdrawalItemInput[] | null | undefined;
+  if (kind === 'goods' && items !== undefined) {
+    if (items === null) {
+      lines = null; // explicit clear rejected below via empty-lines rule
+    } else {
+      const check = validateItemLines(items);
+      if (check.error) {
+        return { error: check.error };
+      }
+      lines = check.lines;
+    }
+  }
+
+  return { lines };
+}
+
 function updateWithdrawal(req: AuthRequest, res: Response): void {
   try {
     const id = parseInt(getRouteParam(req.params.id), 10);
@@ -469,19 +482,9 @@ function updateWithdrawal(req: AuthRequest, res: Response): void {
       return;
     }
 
-    let lines: WithdrawalItemInput[] | null | undefined;
-    if (existing.kind === 'goods' && items !== undefined) {
-      if (items === null) {
-        lines = null; // explicit clear rejected below via empty-lines rule
-      } else {
-        const check = validateItemLines(items);
-        if (check.error) {
-          res.status(400).json({ success: false, error: check.error });
-          return;
-        }
-        lines = check.lines;
-      }
-    }
+    const itemUpdate = withdrawalItemUpdate(existing.kind, items);
+    if (itemUpdate.error) { res.status(400).json({ success: false, error: itemUpdate.error }); return; }
+    const lines = itemUpdate.lines;
 
     const result = OwnerWithdrawalModel.update(db, id, {
       withdrawal_date,

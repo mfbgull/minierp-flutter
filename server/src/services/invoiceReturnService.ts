@@ -272,6 +272,54 @@ interface PostedSettlement {
 // Service
 // ────────────────────────────────────────────────────────────────────────
 
+function requireReturnableInvoice(invoiceId: number): NonNullable<ReturnType<typeof InvoiceModel.getById>> {
+  const invoice = InvoiceModel.getById(invoiceId, db);
+  if (!invoice) throw new ReturnError(404, 'Invoice not found');
+  if (invoice.status === 'Cancelled') throw new ReturnError(400, 'Cannot return a cancelled invoice');
+  return invoice;
+}
+
+function discountedReturnLines(input: ProcessReturnInput, fresh: NonNullable<ReturnType<typeof InvoiceModel.getById>>) {
+  // Validate each line and mirror it proportionally (§3.5).
+  const rawLines = validateReturnLines(db, input.invoiceId, input.items);
+
+  // H2: give back the invoice-scope header discount proportionally.
+  // The sale discounted the pre-tax subtotal, so the return deducts
+  // each line's share from its returned NET (contra-revenue) — the
+  // tax reversal stays exact (H3) and a full return credits exactly
+  // the invoice grand total.
+  // NOTE: the gross here is qty × unit_price only — the same pre-tax
+  // base computeInvoiceGrandTotal discounted on the sale side. The
+  // stored `amount` is tax-INCLUSIVE (net + tax), so feeding it as the
+  // decomposeLineAmount override would inflate the discount base by
+  // the tax and match nothing the sale ever computed.
+  const allItemRows = db.prepare(
+    `SELECT quantity, unit_price, tax_rate, discount_type, discount_value
+     FROM invoice_items WHERE invoice_id = ?`
+  ).all(input.invoiceId) as Array<{
+    quantity: number; unit_price: number; tax_rate: number | null;
+    discount_type: string | null; discount_value: number | null;
+  }>;
+  const invoiceSubtotal = allItemRows.reduce(
+    (s, row) => s + decomposeLineAmount({
+      quantity: Number(row.quantity),
+      unit_price: Number(row.unit_price),
+      tax_rate: Number(row.tax_rate) || 0,
+      discount_type: row.discount_type ?? undefined,
+      discount_value: Number(row.discount_value) || 0,
+    }).gross,
+    0,
+  );
+  const lines = allocateHeaderDiscount(rawLines, {
+    discount_scope: fresh.discount_scope ?? undefined,
+    discount_type: fresh.discount_type ?? undefined,
+    discount_value: fresh.discount_value ?? undefined,
+    invoiceSubtotal,
+  });
+
+  return lines;
+}
+
 export class InvoiceReturnService {
   // ======================================================================
   // 1. PROCESS A RETURN (spec §5.1)
@@ -282,12 +330,7 @@ export class InvoiceReturnService {
       throw new ReturnError(400, 'Invalid request: items must be a non-empty array');
     }
 
-    const invoice = InvoiceModel.getById(input.invoiceId, db);
-    if (!invoice) throw new ReturnError(404, 'Invoice not found');
-    if (invoice.status === 'Cancelled') {
-      throw new ReturnError(400, 'Cannot return a cancelled invoice');
-    }
-
+    requireReturnableInvoice(input.invoiceId);
     const returnDate = resolveReturnDate(input.returnDate);
     const warehouseId = resolveWarehouse(input.warehouseId);
     const feeType: FeeType = normalizeFeeType(input.feeType, input.deductionType);
@@ -301,52 +344,12 @@ export class InvoiceReturnService {
     const txn = db.transaction(() => {
       // Fresh re-read INSIDE the transaction — the per-line returned_qty
       // guard must see concurrent writes (scenario 14's double-spend).
-      const fresh = InvoiceModel.getById(input.invoiceId, db);
-      if (!fresh) throw new ReturnError(404, 'Invoice not found');
-      if (fresh.status === 'Cancelled') {
-        throw new ReturnError(400, 'Cannot return a cancelled invoice');
-      }
-
+      const fresh = requireReturnableInvoice(input.invoiceId);
       // Locked books are never modified (D23). Today's date is always
       // allowed; only back-dated returns can be blocked.
       assertPeriodOpen(returnDate);
 
-      // Validate each line and mirror it proportionally (§3.5).
-      const rawLines = validateReturnLines(db, input.invoiceId, input.items);
-
-      // H2: give back the invoice-scope header discount proportionally.
-      // The sale discounted the pre-tax subtotal, so the return deducts
-      // each line's share from its returned NET (contra-revenue) — the
-      // tax reversal stays exact (H3) and a full return credits exactly
-      // the invoice grand total.
-      // NOTE: the gross here is qty × unit_price only — the same pre-tax
-      // base computeInvoiceGrandTotal discounted on the sale side. The
-      // stored `amount` is tax-INCLUSIVE (net + tax), so feeding it as the
-      // decomposeLineAmount override would inflate the discount base by
-      // the tax and match nothing the sale ever computed.
-      const allItemRows = db.prepare(
-        `SELECT quantity, unit_price, tax_rate, discount_type, discount_value
-         FROM invoice_items WHERE invoice_id = ?`
-      ).all(input.invoiceId) as Array<{
-        quantity: number; unit_price: number; tax_rate: number | null;
-        discount_type: string | null; discount_value: number | null;
-      }>;
-      const invoiceSubtotal = allItemRows.reduce(
-        (s, row) => s + decomposeLineAmount({
-          quantity: Number(row.quantity),
-          unit_price: Number(row.unit_price),
-          tax_rate: Number(row.tax_rate) || 0,
-          discount_type: row.discount_type ?? undefined,
-          discount_value: Number(row.discount_value) || 0,
-        }).gross,
-        0,
-      );
-      const lines = allocateHeaderDiscount(rawLines, {
-        discount_scope: fresh.discount_scope ?? undefined,
-        discount_type: fresh.discount_type ?? undefined,
-        discount_value: fresh.discount_value ?? undefined,
-        invoiceSubtotal,
-      });
+      const lines = discountedReturnLines(input, fresh);
 
       const returnedGross = roundCurrency(lines.reduce((s, l) => s + l.returnedGross, 0));
 
@@ -457,62 +460,9 @@ export class InvoiceReturnService {
       calculateInvoiceBalance(input.invoiceId);
       updateInvoiceStatus(input.invoiceId);
 
-      // Settlements.
-      let posted: PostedSettlement[] = [];
-      if (input.settlements && input.settlements.length > 0) {
-        const position = InvoiceReturnService.getPosition(input.invoiceId);
-        const remainder = roundCurrency(netAmount - Number(header.settled_amount));
-        const validation = validateAllocations(
-          input.settlements,
-          remainder,
-          position.remainingSettlementCapacity,
-        );
-        if (!validation.ok) {
-          throw new ReturnError(400, validation.error ?? 'Invalid settlements');
-        }
-        posted = input.settlements.map((spec) =>
-          InvoiceReturnService.applySettlement(db, {
-            returnHeader: header,
-            invoiceNo: fresh.invoice_no,
-            customerId: fresh.customer_id,
-            spec,
-            userId: input.userId,
-          })
-        );
-      }
-      // Legacy shim (spec §10): a bare `disposition` (no `settlements`
-      // array) keeps the pre-rework settlement semantics.
+      let posted = InvoiceReturnService.settleRequestedReturn(input, header, fresh);
       if (!posted.length && legacyDisposition) {
-        const legacyPosition = InvoiceReturnService.getPosition(input.invoiceId);
-        if (legacyPosition.refundCreditDue > 0.005) {
-          // ACC-18: validate refund against authoritative settlement capacity
-          if (legacyDisposition === 'refund' && netAmount > legacyPosition.remainingSettlementCapacity) {
-            throw new ReturnError(400, `Refund of ${netAmount} exceeds remaining settlement capacity of ${legacyPosition.remainingSettlementCapacity}`);
-          }
-          if (legacyDisposition === 'refund') {
-            const legacyRefundSettlement = InvoiceReturnService.applyLegacyRefund(db, {
-              returnHeader: header,
-              invoiceNo: fresh.invoice_no,
-              customerId: fresh.customer_id,
-              netAmount,
-              userId: input.userId,
-            });
-            if (legacyRefundSettlement) posted.push(legacyRefundSettlement);
-          } else if (legacyDisposition === 'adjust') {
-            posted.push(
-              ...InvoiceReturnService.applyLegacyAdjust(db, {
-                returnHeader: header,
-                invoiceNo: fresh.invoice_no,
-                customerId: fresh.customer_id,
-                netAmount,
-                userId: input.userId,
-                targetInvoiceIds: input.adjustInvoiceIds,
-              }),
-            );
-          }
-          // Legacy 'credit' posts no settlement: the RETURN ledger row
-          // already carries the credit (credit_offset consumes it, D16).
-        }
+        posted = InvoiceReturnService.settleLegacyReturn(input, header, fresh);
       }
       // Legacy 'credit' and no-disposition both leave the return Unsettled
       // with the RETURN credit sitting on the customer ledger (spec §5.1
@@ -943,6 +893,78 @@ export class InvoiceReturnService {
   // ======================================================================
   // Internals — settlement legs
   // ======================================================================
+
+  private static settleRequestedReturn(
+    input: ProcessReturnInput,
+    header: InvoiceReturnHeader,
+    fresh: { readonly invoice_no: string; readonly customer_id: number },
+  ): PostedSettlement[] {
+    const netAmount = Number(header.net_amount);
+    let posted: PostedSettlement[] = [];
+    if (input.settlements && input.settlements.length > 0) {
+      const position = InvoiceReturnService.getPosition(input.invoiceId);
+      const remainder = roundCurrency(netAmount - Number(header.settled_amount));
+      const validation = validateAllocations(
+        input.settlements,
+        remainder,
+        position.remainingSettlementCapacity,
+      );
+      if (!validation.ok) {
+        throw new ReturnError(400, validation.error ?? 'Invalid settlements');
+      }
+      posted = input.settlements.map((spec) =>
+        InvoiceReturnService.applySettlement(db, {
+          returnHeader: header,
+          invoiceNo: fresh.invoice_no,
+          customerId: fresh.customer_id,
+          spec,
+          userId: input.userId,
+        })
+      );
+    }
+    return posted;
+  }
+
+  private static settleLegacyReturn(
+    input: ProcessReturnInput,
+    header: InvoiceReturnHeader,
+    fresh: { readonly invoice_no: string; readonly customer_id: number },
+  ): PostedSettlement[] {
+    const netAmount = Number(header.net_amount);
+    const legacyDisposition = input.disposition;
+    const posted: PostedSettlement[] = [];
+    // Legacy shim (spec §10): a bare `disposition` (no `settlements`
+    // array) keeps the pre-rework settlement semantics.
+    if (!legacyDisposition) return posted;
+    const legacyPosition = InvoiceReturnService.getPosition(input.invoiceId);
+    if (!(legacyPosition.refundCreditDue > 0.005)) return posted;
+    // ACC-18: validate refund against authoritative settlement capacity
+    if (legacyDisposition === 'refund' && netAmount > legacyPosition.remainingSettlementCapacity) {
+      throw new ReturnError(400, `Refund of ${netAmount} exceeds remaining settlement capacity of ${legacyPosition.remainingSettlementCapacity}`);
+    }
+    if (legacyDisposition === 'refund') {
+      const legacyRefundSettlement = InvoiceReturnService.applyLegacyRefund(db, {
+        returnHeader: header,
+        invoiceNo: fresh.invoice_no,
+        customerId: fresh.customer_id,
+        netAmount,
+        userId: input.userId,
+      });
+      if (legacyRefundSettlement) posted.push(legacyRefundSettlement);
+    } else if (legacyDisposition === 'adjust') {
+      posted.push(
+        ...InvoiceReturnService.applyLegacyAdjust(db, {
+          returnHeader: header,
+          invoiceNo: fresh.invoice_no,
+          customerId: fresh.customer_id,
+          netAmount,
+          userId: input.userId,
+          targetInvoiceIds: input.adjustInvoiceIds,
+        }),
+      );
+    }
+    return posted;
+  }
 
   private static applySettlement(
     dbArg: Database.Database,

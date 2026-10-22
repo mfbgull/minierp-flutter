@@ -280,6 +280,21 @@ function buildExpenseUpdatePayload(
   };
 }
 
+function validateExpenseCategoryUpdate(expense_category: unknown, res: Response): boolean {
+  // Category validation on edit too (task 5.3).
+  if (expense_category !== undefined) {
+    const categoryExists = db.prepare(
+      'SELECT id FROM expense_categories WHERE category_name = ? COLLATE NOCASE'
+    ).get(String(expense_category).trim());
+    if (!categoryExists) {
+      res.status(400).json({ success: false, error: `Unknown expense category '${expense_category}'` });
+      return false;
+    }
+  }
+
+  return true;
+}
+
 function updateExpense(req: AuthRequest, res: Response): void {
   try {
     const id = parseInt(getRouteParam(req.params.id), 10);
@@ -322,16 +337,7 @@ function updateExpense(req: AuthRequest, res: Response): void {
       return;
     }
 
-    // Category validation on edit too (task 5.3).
-    if (expense_category !== undefined) {
-      const categoryExists = db.prepare(
-        'SELECT id FROM expense_categories WHERE category_name = ? COLLATE NOCASE'
-      ).get(String(expense_category).trim());
-      if (!categoryExists) {
-        res.status(400).json({ success: false, error: `Unknown expense category '${expense_category}'` });
-        return;
-      }
-    }
+    if (!validateExpenseCategoryUpdate(expense_category, res)) return;
 
     ExpenseModel.update(db, id, buildExpenseUpdatePayload(
       {

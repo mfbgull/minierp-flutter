@@ -1,3 +1,4 @@
+import { listPagination, listPageQuery } from '../utils/controllerPagination';
 import { Request, Response, NextFunction } from 'express';
 import { getQueryInteger, getQueryParam } from '../utils/queryUtils';
 import BOMModel from '../models/BOM';
@@ -8,8 +9,7 @@ import logger from '../utils/logger';
 
 export const getAllBOMs = (req: Request, res: Response, next: NextFunction): void => {
   try {
-    const page = getQueryInteger(req.query.page, 1);
-    const limit = getQueryInteger(req.query.limit, 10);
+    const { page, limit } = listPageQuery(req.query);
     const search = getQueryParam(req.query.search);
     const sortBy = getQueryParam(req.query.sortBy);
     const sortOrder = getQueryParam(req.query.sortOrder);
@@ -27,13 +27,7 @@ export const getAllBOMs = (req: Request, res: Response, next: NextFunction): voi
     res.json({
       success: true,
       data: rows,
-      pagination: {
-        currentPage: pageNum,
-        totalPages: Math.ceil(total / limitNum),
-        totalItems: total,
-        hasNext: pageNum < Math.ceil(total / limitNum),
-        hasPrev: pageNum > 1
-      }
+      pagination: listPagination(total, pageNum, limitNum)
     });
   } catch (error) {
     next(error);

@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { getNextSequenceNumber } from '../utils/sequence';
 import logger from '../utils/logger';
 import AccountingService from '../services/accountingService';
 import { sanitizeSortParams, STOCK_BALANCE_SORT_COLUMNS, STOCK_MOVEMENT_SORT_COLUMNS } from '../utils/sqlSanitizer';
@@ -477,30 +478,34 @@ class StockMovementModel {
       // create a costed batch so every sellable unit has an identifiable cost
       // layer for FIFO consumption.  Source type maps to the movement type
       // (ADJUSTMENT → ADJUSTMENT, everything else → OPENING).
-      let resolvedBatchId = data.batch_id || null;
-      if (qty > 0 && !resolvedBatchId && !data.skipBatchCreation) {
-        const batchSeq = this.getNextBatchSequence(db);
-        const sourceType = data.movement_type === 'ADJUSTMENT' ? 'ADJUSTMENT' : 'OPENING';
-        const batchNo = `BATCH-${new Date().getFullYear() % 100}-${sourceType === 'ADJUSTMENT' ? 'ADJ' : 'OP'}-${batchSeq.toString().padStart(4, '0')}`;
-        const unitCost = data.unit_cost || 0;
-        const batchResult = db.prepare(`
-          INSERT INTO stock_batches (
-            batch_no, item_id, warehouse_id, source_type,
-            source_id, quantity_original, quantity_remaining,
-            unit_cost, received_date
-          ) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?)
-        `).run(
-          batchNo,
-          data.item_id,
-          data.warehouse_id,
-          sourceType,
-          qty,
-          qty,
-          unitCost,
-          data.movement_date || new Date().toISOString().split('T')[0]
-        );
-        resolvedBatchId = batchResult.lastInsertRowid as number;
-      }
+      const createIncomingCostLayer = (): number | null => {
+        let resolvedBatchId = data.batch_id || null;
+        if (qty > 0 && !resolvedBatchId && !data.skipBatchCreation) {
+          const batchSeq = this.getNextBatchSequence(db);
+          const sourceType = data.movement_type === 'ADJUSTMENT' ? 'ADJUSTMENT' : 'OPENING';
+          const batchNo = `BATCH-${new Date().getFullYear() % 100}-${sourceType === 'ADJUSTMENT' ? 'ADJ' : 'OP'}-${batchSeq.toString().padStart(4, '0')}`;
+          const unitCost = data.unit_cost || 0;
+          const batchResult = db.prepare(`
+            INSERT INTO stock_batches (
+              batch_no, item_id, warehouse_id, source_type,
+              source_id, quantity_original, quantity_remaining,
+              unit_cost, received_date
+            ) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?)
+          `).run(
+            batchNo,
+            data.item_id,
+            data.warehouse_id,
+            sourceType,
+            qty,
+            qty,
+            unitCost,
+            data.movement_date || new Date().toISOString().split('T')[0]
+          );
+          resolvedBatchId = batchResult.lastInsertRowid as number;
+        }
+        return resolvedBatchId;
+      };
+      const resolvedBatchId = createIncomingCostLayer();
 
       const movementStmt = db.prepare(`
         INSERT INTO stock_movements (
@@ -1251,17 +1256,7 @@ class StockMovementModel {
         ? consumption.reduce((s, c) => s + c.consumed * c.unitCost, 0) / totalConsumed
         : 0;
 
-      const nextNo = (() => {
-        db.prepare(`
-          INSERT INTO settings (key, value, updated_at)
-          VALUES ('BATCH_TRF_last_no', '1', CURRENT_TIMESTAMP)
-          ON CONFLICT(key) DO UPDATE SET
-            value = CAST(CAST(settings.value AS INTEGER) + 1 AS TEXT),
-            updated_at = CURRENT_TIMESTAMP
-        `).run();
-        const row = db.prepare(`SELECT value FROM settings WHERE key = 'BATCH_TRF_last_no'`).get() as { value: string };
-        return parseInt(row.value, 10);
-      })();
+      const nextNo = getNextSequenceNumber(db, 'BATCH_TRF_last_no');
       const batchNo = `BATCH-${new Date().getFullYear() % 100}-TRF-${nextNo.toString().padStart(4, '0')}`;
       const today = new Date().toISOString().split('T')[0];
       const mirrorBatch = db.prepare(`
@@ -1390,17 +1385,7 @@ class StockMovementModel {
 
       // 4. Mint the mirrored batch at the destination (TRANSFER source_type
       //    per plan 1.5; avoids a BATCH_SOURCE_TYPES table rebuild).
-      const nextNo = (() => {
-        db.prepare(`
-          INSERT INTO settings (key, value, updated_at)
-          VALUES ('BATCH_EXP_last_no', '1', CURRENT_TIMESTAMP)
-          ON CONFLICT(key) DO UPDATE SET
-            value = CAST(CAST(settings.value AS INTEGER) + 1 AS TEXT),
-            updated_at = CURRENT_TIMESTAMP
-        `).run();
-        const row = db.prepare(`SELECT value FROM settings WHERE key = 'BATCH_EXP_last_no'`).get() as { value: string };
-        return parseInt(row.value, 10);
-      })();
+      const nextNo = getNextSequenceNumber(db, 'BATCH_EXP_last_no');
       const mirrorBatchNo = `BATCH-${new Date().getFullYear() % 100}-EXP-${nextNo.toString().padStart(4, '0')}`;
       const mirrorBatch = db.prepare(`
         INSERT INTO stock_batches (
@@ -1503,17 +1488,7 @@ class StockMovementModel {
         UPDATE stock_batches SET quantity_remaining = 0 WHERE id = ?
       `).run(batch.id);
 
-      const nextNo = (() => {
-        db.prepare(`
-          INSERT INTO settings (key, value, updated_at)
-          VALUES ('BATCH_DAM_last_no', '1', CURRENT_TIMESTAMP)
-          ON CONFLICT(key) DO UPDATE SET
-            value = CAST(CAST(settings.value AS INTEGER) + 1 AS TEXT),
-            updated_at = CURRENT_TIMESTAMP
-        `).run();
-        const row = db.prepare(`SELECT value FROM settings WHERE key = 'BATCH_DAM_last_no'`).get() as { value: string };
-        return parseInt(row.value, 10);
-      })();
+      const nextNo = getNextSequenceNumber(db, 'BATCH_DAM_last_no');
       const mirrorBatchNo = `BATCH-${new Date().getFullYear() % 100}-DAM-${nextNo.toString().padStart(4, '0')}`;
       const mirrorBatch = db.prepare(`
         INSERT INTO stock_batches (
@@ -1668,30 +1643,34 @@ class StockMovementModel {
       db.prepare(`UPDATE stock_batches SET quantity_remaining = 0 WHERE id = ?`).run(targetBatchId);
 
       // 3. GL posting: Dr <loss> / Cr inventory_asset at batch cost.
-      let journalEntryId: number | null = null;
-      if (value > 0) {
-        const lossAcct = db.prepare(
-          `SELECT id, code, text_code FROM chart_of_accounts WHERE code = ?`
-        ).get(args.lossAccountCode) as { id: number; code: string; text_code: string | null } | undefined;
-        if (!lossAcct || !lossAcct.text_code) {
-          throw new Error(`Loss account ${args.lossAccountCode} not found in chart of accounts`);
+      const postWriteOffLoss = (): number | null => {
+        let journalEntryId: number | null = null;
+        if (value > 0) {
+          const lossAcct = db.prepare(
+            `SELECT id, code, text_code FROM chart_of_accounts WHERE code = ?`
+          ).get(args.lossAccountCode) as { id: number; code: string; text_code: string | null } | undefined;
+          if (!lossAcct || !lossAcct.text_code) {
+            throw new Error(`Loss account ${args.lossAccountCode} not found in chart of accounts`);
+          }
+          journalEntryId = AccountingService.postLegacyStockEntry(db, {
+            referenceType: 'WRITE_OFF',
+            referenceId: movement.id,
+            entryDate: today,
+            description: `Write-off: ${qty} unit(s) of batch ${batch.batch_no} — ${args.reason}`,
+            debitTextCode: lossAcct.text_code,
+            creditTextCode: 'inventory_asset',
+            amount: value,
+            createdBy: userId
+          });
+          db.prepare(`
+            UPDATE stock_movements
+            SET financial_value = ?, financial_posted = TRUE, journal_entry_id = ?
+            WHERE id = ?
+          `).run(value, journalEntryId, movement.id);
         }
-        journalEntryId = AccountingService.postLegacyStockEntry(db, {
-          referenceType: 'WRITE_OFF',
-          referenceId: movement.id,
-          entryDate: today,
-          description: `Write-off: ${qty} unit(s) of batch ${batch.batch_no} — ${args.reason}`,
-          debitTextCode: lossAcct.text_code,
-          creditTextCode: 'inventory_asset',
-          amount: value,
-          createdBy: userId
-        });
-        db.prepare(`
-          UPDATE stock_movements
-          SET financial_value = ?, financial_posted = TRUE, journal_entry_id = ?
-          WHERE id = ?
-        `).run(value, journalEntryId, movement.id);
-      }
+        return journalEntryId;
+      };
+      const journalEntryId = postWriteOffLoss();
 
       return { movementNo: movement.movement_no, journalEntryId, transferred, qty, value };
     });
@@ -1783,50 +1762,57 @@ class StockMovementModel {
       `).all(outLeg.movement_no) as Array<{
         id: number; quantity: number; batch_id: number | null;
       }>;
-      let restoredBatchId: number | null = null;
-      for (const leg of outConsumptions) {
-        if (leg.batch_id !== null) {
-          db.prepare(`
-            UPDATE stock_batches SET quantity_remaining = quantity_remaining + ? WHERE id = ?
-          `).run(Math.abs(leg.quantity), leg.batch_id);
-          if (restoredBatchId === null) restoredBatchId = leg.batch_id;
-          // New path: restore to default location of source warehouse
-          if (isFeatureEnabled(db, 'feature_batch_locations')) {
-            const srcLoc = db.prepare(`
-              SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
-            `).get(outLeg.warehouse_id) as { id: number } | undefined;
-            if (srcLoc) {
-              db.prepare(`
-                INSERT INTO batch_stock_by_location (batch_id, location_id, quantity_physical, quantity_reserved, quantity_available)
-                VALUES (?, ?, ?, 0, ?)
-                ON CONFLICT(batch_id, location_id) DO UPDATE SET
-                  quantity_physical = quantity_physical + excluded.quantity_physical,
-                  quantity_available = quantity_available + excluded.quantity_available
-              `).run(leg.batch_id, srcLoc.id, Math.abs(leg.quantity), Math.abs(leg.quantity));
+      const restoreTransferSourceBatches = (): number | null => {
+        let restoredBatchId: number | null = null;
+        for (const leg of outConsumptions) {
+          if (leg.batch_id !== null) {
+            db.prepare(`
+              UPDATE stock_batches SET quantity_remaining = quantity_remaining + ? WHERE id = ?
+            `).run(Math.abs(leg.quantity), leg.batch_id);
+            if (restoredBatchId === null) restoredBatchId = leg.batch_id;
+            // New path: restore to default location of source warehouse
+            if (isFeatureEnabled(db, 'feature_batch_locations')) {
+              const srcLoc = db.prepare(`
+                SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
+              `).get(outLeg.warehouse_id) as { id: number } | undefined;
+              if (srcLoc) {
+                db.prepare(`
+                  INSERT INTO batch_stock_by_location (batch_id, location_id, quantity_physical, quantity_reserved, quantity_available)
+                  VALUES (?, ?, ?, 0, ?)
+                  ON CONFLICT(batch_id, location_id) DO UPDATE SET
+                    quantity_physical = quantity_physical + excluded.quantity_physical,
+                    quantity_available = quantity_available + excluded.quantity_available
+                `).run(leg.batch_id, srcLoc.id, Math.abs(leg.quantity), Math.abs(leg.quantity));
+              }
             }
           }
         }
-      }
+        return restoredBatchId;
+      };
+      const restoredBatchId = restoreTransferSourceBatches();
 
-      // 2. Draw down the mirrored TRANSFER batch at the destination.
-      if (inLeg.batch_id !== null) {
-        db.prepare(`
-          UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?
-        `).run(qty, inLeg.batch_id);
-        // New path: subtract from default location of destination warehouse
-        if (isFeatureEnabled(db, 'feature_batch_locations')) {
-          const dstLoc = db.prepare(`
-            SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
-          `).get(inLeg.warehouse_id) as { id: number } | undefined;
-          if (dstLoc) {
-            db.prepare(`
-              UPDATE batch_stock_by_location
-              SET quantity_physical = quantity_physical - ?, quantity_available = quantity_available - ?
-              WHERE batch_id = ? AND location_id = ?
-            `).run(qty, qty, inLeg.batch_id, dstLoc.id);
+      const removeTransferDestinationStock = (): void => {
+        // 2. Draw down the mirrored TRANSFER batch at the destination.
+        if (inLeg.batch_id !== null) {
+          db.prepare(`
+            UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?
+          `).run(qty, inLeg.batch_id);
+          // New path: subtract from default location of destination warehouse
+          if (isFeatureEnabled(db, 'feature_batch_locations')) {
+            const dstLoc = db.prepare(`
+              SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
+            `).get(inLeg.warehouse_id) as { id: number } | undefined;
+            if (dstLoc) {
+              db.prepare(`
+                UPDATE batch_stock_by_location
+                SET quantity_physical = quantity_physical - ?, quantity_available = quantity_available - ?
+                WHERE batch_id = ? AND location_id = ?
+              `).run(qty, qty, inLeg.batch_id, dstLoc.id);
+            }
           }
         }
-      }
+      };
+      removeTransferDestinationStock();
 
       // 3. Equal-and-opposite ADJUSTMENT legs (no GL: adjustments post their
       // own GL only when financial — these cancel existing layers, and the

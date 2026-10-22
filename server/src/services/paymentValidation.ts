@@ -134,35 +134,7 @@ export function validateSupplierPayment(
     const target = `${alloc.kind}:${alloc.id}`;
     if (targets.has(target)) throw new BusinessRuleError(400, 'Duplicate supplier payment allocation target');
     targets.add(target);
-    if (alloc.kind === 'supplier_bill') {
-      const bill = db.prepare(`
-        SELECT b.supplier_id, b.total_amount, b.bill_date,
-          COALESCE((SELECT SUM(a.amount) FROM supplier_bill_allocations a
-            JOIN payments p ON p.id = a.payment_id
-            WHERE a.bill_id = b.id AND a.voided_at IS NULL AND p.voided_at IS NULL), 0) AS paid_amount
-        FROM supplier_bills b WHERE b.id = ? AND b.voided_at IS NULL
-      `).get(alloc.id) as { supplier_id: number; total_amount: number; bill_date: string; paid_amount: number } | undefined;
-      if (!bill || bill.supplier_id !== input.supplierId) throw new BusinessRuleError(400, 'Supplier bill not found for this supplier');
-      if (input.paymentDate < bill.bill_date) throw new BusinessRuleError(400, 'Payment cannot precede the supplier bill');
-      AccountingService.assertPeriodNotClosed(db, bill.bill_date, 'Supplier bill');
-      assertWithinBalance(`supplier bill ${alloc.id}`, alloc, bill.total_amount, bill.paid_amount);
-      continue;
-    }
-    if (alloc.kind === 'purchase_order') {
-      const po = readPurchaseOrder(db, alloc.id);
-      if (!po) throw new Error(`Purchase order ${alloc.id} not found`);
-      if (po.supplier_id !== input.supplierId) {
-        throw new Error(`PO ${alloc.id} does not belong to supplier ${input.supplierId}`);
-      }
-      assertWithinBalance(`PO ${alloc.id}`, alloc, po.total_amount, po.paid_amount);
-      continue;
-    }
-    const purchase = readPurchase(db, alloc.id);
-    if (!purchase) throw new Error(`Purchase ${alloc.id} not found`);
-    if (!purchase.supplier_id || purchase.supplier_id !== input.supplierId) {
-      throw new Error(`Purchase ${alloc.id} does not belong to supplier ${input.supplierId}`);
-    }
-    assertWithinBalance(`purchase ${alloc.id}`, alloc, purchase.total_cost, purchase.paid_amount);
+    validateSupplierAllocation(db, input, alloc);
   }
 
   // H7: document settlements are fully allocated; advances use their own source.
@@ -175,6 +147,42 @@ export function validateSupplierPayment(
       `the selected PO(s) / purchase(s); unallocated supplier payments are not supported`,
     );
   }
+}
+
+function validateSupplierAllocation(
+  db: Database.Database,
+  input: SupplierPaymentInput,
+  alloc: SupplierPaymentAllocation,
+): void {
+  if (alloc.kind === 'supplier_bill') {
+    const bill = db.prepare(`
+      SELECT b.supplier_id, b.total_amount, b.bill_date,
+        COALESCE((SELECT SUM(a.amount) FROM supplier_bill_allocations a
+          JOIN payments p ON p.id = a.payment_id
+          WHERE a.bill_id = b.id AND a.voided_at IS NULL AND p.voided_at IS NULL), 0) AS paid_amount
+      FROM supplier_bills b WHERE b.id = ? AND b.voided_at IS NULL
+    `).get(alloc.id) as { supplier_id: number; total_amount: number; bill_date: string; paid_amount: number } | undefined;
+    if (!bill || bill.supplier_id !== input.supplierId) throw new BusinessRuleError(400, 'Supplier bill not found for this supplier');
+    if (input.paymentDate < bill.bill_date) throw new BusinessRuleError(400, 'Payment cannot precede the supplier bill');
+    AccountingService.assertPeriodNotClosed(db, bill.bill_date, 'Supplier bill');
+    assertWithinBalance(`supplier bill ${alloc.id}`, alloc, bill.total_amount, bill.paid_amount);
+    return;
+  }
+  if (alloc.kind === 'purchase_order') {
+    const po = readPurchaseOrder(db, alloc.id);
+    if (!po) throw new Error(`Purchase order ${alloc.id} not found`);
+    if (po.supplier_id !== input.supplierId) {
+      throw new Error(`PO ${alloc.id} does not belong to supplier ${input.supplierId}`);
+    }
+    assertWithinBalance(`PO ${alloc.id}`, alloc, po.total_amount, po.paid_amount);
+    return;
+  }
+  const purchase = readPurchase(db, alloc.id);
+  if (!purchase) throw new Error(`Purchase ${alloc.id} not found`);
+  if (!purchase.supplier_id || purchase.supplier_id !== input.supplierId) {
+    throw new Error(`Purchase ${alloc.id} does not belong to supplier ${input.supplierId}`);
+  }
+  assertWithinBalance(`purchase ${alloc.id}`, alloc, purchase.total_cost, purchase.paid_amount);
 }
 
 function readPurchaseOrder(db: Database.Database, poId: number): PurchaseOrderRow | undefined {

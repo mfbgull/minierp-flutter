@@ -18,8 +18,7 @@
  *   node dist/scripts/recompute-item-amounts.js            (dry run)
  *   node dist/scripts/recompute-item-amounts.js --apply    (write)
  */
-const path = require('path');
-const fs = require('fs');
+const { openMaintenanceDatabase } = require('./lib/maintenance-database');
 
 function roundCurrency(value) {
   return Number(Math.round(Number(value + 'e+2')) + 'e-2');
@@ -48,25 +47,9 @@ function computeLineAmount(item) {
   return net;
 }
 
-function resolveDbPath() {
-  const candidates = [
-    process.env.DATABASE_PATH && path.join(process.env.DATABASE_PATH, 'erp.db'),
-    process.env.DATABASE_PATH,
-    path.join(__dirname, '../../../database/erp.db'),
-    path.join(__dirname, '../../database/erp.db'),
-  ].filter(Boolean);
-  for (const p of candidates) {
-    if (fs.existsSync(p)) return p;
-  }
-  console.error('[recompute-item-amounts] database not found; set DATABASE_PATH');
-  process.exit(1);
-}
-
 function main() {
   const apply = process.argv.includes('--apply');
-  const dbPath = resolveDbPath();
-  const Database = require('better-sqlite3');
-  const db = new Database(dbPath);
+  const db = openMaintenanceDatabase(__dirname, 'recompute-item-amounts');
 
   try {
     const items = db.prepare(`

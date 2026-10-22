@@ -475,6 +475,65 @@ function getKPI(
       )
   `).get() as { total: number };
 
+  const periodFinancialKPI = (): KPIResult | undefined => {
+    switch (metric) {
+      case 'sales_revenue': {
+        const result = db.prepare(`
+          SELECT COALESCE(SUM(total_amount - COALESCE(returned_amount, 0)), 0) as total
+          FROM invoices
+          WHERE status != 'Cancelled' AND invoice_date BETWEEN ? AND ?
+        `).get(from, to) as { total: number };
+        return { metric, value: result.total, unit: 'currency', label: 'Sales Revenue' };
+      }
+
+      case 'gross_profit': {
+        const revenue = db.prepare(`
+          SELECT COALESCE(SUM(total_amount - COALESCE(returned_amount, 0)), 0) as total
+          FROM invoices
+          WHERE status != 'Cancelled' AND invoice_date BETWEEN ? AND ?
+        `).get(from, to) as { total: number };
+        const cogs = db.prepare(`
+          SELECT COALESCE(-SUM(sm.quantity * sm.unit_cost), 0) as total
+          FROM stock_movements sm
+          WHERE sm.movement_date BETWEEN ? AND ?
+            AND (
+              sm.movement_type = 'SALE'
+              OR (sm.movement_type = 'ADJUSTMENT'
+                  AND sm.reference_doctype IN ('RETURN', 'INVOICE_DELETE', 'INVOICE_UPDATE', 'INVOICE_CANCEL', 'SO_CANCEL'))
+            )
+        `).get(from, to) as { total: number };
+        return { metric, value: revenue.total - cogs.total, unit: 'currency', label: 'Gross Profit' };
+      }
+
+      case 'purchase_orders': {
+        const result = db.prepare(`
+          SELECT COALESCE(SUM(total_amount), 0) as total FROM purchase_orders
+          WHERE status NOT IN ('Draft', 'Cancelled') AND po_date BETWEEN ? AND ?
+        `).get(from, to) as { total: number };
+        return { metric, value: result.total, unit: 'currency', label: 'Purchase Orders' };
+      }
+
+
+      case 'expenses': {
+        const report = ReportsModel.getProfitLossReport(from, to, db);
+        return { metric, value: report.totalExpenses, unit: 'currency', label: 'Expenses' };
+      }
+
+      case 'net_profit': {
+        const report = ReportsModel.getProfitLossReport(from, to, db);
+        return {
+          metric,
+          value: report.netProfit,
+          unit: 'currency',
+          label: 'Net Profit',
+        };
+      }
+      default: return undefined;
+    }
+  };
+  const financialKPI = periodFinancialKPI();
+  if (financialKPI) return financialKPI;
+
   switch (metric) {
     // ── Phase 1 core cards (match getSummary exactly) ────────────────
     case 'stock_value':
@@ -484,42 +543,6 @@ function getKPI(
         unit: 'currency',
         label: 'Stock Value',
       };
-
-    case 'sales_revenue': {
-      const result = db.prepare(`
-        SELECT COALESCE(SUM(total_amount - COALESCE(returned_amount, 0)), 0) as total
-        FROM invoices
-        WHERE status != 'Cancelled' AND invoice_date BETWEEN ? AND ?
-      `).get(from, to) as { total: number };
-      return { metric, value: result.total, unit: 'currency', label: 'Sales Revenue' };
-    }
-
-    case 'gross_profit': {
-      const revenue = db.prepare(`
-        SELECT COALESCE(SUM(total_amount - COALESCE(returned_amount, 0)), 0) as total
-        FROM invoices
-        WHERE status != 'Cancelled' AND invoice_date BETWEEN ? AND ?
-      `).get(from, to) as { total: number };
-      const cogs = db.prepare(`
-        SELECT COALESCE(-SUM(sm.quantity * sm.unit_cost), 0) as total
-        FROM stock_movements sm
-        WHERE sm.movement_date BETWEEN ? AND ?
-          AND (
-            sm.movement_type = 'SALE'
-            OR (sm.movement_type = 'ADJUSTMENT'
-                AND sm.reference_doctype IN ('RETURN', 'INVOICE_DELETE', 'INVOICE_UPDATE', 'INVOICE_CANCEL', 'SO_CANCEL'))
-          )
-      `).get(from, to) as { total: number };
-      return { metric, value: revenue.total - cogs.total, unit: 'currency', label: 'Gross Profit' };
-    }
-
-    case 'purchase_orders': {
-      const result = db.prepare(`
-        SELECT COALESCE(SUM(total_amount), 0) as total FROM purchase_orders
-        WHERE status NOT IN ('Draft', 'Cancelled') AND po_date BETWEEN ? AND ?
-      `).get(from, to) as { total: number };
-      return { metric, value: result.total, unit: 'currency', label: 'Purchase Orders' };
-    }
 
     case 'warehouse_stock': {
       const result = db.prepare(`
@@ -599,20 +622,6 @@ function getKPI(
     }
 
     // ── Additional cards (match the P&L / cash reports) ─────────────
-    case 'expenses': {
-      const report = ReportsModel.getProfitLossReport(from, to, db);
-      return { metric, value: report.totalExpenses, unit: 'currency', label: 'Expenses' };
-    }
-
-    case 'net_profit': {
-      const report = ReportsModel.getProfitLossReport(from, to, db);
-      return {
-        metric,
-        value: report.netProfit,
-        unit: 'currency',
-        label: 'Net Profit',
-      };
-    }
 
     case 'outstanding_payables': {
       // Mirror of the AR card: latest supplier_ledger running balance

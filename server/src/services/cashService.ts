@@ -99,31 +99,14 @@ interface FlowTotals {
  * the dashboard never needs older detail, and the date bound keeps every
  * scan on an index). Rows older than the floor fold into a single
  * pre-floor inflow/outflow pair so balances stay exact. */
-export function collectFlows(
+type AddCashFlow = (method: string | null, inflow: number, outflow: number) => void;
+
+function accumulateHistoricalFlows(
   db: Database.Database,
-  uptoDate: string,
-  floorDate?: string
-): Map<string, FlowTotals> {
-  const floor = floorDate
-    ?? (db.prepare(`SELECT date(?, '-90 day') AS d`).get(uptoDate) as { d: string }).d;
-  // Seed every account with its opening (business-start) balance — the
-  // till didn't start at zero. `inflow` carries the seed so
-  // balance = inflow − outflow includes it on every day.
-  const opening = getOpeningBalances(db);
-  const totals = new Map<string, FlowTotals>();
-  for (const a of CASH_ACCOUNTS) {
-    totals.set(a.key, { inflow: opening.get(a.key) ?? 0, outflow: 0 });
-  }
-
-
-  const add = (method: string | null, inflow: number, outflow: number): void => {
-    const key = normalizeCashMethod(method);
-    if (!key) return;
-    const t = ensureBucket(totals, key);
-    t.inflow += inflow;
-    t.outflow += outflow;
-  };
-
+  dates: { readonly floor: string; readonly uptoDate: string },
+  add: AddCashFlow,
+): void {
+  const { floor, uptoDate } = dates;
   // Task 8.3: rows older than the floor are folded into one net
   // pre-floor movement per account, preserving exact balances while the
   // per-method GROUP BYs below only touch the bounded, indexed range.
@@ -212,6 +195,35 @@ export function collectFlows(
     ) GROUP BY payment_method
   `).all(floor, uptoDate, floor, uptoDate, floor, uptoDate) as Array<{ payment_method: string | null; outflow: number }>;
   for (const row of expenseAndSalaryPreFloor) add(row.payment_method, 0, row.outflow);
+
+}
+
+export function collectFlows(
+  db: Database.Database,
+  uptoDate: string,
+  floorDate?: string
+): Map<string, FlowTotals> {
+  const floor = floorDate
+    ?? (db.prepare(`SELECT date(?, '-90 day') AS d`).get(uptoDate) as { d: string }).d;
+  // Seed every account with its opening (business-start) balance — the
+  // till didn't start at zero. `inflow` carries the seed so
+  // balance = inflow − outflow includes it on every day.
+  const opening = getOpeningBalances(db);
+  const totals = new Map<string, FlowTotals>();
+  for (const a of CASH_ACCOUNTS) {
+    totals.set(a.key, { inflow: opening.get(a.key) ?? 0, outflow: 0 });
+  }
+
+
+  const add = (method: string | null, inflow: number, outflow: number): void => {
+    const key = normalizeCashMethod(method);
+    if (!key) return;
+    const t = ensureBucket(totals, key);
+    t.inflow += inflow;
+    t.outflow += outflow;
+  };
+
+  accumulateHistoricalFlows(db, { floor, uptoDate }, add);
 
   // Customer payments: positive amounts are money in; negative amounts
   // (refunds paid out to customers) are money out.
@@ -526,6 +538,86 @@ export interface CashPositionTransaction {
  * oldest first — the drill-down behind the dashboard cash-position card
  * so users can see *why* the balance is what it is.
  */
+type CashTransactionRow = CashPositionTransaction & { readonly method: string | null };
+
+/**
+ * Map one selected cash row onto the transaction shape. Every source query
+ * aliases its columns to date / method / reference / description / amount,
+ * so the only per-source differences are the type label and the sign.
+ */
+function toCashTransaction(
+  row: Record<string, unknown>,
+  type: string,
+  sign: 1 | -1 = 1
+): CashTransactionRow {
+  return {
+    method: row.method as string | null,
+    date: row.date as string,
+    reference: row.reference as string | null,
+    description: row.description as string | null,
+    amount: sign * (Number(row.amount) || 0),
+    type,
+  };
+}
+
+function collectFinancingTransactions(
+  db: Database.Database,
+  uptoDate: string,
+  push: (row: CashTransactionRow) => void,
+): void {
+  // Owner capital contributions (money in).
+  for (const r of db.prepare(`
+    SELECT capital_date as date, payment_method as method, capital_no as reference,
+           note as description, amount
+    FROM owner_capital
+    WHERE status = 'posted' AND capital_date <= ?
+  `).all(uptoDate) as Array<Record<string, unknown>>) {
+    push(toCashTransaction(r, 'owner_capital'));
+  }
+
+  // Cash-kind owner withdrawals (money out); goods withdrawals move no
+  // cash so they never appear on a till walk.
+  for (const r of db.prepare(`
+    SELECT withdrawal_date as date, payment_method as method, withdrawal_no as reference,
+           note as description, amount
+    FROM owner_withdrawals
+    WHERE status = 'posted' AND kind = 'cash' AND withdrawal_date <= ?
+  `).all(uptoDate) as Array<Record<string, unknown>>) {
+    push(toCashTransaction(r, 'owner_withdrawal', -1));
+  }
+
+  // Employee loan disbursements (money out) and direct repayments
+  // (money in); salary deductions move no cash directly — they are
+  // already inside the salary payment's outflow.
+  for (const r of db.prepare(`
+    SELECT id, disbursement_date as date, payment_method as method, purpose as description, amount
+    FROM employee_loans
+    WHERE voided_at IS NULL AND disbursement_date <= ?
+  `).all(uptoDate) as Array<Record<string, unknown>>) {
+    push({ ...toCashTransaction(r, 'loan_disbursement', -1), reference: `#${r.id}` });
+  }
+
+  for (const r of db.prepare(`
+    SELECT payment_date as date, payment_method as method, reference_no as reference,
+           notes as description, amount
+    FROM employee_loan_repayments
+    WHERE (repayment_type = 'direct' OR journal_entry_id IS NOT NULL) AND voided_at IS NULL AND payment_date <= ?
+  `).all(uptoDate) as Array<Record<string, unknown>>) {
+    push(toCashTransaction(r, 'loan_repayment'));
+  }
+
+  // Supplier refunds (money in once POSTED — voided rows collected nothing).
+  for (const r of db.prepare(`
+    SELECT refund_date as date, payment_method as method, refund_no as reference,
+           reference_no as description, amount
+    FROM supplier_refunds
+    WHERE status = 'POSTED' AND refund_date <= ?
+  `).all(uptoDate) as Array<Record<string, unknown>>) {
+    push(toCashTransaction(r, 'supplier_refund'));
+  }
+
+}
+
 export function getCashAccountTransactions(
   db: Database.Database,
   accountKey: string,
@@ -619,91 +711,7 @@ export function getCashAccountTransactions(
     push({ method: r.method as string | null, date: r.date as string, reference: r.reference as string | null, description: r.description as string | null, amount: -amount, type: 'salary' });
   }
 
-  // Owner capital contributions (money in).
-  for (const r of db.prepare(`
-    SELECT capital_date as date, payment_method as method, capital_no as reference,
-           note as description, amount
-    FROM owner_capital
-    WHERE status = 'posted' AND capital_date <= ?
-  `).all(uptoDate) as Array<Record<string, unknown>>) {
-    push({
-      method: r.method as string | null,
-      date: r.date as string,
-      reference: r.reference as string | null,
-      description: r.description as string | null,
-      amount: Number(r.amount) || 0,
-      type: 'owner_capital',
-    });
-  }
-
-  // Cash-kind owner withdrawals (money out); goods withdrawals move no
-  // cash so they never appear on a till walk.
-  for (const r of db.prepare(`
-    SELECT withdrawal_date as date, payment_method as method, withdrawal_no as reference,
-           note as description, amount
-    FROM owner_withdrawals
-    WHERE status = 'posted' AND kind = 'cash' AND withdrawal_date <= ?
-  `).all(uptoDate) as Array<Record<string, unknown>>) {
-    push({
-      method: r.method as string | null,
-      date: r.date as string,
-      reference: r.reference as string | null,
-      description: r.description as string | null,
-      amount: -(Number(r.amount) || 0),
-      type: 'owner_withdrawal',
-    });
-  }
-
-  // Employee loan disbursements (money out) and direct repayments
-  // (money in); salary deductions move no cash directly — they are
-  // already inside the salary payment's outflow.
-  for (const r of db.prepare(`
-    SELECT id, disbursement_date as date, payment_method as method, purpose as description, amount
-    FROM employee_loans
-    WHERE voided_at IS NULL AND disbursement_date <= ?
-  `).all(uptoDate) as Array<Record<string, unknown>>) {
-    push({
-      method: r.method as string | null,
-      date: r.date as string,
-      reference: `#${r.id}`,
-      description: r.description as string | null,
-      amount: -(Number(r.amount) || 0),
-      type: 'loan_disbursement',
-    });
-  }
-
-  for (const r of db.prepare(`
-    SELECT payment_date as date, payment_method as method, reference_no as reference,
-           notes as description, amount
-    FROM employee_loan_repayments
-    WHERE (repayment_type = 'direct' OR journal_entry_id IS NOT NULL) AND voided_at IS NULL AND payment_date <= ?
-  `).all(uptoDate) as Array<Record<string, unknown>>) {
-    push({
-      method: r.method as string | null,
-      date: r.date as string,
-      reference: r.reference as string | null,
-      description: r.description as string | null,
-      amount: Number(r.amount) || 0,
-      type: 'loan_repayment',
-    });
-  }
-
-  // Supplier refunds (money in once POSTED — voided rows collected nothing).
-  for (const r of db.prepare(`
-    SELECT refund_date as date, payment_method as method, refund_no as reference,
-           reference_no as description, amount
-    FROM supplier_refunds
-    WHERE status = 'POSTED' AND refund_date <= ?
-  `).all(uptoDate) as Array<Record<string, unknown>>) {
-    push({
-      method: r.method as string | null,
-      date: r.date as string,
-      reference: r.reference as string | null,
-      description: r.description as string | null,
-      amount: Number(r.amount) || 0,
-      type: 'supplier_refund',
-    });
-  }
+  collectFinancingTransactions(db, uptoDate, push);
 
   out.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
   return out;

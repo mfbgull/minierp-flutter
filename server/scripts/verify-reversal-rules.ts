@@ -65,6 +65,20 @@ function activeLines(refType: string, refId: number): number {
   ).get(refType, refId) as { c: number }).c;
 }
 
+function finishVerification(): never {
+  console.log(`\nResult: ${passed} passed, ${failed} failed`);
+  if (passed + failed !== EXPECTED_ASSERTIONS) {
+    console.error(
+      `Assertion count drift: expected ${EXPECTED_ASSERTIONS}, ran ${passed + failed}. ` +
+      'Update EXPECTED_ASSERTIONS in the same commit that adds or removes a case.'
+    );
+    fs.rmSync(testDbDir, { recursive: true, force: true });
+    process.exit(1);
+  }
+  fs.rmSync(testDbDir, { recursive: true, force: true });
+  process.exit(failed > 0 ? 1 : 0);
+}
+
 async function main(): Promise<void> {
   // The admin seed hash is computed off the event loop — wait for the
   // row before any FK (created_by) references it.
@@ -611,19 +625,7 @@ function createPostedInvoice(invoiceNo: string, qty: number, unitPrice: number):
   assert(doubleCorrectionBlocked, 'double correction rejected');
   assertClose(stockOf(itemId), systemQty - 1, 'stock unchanged after rejected double correction');
 
-  console.log(`\nResult: ${passed} passed, ${failed} failed`);
-
-  if (passed + failed !== EXPECTED_ASSERTIONS) {
-    console.error(
-      `Assertion count drift: expected ${EXPECTED_ASSERTIONS}, ran ${passed + failed}. ` +
-      'Update EXPECTED_ASSERTIONS in the same commit that adds or removes a case.'
-    );
-    fs.rmSync(testDbDir, { recursive: true, force: true });
-    process.exit(1);
-  }
-
-  fs.rmSync(testDbDir, { recursive: true, force: true });
-  process.exit(failed > 0 ? 1 : 0);
+  finishVerification();
 }
 
 void main().catch((err) => {

@@ -211,26 +211,29 @@ function moveEditedPaymentLedgerDate(
     return;
   }
 
-  if (finalPayment.supplier_id) {
-    const supRows = db.prepare(
-      `SELECT id, description FROM supplier_ledger
-       WHERE reference_no = ? AND voided = 0 AND transaction_type = 'PAYMENT' AND supplier_id = ?`
-    ).all(finalPayment.payment_no, finalPayment.supplier_id) as Array<{ id: number; description: string | null }>;
-    if (supRows.length > 0) {
-      for (const row of supRows) {
-        ledgerUtils.reverseLedgerEntry('supplier_ledger', row.id, `payment ${finalPayment.payment_no} date edited to ${newDate}`);
+  const moveSupplierPaymentLedgerDate = (): void => {
+    if (finalPayment.supplier_id) {
+      const supRows = db.prepare(
+        `SELECT id, description FROM supplier_ledger
+         WHERE reference_no = ? AND voided = 0 AND transaction_type = 'PAYMENT' AND supplier_id = ?`
+      ).all(finalPayment.payment_no, finalPayment.supplier_id) as Array<{ id: number; description: string | null }>;
+      if (supRows.length > 0) {
+        for (const row of supRows) {
+          ledgerUtils.reverseLedgerEntry('supplier_ledger', row.id, `payment ${finalPayment.payment_no} date edited to ${newDate}`);
+        }
+        SupplierLedgerModel.createEntry({
+          supplier_id: finalPayment.supplier_id,
+          transaction_date: newDate,
+          transaction_type: 'PAYMENT',
+          reference_no: finalPayment.payment_no,
+          credit: parseCurrency(finalPayment.amount),
+          description: supRows[0].description || `Payment ${finalPayment.payment_no}`,
+        }, db);
+        SupplierLedgerModel.rebuildBalances(finalPayment.supplier_id, db);
       }
-      SupplierLedgerModel.createEntry({
-        supplier_id: finalPayment.supplier_id,
-        transaction_date: newDate,
-        transaction_type: 'PAYMENT',
-        reference_no: finalPayment.payment_no,
-        credit: parseCurrency(finalPayment.amount),
-        description: supRows[0].description || `Payment ${finalPayment.payment_no}`,
-      }, db);
-      SupplierLedgerModel.rebuildBalances(finalPayment.supplier_id, db);
     }
-  }
+  };
+  moveSupplierPaymentLedgerDate();
 }
 
 export class PaymentModel {
@@ -592,17 +595,20 @@ export class PaymentModel {
     if ((dateChanged || methodChanged) && db.prepare('SELECT id FROM supplier_prepayment_applications WHERE payment_id = ?').get(id)) {
       throw new BusinessRuleError(409, 'Reverse and reapply supplier advances to change their application date or funding');
     }
-    if (dateChanged || methodChanged) {
-      const bills = db.prepare(`SELECT b.bill_date FROM supplier_bill_allocations a
-        JOIN supplier_bills b ON b.id = a.bill_id
-        WHERE a.payment_id = ? AND a.voided_at IS NULL`).all(id) as Array<{ bill_date: string }>;
-      for (const bill of bills) {
-        if ((data.payment_date ?? existing.payment_date) < bill.bill_date) {
-          throw new BusinessRuleError(400, 'Payment cannot precede the supplier bill');
+    const validateEditedSupplierBills = (): void => {
+      if (dateChanged || methodChanged) {
+        const bills = db.prepare(`SELECT b.bill_date FROM supplier_bill_allocations a
+          JOIN supplier_bills b ON b.id = a.bill_id
+          WHERE a.payment_id = ? AND a.voided_at IS NULL`).all(id) as Array<{ bill_date: string }>;
+        for (const bill of bills) {
+          if ((data.payment_date ?? existing.payment_date) < bill.bill_date) {
+            throw new BusinessRuleError(400, 'Payment cannot precede the supplier bill');
+          }
+          AccountingService.assertPeriodNotClosed(db, bill.bill_date, 'Supplier bill');
         }
-        AccountingService.assertPeriodNotClosed(db, bill.bill_date, 'Supplier bill');
       }
-    }
+    };
+    validateEditedSupplierBills();
 
     // The payment already posted in its CURRENT period and, when the date
     // moves, will post in the TARGET period — both must be open before any

@@ -1,3 +1,4 @@
+import { localMonthCode } from '../utils/documentNumbering';
 import Database from 'better-sqlite3';
 import { getNextSequenceNumber } from '../utils/sequence';
 import { sanitizeSortParams, BOM_SORT_COLUMNS } from '../utils/sqlSanitizer';
@@ -84,10 +85,9 @@ const BOM_SORT_COLUMN_MAP: Record<string, string> = {
 class BOMModel {
   static generateBOMNo(db: Database.Database): string {
     const now = new Date();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const year = String(now.getFullYear()).slice(-2);
-    const prefix = `BOM-${month}${year}-`;
-    const settingKey = `BOM_last_no_${month}${year}`;
+    const monthCode = localMonthCode(now);
+    const prefix = `BOM-${monthCode}-`;
+    const settingKey = `BOM_last_no_${monthCode}`;
 
     // Seed from existing max on first call
     const existing = db.prepare('SELECT value FROM settings WHERE key = ?').get(settingKey) as { value: string } | undefined;

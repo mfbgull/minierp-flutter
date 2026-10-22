@@ -131,6 +131,65 @@ function flagUnbatchableStock(): void {
 // ────────────────────────────────────────────────────────────────────
 // 2. Possibly duplicate purchases — direct purchase vs received PO
 // ────────────────────────────────────────────────────────────────────
+interface PoReceiptLine {
+  po_id: number;
+  po_no: string;
+  po_date: string;
+  supplier_id: number;
+  supplier_name: string;
+  item_id: number;
+  po_quantity: number;
+  unit_price: number;
+  received_quantity: number;
+  received_value: number;
+}
+
+interface DirectPurchaseRow {
+  id: number;
+  purchase_no: string;
+  purchase_date: string;
+  item_id: number;
+  warehouse_id: number | null;
+  quantity: number;
+  unit_cost: number;
+  total_cost: number;
+  supplier_name: string | null;
+}
+
+// Same item, same quantity, same unit price, same day — a direct purchase
+// that merely re-enters goods the PO already brought in.
+function purchaseMatchesReceipt(purchase: DirectPurchaseRow, receipt: PoReceiptLine): boolean {
+  if (purchase.item_id !== receipt.item_id) return false;
+  if (Math.abs(purchase.quantity - receipt.received_quantity) > 0.0005) return false;
+  if (Math.abs(purchase.unit_cost - receipt.unit_price) > 0.0005) return false;
+  return purchase.purchase_date === receipt.po_date;
+}
+
+function poPaidTotal(poId: number): number {
+  // Was this PO actually paid? If a supplier payment covers it, the direct
+  // purchase is a second record of the same money going out.
+  const paid = db.prepare(`
+    SELECT COALESCE(SUM(amount), 0) as total
+    FROM po_allocations WHERE po_id = ?
+  `).get(poId) as { total: number };
+  return paid.total;
+}
+
+function logDuplicatePurchase(purchase: DirectPurchaseRow, receipt: PoReceiptLine, poPaid: number): void {
+  console.log(`  ⚠ Direct purchase ${purchase.purchase_no} matches received PO line ${receipt.po_no}:`);
+  console.log(`      item      : ${receipt.item_id}`);
+  console.log(`      quantity  : ${purchase.quantity} (PO received ${receipt.received_quantity})`);
+  console.log(`      unit price: ${purchase.unit_cost} (PO ${receipt.unit_price})`);
+  console.log(`      date      : ${purchase.purchase_date} (PO ${receipt.po_date})`);
+  console.log(`      PO supplier: ${receipt.supplier_name}${purchase.supplier_name ? ' | purchase supplier: ' + purchase.supplier_name : ''}`);
+  console.log(`      PO payment: ${poPaid > 0 ? `paid Rs ${poPaid} (PO ${receipt.po_no})` : 'not paid'}`);
+  console.log(`      total     : Rs ${purchase.total_cost}`);
+  console.log(`      → if duplicate: stock overstated by ${purchase.quantity} units and cash`);
+  console.log(`        outflow overstated by Rs ${purchase.total_cost} (direct purchases are counted`);
+  console.log(`        as cash out on top of the supplier payment).`);
+  console.log();
+}
+
 function flagDuplicatePurchases(): void {
   console.log('\n[2] POSSIBLE DUPLICATE PURCHASES (direct purchase vs received+paid PO)');
   console.log('    ' + '-'.repeat(70));
@@ -155,69 +214,25 @@ function flagDuplicatePurchases(): void {
     LEFT JOIN goods_receipt_items gri ON gri.po_item_id = poi.id
     WHERE po.status NOT IN ('Draft', 'Cancelled')
     GROUP BY poi.id
-  `).all() as Array<{
-    po_id: number;
-    po_no: string;
-    po_date: string;
-    supplier_id: number;
-    supplier_name: string;
-    item_id: number;
-    po_quantity: number;
-    unit_price: number;
-    received_quantity: number;
-    received_value: number;
-  }>;
+  `).all() as PoReceiptLine[];
 
   const purchases = db.prepare(`
     SELECT id, purchase_no, purchase_date, item_id, warehouse_id,
            quantity, unit_cost, total_cost, supplier_name
     FROM purchases
     ORDER BY purchase_date, id
-  `).all() as Array<{
-    id: number;
-    purchase_no: string;
-    purchase_date: string;
-    item_id: number;
-    warehouse_id: number | null;
-    quantity: number;
-    unit_cost: number;
-    total_cost: number;
-    supplier_name: string | null;
-  }>;
+  `).all() as DirectPurchaseRow[];
 
   let found = 0;
-  for (const rec of receipts) {
-    if (rec.received_quantity <= 0) continue;
+  for (const receipt of receipts) {
+    if (receipt.received_quantity <= 0) continue;
 
-    for (const p of purchases) {
-      // Same item, same quantity, same unit price, same day — a direct
-      // purchase that merely re-enters goods the PO already brought in.
-      if (p.item_id !== rec.item_id) continue;
-      if (Math.abs(p.quantity - rec.received_quantity) > 0.0005) continue;
-      if (Math.abs(p.unit_cost - rec.unit_price) > 0.0005) continue;
-      if (p.purchase_date !== rec.po_date) continue;
-
-      // Was this PO actually paid? If a supplier payment covers it, the
-      // direct purchase is a second record of the same money going out.
-      const paid = db.prepare(`
-        SELECT COALESCE(SUM(amount), 0) as total
-        FROM po_allocations WHERE po_id = ?
-      `).get(rec.po_id) as { total: number };
+    for (const purchase of purchases) {
+      if (!purchaseMatchesReceipt(purchase, receipt)) continue;
 
       found++;
       issues++;
-      console.log(`  ⚠ Direct purchase ${p.purchase_no} matches received PO line ${rec.po_no}:`);
-      console.log(`      item      : ${rec.item_id}`);
-      console.log(`      quantity  : ${p.quantity} (PO received ${rec.received_quantity})`);
-      console.log(`      unit price: ${p.unit_cost} (PO ${rec.unit_price})`);
-      console.log(`      date      : ${p.purchase_date} (PO ${rec.po_date})`);
-      console.log(`      PO supplier: ${rec.supplier_name}${p.supplier_name ? ' | purchase supplier: ' + p.supplier_name : ''}`);
-      console.log(`      PO payment: ${paid.total > 0 ? `paid Rs ${paid.total} (PO ${rec.po_no})` : 'not paid'}`);
-      console.log(`      total     : Rs ${p.total_cost}`);
-      console.log(`      → if duplicate: stock overstated by ${p.quantity} units and cash`);
-      console.log(`        outflow overstated by Rs ${p.total_cost} (direct purchases are counted`);
-      console.log(`        as cash out on top of the supplier payment).`);
-      console.log();
+      logDuplicatePurchase(purchase, receipt, poPaidTotal(receipt.po_id));
     }
   }
 

@@ -1,3 +1,4 @@
+import { localMonthCode } from '../utils/documentNumbering';
 import Database from 'better-sqlite3';
 import AccountingService from '../services/accountingService';
 import { getNextSequenceNumber } from '../utils/sequence';
@@ -51,16 +52,15 @@ interface ExpenseCategoryDTO {
 
 function generateExpenseNo(db: Database.Database, expenseDate: string): string {
   const date = new Date(expenseDate);
-  const year = date.getFullYear().toString().slice(-2);
-  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const monthCode = localMonthCode(date, 'YYMM');
 
   // EXP-05 (task 5.4): the shared atomic counter replaces the old
   // read-modify-write over MAX(expense_no), which ran outside any
   // transaction and reused numbers after deletion. Callers wrap this in
   // the same transaction as the INSERT. Counters are seeded from existing
   // maxima by migrations/seed-expense-sequence.sql.
-  const nextNo = getNextSequenceNumber(db, `EXP_last_no_${year}${month}`);
-  return `EXP-${year}${month}-${String(nextNo).padStart(5, '0')}`;
+  const nextNo = getNextSequenceNumber(db, `EXP_last_no_${monthCode}`);
+  return `EXP-${monthCode}-${String(nextNo).padStart(5, '0')}`;
 }
 
 function create(db: Database.Database, data: CreateExpenseDTO): number {
@@ -214,27 +214,30 @@ function update(db: Database.Database, id: number, data: UpdateExpenseDTO, opts?
       newStatus, id
     );
 
-    if (willBeGlWorthy && ((!wasGlWorthy && willBeGlWorthy) || (wasGlWorthy && moneyChanged))) {
-      const cashCode = newMethod === 'Credit' ? '2115' : AccountingService._cashOrBankAccountCode(newMethod || 'cash');
-      const fundsAccount = AccountingService.getAccountByCode(db, cashCode);
-      if (!fundsAccount) {
-        throw new Error(`Chart of accounts is missing required account: ${cashCode}`);
+    const postEditedExpense = (): void => {
+      if (willBeGlWorthy && ((!wasGlWorthy && willBeGlWorthy) || (wasGlWorthy && moneyChanged))) {
+        const cashCode = newMethod === 'Credit' ? '2115' : AccountingService._cashOrBankAccountCode(newMethod || 'cash');
+        const fundsAccount = AccountingService.getAccountByCode(db, cashCode);
+        if (!fundsAccount) {
+          throw new Error(`Chart of accounts is missing required account: ${cashCode}`);
+        }
+        if (newMethod !== 'Credit') AccountingService.assertSufficientFunds(db, {
+          accountId: fundsAccount.id,
+          amount: newAmount,
+          asOfDate: newDate,
+          label: `expense ${existing.expense_no}`,
+        });
+        AccountingService.postExpenseEntry(db, {
+          expenseId: id,
+          expenseNo: String(existing.expense_no),
+          amount: newAmount,
+          expenseDate: newDate,
+          paymentMethod: newMethod || undefined,
+          userId: opts?.userId,
+        });
       }
-      if (newMethod !== 'Credit') AccountingService.assertSufficientFunds(db, {
-        accountId: fundsAccount.id,
-        amount: newAmount,
-        asOfDate: newDate,
-        label: `expense ${existing.expense_no}`,
-      });
-      AccountingService.postExpenseEntry(db, {
-        expenseId: id,
-        expenseNo: String(existing.expense_no),
-        amount: newAmount,
-        expenseDate: newDate,
-        paymentMethod: newMethod || undefined,
-        userId: opts?.userId,
-      });
-    }
+    };
+    postEditedExpense();
   })();
 }
 

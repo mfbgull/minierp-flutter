@@ -1,3 +1,4 @@
+import { listPagination, listPageQuery } from '../utils/controllerPagination';
 import { Request, Response } from 'express';
 import { getQueryInteger, getQueryParam } from '../utils/queryUtils';
 import ProductionModel from '../models/Production';
@@ -7,98 +8,115 @@ import db from '../config/database';
 import logger from '../utils/logger';
 import { handleBusinessError } from '../utils/businessRuleError';
 
+function validateJointOutputs(lines: Array<{ item_id?: unknown; quantity?: unknown }>, inputs: Array<{ item_id: unknown }>): string | null {
+  const seen = new Set<number>();
+  const inputIds = new Set(inputs.map(line => Number(line.item_id)));
+  for (const line of lines) {
+    const itemId = Number(line.item_id);
+    const quantity = Number(line.quantity);
+    if (!Number.isInteger(itemId) || itemId <= 0) return 'Each output needs a valid item_id';
+    if (!Number.isFinite(quantity) || quantity <= 0) return 'Output quantity must be positive';
+    if (seen.has(itemId)) return `Output item ${itemId} is listed more than once`;
+    if (inputIds.has(itemId)) return 'An item cannot be produced from itself';
+    seen.add(itemId);
+  }
+  return null;
+}
+
+function productionBomError(bom_id: number, primaryId: number): string | null {
+  const bom = db
+    .prepare('SELECT finished_item_id FROM boms WHERE id = ?')
+    .get(Number(bom_id)) as { finished_item_id: number } | undefined;
+  if (!bom) {
+    return `BOM ${bom_id} not found`;
+  }
+  if (bom.finished_item_id !== primaryId) {
+    return `BOM ${bom_id} produces item ${bom.finished_item_id}, but the primary output is item ${primaryId}`;
+  }
+  return null;
+}
+
+interface ProductionRequestBody {
+  output_item_id?: unknown;
+  output_quantity?: unknown;
+  warehouse_id?: unknown;
+  raw_materials_warehouse_id?: unknown;
+  production_date?: unknown;
+  input_items?: unknown;
+  overhead_cost?: unknown;
+  bom_id?: unknown;
+  outputs?: unknown;
+}
+
+// D6 guards for joint-product payloads: an output line must be positive,
+// unique, and never an input (an item cannot be produced from itself), and
+// the BOM must produce the PRIMARY output (the first line). Both reject
+// with 400 before the model opens a transaction. The model enforces the
+// same rules, but there a BOM mismatch throws into a 500 that hides the
+// reason — answering it here gives the client a 400 it can act on (e.g. a
+// joint production whose co-product was listed first).
+function jointOutputRequestError(
+  outputs: unknown,
+  inputItems: unknown,
+  outputItemId: unknown,
+  bomId: unknown
+): string | null {
+  const hasOutputLines = Array.isArray(outputs) && outputs.length > 0;
+
+  if (hasOutputLines) {
+    const lines = outputs as Array<{ item_id?: unknown; quantity?: unknown }>;
+    const lineError = validateJointOutputs(lines, inputItems as Array<{ item_id: unknown }>);
+    if (lineError) return lineError;
+  }
+
+  if (bomId) {
+    const primaryId = hasOutputLines
+      ? Number((outputs as Array<{ item_id?: unknown }>)[0]?.item_id)
+      : Number(outputItemId);
+    const bomError = productionBomError(Number(bomId), primaryId);
+    if (bomError) return bomError;
+  }
+
+  return null;
+}
+
+// Every guard below answers 400 with `{ error }`, in this exact precedence.
+// Keeping them together preserves that precedence and keeps recordProduction
+// readable; the model still enforces the same rules transactionally.
+function productionRequestError(body: ProductionRequestBody): string | null {
+  const { output_item_id, output_quantity, warehouse_id, production_date, input_items, bom_id } = body;
+  const outputs = body.outputs;
+  const hasOutputLines = Array.isArray(outputs) && outputs.length > 0;
+  const hasSingleOutput = Boolean(output_item_id) && output_quantity !== undefined;
+
+  if (!hasSingleOutput && !hasOutputLines) {
+    return 'Provide either outputs[] (D6 joint products) or output_item_id + output_quantity';
+  }
+
+  if (!warehouse_id || !production_date || !input_items || !(input_items as unknown[]).length) {
+    return 'Warehouse, date, and input items are required';
+  }
+
+  if (output_quantity !== undefined && Number(output_quantity) <= 0) {
+    return 'Output quantity must be positive';
+  }
+
+  return jointOutputRequestError(outputs, input_items, output_item_id, bom_id);
+}
+
 function recordProduction(req: AuthRequest, res: Response): void {
   try {
-    const {
-      output_item_id,
-      output_quantity,
-      warehouse_id,
-      raw_materials_warehouse_id,
-      production_date,
-      input_items,
-      overhead_cost,
-      bom_id
-    } = req.body;
-
-    const outputs: unknown = req.body.outputs;
-    const hasOutputLines = Array.isArray(outputs) && outputs.length > 0;
-    const hasSingleOutput = Boolean(output_item_id) && output_quantity !== undefined;
-
-    if (!hasSingleOutput && !hasOutputLines) {
-      res.status(400).json({
-        error: 'Provide either outputs[] (D6 joint products) or output_item_id + output_quantity',
-      });
+    const requestError = productionRequestError(req.body as ProductionRequestBody);
+    if (requestError) {
+      res.status(400).json({ error: requestError });
       return;
     }
 
-    if (!warehouse_id || !production_date || !input_items || !input_items.length) {
-      res.status(400).json({ error: 'Warehouse, date, and input items are required' });
-      return;
-    }
-
-    if (output_quantity !== undefined && Number(output_quantity) <= 0) {
-      res.status(400).json({ error: 'Output quantity must be positive' });
-      return;
-    }
-
-    // D6 guards: an output line must be positive, unique, and never an input
-    // (an item cannot be produced from itself). Reject with 400 before the
-    // model opens a transaction.
-    if (hasOutputLines) {
-      const lines = outputs as Array<{ item_id?: unknown; quantity?: unknown }>;
-      const seen = new Set<number>();
-      const inputIds = new Set(
-        (input_items as Array<{ item_id: unknown }>).map((line) => Number(line.item_id)),
-      );
-      for (const line of lines) {
-        const itemId = Number(line.item_id);
-        const quantity = Number(line.quantity);
-        if (!Number.isInteger(itemId) || itemId <= 0) {
-          res.status(400).json({ error: 'Each output needs a valid item_id' });
-          return;
-        }
-        if (!Number.isFinite(quantity) || quantity <= 0) {
-          res.status(400).json({ error: 'Output quantity must be positive' });
-          return;
-        }
-        if (seen.has(itemId)) {
-          res.status(400).json({ error: `Output item ${itemId} is listed more than once` });
-          return;
-        }
-        if (inputIds.has(itemId)) {
-          res.status(400).json({ error: 'An item cannot be produced from itself' });
-          return;
-        }
-        seen.add(itemId);
-      }
-    }
-
-    // D6: the BOM must produce the PRIMARY output (the first line). The model
-    // enforces the same rule, but there it throws into a 500 that hides the
-    // reason — so a mismatched BOM is answered here as a 400 the client can act
-    // on (e.g. a joint production whose co-product was listed first).
-    if (bom_id) {
-      const primaryId = hasOutputLines
-        ? Number((outputs as Array<{ item_id?: unknown }>)[0]?.item_id)
-        : Number(output_item_id);
-      const bom = db
-        .prepare('SELECT finished_item_id FROM boms WHERE id = ?')
-        .get(Number(bom_id)) as { finished_item_id: number } | undefined;
-      if (!bom) {
-        res.status(400).json({ error: `BOM ${bom_id} not found` });
-        return;
-      }
-      if (bom.finished_item_id !== primaryId) {
-        res.status(400).json({
-          error: `BOM ${bom_id} produces item ${bom.finished_item_id}, but the primary output is item ${primaryId}`,
-        });
-        return;
-      }
-    }
+    const { warehouse_id, raw_materials_warehouse_id, overhead_cost } = req.body as ProductionRequestBody;
 
     const productionData = {
       ...req.body,
-      raw_materials_warehouse_id: raw_materials_warehouse_id || warehouse_id,
+      raw_materials_warehouse_id: (raw_materials_warehouse_id as string | undefined) || (warehouse_id as string),
       overhead_cost: overhead_cost ? parseFloat(String(overhead_cost)) : 0
     };
 
@@ -116,8 +134,7 @@ function recordProduction(req: AuthRequest, res: Response): void {
 
 function getProductions(req: Request, res: Response): void {
   try {
-    const page = getQueryInteger(req.query.page, 1);
-    const limit = getQueryInteger(req.query.limit, 10);
+    const { page, limit } = listPageQuery(req.query);
     const startDateParam = getQueryParam(req.query.start_date);
     const endDateParam = getQueryParam(req.query.end_date);
     const outputItemIdParam = getQueryParam(req.query.output_item_id);
@@ -144,13 +161,7 @@ function getProductions(req: Request, res: Response): void {
     res.json({
       success: true,
       data: rows,
-      pagination: {
-        currentPage: pageNum,
-        totalPages: Math.ceil(total / limitNum),
-        totalItems: total,
-        hasNext: pageNum < Math.ceil(total / limitNum),
-        hasPrev: pageNum > 1
-      }
+      pagination: listPagination(total, pageNum, limitNum)
     });
   } catch (error) {
     logger.error('Get productions error:', error);

@@ -70,6 +70,47 @@ function repairUnbatchedStock(): void {
   let created = 0;
   let capitalised = 0;
 
+  const trimExcessLayers = (row: typeof rows[number], uncovered: number): void => {
+    const overBy = -uncovered;
+    logger.warn(`Over-covered batches for item ${row.item_id}/wh ${row.warehouse_id} by ${overBy} — trimming oldest layers`);
+    const layers = db.prepare(`
+      SELECT id, quantity_remaining FROM stock_batches
+      WHERE item_id = ? AND warehouse_id = ?
+      ORDER BY received_date ASC, id ASC
+    `).all(row.item_id, row.warehouse_id) as Array<{ id: number; quantity_remaining: number }>;
+    let toTrim = overBy;
+    for (const layer of layers) {
+      if (toTrim <= 0.0005) break;
+      const trim = Math.min(layer.quantity_remaining, toTrim);
+      db.prepare('UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?').run(trim, layer.id);
+      toTrim -= trim;
+    }
+  };
+
+  const postReconciledStock = (row: typeof rows[number], uncovered: number, unitCost: number): number => {
+    const value = uncovered * unitCost;
+    if (value > 0.005 && db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='journal_entries'`).get()) {
+      const desc = `Unbatched stock reconciliation: ${uncovered} units @ ${unitCost} (item ${row.item_id}, warehouse ${row.warehouse_id})`;
+      const je = db.prepare(`
+        INSERT INTO journal_entries (reference_type, reference_id, entry_date, description, debit_account, credit_account, amount, voided)
+        VALUES ('RECON', 0, ?, ?, '1200', '4999', ?, 0)
+      `).run(new Date().toISOString().split('T')[0], desc, value);
+      const jeId = je.lastInsertRowid as number;
+      const lines = db.prepare(`
+        INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, line_date)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `);
+      const inventoryAccount = db.prepare(`SELECT id FROM chart_of_accounts WHERE code = '1200'`).get() as { id: number } | undefined;
+      const adjustmentAccount = db.prepare(`SELECT id FROM chart_of_accounts WHERE code = '4999' OR code = '4000' ORDER BY code DESC LIMIT 1`).get() as { id: number } | undefined;
+      if (inventoryAccount && adjustmentAccount) {
+        const today = new Date().toISOString().split('T')[0];
+        lines.run(jeId, inventoryAccount.id, value, 0, 'Inventory increase (reconciled unbatched stock)', today);
+        lines.run(jeId, adjustmentAccount.id, 0, value, 'Stock reconciliation adjustment', today);
+      }
+    }
+    return value;
+  };
+
   const run = db.transaction(() => {
     const insertBatch = db.prepare(`
       INSERT INTO stock_batches (
@@ -86,20 +127,7 @@ function repairUnbatchedStock(): void {
       // Over-covered batches (batch quantity exceeding balances): trim the
       // batch down to the balance instead of ignoring the mismatch.
       if (uncovered < 0) {
-        const overBy = -uncovered;
-        logger.warn(`Over-covered batches for item ${row.item_id}/wh ${row.warehouse_id} by ${overBy} — trimming oldest layers`);
-        const layers = db.prepare(`
-          SELECT id, quantity_remaining FROM stock_batches
-          WHERE item_id = ? AND warehouse_id = ?
-          ORDER BY received_date ASC, id ASC
-        `).all(row.item_id, row.warehouse_id) as Array<{ id: number; quantity_remaining: number }>;
-        let toTrim = overBy;
-        for (const layer of layers) {
-          if (toTrim <= 0.0005) break;
-          const trim = Math.min(layer.quantity_remaining, toTrim);
-          db.prepare('UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?').run(trim, layer.id);
-          toTrim -= trim;
-        }
+        trimExcessLayers(row, uncovered);
         continue;
       }
 
@@ -137,27 +165,7 @@ function repairUnbatchedStock(): void {
       // legacy journal_entries shape (reference_type/reference_id +
       // text accounts) that the rest of the system reconciles against,
       // plus matching journal_lines rows keyed to the real COA ids.
-      const value = uncovered * unitCost;
-      if (value > 0.005 && db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='journal_entries'`).get()) {
-        const desc = `Unbatched stock reconciliation: ${uncovered} units @ ${unitCost} (item ${row.item_id}, warehouse ${row.warehouse_id})`;
-        const je = db.prepare(`
-          INSERT INTO journal_entries (reference_type, reference_id, entry_date, description, debit_account, credit_account, amount, voided)
-          VALUES ('RECON', 0, ?, ?, '1200', '4999', ?, 0)
-        `).run(new Date().toISOString().split('T')[0], desc, value);
-        const jeId = je.lastInsertRowid as number;
-        const lines = db.prepare(`
-          INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, line_date)
-          VALUES (?, ?, ?, ?, ?, ?)
-        `);
-        const inventoryAccount = db.prepare(`SELECT id FROM chart_of_accounts WHERE code = '1200'`).get() as { id: number } | undefined;
-        const adjustmentAccount = db.prepare(`SELECT id FROM chart_of_accounts WHERE code = '4999' OR code = '4000' ORDER BY code DESC LIMIT 1`).get() as { id: number } | undefined;
-        if (inventoryAccount && adjustmentAccount) {
-          const today = new Date().toISOString().split('T')[0];
-          lines.run(jeId, inventoryAccount.id, value, 0, 'Inventory increase (reconciled unbatched stock)', today);
-          lines.run(jeId, adjustmentAccount.id, 0, value, 'Stock reconciliation adjustment', today);
-        }
-      }
-      capitalised += value;
+      capitalised += postReconciledStock(row, uncovered, unitCost);
       created++;
     }
 

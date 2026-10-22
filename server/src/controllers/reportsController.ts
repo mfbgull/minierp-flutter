@@ -1,3 +1,4 @@
+import { requireReportDateRange } from '../utils/controllerValidation';
 import { Request, Response } from 'express';
 import { AuthRequest } from '../types';
 import { getQueryParam } from '../utils/queryUtils';
@@ -122,7 +123,7 @@ function getTrialBalanceReport(req: Request, res: Response): void {
 function getGeneralLedgerReport(req: Request, res: Response): void {
   try {
     const { startDate, endDate } = req.query;
-    if (!startDate || !endDate) { res.status(400).json({ success: false, error: 'startDate and endDate are required' }); return; }
+    if (!requireReportDateRange(startDate, endDate, res)) return;
     res.json({ success: true, data: ReportsModel.getGeneralLedger(startDate as string, endDate as string, db) });
   } catch (error) { logger.error('Error fetching general ledger report:', error); res.status(500).json({ success: false, error: 'Failed to fetch general ledger report' }); }
 }
@@ -137,7 +138,7 @@ function getBalanceSheetReport(req: Request, res: Response): void {
 function getIncomeStatementReport(req: Request, res: Response): void {
   try {
     const { startDate, endDate } = req.query;
-    if (!startDate || !endDate) { res.status(400).json({ success: false, error: 'startDate and endDate are required' }); return; }
+    if (!requireReportDateRange(startDate, endDate, res)) return;
     res.json({ success: true, data: ReportsModel.getIncomeStatement(startDate as string, endDate as string, db) });
   } catch (error) { logger.error('Error fetching income statement report:', error); res.status(500).json({ success: false, error: 'Failed to fetch income statement report' }); }
 }
@@ -145,7 +146,7 @@ function getIncomeStatementReport(req: Request, res: Response): void {
 function getTaxSummaryReport(req: Request, res: Response): void {
   try {
     const { startDate, endDate } = req.query;
-    if (!startDate || !endDate) { res.status(400).json({ success: false, error: 'startDate and endDate are required' }); return; }
+    if (!requireReportDateRange(startDate, endDate, res)) return;
     res.json({ success: true, data: ReportsModel.getTaxSummary(startDate as string, endDate as string, db) });
   } catch (error) { logger.error('Error fetching tax summary report:', error); res.status(500).json({ success: false, error: 'Failed to fetch tax summary report' }); }
 }

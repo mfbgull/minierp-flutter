@@ -93,13 +93,19 @@ function getAccount(req: AuthRequest, res: Response): void {
  * Trial-balance data: every account's debit / credit / signed balance
  * as of the given date (defaults to today).
  */
+function readAsOfDate(req: AuthRequest, res: Response): string | undefined {
+  const asOfDate = getQueryParam(req.query.asOfDate) ?? new Date().toISOString().slice(0, 10);
+  if (!isValidIsoDate(asOfDate)) {
+    sendBadRequest(res, 'asOfDate must be a valid YYYY-MM-DD date');
+    return undefined;
+  }
+  return asOfDate;
+}
+
 function listAccountBalances(req: AuthRequest, res: Response): void {
   try {
-    const asOfDate = getQueryParam(req.query.asOfDate) ?? new Date().toISOString().slice(0, 10);
-    if (!isValidIsoDate(asOfDate)) {
-      sendBadRequest(res, 'asOfDate must be a valid YYYY-MM-DD date');
-      return;
-    }
+    const asOfDate = readAsOfDate(req, res);
+    if (asOfDate === undefined) return;
 
     const balances = AccountingService.getAllAccountBalances(db, asOfDate);
     const totalDebit = balances.reduce((s, b) => s + b.total_debit, 0);
@@ -130,11 +136,8 @@ function getAccountBalance(req: AuthRequest, res: Response): void {
     const account = AccountingService.getAccountByCode(db, code);
     if (!account) { sendNotFound(res, `Account ${code}`); return; }
 
-    const asOfDate = getQueryParam(req.query.asOfDate) ?? new Date().toISOString().slice(0, 10);
-    if (!isValidIsoDate(asOfDate)) {
-      sendBadRequest(res, 'asOfDate must be a valid YYYY-MM-DD date');
-      return;
-    }
+    const asOfDate = readAsOfDate(req, res);
+    if (asOfDate === undefined) return;
 
     const balance = AccountingService.getAccountBalance(db, account.id, asOfDate);
     sendSuccess(res, balance);
@@ -151,11 +154,8 @@ function getAccountBalance(req: AuthRequest, res: Response): void {
  */
 function getReconciliation(req: AuthRequest, res: Response): void {
   try {
-    const asOfDate = getQueryParam(req.query.asOfDate) ?? new Date().toISOString().slice(0, 10);
-    if (!isValidIsoDate(asOfDate)) {
-      sendBadRequest(res, 'asOfDate must be a valid YYYY-MM-DD date');
-      return;
-    }
+    const asOfDate = readAsOfDate(req, res);
+    if (asOfDate === undefined) return;
 
     const report = ReportsModel.getGLReconciliation(asOfDate, db);
     sendSuccess(res, report);

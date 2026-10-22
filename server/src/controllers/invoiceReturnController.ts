@@ -1,3 +1,4 @@
+import { respondToClosedPeriod } from '../utils/controllerErrors';
 /**
  * Return settlement endpoints (spec §5.2 / §5.3). The endpoints are thin:
  * all money logic lives in InvoiceReturnService so desktop and mobile
@@ -51,9 +52,7 @@ function voidReturn(req: AuthRequest, res: Response): Response | void {
       return res.status(error.status).json({ error: error.message });
     }
     const errorMessage = error instanceof Error ? error.message : String(error);
-    if (errorMessage.includes('inside closed accounting period')) {
-      return res.status(409).json({ error: errorMessage });
-    }
+    if (respondToClosedPeriod(res, errorMessage)) return;
     handleBusinessError(res, error, 'Void return', 'Failed to void the return');
     return;
   }
@@ -70,9 +69,7 @@ function voidSettlement(req: AuthRequest, res: Response): Response | void {
       return res.status(error.status).json({ error: error.message });
     }
     const errorMessage = error instanceof Error ? error.message : String(error);
-    if (errorMessage.includes('inside closed accounting period')) {
-      return res.status(409).json({ error: errorMessage });
-    }
+    if (respondToClosedPeriod(res, errorMessage)) return;
     handleBusinessError(res, error, 'Void settlement', 'Failed to void the settlement');
     return;
   }

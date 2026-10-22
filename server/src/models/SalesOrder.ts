@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { validateSalesDocumentItems, validateSalesWarehouse } from './salesDocumentValidation';
 import { generateDocNo } from '../utils/sequence';
 import { sanitizeSortParams, SALES_ORDER_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import { QuotationWithWarehouse, InvoiceWithUsername } from '../types';
@@ -120,44 +121,24 @@ class SalesOrderModel {
       }
 
       // Validate warehouse if provided
-      if (warehouse_id) {
-        const warehouse = db.prepare('SELECT id FROM warehouses WHERE id = ? AND is_active = 1').get(warehouse_id);
-        if (!warehouse) {
-          throw new Error('Warehouse not found or inactive');
-        }
-      }
+      validateSalesWarehouse(db, warehouse_id);
 
-      // Validate source if provided
-      if (source_type === 'QUOTATION' && source_id) {
-        const quotation = db.prepare('SELECT id, status FROM quotations WHERE id = ?').get(source_id) as { id: number; status: string } | undefined;
-        if (!quotation) {
-          throw new Error('Source quotation not found');
+      const validateSourceQuotation = (): void => {
+        // Validate source if provided
+        if (source_type === 'QUOTATION' && source_id) {
+          const quotation = db.prepare('SELECT id, status FROM quotations WHERE id = ?').get(source_id) as { id: number; status: string } | undefined;
+          if (!quotation) {
+            throw new Error('Source quotation not found');
+          }
+          if (quotation.status !== 'Accepted' && quotation.status !== 'Sent') {
+            throw new Error('Source quotation must be in Accepted or Sent status');
+          }
         }
-        if (quotation.status !== 'Accepted' && quotation.status !== 'Sent') {
-          throw new Error('Source quotation must be in Accepted or Sent status');
-        }
-      }
+      };
+      validateSourceQuotation();
 
       // Validate items
-      if (!items || items.length === 0) {
-        throw new Error('Sales order must have at least one item');
-      }
-
-      for (const item of items) {
-        const dbItem = db.prepare('SELECT id, is_active FROM items WHERE id = ?').get(item.item_id) as { id: number; is_active: number } | undefined;
-        if (!dbItem) {
-          throw new Error(`Item ${item.item_id} not found`);
-        }
-        if (!dbItem.is_active) {
-          throw new Error(`Item ${item.item_id} is inactive`);
-        }
-        if (item.quantity <= 0) {
-          throw new Error('Item quantity must be positive');
-        }
-        if (item.unit_price < 0) {
-          throw new Error('Item unit price cannot be negative');
-        }
-      }
+      validateSalesDocumentItems(db, items, 'Sales order');
 
       // Generate sales order number
       const soNo = this.generateSalesOrderNo(db);
@@ -427,43 +408,46 @@ class SalesOrderModel {
         }
       }
 
-      // Update header
-      const updateFields: string[] = [];
-      const updateParams: SqlParam[] = [];
+      const updateHeader = (): void => {
+        // Update header
+        const updateFields: string[] = [];
+        const updateParams: SqlParam[] = [];
 
-      if (customer_id !== undefined) {
-        updateFields.push('customer_id = ?');
-        updateParams.push(customer_id);
-      }
-      if (customer_name !== undefined) {
-        updateFields.push('customer_name = ?');
-        updateParams.push(customer_name);
-      }
-      if (so_date !== undefined) {
-        updateFields.push('so_date = ?');
-        updateParams.push(so_date);
-      }
-      if (delivery_date !== undefined) {
-        updateFields.push('delivery_date = ?');
-        updateParams.push(delivery_date);
-      }
-      if (status !== undefined) {
-        updateFields.push('status = ?');
-        updateParams.push(status);
-      }
-      if (notes !== undefined) {
-        updateFields.push('notes = ?');
-        updateParams.push(notes);
-      }
-      if (warehouse_id !== undefined) {
-        updateFields.push('warehouse_id = ?');
-        updateParams.push(warehouse_id);
-      }
+        if (customer_id !== undefined) {
+          updateFields.push('customer_id = ?');
+          updateParams.push(customer_id);
+        }
+        if (customer_name !== undefined) {
+          updateFields.push('customer_name = ?');
+          updateParams.push(customer_name);
+        }
+        if (so_date !== undefined) {
+          updateFields.push('so_date = ?');
+          updateParams.push(so_date);
+        }
+        if (delivery_date !== undefined) {
+          updateFields.push('delivery_date = ?');
+          updateParams.push(delivery_date);
+        }
+        if (status !== undefined) {
+          updateFields.push('status = ?');
+          updateParams.push(status);
+        }
+        if (notes !== undefined) {
+          updateFields.push('notes = ?');
+          updateParams.push(notes);
+        }
+        if (warehouse_id !== undefined) {
+          updateFields.push('warehouse_id = ?');
+          updateParams.push(warehouse_id);
+        }
 
-      updateFields.push('updated_at = CURRENT_TIMESTAMP');
-      updateParams.push(id);
+        updateFields.push('updated_at = CURRENT_TIMESTAMP');
+        updateParams.push(id);
 
-      db.prepare(`UPDATE sales_orders SET ${updateFields.join(', ')} WHERE id = ?`).run(...updateParams);
+        db.prepare(`UPDATE sales_orders SET ${updateFields.join(', ')} WHERE id = ?`).run(...updateParams);
+      };
+      updateHeader();
 
       // Update items if provided
       if (items) {

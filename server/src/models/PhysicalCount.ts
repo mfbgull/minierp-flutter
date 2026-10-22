@@ -1,3 +1,4 @@
+import { localMonthCode } from '../utils/documentNumbering';
 import Database from 'better-sqlite3';
 import { sanitizeSortParams, PHYSICAL_COUNT_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import StockMovementModel from './StockMovement';
@@ -114,9 +115,8 @@ class PhysicalCountModel {
     const nextNo = parseInt(setting.value);
 
     const now = new Date();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const currentYear = String(now.getFullYear()).slice(-2);
-    return `PC-${month}${currentYear}-${String(nextNo).padStart(5, '0')}`;
+    const monthCode = localMonthCode(now);
+    return `PC-${monthCode}-${String(nextNo).padStart(5, '0')}`;
   }
 
   static create(data: CreateCountDTO, userId: number, db: Database.Database): number {
@@ -313,7 +313,7 @@ class PhysicalCountModel {
           i.counted_quantity !== null && i.variance !== null && i.variance !== 0
       );
 
-      for (const item of adjustmentItems) {
+      const postCountAdjustment = (item: typeof adjustmentItems[number]): void => {
         // INV-01: count completion reconciles ALL THREE tables — movements,
         // balances AND cost layers — inside this one transaction.
         let consumedCost = item.unit_cost;
@@ -432,6 +432,9 @@ class PhysicalCountModel {
             createdBy: userId
           }), movementId);
         }
+      };
+      for (const item of adjustmentItems) {
+        postCountAdjustment(item);
       }
 
       // Update count status
@@ -512,8 +515,8 @@ class PhysicalCountModel {
       const byItemId = new Map(items.map((i) => [i.item_id, i]));
 
       // ---- 1. Reverse the original adjustments (stock + GL). ----------
-      for (const item of items) {
-        if (!item.adjustment_posted || item.variance === null || item.variance === 0) continue;
+      const reverseCountAdjustment = (item: typeof items[number]): void => {
+        if (!item.adjustment_posted || item.variance === null || item.variance === 0) return;
 
         const originalVariance = item.variance; // signed: + surplus, − shortage
 
@@ -525,74 +528,80 @@ class PhysicalCountModel {
           });
         }
 
-        // Stock: reverse the variance effect.
-        //  - Surplus (+): draw down the ADJUSTMENT batch created at
-        //    completion (must still hold the full surplus, else refuse).
-        //  - Shortage (−): restore the FIFO layers the original completion
-        //    consumed — the reversal movement's consumed layers are the
-        //    provenance (stock_movements.batch_id on the original
-        //    adjustment), so add back to those exact batches. Without this
-        //    the batches-vs-balances invariant (Phase 5) drifts: balances
-        //    gain +|v| but the layers were zeroed at completion.
-        if (originalVariance > 0) {
-          const adjBatch = db.prepare(`
-            SELECT id, quantity_remaining FROM stock_batches
-            WHERE source_type = 'ADJUSTMENT' AND source_id = ?
-          `).get(data.countId) as { id: number; quantity_remaining: number } | undefined;
-          if (!adjBatch || Number(adjBatch.quantity_remaining) + 1e-9 < originalVariance) {
-            throw new Error(
-              `Cannot correct count ${count.count_no}: surplus units of item ${item.item_id} were already consumed`
-            );
-          }
-          if (isFeatureEnabled(db, 'feature_batch_locations')) {
-            const locRow = db.prepare(`
-              SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
-            `).get(count.warehouse_id) as { id: number } | undefined;
-            if (locRow) {
-              db.prepare(`
-                UPDATE batch_stock_by_location
-                SET quantity_physical = quantity_physical - ?, quantity_available = quantity_available - ?
-                WHERE batch_id = ? AND location_id = ?
-              `).run(originalVariance, originalVariance, adjBatch.id, locRow.id);
+        const reverseCountStockVariance = (): void => {
+          // Stock: reverse the variance effect.
+          //  - Surplus (+): draw down the ADJUSTMENT batch created at
+          //    completion (must still hold the full surplus, else refuse).
+          //  - Shortage (−): restore the FIFO layers the original completion
+          //    consumed — the reversal movement's consumed layers are the
+          //    provenance (stock_movements.batch_id on the original
+          //    adjustment), so add back to those exact batches. Without this
+          //    the batches-vs-balances invariant (Phase 5) drifts: balances
+          //    gain +|v| but the layers were zeroed at completion.
+          if (originalVariance > 0) {
+            const adjBatch = db.prepare(`
+              SELECT id, quantity_remaining FROM stock_batches
+              WHERE source_type = 'ADJUSTMENT' AND source_id = ?
+            `).get(data.countId) as { id: number; quantity_remaining: number } | undefined;
+            if (!adjBatch || Number(adjBatch.quantity_remaining) + 1e-9 < originalVariance) {
+              throw new Error(
+                `Cannot correct count ${count.count_no}: surplus units of item ${item.item_id} were already consumed`
+              );
+            }
+            if (isFeatureEnabled(db, 'feature_batch_locations')) {
+              const locRow = db.prepare(`
+                SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
+              `).get(count.warehouse_id) as { id: number } | undefined;
+              if (locRow) {
+                db.prepare(`
+                  UPDATE batch_stock_by_location
+                  SET quantity_physical = quantity_physical - ?, quantity_available = quantity_available - ?
+                  WHERE batch_id = ? AND location_id = ?
+                `).run(originalVariance, originalVariance, adjBatch.id, locRow.id);
+              }
+            } else {
+              db.prepare(`UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?`)
+                .run(originalVariance, adjBatch.id);
             }
           } else {
-            db.prepare(`UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?`)
-              .run(originalVariance, adjBatch.id);
-          }
-        } else {
-          // Shortage: restore the layers consumed by the original
-          // adjustment movement (its batch_id is the primary consumed
-          // layer). Layer provenance across multiple batches is recorded
-          // only on the primary batch, so restore the full shortage there;
-          // the re-application step below re-consumes FIFO-oldest layers,
-          // netting aggregate layer quantity back out exactly.
-          if (item.adjustment_movement_id !== null) {
-            const origMovement = db.prepare(`
-              SELECT batch_id, quantity FROM stock_movements WHERE id = ?
-            `).get(item.adjustment_movement_id) as { batch_id: number | null; quantity: number } | undefined;
-            if (origMovement?.batch_id != null) {
-              if (isFeatureEnabled(db, 'feature_batch_locations')) {
-                const locRow = db.prepare(`
-                  SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
-                `).get(count.warehouse_id) as { id: number } | undefined;
-                if (locRow) {
-                  db.prepare(`
-                    INSERT INTO batch_stock_by_location (batch_id, location_id, quantity_physical, quantity_reserved, quantity_available)
-                    VALUES (?, ?, ?, 0, ?)
-                    ON CONFLICT(batch_id, location_id) DO UPDATE SET
-                      quantity_physical = quantity_physical + excluded.quantity_physical,
-                      quantity_available = quantity_available + excluded.quantity_available
-                  `).run(origMovement.batch_id, locRow.id, Math.abs(originalVariance), Math.abs(originalVariance));
+            const restoreCountShortage = (): void => {
+              // Shortage: restore the layers consumed by the original
+              // adjustment movement (its batch_id is the primary consumed
+              // layer). Layer provenance across multiple batches is recorded
+              // only on the primary batch, so restore the full shortage there;
+              // the re-application step below re-consumes FIFO-oldest layers,
+              // netting aggregate layer quantity back out exactly.
+              if (item.adjustment_movement_id !== null) {
+                const origMovement = db.prepare(`
+                  SELECT batch_id, quantity FROM stock_movements WHERE id = ?
+                `).get(item.adjustment_movement_id) as { batch_id: number | null; quantity: number } | undefined;
+                if (origMovement?.batch_id != null) {
+                  if (isFeatureEnabled(db, 'feature_batch_locations')) {
+                    const locRow = db.prepare(`
+                      SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
+                    `).get(count.warehouse_id) as { id: number } | undefined;
+                    if (locRow) {
+                      db.prepare(`
+                        INSERT INTO batch_stock_by_location (batch_id, location_id, quantity_physical, quantity_reserved, quantity_available)
+                        VALUES (?, ?, ?, 0, ?)
+                        ON CONFLICT(batch_id, location_id) DO UPDATE SET
+                          quantity_physical = quantity_physical + excluded.quantity_physical,
+                          quantity_available = quantity_available + excluded.quantity_available
+                      `).run(origMovement.batch_id, locRow.id, Math.abs(originalVariance), Math.abs(originalVariance));
+                    }
+                  } else {
+                    db.prepare(`
+                      UPDATE stock_batches
+                      SET quantity_remaining = quantity_remaining + ? WHERE id = ?
+                    `).run(Math.abs(originalVariance), origMovement.batch_id);
+                  }
                 }
-              } else {
-                db.prepare(`
-                  UPDATE stock_batches
-                  SET quantity_remaining = quantity_remaining + ? WHERE id = ?
-                `).run(Math.abs(originalVariance), origMovement.batch_id);
               }
-            }
+            };
+            restoreCountShortage();
           }
-        }
+        };
+        reverseCountStockVariance();
 
         // Append-only CORRECTION movement (equal and opposite).
         const reverseNo = StockMovementModel.generateMovementNo(db);
@@ -621,12 +630,15 @@ class PhysicalCountModel {
           SET quantity = quantity - ?, last_updated = CURRENT_TIMESTAMP
           WHERE item_id = ? AND warehouse_id = ?
         `).run(originalVariance, item.item_id, count.warehouse_id);
+      };
+      for (const item of items) {
+        reverseCountAdjustment(item);
       }
 
       // ---- 2. Re-apply corrected variances via recordCount + completeCount
       //      semantics. We cannot reuse completeCount (it flips status), so
       //      mirror its per-item posting logic here.
-      for (const correction of data.corrections) {
+      const postCorrectedCountItem = (correction: typeof data.corrections[number]): void => {
         const item = byItemId.get(correction.item_id);
         if (!item) {
           throw new Error(
@@ -744,6 +756,9 @@ class PhysicalCountModel {
             createdBy: userId
           }), movementId);
         }
+      };
+      for (const correction of data.corrections) {
+        postCorrectedCountItem(correction);
       }
 
       // ---- 3. Stamp + log. --------------------------------------------

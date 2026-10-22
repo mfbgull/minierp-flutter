@@ -17,28 +17,11 @@
  *   node dist/scripts/backfill-ledger-dates.js            (dry run)
  *   node dist/scripts/backfill-ledger-dates.js --apply    (write)
  */
-const path = require('path');
-const fs = require('fs');
-
-function resolveDbPath() {
-  const candidates = [
-    process.env.DATABASE_PATH && path.join(process.env.DATABASE_PATH, 'erp.db'),
-    process.env.DATABASE_PATH,
-    path.join(__dirname, '../../../database/erp.db'),
-    path.join(__dirname, '../../database/erp.db'),
-  ].filter(Boolean);
-  for (const p of candidates) {
-    if (fs.existsSync(p)) return p;
-  }
-  console.error('[backfill-ledger-dates] database not found; set DATABASE_PATH');
-  process.exit(1);
-}
+const { openMaintenanceDatabase } = require('./lib/maintenance-database');
 
 function main() {
   const apply = process.argv.includes('--apply');
-  const dbPath = resolveDbPath();
-  const Database = require('better-sqlite3');
-  const db = new Database(dbPath);
+  const db = openMaintenanceDatabase(__dirname, 'backfill-ledger-dates');
 
   try {
     // Candidate rows: any row whose transaction_date does not already match

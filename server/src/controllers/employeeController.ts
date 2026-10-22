@@ -1,3 +1,4 @@
+import { localMonthCode } from '../utils/documentNumbering';
 import { Request, Response } from 'express';
 import type Database from 'better-sqlite3';
 import { AuthRequest } from '../types';
@@ -5,7 +6,7 @@ import { logCRUD, ActionType } from '../services/activityLogger';
 import db from '../config/database';
 import logger from '../utils/logger';
 import { initializeSequenceFromMax, getNextSequenceNumber } from '../utils/sequence';
-import EmployeeModel from '../models/Employee';
+import EmployeeModel, { Employee } from '../models/Employee';
 import { EmployeeLoanModel } from '../models/EmployeeLoan';
 import { AccountingService } from '../services/accountingService';
 import { isValidPaymentMethod } from '../services/cashService';
@@ -23,6 +24,23 @@ import { roundCurrency } from '../utils/currency';
 import { defaultUploadsDir } from '../utils/serverRoot';
 import { BusinessRuleError, handleBusinessError } from '../utils/businessRuleError';
 import { assertCashTimeline } from '../services/cashBalanceGuard';
+
+function findEmployeeForResponse(employeeId: number, res: Response) {
+  const record = EmployeeModel.getById(employeeId, db);
+  if (!record) res.status(404).json({ success: false, error: 'Employee not found' });
+  return record;
+}
+
+/**
+ * Resolve the employee named by the :id route param, answering the standard
+ * 404 when the id is unparseable or unknown. Handlers return early on
+ * undefined, so the guard stays a single line at each call site.
+ */
+function employeeForRequest(req: Request, res: Response): Employee | undefined {
+  const { id } = req.params;
+  const employeeId = parseInt(Array.isArray(id) ? id[0] : id, 10);
+  return findEmployeeForResponse(employeeId, res);
+}
 
 function getEmployees(req: Request, res: Response): void {
   try {
@@ -64,13 +82,8 @@ function getEmployees(req: Request, res: Response): void {
 
 function getEmployee(req: Request, res: Response): void {
   try {
-    const { id } = req.params;
-    const employeeId = parseInt(Array.isArray(id) ? id[0] : id, 10);
-    const employee = EmployeeModel.getById(employeeId, db);
-    if (!employee) {
-      res.status(404).json({ success: false, error: 'Employee not found' });
-      return;
-    }
+    const employee = employeeForRequest(req, res);
+    if (!employee) return;
     res.json({ success: true, data: employee });
   } catch (error) {
     logger.error('Error fetching employee:', error);
@@ -106,9 +119,7 @@ function createEmployee(req: Request, res: Response): void {
     initializeSequenceFromMax(db, 'EMP_last_no', 'employees', 'employee_code', 'EMP-');
     const nextNumber = getNextSequenceNumber(db, 'EMP_last_no');
     const now = new Date();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const year = String(now.getFullYear()).slice(-2);
-    const employee_code = `EMP-${month}${year}-${String(nextNumber).padStart(5, '0')}`;
+    const employee_code = `EMP-${localMonthCode(now)}-${String(nextNumber).padStart(5, '0')}`;
 
     const id = EmployeeModel.create({
       employee_code,
@@ -201,16 +212,12 @@ function getNextEmployeeCode(req: Request, res: Response): void {
     initializeSequenceFromMax(db, 'EMP_last_no', 'employees', 'employee_code', 'EMP-');
     const nextNumber = getNextSequenceNumber(db, 'EMP_last_no');
     const now = new Date();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const year = String(now.getFullYear()).slice(-2);
-    const code = `EMP-${month}${year}-${String(nextNumber).padStart(5, '0')}`;
+    const code = `EMP-${localMonthCode(now)}-${String(nextNumber).padStart(5, '0')}`;
     res.json({ success: true, data: { code } });
   } catch (error) {
     logger.error('Error generating employee code:', error);
     const now = new Date();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const year = String(now.getFullYear()).slice(-2);
-    const code = `EMP-${month}${year}-00001`;
+    const code = `EMP-${localMonthCode(now)}-00001`;
     res.json({ success: true, data: { code } });
   }
 }
@@ -351,22 +358,66 @@ function applySalaryLoanDeduction(
   if (repaymentEntry) EmployeeLoanModel.updateRepaymentJournal(repaymentId, repaymentEntry.journal_entry_id, db);
 }
 
+function fullSalaryConflict(employeeId: number, paymentDate: string, paymentType: string): string | null {
+  // Duplicate guard: reject a 'full' payment if one already exists for the month.
+  // Advance and partial payments are always allowed.
+  if (paymentType === 'full') {
+    const payPeriod = paymentDate.substring(0, 7); // YYYY-MM
+    const existingFull = db.prepare(
+      `SELECT id FROM salary_payments WHERE employee_id = ? AND pay_period = ? AND payment_type = 'full' AND voided_at IS NULL`
+    ).get(employeeId, payPeriod) as { id: number } | undefined;
+    if (existingFull) {
+      const monthName = new Date(payPeriod + '-01').toLocaleString('en-US', { month: 'long', year: 'numeric' });
+      return `Full salary already paid for ${monthName}`;
+    }
+  }
+
+  return null;
+}
+
+function resolveLoanRepaymentMethod(employeeId: number, input: { salary_payment_id?: number; payment_method?: string; payment_date: string; amount: number }): string {
+  const { salary_payment_id, payment_method, payment_date, amount } = input;
+  let repaymentMethod: string = payment_method || 'cash';
+  if (salary_payment_id) {
+    const salaryPayment = EmployeeModel.getSalaryPayment(Number(salary_payment_id), db);
+    if (!salaryPayment || salaryPayment.employee_id !== employeeId || salaryPayment.voided_at || salaryPayment.parent_payment_id) {
+      throw new BusinessRuleError(400, 'Salary deduction requires an active salary payment for this employee');
+    }
+    if (payment_date < salaryPayment.payment_date) {
+      throw new BusinessRuleError(400, 'Salary deduction cannot precede its salary payment');
+    }
+    if (payment_method && AccountingService._cashOrBankAccountCode(payment_method) !==
+        AccountingService._cashOrBankAccountCode(salaryPayment.payment_method)) {
+      throw new BusinessRuleError(400, 'Salary deduction must use the salary payment account');
+    }
+    const deducted = db.prepare<[number], { total: number }>(
+      'SELECT COALESCE(SUM(amount), 0) AS total FROM employee_loan_repayments WHERE salary_payment_id = ? AND voided_at IS NULL'
+    ).get(salaryPayment.id);
+    if (roundCurrency((deducted?.total ?? 0) + Number(amount)) > salaryPayment.amount) {
+      throw new BusinessRuleError(400, 'Salary deductions exceed the salary payment amount');
+    }
+    repaymentMethod = salaryPayment.payment_method;
+  }
+  return repaymentMethod;
+}
+
+function validateSalaryLoanDeduction(loanDeduction: unknown): void {
+  if (loanDeduction !== undefined && (typeof loanDeduction !== 'number' || !Number.isFinite(loanDeduction) || loanDeduction < 0)) {
+    throw new BusinessRuleError(400, 'Loan deduction must be a non-negative finite amount');
+  }
+}
+
 function paySalary(req: Request, res: Response): void {
   try {
     const { id } = req.params;
     const employeeId = parseInt(Array.isArray(id) ? id[0] : id, 10);
     const authReq = req as AuthRequest;
 
-    const employee = EmployeeModel.getById(employeeId, db);
-    if (!employee) {
-      res.status(404).json({ success: false, error: 'Employee not found' });
-      return;
-    }
+    const employee = findEmployeeForResponse(employeeId, res);
+    if (!employee) return;
 
     const { amount, payment_date, payment_method, reference_no, notes, payment_type, loan_deduction, loan_id } = req.body;
-    if (loan_deduction !== undefined && (typeof loan_deduction !== 'number' || !Number.isFinite(loan_deduction) || loan_deduction < 0)) {
-      throw new BusinessRuleError(400, 'Loan deduction must be a non-negative finite amount');
-    }
+    validateSalaryLoanDeduction(loan_deduction);
     if (typeof amount !== 'number' || !Number.isFinite(amount) || roundCurrency(amount) <= 0) {
       res.status(422).json({ success: false, error: 'Valid amount is required' });
       return;
@@ -407,21 +458,10 @@ function paySalary(req: Request, res: Response): void {
       return;
     }
 
-    // Duplicate guard: reject a 'full' payment if one already exists for the month.
-    // Advance and partial payments are always allowed.
-    if (safeType === 'full') {
-      const payPeriod = payment_date.substring(0, 7); // YYYY-MM
-      const existingFull = db.prepare(
-        `SELECT id FROM salary_payments WHERE employee_id = ? AND pay_period = ? AND payment_type = 'full' AND voided_at IS NULL`
-      ).get(employeeId, payPeriod) as { id: number } | undefined;
-      if (existingFull) {
-        const monthName = new Date(payPeriod + '-01').toLocaleString('en-US', { month: 'long', year: 'numeric' });
-        res.status(409).json({
-          success: false,
-          error: `Full salary already paid for ${monthName}`,
-        });
-        return;
-      }
+    const salaryConflict = fullSalaryConflict(employeeId, payment_date, safeType);
+    if (salaryConflict) {
+      res.status(409).json({ success: false, error: salaryConflict });
+      return;
     }
 
     const trx = db.transaction(() => {
@@ -481,16 +521,10 @@ function paySalary(req: Request, res: Response): void {
 
 function getSalaryHistory(req: Request, res: Response): void {
   try {
-    const { id } = req.params;
-    const employeeId = parseInt(Array.isArray(id) ? id[0] : id, 10);
+    const employee = employeeForRequest(req, res);
+    if (!employee) return;
 
-    const employee = EmployeeModel.getById(employeeId, db);
-    if (!employee) {
-      res.status(404).json({ success: false, error: 'Employee not found' });
-      return;
-    }
-
-    const history = EmployeeModel.getSalaryHistory(employeeId, db);
+    const history = EmployeeModel.getSalaryHistory(employee.id, db);
     res.json({ success: true, data: history });
   } catch (error) {
     logger.error('Error fetching salary history:', error);
@@ -504,11 +538,8 @@ function getSalaryMonthDetail(req: Request, res: Response): void {
     const employeeId = parseInt(Array.isArray(id) ? id[0] : id, 10);
     const payPeriod = Array.isArray(rawPeriod) ? rawPeriod[0] : rawPeriod;
 
-    const employee = EmployeeModel.getById(employeeId, db);
-    if (!employee) {
-      res.status(404).json({ success: false, error: 'Employee not found' });
-      return;
-    }
+    const employee = findEmployeeForResponse(employeeId, res);
+    if (!employee) return;
 
     const detail = EmployeeModel.getSalaryMonthDetail(employeeId, payPeriod, db);
     res.json({ success: true, data: detail });
@@ -525,11 +556,8 @@ function deleteSalaryPayment(req: Request, res: Response): void {
     const salaryPaymentId = parseInt(Array.isArray(paymentId) ? paymentId[0] : paymentId, 10);
     const authReq = req as AuthRequest;
 
-    const employee = EmployeeModel.getById(employeeId, db);
-    if (!employee) {
-      res.status(404).json({ success: false, error: 'Employee not found' });
-      return;
-    }
+    const employee = findEmployeeForResponse(employeeId, res);
+    if (!employee) return;
 
     const payment = EmployeeModel.getSalaryPayment(salaryPaymentId, db);
     if (!payment || payment.employee_id !== employeeId) {
@@ -610,16 +638,10 @@ function deleteSalaryPayment(req: Request, res: Response): void {
 
 function getEmployeeDocuments(req: Request, res: Response): void {
   try {
-    const { id } = req.params;
-    const employeeId = parseInt(Array.isArray(id) ? id[0] : id, 10);
+    const employee = employeeForRequest(req, res);
+    if (!employee) return;
 
-    const employee = EmployeeModel.getById(employeeId, db);
-    if (!employee) {
-      res.status(404).json({ success: false, error: 'Employee not found' });
-      return;
-    }
-
-    const documents = EmployeeModel.getDocuments(employeeId, db);
+    const documents = EmployeeModel.getDocuments(employee.id, db);
     res.json({ success: true, data: documents });
   } catch (error) {
     logger.error('Error fetching employee documents:', error);
@@ -629,14 +651,8 @@ function getEmployeeDocuments(req: Request, res: Response): void {
 
 function addEmployeeDocument(req: Request, res: Response): void {
   try {
-    const { id } = req.params;
-    const employeeId = parseInt(Array.isArray(id) ? id[0] : id, 10);
-
-    const employee = EmployeeModel.getById(employeeId, db);
-    if (!employee) {
-      res.status(404).json({ success: false, error: 'Employee not found' });
-      return;
-    }
+    const employee = employeeForRequest(req, res);
+    if (!employee) return;
 
     const { document_name, document_type, document_number, issue_date, expiry_date, file_path, notes } = req.body;
 
@@ -656,7 +672,7 @@ function addEmployeeDocument(req: Request, res: Response): void {
     const filePath = uploadedFile ? uploadedFile.filename : file_path || null;
 
     const docId = EmployeeModel.addDocument({
-      employee_id: employeeId,
+      employee_id: employee.id,
       document_name: document_name.trim(),
       document_type,
       document_number,
@@ -679,11 +695,8 @@ function removeEmployeeDocument(req: Request, res: Response): void {
     const employeeId = parseInt(Array.isArray(id) ? id[0] : id, 10);
     const documentId = parseInt(Array.isArray(docId) ? docId[0] : docId, 10);
 
-    const employee = EmployeeModel.getById(employeeId, db);
-    if (!employee) {
-      res.status(404).json({ success: false, error: 'Employee not found' });
-      return;
-    }
+    const employee = findEmployeeForResponse(employeeId, res);
+    if (!employee) return;
 
     // The document must belong to the employee in the URL (FILE-001).
     const doc = db.prepare('SELECT file_path FROM employee_documents WHERE id = ? AND employee_id = ?')
@@ -715,20 +728,14 @@ function removeEmployeeDocument(req: Request, res: Response): void {
 
 function getLoans(req: Request, res: Response): void {
   try {
-    const { id } = req.params;
-    const employeeId = parseInt(Array.isArray(id) ? id[0] : id, 10);
-
-    const employee = EmployeeModel.getById(employeeId, db);
-    if (!employee) {
-      res.status(404).json({ success: false, error: 'Employee not found' });
-      return;
-    }
+    const employee = employeeForRequest(req, res);
+    if (!employee) return;
 
     // Auto-update overdue statuses
     EmployeeLoanModel.updateOverdueStatuses(db);
 
-    const loans = EmployeeLoanModel.getByEmployee(employeeId, db);
-    const summary = EmployeeLoanModel.getSummary(employeeId, db);
+    const loans = EmployeeLoanModel.getByEmployee(employee.id, db);
+    const summary = EmployeeLoanModel.getSummary(employee.id, db);
 
     res.json({
       success: true,
@@ -754,11 +761,8 @@ function createLoan(req: Request, res: Response): void {
     const employeeId = parseInt(Array.isArray(id) ? id[0] : id, 10);
     const authReq = req as AuthRequest;
 
-    const employee = EmployeeModel.getById(employeeId, db);
-    if (!employee) {
-      res.status(404).json({ success: false, error: 'Employee not found' });
-      return;
-    }
+    const employee = findEmployeeForResponse(employeeId, res);
+    if (!employee) return;
 
     const { amount, disbursement_date, due_date, purpose, payment_method, monthly_installment, notes } = req.body;
     if (typeof amount !== 'number' || !Number.isFinite(amount) || roundCurrency(amount) <= 0) {
@@ -888,27 +892,7 @@ function repayLoan(req: Request, res: Response): void {
     const employee = EmployeeModel.getById(employeeId, db);
 
     const trx = db.transaction(() => {
-      let repaymentMethod: string = payment_method || 'cash';
-      if (isSalaryDeduction) {
-        const salaryPayment = EmployeeModel.getSalaryPayment(Number(salary_payment_id), db);
-        if (!salaryPayment || salaryPayment.employee_id !== employeeId || salaryPayment.voided_at || salaryPayment.parent_payment_id) {
-          throw new BusinessRuleError(400, 'Salary deduction requires an active salary payment for this employee');
-        }
-        if (payment_date < salaryPayment.payment_date) {
-          throw new BusinessRuleError(400, 'Salary deduction cannot precede its salary payment');
-        }
-        if (payment_method && AccountingService._cashOrBankAccountCode(payment_method) !==
-            AccountingService._cashOrBankAccountCode(salaryPayment.payment_method)) {
-          throw new BusinessRuleError(400, 'Salary deduction must use the salary payment account');
-        }
-        const deducted = db.prepare<[number], { total: number }>(
-          'SELECT COALESCE(SUM(amount), 0) AS total FROM employee_loan_repayments WHERE salary_payment_id = ? AND voided_at IS NULL'
-        ).get(salaryPayment.id);
-        if (roundCurrency((deducted?.total ?? 0) + Number(amount)) > salaryPayment.amount) {
-          throw new BusinessRuleError(400, 'Salary deductions exceed the salary payment amount');
-        }
-        repaymentMethod = salaryPayment.payment_method;
-      }
+      const repaymentMethod = resolveLoanRepaymentMethod(employeeId, { salary_payment_id, payment_method, payment_date, amount });
       const repaymentId = EmployeeLoanModel.addRepayment({
         loan_id: parsedLoanId,
         employee_id: employeeId,

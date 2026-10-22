@@ -1,3 +1,4 @@
+import { localMonthCode } from '../utils/documentNumbering';
 import Database from 'better-sqlite3';
 import AccountingService from '../services/accountingService';
 import { assertCashTimeline } from '../services/cashBalanceGuard';
@@ -42,13 +43,12 @@ interface OwnerCapitalRow {
 
 export function generateCapitalNo(db: Database.Database, capitalDate: string): string {
   const date = new Date(capitalDate);
-  const year = date.getFullYear().toString().slice(-2);
-  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const monthCode = localMonthCode(date, 'YYMM');
 
   // Shared atomic counter, allocated inside the same transaction as the
   // INSERT (EXP-05 pattern); UNIQUE(capital_no) backstops it.
-  const nextNo = getNextSequenceNumber(db, `CAP_last_no_${year}${month}`);
-  return `CAP-${year}${month}-${String(nextNo).padStart(5, '0')}`;
+  const nextNo = getNextSequenceNumber(db, `CAP_last_no_${monthCode}`);
+  return `CAP-${monthCode}-${String(nextNo).padStart(5, '0')}`;
 }
 
 function create(db: Database.Database, data: CreateOwnerCapitalDTO): number {

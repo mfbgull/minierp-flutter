@@ -107,6 +107,31 @@ async function createUser(req: AuthRequest, res: Response): Promise<void> {
   }
 }
 
+function userIdentityConflict(userId: number, existingUser: { username: string; email?: string | null }, identity: { username?: string; email?: string }): string | null {
+  const { username, email } = identity;
+  if (username && username !== existingUser.username && UserModel.usernameExists(db, username, userId)) {
+    return 'Username already exists';
+  }
+
+  if (email && email !== existingUser.email && UserModel.emailExists(db, email, userId)) {
+    return 'Email already exists';
+  }
+
+  return null;
+}
+
+function handleUpdateUserError(res: Response, error: unknown) {
+  const message = error instanceof Error ? error.message : 'Failed to update user';
+  if (message === 'User not found') {
+    res.status(404).json({ error: message });
+  } else if (message === 'No fields to update') {
+    res.status(400).json({ error: message });
+  } else {
+    logger.error('Update user error:', error);
+    res.status(500).json({ error: 'Failed to update user' });
+  }
+}
+
 function updateUser(req: AuthRequest, res: Response): void {
   try {
     const userId = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
@@ -130,15 +155,8 @@ function updateUser(req: AuthRequest, res: Response): void {
     }
     if (role_id && denyIfRoleExceedsActor(req, res, role_id)) return;
 
-    if (username && username !== existingUser.username && UserModel.usernameExists(db, username, userId)) {
-      res.status(409).json({ error: 'Username already exists' });
-      return;
-    }
-
-    if (email && email !== existingUser.email && UserModel.emailExists(db, email, userId)) {
-      res.status(409).json({ error: 'Email already exists' });
-      return;
-    }
+    const identityConflict = userIdentityConflict(userId, existingUser, { username, email });
+    if (identityConflict) { res.status(409).json({ error: identityConflict }); return; }
 
     UserModel.update(db, userId, { username, email, full_name, role_id, is_active });
 
@@ -148,15 +166,7 @@ function updateUser(req: AuthRequest, res: Response): void {
     const updatedUser = UserModel.getPublicById(userId, db);
     res.json({ success: true, data: updatedUser });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Failed to update user';
-    if (message === 'User not found') {
-      res.status(404).json({ error: message });
-    } else if (message === 'No fields to update') {
-      res.status(400).json({ error: message });
-    } else {
-      logger.error('Update user error:', error);
-      res.status(500).json({ error: 'Failed to update user' });
-    }
+    return handleUpdateUserError(res, error);
   }
 }
 

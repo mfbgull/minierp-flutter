@@ -105,6 +105,29 @@ function validateInput(input: InvoiceCreationInput): void {
   }
 }
 
+function invoicePaymentLegs(input: InvoiceCreationInput): { legs: readonly InvoiceCreationPayment[]; legsTotal: number } {
+  const legs: readonly InvoiceCreationPayment[] = input.payments !== undefined
+    ? input.payments
+    : input.recordPayment && input.payment
+      ? [input.payment]
+      : [];
+
+  let legsTotal = 0;
+  for (const leg of legs) {
+    const legAmount = parseCurrency(leg.amount);
+    if (legAmount < 0) throw new BusinessRuleError(400, 'Payment amounts must be non-negative');
+    if (legAmount > 0 && !isValidPaymentMethod(leg.payment_method ?? 'Cash')) {
+      throw new InvoiceCreationPaymentMethodError(leg.payment_method);
+    }
+    // addCurrency, not `+=`: summing several 2dp legs in floating point
+    // can land a cent low and flip a fully-settled invoice to
+    // 'Partially Paid'.
+    legsTotal = addCurrency(legsTotal, legAmount);
+  }
+
+  return { legs, legsTotal };
+}
+
 export class InvoiceCreationService {
   constructor(private readonly db: Database.Database) {}
 
@@ -120,24 +143,7 @@ export class InvoiceCreationService {
       throw new InvoiceCreationTotalMismatchError(input.totalAmount, totalAmount);
     }
 
-    const legs: readonly InvoiceCreationPayment[] = input.payments !== undefined
-      ? input.payments
-      : input.recordPayment && input.payment
-        ? [input.payment]
-        : [];
-
-    let legsTotal = 0;
-    for (const leg of legs) {
-      const legAmount = parseCurrency(leg.amount);
-      if (legAmount < 0) throw new BusinessRuleError(400, 'Payment amounts must be non-negative');
-      if (legAmount > 0 && !isValidPaymentMethod(leg.payment_method ?? 'Cash')) {
-        throw new InvoiceCreationPaymentMethodError(leg.payment_method);
-      }
-      // addCurrency, not `+=`: summing several 2dp legs in floating point
-      // can land a cent low and flip a fully-settled invoice to
-      // 'Partially Paid'.
-      legsTotal = addCurrency(legsTotal, legAmount);
-    }
+    const { legs, legsTotal } = invoicePaymentLegs(input);
 
     const creditOffset = parseCurrency(input.creditOffset);
     if (creditOffset < 0) throw new BusinessRuleError(400, 'Credit offset must be non-negative');
@@ -161,13 +167,8 @@ export class InvoiceCreationService {
         this.db, input.invoiceDate, `Invoice dated ${input.invoiceDate}`,
       );
 
-      if (input.idempotency) {
-        const existing = findIdempotencyRecord(this.db, input.idempotency.scope, input.idempotency.key);
-        if (existing) {
-          if (existing.request_hash !== input.idempotency.hash) throw new InvoiceCreationIdempotencyError();
-          if (existing.resource_id !== null) return this.resultFromExisting(existing.resource_id, true);
-        }
-      }
+      const replay = this.replayInvoice(input);
+      if (replay) return replay;
 
       if (!this.db.prepare('SELECT id FROM customers WHERE id = ?').get(input.customerId)) {
         throw new BusinessRuleError(404, `Customer ${input.customerId} not found`);
@@ -180,14 +181,7 @@ export class InvoiceCreationService {
       const missingId = itemIds.find(id => !foundIds.has(id));
       if (missingId !== undefined) throw new BusinessRuleError(404, `Item ${missingId} not found`);
 
-      if (creditOffset > 0) {
-        const customer = this.db.prepare(`
-          SELECT current_balance, COALESCE(credit_balance, 0) AS credit_balance
-          FROM customers WHERE id = ?
-        `).get(input.customerId) as { current_balance: number; credit_balance: number } | undefined;
-        const available = Math.max(0, customer?.credit_balance ?? 0) + Math.abs(Math.min(0, customer?.current_balance ?? 0));
-        if (creditOffset > available + 0.005) throw new InvoiceCreationCreditError(creditOffset, available);
-      }
+      this.assertCreditOffset(input, creditOffset);
 
       const invoiceNo = input.invoiceNo || generateDocNo(this.db, 'INV', 5);
       const invoiceId = InvoiceModel.createInvoice(this.db, {
@@ -236,15 +230,7 @@ export class InvoiceCreationService {
       if (cogsAmount > 0) AccountingService.postCOGSEntry(this.db, { invoiceId, invoiceNo, cogsAmount: parseCurrency(cogsAmount), invoiceDate: input.invoiceDate, userId: input.userId });
 
       const { paymentId, paymentNo } = this.recordPaymentLegs(legs, invoiceId, input);
-      if (creditOffset > 0) {
-        AccountingService.postCreditOffsetEntry(this.db, { invoiceId, invoiceNo, amount: creditOffset, invoiceDate: input.invoiceDate, customerId: input.customerId, userId: input.userId });
-        const customer = this.db.prepare('SELECT COALESCE(credit_balance, 0) AS credit_balance FROM customers WHERE id = ?').get(input.customerId) as { credit_balance: number };
-        const poolApplied = Math.min(creditOffset, Math.max(0, customer.credit_balance));
-        if (poolApplied > 0) {
-          this.db.prepare('UPDATE customers SET credit_balance = MAX(0, credit_balance - ?) WHERE id = ?').run(poolApplied, input.customerId);
-          InvoiceModel.createLedgerEntry(this.db, input.customerId, 'CREDIT', `CREDIT-${invoiceNo}`, input.invoiceDate, 0, poolApplied, `Store credit applied to Invoice ${invoiceNo}`);
-        }
-      }
+      this.applyCreditOffset(input, { invoiceId, invoiceNo }, creditOffset);
       if (input.afterCreate) input.afterCreate(invoiceId, invoiceNo);
       ledgerUtils.rebuildLedgerBalances(input.customerId, this.db);
       ledgerUtils.recalcCustomerBalanceFromLedger(input.customerId, this.db);
@@ -359,6 +345,43 @@ export class InvoiceCreationService {
       paymentNo = paymentNo ?? recorded.paymentNo;
     }
     return { paymentId, paymentNo };
+  }
+
+  private replayInvoice(input: InvoiceCreationInput): InvoiceCreationResult | undefined {
+    if (input.idempotency) {
+      const existing = findIdempotencyRecord(this.db, input.idempotency.scope, input.idempotency.key);
+      if (existing) {
+        if (existing.request_hash !== input.idempotency.hash) throw new InvoiceCreationIdempotencyError();
+        if (existing.resource_id !== null) return this.resultFromExisting(existing.resource_id, true);
+      }
+    }
+
+    return undefined;
+  }
+
+  private assertCreditOffset(input: InvoiceCreationInput, creditOffset: number): void {
+    if (creditOffset > 0) {
+      const customer = this.db.prepare(`
+        SELECT current_balance, COALESCE(credit_balance, 0) AS credit_balance
+        FROM customers WHERE id = ?
+      `).get(input.customerId) as { current_balance: number; credit_balance: number } | undefined;
+      const available = Math.max(0, customer?.credit_balance ?? 0) + Math.abs(Math.min(0, customer?.current_balance ?? 0));
+      if (creditOffset > available + 0.005) throw new InvoiceCreationCreditError(creditOffset, available);
+    }
+
+  }
+
+  private applyCreditOffset(input: InvoiceCreationInput, invoice: { readonly invoiceId: number; readonly invoiceNo: string }, creditOffset: number): void {
+    const { invoiceId, invoiceNo } = invoice;
+    if (creditOffset > 0) {
+      AccountingService.postCreditOffsetEntry(this.db, { invoiceId, invoiceNo, amount: creditOffset, invoiceDate: input.invoiceDate, customerId: input.customerId, userId: input.userId });
+      const customer = this.db.prepare('SELECT COALESCE(credit_balance, 0) AS credit_balance FROM customers WHERE id = ?').get(input.customerId) as { credit_balance: number };
+      const poolApplied = Math.min(creditOffset, Math.max(0, customer.credit_balance));
+      if (poolApplied > 0) {
+        this.db.prepare('UPDATE customers SET credit_balance = MAX(0, credit_balance - ?) WHERE id = ?').run(poolApplied, input.customerId);
+        InvoiceModel.createLedgerEntry(this.db, input.customerId, 'CREDIT', `CREDIT-${invoiceNo}`, input.invoiceDate, 0, poolApplied, `Store credit applied to Invoice ${invoiceNo}`);
+      }
+    }
   }
 
   private resultFromExisting(invoiceId: number, replayed: boolean): InvoiceCreationResult {

@@ -1,3 +1,4 @@
+import { listPagination, listPageQuery } from '../utils/controllerPagination';
 import {
   IDEMPOTENCY_KEY_HEADER,
   IDEMPOTENCY_SCOPES,
@@ -68,6 +69,101 @@ function validateSingleItemPurchase(body: SingleItemPurchaseBody): string | null
   return null;
 }
 
+function respondToPurchaseReplay(req: AuthRequest, res: Response, replayId: number): void {
+  if (Array.isArray(req.body?.items)) {
+    const members = db.prepare('SELECT purchase_id FROM purchase_submission_items WHERE root_purchase_id = ? ORDER BY line_index').all(replayId) as { purchase_id: number }[];
+    if (members.length === req.body.items.length) {
+      res.status(201).json(members.map(member => Purchase.getById(member.purchase_id, db)));
+    } else if (members.length === 0 && req.body.items.length === 1) {
+      res.status(201).json([Purchase.getById(replayId, db)]);
+    } else {
+      res.status(409).json({ error: 'The original purchase was recorded before multi-item retry tracking. Review the saved purchases before submitting again.' });
+    }
+  } else {
+    res.status(201).json(Purchase.getById(replayId, db));
+  }
+}
+
+function validatePurchaseSupplier(req: AuthRequest, res: Response): boolean {
+  try {
+    requireSupplierForPurchase(req.body?.supplier_id, db);
+  } catch (supplierError) {
+    logger.warn(
+      'Record purchase rejected (ACCT-005): %s — body: %j',
+      (supplierError as Error).message,
+      req.body
+    );
+    res.status(400).json({
+      error: 'A supplier is required for all purchases.',
+      code: 'SUPPLIER_REQUIRED_FOR_PURCHASE',
+    });
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Multi-item payload (Record Purchase form's line items): one transaction
+ * creates one purchases row per item. Runs after the idempotency claim and
+ * the ACCT-005 supplier check, in that order.
+ */
+function recordMultiItemPurchase(req: AuthRequest, res: Response, idemKey: string | null, hash: string): void {
+  const items = req.body?.items as MultiItemPurchaseLine[];
+  if (items.length === 0) {
+    res.status(400).json({ error: 'At least one purchase item is required' });
+    return;
+  }
+  if (!req.body.warehouse_id || !req.body.purchase_date) {
+    res.status(400).json({ error: 'Warehouse and purchase date are required' });
+    return;
+  }
+  const lineError = validateMultiItemPurchaseLines(items);
+  if (lineError) {
+    res.status(400).json({ error: lineError });
+    return;
+  }
+
+  const created = db.transaction(() => {
+    const rows = Purchase.recordPurchaseMulti(req.body, req.user!.id, db);
+    if (idemKey) {
+      claimIdempotencyKey(db, IDEMPOTENCY_SCOPES.PURCHASE_RECORD, idemKey, hash, rows[0].id);
+    }
+    return rows;
+  })();
+  res.status(201).json(created);
+}
+
+/**
+ * Legacy flat single-item body. Same ordering as the multi-item path:
+ * validation before the transaction, idempotency claim inside it.
+ */
+function recordSingleItemPurchase(req: AuthRequest, res: Response, idemKey: string | null, hash: string): void {
+  const {
+    item_id,
+    warehouse_id,
+    quantity,
+    unit_cost,
+    purchase_date,
+  } = req.body;
+
+  const singleError = validateSingleItemPurchase({ item_id, warehouse_id, quantity, unit_cost, purchase_date });
+  if (singleError) {
+    res.status(400).json({ error: singleError });
+    return;
+  }
+
+  const purchase = db.transaction(() => {
+    const row = Purchase.recordPurchase(req.body, req.user!.id, db);
+    if (idemKey) {
+      claimIdempotencyKey(db, IDEMPOTENCY_SCOPES.PURCHASE_RECORD, idemKey, hash, row.id);
+    }
+    return row;
+  })();
+
+  res.status(201).json(purchase);
+}
+
 function recordPurchase(req: AuthRequest, res: Response): void {
   try {
     // audit-3 task 08: a purchase is the widest blast radius of any keyed
@@ -85,91 +181,21 @@ function recordPurchase(req: AuthRequest, res: Response): void {
     const { replayId } = beginIdempotentWrite(db, IDEMPOTENCY_SCOPES.PURCHASE_RECORD, idemKey, hash);
     if (replayId !== null) {
       if (idemKey) res.set('X-Idempotent-Replay', 'true');
-      if (Array.isArray(req.body?.items)) {
-        const members = db.prepare('SELECT purchase_id FROM purchase_submission_items WHERE root_purchase_id = ? ORDER BY line_index').all(replayId) as { purchase_id: number }[];
-        if (members.length === req.body.items.length) {
-          res.status(201).json(members.map(member => Purchase.getById(member.purchase_id, db)));
-        } else if (members.length === 0 && req.body.items.length === 1) {
-          res.status(201).json([Purchase.getById(replayId, db)]);
-        } else {
-          res.status(409).json({ error: 'The original purchase was recorded before multi-item retry tracking. Review the saved purchases before submitting again.' });
-        }
-      } else {
-        res.status(201).json(Purchase.getById(replayId, db));
-      }
+      respondToPurchaseReplay(req, res, replayId);
       return;
     }
     // ACCT-005: a purchase may not be created without an
     // identified, active supplier — no amount, payment method
     // or role is exempt. Rejected before any write so nothing
     // (row, line, journal entry, idempotency claim) survives.
-    try {
-      requireSupplierForPurchase(req.body?.supplier_id, db);
-    } catch (supplierError) {
-      logger.warn(
-        'Record purchase rejected (ACCT-005): %s — body: %j',
-        (supplierError as Error).message,
-        req.body
-      );
-      res.status(400).json({
-        error: 'A supplier is required for all purchases.',
-        code: 'SUPPLIER_REQUIRED_FOR_PURCHASE',
-      });
+    if (!validatePurchaseSupplier(req, res)) return;
+
+    // Multi-item payload vs the legacy flat single-item body.
+    if (Array.isArray(req.body?.items)) {
+      recordMultiItemPurchase(req, res, idemKey, hash);
       return;
     }
-    // Multi-item payload (Record Purchase form's line items): one
-    // transaction creates one purchases row per item. The flat
-    // single-item body remains the legacy path.
-    const items = req.body?.items;
-    if (Array.isArray(items)) {
-      if (items.length === 0) {
-        res.status(400).json({ error: 'At least one purchase item is required' });
-        return;
-      }
-      if (!req.body.warehouse_id || !req.body.purchase_date) {
-        res.status(400).json({ error: 'Warehouse and purchase date are required' });
-        return;
-      }
-      const lineError = validateMultiItemPurchaseLines(items);
-      if (lineError) {
-        res.status(400).json({ error: lineError });
-        return;
-      }
-
-      const created = db.transaction(() => {
-        const rows = Purchase.recordPurchaseMulti(req.body, req.user!.id, db);
-        if (idemKey) {
-          claimIdempotencyKey(db, IDEMPOTENCY_SCOPES.PURCHASE_RECORD, idemKey, hash, rows[0].id);
-        }
-        return rows;
-      })();
-      res.status(201).json(created);
-      return;
-    }
-
-    const {
-      item_id,
-      warehouse_id,
-      quantity,
-      unit_cost,
-      purchase_date,
-    } = req.body;
-
-    const singleError = validateSingleItemPurchase({ item_id, warehouse_id, quantity, unit_cost, purchase_date });
-    if (singleError) {
-      res.status(400).json({ error: singleError });
-      return;
-    }
-
-    const purchase = db.transaction(() => {
-      const row = Purchase.recordPurchase(req.body, req.user!.id, db);
-      if (idemKey) {
-        claimIdempotencyKey(db, IDEMPOTENCY_SCOPES.PURCHASE_RECORD, idemKey, hash, row.id);
-      }
-      return row;
-    })();
-
-    res.status(201).json(purchase);
+    recordSingleItemPurchase(req, res, idemKey, hash);
   } catch (error: unknown) {
     logger.error('Record purchase error:', error);
     if (error instanceof IdempotencyConflictError) {
@@ -182,8 +208,7 @@ function recordPurchase(req: AuthRequest, res: Response): void {
 
 function getPurchases(req: Request, res: Response): void {
   try {
-    const page = getQueryInteger(req.query.page, 1);
-    const limit = getQueryInteger(req.query.limit, 10);
+    const { page, limit } = listPageQuery(req.query);
     const startDateParam = getQueryParam(req.query.start_date);
     const endDateParam = getQueryParam(req.query.end_date);
     const itemIdParam = getQueryParam(req.query.item_id);
@@ -217,13 +242,7 @@ function getPurchases(req: Request, res: Response): void {
     res.json({
       success: true,
       data: rows,
-      pagination: {
-        currentPage: pageNum,
-        totalPages: Math.ceil(total / limitNum),
-        totalItems: total,
-        hasNext: pageNum < Math.ceil(total / limitNum),
-        hasPrev: pageNum > 1
-      }
+      pagination: listPagination(total, pageNum, limitNum)
     });
   } catch (error) {
     logger.error('Get purchases error:', error);

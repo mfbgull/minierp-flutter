@@ -31,6 +31,29 @@ function fail(message) {
   process.exit(1);
 }
 
+/** Human-readable message for an unknown thrown value. */
+function snapshotErrorMessage(err) {
+  return err && err.message ? err.message : String(err);
+}
+
+/** Best-effort delete: a missing file is not an error worth reporting. */
+function removeQuietly(target) {
+  try {
+    fs.rmSync(target, { force: true });
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Best-effort close: a handle that refuses to close must not mask the real error. */
+function closeQuietly(handle) {
+  try {
+    handle.close();
+  } catch {
+    /* ignore */
+  }
+}
+
 if (!fs.existsSync(dbPath)) {
   fail(`database not found at ${dbPath}`);
 }
@@ -40,7 +63,7 @@ fs.mkdirSync(backupDir, { recursive: true });
 const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 const backupPath = path.join(backupDir, `erp-backup-${timestamp}.db`);
 
-async function run() {
+async function createSnapshot() {
   let source;
   try {
     source = new Database(dbPath, { readonly: true });
@@ -49,12 +72,14 @@ async function run() {
     // the server holds the DB open in WAL mode.
     await source.backup(backupPath);
   } catch (err) {
-    try { fs.rmSync(backupPath, { force: true }); } catch { /* ignore */ }
-    fail(err && err.message ? err.message : String(err));
+    removeQuietly(backupPath);
+    fail(snapshotErrorMessage(err));
   } finally {
-    if (source) { try { source.close(); } catch { /* ignore */ } }
+    if (source) closeQuietly(source);
   }
+}
 
+function verifySnapshot() {
   // integrity_check on the snapshot itself (fresh connection)
   try {
     const checkDb = new Database(backupPath, { readonly: true });
@@ -68,7 +93,11 @@ async function run() {
   } catch (err) {
     fail(`integrity_check could not run: ${err && err.message ? err.message : err}`);
   }
+}
 
+async function run() {
+  await createSnapshot();
+  verifySnapshot();
   const bytes = fs.statSync(backupPath).size;
 
   // Prune to the newest MAX_BACKUPS snapshots.

@@ -1,6 +1,7 @@
 import request from 'supertest';
 import app from '../app';
 import db from '../config/database';
+import { createCustomer, createItem } from './helpers/invoiceReturnSpec';
 
 const TEST_PASSWORD = process.env.TEST_ADMIN_PASSWORD;
 if (!TEST_PASSWORD) {
@@ -378,6 +379,41 @@ describe('Sales Controller', () => {
         items: []
       });
     expect(res.status).toBe(400);
+  });
+
+  it('converts a quotation to a sales order, then refuses a second conversion', async () => {
+    const customerId = await createCustomer(`CONV-${Date.now()}`, authCookie);
+    const itemId = await createItem(`CONV-ITEM-${Date.now()}`, authCookie);
+
+    const created = await request(app)
+      .post('/api/quotations')
+      .set('Cookie', [authCookie, csrfCookie])
+      .set('x-csrf-token', csrfToken)
+      .send({
+        customer_id: customerId,
+        quotation_date: '2026-02-01',
+        items: [{ item_id: itemId, quantity: 2, unit_price: 10 }],
+      });
+    expect([200, 201]).toContain(created.status);
+    const quotationId = created.body?.data?.id ?? created.body?.id;
+    expect(quotationId).toBeDefined();
+
+    const converted = await request(app)
+      .post(`/api/quotations/${quotationId}/convert`)
+      .set('Cookie', [authCookie, csrfCookie])
+      .set('x-csrf-token', csrfToken)
+      .send({});
+    expect([200, 201]).toContain(converted.status);
+    expect(converted.body.success).toBe(true);
+    expect(converted.body.salesOrderId).toBeDefined();
+
+    const again = await request(app)
+      .post(`/api/quotations/${quotationId}/convert`)
+      .set('Cookie', [authCookie, csrfCookie])
+      .set('x-csrf-token', csrfToken)
+      .send({});
+    expect(again.status).toBe(400);
+    expect(String(again.body.error)).toMatch(/already converted/i);
   });
 
   it('getSalesOrders returns orders list', async () => {

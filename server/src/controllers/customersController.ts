@@ -1,3 +1,5 @@
+import { localMonthCode } from '../utils/documentNumbering';
+import { listPagination, rawListPageQuery } from '../utils/controllerPagination';
 import { Request, Response } from 'express';
 import { getQueryParam } from '../utils/queryUtils';
 import { AuthRequest } from '../types';
@@ -10,11 +12,15 @@ import logger from '../utils/logger';
 import { parsePageParams, envelope } from '../utils/paginate';
 import { initializeSequenceFromMax, getNextSequenceNumber } from '../utils/sequence';
 
+function findCustomerForResponse(id: string, res: Response) {
+  const record = CustomerModel.getById(id, db);
+  if (!record) res.status(404).json({ success: false, error: 'Customer not found' });
+  return record;
+}
+
 function getCustomers(req: Request, res: Response): void {
   try {
-    const pageParam = getQueryParam(req.query.page);
-    const limitParam = getQueryParam(req.query.limit);
-    const searchParam = getQueryParam(req.query.search);
+    const { pageParam, limitParam, searchParam } = rawListPageQuery(req.query);
     const sortByParam = getQueryParam(req.query.sortBy);
     const sortOrderParam = getQueryParam(req.query.sortOrder);
     const statusParam = getQueryParam(req.query.status);
@@ -34,13 +40,7 @@ function getCustomers(req: Request, res: Response): void {
     res.json({
       success: true,
       data: customers,
-      pagination: {
-        currentPage: page,
-        totalPages: Math.ceil(total / limit),
-        totalItems: total,
-        hasNext: page < Math.ceil(total / limit),
-        hasPrev: page > 1
-      }
+      pagination: listPagination(total, page, limit)
     });
   } catch (error) {
     logger.error('Error fetching customers:', error);
@@ -77,9 +77,7 @@ function createCustomer(req: AuthRequest, res: Response): void {
     initializeSequenceFromMax(db, 'CUST_last_no', 'customers', 'customer_code', 'CUST');
     const nextCustomerNo = getNextSequenceNumber(db, 'CUST_last_no');
     const now = new Date();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const year = String(now.getFullYear()).slice(-2);
-    const newCustomerCode = `CUST-${month}${year}-${String(nextCustomerNo).padStart(5, '0')}`;
+    const newCustomerCode = `CUST-${localMonthCode(now)}-${String(nextCustomerNo).padStart(5, '0')}`;
 
     const customerId = db.transaction(() => {
       const cid = CustomerModel.create({ ...req.body, opening_balance: opening_balance || 0 }, db);
@@ -109,11 +107,8 @@ function createCustomer(req: AuthRequest, res: Response): void {
 function updateCustomer(req: AuthRequest, res: Response): void {
   try {
     const id = getRouteParam(req.params.id);
-    const existingCustomer = CustomerModel.getById(id, db);
-    if (!existingCustomer) {
-      res.status(404).json({ success: false, error: 'Customer not found' });
-      return;
-    }
+    const existingCustomer = findCustomerForResponse(id, res);
+    if (!existingCustomer) return;
 
     CustomerModel.update(id, req.body, db);
     const updatedCustomer = CustomerModel.getById(id, db);
@@ -133,11 +128,8 @@ function updateCustomer(req: AuthRequest, res: Response): void {
 function deleteCustomer(req: AuthRequest, res: Response): void {
   try {
     const id = getRouteParam(req.params.id);
-    const existingCustomer = CustomerModel.getById(id, db);
-    if (!existingCustomer) {
-      res.status(404).json({ success: false, error: 'Customer not found' });
-      return;
-    }
+    const existingCustomer = findCustomerForResponse(id, res);
+    if (!existingCustomer) return;
 
     const invoiceCount = CustomerModel.countInvoices(id, db);
     const paymentCount = CustomerModel.countPayments(id, db);
@@ -166,11 +158,8 @@ function deleteCustomer(req: AuthRequest, res: Response): void {
 function restoreCustomer(req: AuthRequest, res: Response): void {
   try {
     const id = getRouteParam(req.params.id);
-    const existingCustomer = CustomerModel.getById(id, db);
-    if (!existingCustomer) {
-      res.status(404).json({ success: false, error: 'Customer not found' });
-      return;
-    }
+    const existingCustomer = findCustomerForResponse(id, res);
+    if (!existingCustomer) return;
 
     CustomerModel.restore(id, db);
     const restoredCustomer = CustomerModel.getById(id, db);
