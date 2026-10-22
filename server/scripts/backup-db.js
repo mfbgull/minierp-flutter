@@ -16,6 +16,7 @@
 const fs = require('fs');
 const path = require('path');
 const Database = require('better-sqlite3');
+const { verifySnapshotAt } = require('./lib/backup-verify');
 
 const MAX_BACKUPS = 30;
 
@@ -80,19 +81,9 @@ async function createSnapshot() {
 }
 
 function verifySnapshot() {
-  // integrity_check on the snapshot itself (fresh connection)
-  try {
-    const checkDb = new Database(backupPath, { readonly: true });
-    const row = checkDb.pragma('integrity_check', { simple: true });
-    checkDb.close();
-    if (row !== 'ok') {
-      fs.rmSync(backupPath, { force: true });
-      fail(`integrity_check failed on snapshot: ${row}`);
-    }
-    console.log('[db:backup] integrity_check: ok');
-  } catch (err) {
-    fail(`integrity_check could not run: ${err && err.message ? err.message : err}`);
-  }
+  const result = verifySnapshotAt(backupPath);
+  if (!result.ok) fail(result.message);
+  console.log('[db:backup] integrity_check: ok');
 }
 
 async function run() {
