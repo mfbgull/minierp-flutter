@@ -27,8 +27,8 @@ Post-remediation scan additions (not part of the original 340) are recorded in D
 
 | Post-remediation addition | Count | Status |
 |---|---|---|
-| New named symbols | 6 | Still reported (CRAP 30–90); recorded in D.1b |
-| Anonymous arrow findings | 2 | Newly reported; recorded in D.1b |
+| New named symbols | 6 | Resolved — no longer reported (CRAP < 30) |
+| Anonymous arrow findings | 2 | Resolved — no longer reported (CRAP < 30) |
 | Pre-existing functions newly reported | 72 | Recorded in D.2; not introduced by extraction |
 
 ## A. Dead code (63 entries)
@@ -451,19 +451,19 @@ here rather than omitted:
 The named symbols below are absent from the fixed point (`212a9fa7`) and were not in the
 first version of this section. The two anonymous arrow findings are new relative to the
 original inventory but cannot be name-matched; they are included so the scan delta is
-complete. All eight are still reported by the final scan; their measured status is
-recorded rather than claimed cleared.
+complete. All eight were resolved in commits `8bb623b9`, `1711b2a1`, and `0e245f40`;
+the final scan no longer reports them.
 
 | Symbol | Path:line | Owner | Final scan | Status |
 |---|---|---|---|---|
-| `updateBorrowerFields` | `server/src/controllers/ownerPersonalLoansController.ts:695` | controllers | CRAP 90 (cyc 9/cog 8; istanbul) | New symbol; absent at 212a9fa7; still reported |
-| `validateReportSort` | `server/src/controllers/customReportsController.ts:97` | controllers | CRAP 35 (cyc 8/cog 12; istanbul) | New symbol; absent at 212a9fa7; still reported |
-| `parseGuardOption` | `scripts/openspec-archive-guard.js:58` | scripts | CRAP 30 (cyc 5/cog 5; estimated) | New symbol; absent at 212a9fa7; still reported |
-| `verifySnapshot` | `server/scripts/backup-db.js:82` | scripts | CRAP 30 (cyc 5/cog 5; estimated) | New symbol; absent at 212a9fa7; still reported |
-| `postReconciledStock` | `server/scripts/repair-stock.ts:90` | scripts | CRAP 30 (cyc 5/cog 5; estimated) | New symbol; absent at 212a9fa7; still reported |
-| `postCoverageAdjustment` | `server/src/config/database.ts:1262` | config | CRAP 30 (cyc 5/cog 5; istanbul) | New symbol; absent at 212a9fa7; still reported |
-| `<arrow>` | `server/src/models/Employee.ts:405` | models | CRAP 72 (cyc 8/cog 9; istanbul) | Anonymous callback; new relative to the inventory; still reported |
-| `<arrow>` | `server/src/models/Reports.ts:1241` | models | CRAP 56 (cyc 7/cog 10; istanbul) | Anonymous callback; new relative to the inventory; still reported |
+| `updateBorrowerFields` | `server/src/controllers/ownerPersonalLoansController.ts:695` | controllers | Not reported (CRAP < 30) | Resolved — route tests cover every optional-field branch |
+| `validateReportSort` | `server/src/controllers/customReportsController.ts:97` | controllers | Not reported (CRAP < 30) | Resolved — HTTP validation tests cover every sort branch |
+| `parseGuardOption` | `scripts/openspec-archive-guard.js:58` | scripts | Not reported (CRAP < 30) | Resolved — parser moved to `server/scripts/lib/openspec-archive-guard.js`; 10 tests |
+| `verifySnapshot` | `server/scripts/backup-db.js:82` | scripts | Not reported (CRAP < 30) | Resolved — moved to `server/scripts/lib/backup-verify.js`; snapshot tests |
+| `postReconciledStock` | `server/scripts/repair-stock.ts:90` | scripts | Not reported (CRAP < 30) | Resolved — replaced by shared `postInventoryReconciliationEntry`; 5 tests |
+| `postCoverageAdjustment` | `server/src/config/database.ts:1262` | config | Not reported (CRAP < 30) | Resolved — replaced by shared `postInventoryReconciliationEntry`; 5 tests |
+| `<arrow>` | `server/src/models/Employee.ts:405` | models | Not reported (CRAP < 30) | Resolved — extracted to `toSalaryHistoryRow`; salary-history tests |
+| `<arrow>` | `server/src/models/Reports.ts:1241` | models | Not reported (CRAP < 30) | Resolved — extracted to `upsertCashReconciliationEntries`; cash-reconciliation tests |
 
 ### D.2 Pre-existing functions newly reported by the remapped coverage (72)
 
@@ -569,9 +569,11 @@ exits 0.
 | Typecheck | `npm run typecheck` (server/) | exit 0 |
 | Lint | `npm run lint` (server/) | exit 0 |
 | Reversal rules | `npm run verify:reversal-rules` (server/) | exit 0 |
-| Full server suite + mapped coverage | `npm test -- --coverage` (server/) | 168/169 suites, 1496/1497 tests passed. `supplierPurchasesFilter.test.ts` hit its 10 s test timeout under load; that suite passed 3/3 on isolated re-run and its coverage was merged. No clean full-suite run is recorded. |
-| Final Fallow scan | `npx --yes fallow@3.34.1 --format json` | structural 0, clone groups 4 (all retained above) |
-| Diff gate (CI) | `npx --yes fallow@3.34.1 audit --base HEAD` | see `.omo/evidence/task-7-audit-gate-final.log` |
+| Full server suite + mapped coverage | `npm test -- --coverage --maxWorkers=4` (server/) | 176/176 suites, 1534/1534 tests passed; exit 0; 1525.8s. No timeouts. |
+| Final Fallow scan | `npx --yes fallow@3.34.1 --format json` | structural 0, clone groups 4 (all retained above), health 145 (40 estimated / 105 istanbul); all eight D.1b targets absent. |
+| Diff gate (working tree) | `npx --yes fallow@3.34.1 audit --base HEAD` | exit 0; no issues in 8 changed files. |
+| Phase 3 commit audit | `npx --yes fallow@3.34.1 audit --base 1711b2a1` | exit 0; no issues in 15 changed files. |
+| CI quick gate | `scripts/check.sh --quick` | all checks passed (server typecheck/lint/Fallow, Flutter analyze, l10n drift). |
 
-Flutter was intentionally not rerun: no client code, route contract or shared API
-shape changed, so `flutter analyze` / `flutter test` would not have observed a difference.
+Flutter tests were intentionally not rerun: no client code, route contract or shared API
+shape changed. `flutter analyze` and the l10n drift check passed in `scripts/check.sh --quick`.

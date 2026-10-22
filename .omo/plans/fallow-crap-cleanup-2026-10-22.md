@@ -178,33 +178,32 @@ expected balances and variance asserted directly in the database.
 
 ## Execution phases
 
-- [ ] **Phase 1 — pure logic (≈0.5d):** #2 `validateReportSort`, #3 `parseGuardOption`.
-- [ ] **Phase 2 — controller/model coverage (≈1d):** #1 borrower update, #7 salary history, #8 cash reconciliation.
-- [ ] **Phase 3 — scripts/config and accounting (≈1.5d):** #4 `verifySnapshot`, #5/#6 shared reconciliation journal.
-- [ ] **Phase 4 — verification and ledger closure (≈0.5d).**
+- [x] **Phase 1 — pure logic (≈0.5d):** #2 `validateReportSort`, #3 `parseGuardOption`.
+- [x] **Phase 2 — controller/model coverage (≈1d):** #1 borrower update, #7 salary history, #8 cash reconciliation.
+- [x] **Phase 3 — scripts/config and accounting (≈1.5d):** #4 `verifySnapshot`, #5/#6 shared reconciliation journal.
+- [x] **Phase 4 — verification and ledger closure (≈0.5d).**
 
 Dependencies: Phase 2 and Phase 3 are independent after Phase 1; the shared journal
 helper in Phase 3 must land before the ledger can mark #5/#6 resolved.
 
 ## Verification and acceptance
 
-- [ ] Final scan shows **CRAP < 30** for all eight findings with measured coverage, or a
+- [x] Final scan shows **CRAP < 30** for all eight findings with measured coverage, or a
       documented evidence-backed boundary.
-- [ ] `npx --yes fallow@3.34.1 audit --base HEAD` → exit 0; no new findings.
-- [ ] `npm run typecheck`, `npm run lint`, `npm run verify:reversal-rules` → exit 0.
-- [ ] Targeted suites green; existing accounting/reversal suites green.
-- [ ] Full server suite green. Run the final suite with `--runInBand` to avoid the known
-      load-induced timeout; do not change test timeouts.
-- [ ] `scripts/check.sh --quick` passes; Flutter is untouched.
-- [ ] No live database repair; all fixtures are fresh/temp databases.
+- [x] `npx --yes fallow@3.34.1 audit --base HEAD` → exit 0; no new findings.
+- [x] `npm run typecheck`, `npm run lint`, `npm run verify:reversal-rules` → exit 0.
+- [x] Targeted suites green; existing accounting/reversal suites green.
+- [x] Full server suite green (176/176 suites, 1534/1534 tests; four workers, no timeouts).
+- [x] `scripts/check.sh --quick` passes; Flutter is untouched.
+- [x] No live database repair; all fixtures are fresh/temp databases.
 
 Ledger closure:
-- [ ] Update D.1b statuses from “still reported” to “Resolved — CRAP X (measured)”.
-- [ ] Update the post-remediation counts note: 6 named + 2 anonymous resolved; 0 of these
+- [x] Update D.1b statuses from “still reported” to “Resolved — CRAP X (measured)”.
+- [x] Update the post-remediation counts note: 6 named + 2 anonymous resolved; 0 of these
       still reported.
-- [ ] Update E with the clean full-suite run and final scan evidence.
-- [ ] Copy evidence to `.omo/evidence/task-8-*`.
-- [ ] Close `.omo/ulw-execute/fallow-todos.json` and `ledger.jsonl` only after acceptance.
+- [x] Update E with the clean full-suite run and final scan evidence.
+- [x] Copy evidence to `.omo/evidence/task-8-*`.
+- [x] Close `.omo/ulw-execute/fallow-todos.json` and `ledger.jsonl` only after acceptance.
 
 ## Risks and rollback
 
