@@ -467,10 +467,11 @@ recorded rather than claimed cleared.
 
 ### D.2 Pre-existing functions newly reported by the remapped coverage (72)
 
-These symbol names are present at the fixed point (`212a9fa7`) and were not part of the
-original 340-entry report. They are surfaced by the test-only source maps and measured
-coverage; they are not introduced by the extraction. All are recorded with their final
-measured CRAP so the scan delta is not silent.
+These symbol names (or their quote-insensitive equivalents) are present at the fixed
+point (`212a9fa7`) and were not part of the original 340-entry report. They are surfaced
+by the test-only source maps and measured coverage; they are not introduced by the
+extraction. All are recorded with their final measured CRAP so the scan delta is not
+silent.
 
 | File:line | Symbol | Owner | Final scan | Why now |
 |---|---|---|---|---|
