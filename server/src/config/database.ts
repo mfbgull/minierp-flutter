@@ -6,6 +6,7 @@ import * as bcrypt from 'bcrypt';
 import { passwordPolicyError } from '../utils/passwordPolicy';
 import logger from '../utils/logger';
 import { getNextSequenceNumber } from '../utils/sequence';
+import { postInventoryReconciliationEntry } from '../utils/inventoryReconciliation';
 import { backfillPurchaseReturns } from '../utils/purchaseReturnBackfill';
 import { createRequire } from 'node:module';
 import { errorMessage } from '../utils/errorMessage';
@@ -1259,29 +1260,6 @@ function runStockCoverageReconciliation(): void {
     logger.info(`  item ${m.item_id}/wh ${m.warehouse_id}: trimmed over-coverage by ${(-delta).toFixed(3)}`);
   };
 
-  const postCoverageAdjustment = (m: typeof mismatches[number], delta: number, unitCost: number): void => {
-    const value = delta * unitCost;
-    if (value > 0.005 && db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='journal_entries'`).get()) {
-      const desc = `Coverage reconciliation: +${delta} units @ ${unitCost} (item ${m.item_id}, warehouse ${m.warehouse_id})`;
-      const je = db.prepare(`
-        INSERT INTO journal_entries (reference_type, reference_id, entry_date, description, debit_account, credit_account, amount, voided)
-        VALUES ('RECON', 0, ?, ?, '1200', '4999', ?, 0)
-      `).run(new Date().toISOString().split('T')[0], desc, value);
-      const jeId = je.lastInsertRowid as number;
-      const invAcc = db.prepare(`SELECT id FROM chart_of_accounts WHERE code = '1200'`).get() as { id: number } | undefined;
-      const adjAcc = db.prepare(`SELECT id FROM chart_of_accounts WHERE code IN ('4999','4000') ORDER BY code DESC LIMIT 1`).get() as { id: number } | undefined;
-      if (invAcc && adjAcc) {
-        const lines = db.prepare(`
-          INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, line_date)
-          VALUES (?, ?, ?, ?, ?, ?)
-        `);
-        const today = new Date().toISOString().split('T')[0];
-        lines.run(jeId, invAcc.id, value, 0, 'Inventory increase (coverage reconciliation)', today);
-        lines.run(jeId, adjAcc.id, 0, value, 'Coverage reconciliation adjustment', today);
-      }
-    }
-  };
-
   const run = db.transaction(() => {
     for (const m of mismatches) {
       const delta = m.balance_qty - m.covered; // >0 under-covered, <0 over-covered
@@ -1312,7 +1290,12 @@ function runStockCoverageReconciliation(): void {
           new Date().toISOString().split('T')[0]
         );
 
-        postCoverageAdjustment(m, delta, unitCost);
+        postInventoryReconciliationEntry(db, {
+          description: `Coverage reconciliation: +${delta} units @ ${unitCost} (item ${m.item_id}, warehouse ${m.warehouse_id})`,
+          inventoryLineDescription: 'Inventory increase (coverage reconciliation)',
+          adjustmentLineDescription: 'Coverage reconciliation adjustment',
+          amount: delta * unitCost,
+        });
         logger.info(`  item ${m.item_id}/wh ${m.warehouse_id}: minted RECON layer of ${delta} @ ${unitCost}`);
       }
     }

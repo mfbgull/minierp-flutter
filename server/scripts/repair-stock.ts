@@ -25,6 +25,7 @@ import path from 'path';
 import fs from 'fs';
 import db, { applyPendingMigrations } from '../src/config/database';
 import { getNextSequenceNumber } from '../src/utils/sequence';
+import { postInventoryReconciliationEntry } from '../src/utils/inventoryReconciliation';
 
 applyPendingMigrations();
 
@@ -87,30 +88,6 @@ function repairUnbatchedStock(): void {
     }
   };
 
-  const postReconciledStock = (row: typeof rows[number], uncovered: number, unitCost: number): number => {
-    const value = uncovered * unitCost;
-    if (value > 0.005 && db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='journal_entries'`).get()) {
-      const desc = `Unbatched stock reconciliation: ${uncovered} units @ ${unitCost} (item ${row.item_id}, warehouse ${row.warehouse_id})`;
-      const je = db.prepare(`
-        INSERT INTO journal_entries (reference_type, reference_id, entry_date, description, debit_account, credit_account, amount, voided)
-        VALUES ('RECON', 0, ?, ?, '1200', '4999', ?, 0)
-      `).run(new Date().toISOString().split('T')[0], desc, value);
-      const jeId = je.lastInsertRowid as number;
-      const lines = db.prepare(`
-        INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, line_date)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `);
-      const inventoryAccount = db.prepare(`SELECT id FROM chart_of_accounts WHERE code = '1200'`).get() as { id: number } | undefined;
-      const adjustmentAccount = db.prepare(`SELECT id FROM chart_of_accounts WHERE code = '4999' OR code = '4000' ORDER BY code DESC LIMIT 1`).get() as { id: number } | undefined;
-      if (inventoryAccount && adjustmentAccount) {
-        const today = new Date().toISOString().split('T')[0];
-        lines.run(jeId, inventoryAccount.id, value, 0, 'Inventory increase (reconciled unbatched stock)', today);
-        lines.run(jeId, adjustmentAccount.id, 0, value, 'Stock reconciliation adjustment', today);
-      }
-    }
-    return value;
-  };
-
   const run = db.transaction(() => {
     const insertBatch = db.prepare(`
       INSERT INTO stock_batches (
@@ -165,7 +142,14 @@ function repairUnbatchedStock(): void {
       // legacy journal_entries shape (reference_type/reference_id +
       // text accounts) that the rest of the system reconciles against,
       // plus matching journal_lines rows keyed to the real COA ids.
-      capitalised += postReconciledStock(row, uncovered, unitCost);
+      const value = uncovered * unitCost;
+      postInventoryReconciliationEntry(db, {
+        description: `Unbatched stock reconciliation: ${uncovered} units @ ${unitCost} (item ${row.item_id}, warehouse ${row.warehouse_id})`,
+        inventoryLineDescription: 'Inventory increase (reconciled unbatched stock)',
+        adjustmentLineDescription: 'Stock reconciliation adjustment',
+        amount: value,
+      });
+      capitalised += value;
       created++;
     }
 
