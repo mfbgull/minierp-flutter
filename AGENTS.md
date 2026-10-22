@@ -114,14 +114,13 @@ OPEN-DECISION, not guessed.
 
 Plan: [`.omo/plans/fallow-crap-cleanup-2026-10-22.md`](.omo/plans/fallow-crap-cleanup-2026-10-22.md).
 
-- **Phase 1 complete** (`8bb623b9`): `validateReportSort` and `parseGuardOption` are
-  below CRAP 30. Added 10 HTTP-level report-sort tests and 10 archive-guard parser
-  tests; moved the parser to `server/scripts/lib/openspec-archive-guard.js` so Jest
-  can measure it.
-- **Verified:** typecheck, lint, the 20 targeted tests, `reportExpressionSecurity.test.ts`,
-  and `fallow audit --base HEAD` (exit 0). The full server suite was green immediately
-  before Phase 1; rerun it after Phases 2–3.
-- **Remaining:** Phases 2–4 — `updateBorrowerFields`, `verifySnapshot`,
-  `postReconciledStock`, `postCoverageAdjustment`, and the anonymous findings in
-  `Employee.ts:405` and `Reports.ts:1241`; then the final full-suite scan and ledger
-  D.1b/E closure.
+- **Phases 1–4 complete** (`8bb623b9`, `1711b2a1`, `0e245f40`): all eight D.1b
+  findings are below CRAP 30. Added 37 targeted tests across seven suites; extracted
+  `toSalaryHistoryRow`, `upsertCashReconciliationEntries`,
+  `postInventoryReconciliationEntry`, `verifySnapshotAt`, and the archive-guard parser.
+- **Final verification (Phase 4):** 176/176 suites and 1534/1534 tests passed (exit 0);
+  `scripts/check.sh --quick` passed; the final Fallow scan is structural 0, duplicate
+  groups 4, health 145, with all eight D.1b targets absent. The Phase 3 commit audit and
+  the working-tree gate both exit 0. Ledger D.1b and E are updated.
+- **Remaining:** the 64 original CRAP-only findings and 72 pre-existing newly reported
+  findings remain documented but were out of scope for this cleanup.
