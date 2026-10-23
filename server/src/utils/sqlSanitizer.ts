@@ -22,8 +22,14 @@ export function sanitizeSortParams(
   // Validate sortBy against allowed columns
   const column = allowedColumns.includes(sortBy) ? sortBy : columnDefault;
 
-  // Validate sortOrder - only allow ASC or DESC (case-insensitive)
-  const order = sortOrder.toUpperCase() === 'DESC' ? 'DESC' : orderDefault;
+  // Validate sortOrder - only allow ASC or DESC (case-insensitive).
+  // Honor an explicit ASC even when the caller's default is DESC; otherwise
+  // ascending sorting was impossible for ledgers whose natural default is
+  // newest-first.
+  const normalizedOrder = sortOrder.toUpperCase();
+  const order = normalizedOrder === 'ASC' || normalizedOrder === 'DESC'
+    ? normalizedOrder
+    : orderDefault;
 
   return { column, order };
 }
