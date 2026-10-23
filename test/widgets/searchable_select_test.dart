@@ -6,6 +6,38 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:minierp_app/widgets/searchable_select.dart';
 
 void main() {
+  testWidgets('select trigger exposes button and expanded semantics', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SearchableSelect<String>(
+            items: const ['Alpha', 'Beta'],
+            hint: 'Pick an item',
+            labelBuilder: (value) => value,
+            onChanged: (_) {},
+          ),
+        ),
+      ),
+    );
+
+    bool hasTrigger({required bool expanded}) => tester
+        .widgetList<Semantics>(find.byType(Semantics))
+        .any(
+          (widget) =>
+              widget.properties.button == true &&
+              widget.properties.expanded == expanded,
+        );
+
+    expect(hasTrigger(expanded: false), isTrue);
+
+    await tester.tap(find.text('Pick an item'));
+    await tester.pumpAndSettle();
+
+    expect(hasTrigger(expanded: true), isTrue);
+  });
+
   testWidgets('popup follows the field when the form scrolls', (tester) async {
     final controller = ScrollController();
     addTearDown(controller.dispose);

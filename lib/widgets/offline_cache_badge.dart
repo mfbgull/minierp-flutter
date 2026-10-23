@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/cache/cached_repository.dart'
     show servingCachedNotifierProvider;
+import '../l10n/app_localizations.dart';
 
 /// Renders a compact "Offline" chip while the shared cached client is
 /// serving snapshots instead of live responses; collapses to nothing
@@ -16,6 +17,7 @@ class OfflineCacheBadge extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
     final notifier = ref.watch(servingCachedNotifierProvider);
     return ValueListenableBuilder<bool>(
       valueListenable: notifier,
@@ -23,7 +25,7 @@ class OfflineCacheBadge extends ConsumerWidget {
         if (!isOffline) return const SizedBox.shrink();
         final scheme = Theme.of(context).colorScheme;
         return Tooltip(
-          message: 'Showing saved data — server unreachable',
+          message: l10n.commonOfflineTooltip,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
@@ -40,7 +42,7 @@ class OfflineCacheBadge extends ConsumerWidget {
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  'Offline',
+                  l10n.commonOffline,
                   style: Theme.of(context).textTheme.labelMedium?.copyWith(
                     color: scheme.onErrorContainer,
                     fontWeight: FontWeight.w600,

@@ -497,25 +497,30 @@ class _SearchableSelectFieldState<T> extends State<_SearchableSelectField<T>>
   Widget _option(BuildContext overlayContext, T item, int index) {
     final theme = Theme.of(overlayContext);
     final selected = index == _selectedIndex;
-    return InkWell(
-      onTap: () => _select(item),
-      onHover: (_) {
-        if (!mounted || _selectedIndex == index) return;
-        setState(() => _selectedIndex = index);
-        _overlay?.markNeedsBuild();
-      },
-      child: Container(
-        height: 40,
-        color: selected
-            ? theme.colorScheme.primaryContainer.withValues(alpha: 0.5)
-            : null,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        alignment: Alignment.centerLeft,
-        child: Text(
-          _labelOf(item),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 13),
+    return Semantics(
+      container: true,
+      button: true,
+      selected: selected,
+      child: InkWell(
+        onTap: () => _select(item),
+        onHover: (_) {
+          if (!mounted || _selectedIndex == index) return;
+          setState(() => _selectedIndex = index);
+          _overlay?.markNeedsBuild();
+        },
+        child: Container(
+          height: 40,
+          color: selected
+              ? theme.colorScheme.primaryContainer.withValues(alpha: 0.5)
+              : null,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          alignment: Alignment.centerLeft,
+          child: Text(
+            _labelOf(item),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 13),
+          ),
         ),
       ),
     );
@@ -530,21 +535,34 @@ class _SearchableSelectFieldState<T> extends State<_SearchableSelectField<T>>
       errorText: widget.errorText,
       suffixIcon: const Icon(Icons.arrow_drop_down, size: 22),
     );
-    return Focus(
-      focusNode: _focus,
-      child: InkWell(
-        key: _anchorKey,
-        onTap: widget.enabled ? _toggle : null,
-        child: InputDecorator(
-          decoration: decoration,
-          isEmpty: widget.label.isEmpty,
-          child: Text(
-            widget.label.isEmpty ? (widget.hint ?? '') : widget.label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: widget.label.isEmpty
-                ? widget.textStyle.copyWith(color: scheme.outline)
-                : widget.textStyle,
+    final semanticLabel = widget.label.isEmpty
+        ? (widget.hint ?? widget.searchHint ?? '')
+        : widget.label;
+    return Semantics(
+      container: true,
+      button: true,
+      enabled: widget.enabled,
+      expanded: _open,
+      label: semanticLabel,
+      hint: widget.errorText ?? widget.searchHint,
+      excludeSemantics: true,
+      onTap: widget.enabled ? _toggle : null,
+      child: Focus(
+        focusNode: _focus,
+        child: InkWell(
+          key: _anchorKey,
+          onTap: widget.enabled ? _toggle : null,
+          child: InputDecorator(
+            decoration: decoration,
+            isEmpty: widget.label.isEmpty,
+            child: Text(
+              widget.label.isEmpty ? (widget.hint ?? '') : widget.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: widget.label.isEmpty
+                  ? widget.textStyle.copyWith(color: scheme.outline)
+                  : widget.textStyle,
+            ),
           ),
         ),
       ),

@@ -5696,6 +5696,18 @@ abstract class AppLocalizations {
   /// **'No results found'**
   String get commonNoresults;
 
+  /// No description provided for @commonOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline'**
+  String get commonOffline;
+
+  /// No description provided for @commonOfflineTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing saved data — server unreachable'**
+  String get commonOfflineTooltip;
+
   /// No description provided for @posItemNotFound.
   ///
   /// In en, this message translates to:
