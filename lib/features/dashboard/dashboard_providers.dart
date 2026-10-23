@@ -42,17 +42,20 @@ T _data<T>(ApiResult<T> result) => switch (result) {
 ///
 /// Failures surface as [ApiFailure.error]; the screen offers a retry
 /// via `ref.invalidate`.
-final dashboardBootProvider =
-    FutureProvider<DashboardBootSnapshot>((ref) async {
-      final from = ref.watch(globalReportFromDateProvider);
-      final to = ref.watch(globalReportToDateProvider);
-      final result = await ref.watch(dashboardRepositoryProvider).boot(
+final dashboardBootProvider = FutureProvider<DashboardBootSnapshot>((
+  ref,
+) async {
+  final from = ref.watch(globalReportFromDateProvider);
+  final to = ref.watch(globalReportToDateProvider);
+  final result = await ref
+      .watch(dashboardRepositoryProvider)
+      .boot(
         metrics: [for (final def in kpiCardCatalog) def.metric],
         fromDate: from == null ? null : isoDate(from),
         toDate: to == null ? null : isoDate(to),
       );
-      return DashboardBootSnapshot.from(_data(result));
-    });
+  return DashboardBootSnapshot.from(_data(result));
+});
 
 /// The boot payload flattened for the derived providers: the summary is
 /// required (the whole screen errors without it) while the optional
@@ -96,9 +99,7 @@ class DashboardBootSnapshot {
 /// the boot payload — no separate GET /dashboard/summary. Reacts to the
 /// dashboard's global date range: changing the range refetches the boot
 /// payload (the money figures + chart follow it).
-final dashboardSummaryProvider = FutureProvider<DashboardSummary>((
-  ref,
-) async {
+final dashboardSummaryProvider = FutureProvider<DashboardSummary>((ref) async {
   final boot = await ref.watch(dashboardBootProvider.future);
   return boot.summary;
 });
@@ -110,6 +111,10 @@ final dashboardKpiBatchProvider = FutureProvider<Map<String, KpiResult>>((
   ref,
 ) async {
   final boot = await ref.watch(dashboardBootProvider.future);
+  // An empty batch means the optional server block failed (the request
+  // always asks for every catalog metric), so surface it as an error and
+  // let the strip offer a retry instead of rendering silent '—' cards.
+  if (boot.kpis.isEmpty) throw const _BootBlockMissing('kpi-batch');
   return boot.kpis;
 });
 
@@ -127,9 +132,7 @@ final dashboardCashPositionProvider = FutureProvider<CashPositionSummary>((
 });
 
 /// AR aging summary — derived from the boot payload.
-final dashboardArSummaryProvider = FutureProvider<ArSummaryResult>((
-  ref,
-) async {
+final dashboardArSummaryProvider = FutureProvider<ArSummaryResult>((ref) async {
   final boot = await ref.watch(dashboardBootProvider.future);
   final ar = boot.ar;
   if (ar == null) throw const _BootBlockMissing('ar-summary');
@@ -138,11 +141,12 @@ final dashboardArSummaryProvider = FutureProvider<ArSummaryResult>((
 
 /// Top customers — derived from the boot payload (limit is fixed at 5,
 /// what the server's boot composite fetches).
-final dashboardTopCustomersProvider =
-    FutureProvider<List<TopCustomer>>((ref) async {
-      final boot = await ref.watch(dashboardBootProvider.future);
-      return boot.topCustomers;
-    });
+final dashboardTopCustomersProvider = FutureProvider<List<TopCustomer>>((
+  ref,
+) async {
+  final boot = await ref.watch(dashboardBootProvider.future);
+  return boot.topCustomers;
+});
 
 /// Expiry alerts — derived from the boot payload (the server's boot
 /// composite uses the same 30-day window as the default reports view).

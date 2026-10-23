@@ -23,6 +23,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _password = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _busy = false;
+  bool _obscurePassword = true;
   String? _error;
 
   @override
@@ -117,11 +118,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       TextFormField(
                         controller: _password,
                         enabled: !_busy,
-                        obscureText: true,
+                        obscureText: _obscurePassword,
                         textInputAction: TextInputAction.done,
                         decoration: InputDecoration(
                           labelText: l10n.loginPassword,
                           prefixIcon: const Icon(Icons.lock_outline),
+                          suffixIcon: IconButton(
+                            tooltip: _obscurePassword
+                                ? l10n.loginShowPassword
+                                : l10n.loginHidePassword,
+                            icon: Icon(
+                              _obscurePassword
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
+                            ),
+                            onPressed: () => setState(
+                              () => _obscurePassword = !_obscurePassword,
+                            ),
+                          ),
                           border: const OutlineInputBorder(),
                         ),
                         validator: (value) => (value == null || value.isEmpty)
@@ -131,7 +145,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                       if (_error != null) ...[
                         const SizedBox(height: 16),
-                        _ErrorBanner(message: _error!),
+                        LoginErrorBanner(message: _error!),
                       ],
                       const SizedBox(height: 24),
                       FilledButton(
@@ -153,14 +167,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               )
                             : Text(l10n.commonLogin),
                       ),
-                      const SizedBox(height: 16),
-                      Text(
-                        l10n.loginDevHint,
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -173,31 +179,37 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 }
 
-class _ErrorBanner extends StatelessWidget {
-  const _ErrorBanner({required this.message});
+/// Login failure banner — exposed for widget tests and wrapped in a live
+/// region so screen readers announce failed sign-ins.
+class LoginErrorBanner extends StatelessWidget {
+  const LoginErrorBanner({super.key, required this.message});
 
   final String message;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: scheme.errorContainer,
-        borderRadius: AppBorderRadius.smRadius,
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.error_outline, size: 18, color: scheme.onErrorContainer),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              message,
-              style: TextStyle(color: scheme.onErrorContainer),
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: scheme.errorContainer,
+          borderRadius: AppBorderRadius.smRadius,
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.error_outline, size: 18, color: scheme.onErrorContainer),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                message,
+                style: TextStyle(color: scheme.onErrorContainer),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

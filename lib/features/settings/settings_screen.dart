@@ -44,6 +44,7 @@ import '../preferences/preference_providers.dart'
         weekStartProvider;
 import 'settings_providers.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
+import 'package:minierp_app/core/theme/grid_density.dart';
 
 /// Keys configured on the Integrations module's service forms — excluded
 /// here to avoid two editing surfaces for the same store (PORTING.md §13
@@ -341,6 +342,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       children: [
                         _dateRangeSection(l10n),
                         const SizedBox(height: 16),
+                        _displaySection(l10n),
+                        const SizedBox(height: 16),
                         _backupSection(l10n),
                         const SizedBox(height: 16),
                         LayoutBuilder(
@@ -586,6 +589,66 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Display section — grid density ───────────────────────────────────
+  Widget _displaySection(AppLocalizations l10n) {
+    final scheme = Theme.of(context).colorScheme;
+    final density = ref.watch(gridDensityProvider);
+
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: AppBorderRadius.mdRadius,
+        side: BorderSide(color: scheme.outlineVariant),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        leading: Icon(
+          Icons.table_rows_outlined,
+          size: 20,
+          color: scheme.primary,
+        ),
+        initiallyExpanded: false,
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        title: Text(
+          l10n.settingsSectionDisplay,
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              l10n.settingsGridDensity,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ),
+          const SizedBox(height: 8),
+          SegmentedButton<GridDensity>(
+            segments: [
+              ButtonSegment(
+                value: GridDensity.compact,
+                label: Text(l10n.settingsDensityCompact),
+              ),
+              ButtonSegment(
+                value: GridDensity.standard,
+                label: Text(l10n.settingsDensityStandard),
+              ),
+              ButtonSegment(
+                value: GridDensity.comfortable,
+                label: Text(l10n.settingsDensityComfortable),
+              ),
+            ],
+            selected: {density},
+            onSelectionChanged: (selection) {
+              ref
+                  .read(gridDensityProvider.notifier)
+                  .setDensity(selection.first);
+            },
           ),
         ],
       ),

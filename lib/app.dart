@@ -10,6 +10,7 @@ import 'core/utils/formatters.dart';
 import 'core/router/module_registry.dart'
     show moduleRegistry, shellDestinations;
 import 'core/theme/app_theme.dart';
+import 'core/theme/grid_density.dart';
 import 'core/theme/theme_mode_provider.dart';
 import 'core/utils/print_service.dart' show PrintFormatMemory;
 import 'features/preferences/preference_providers.dart'
@@ -132,6 +133,10 @@ class MiniErpApp extends ConsumerWidget {
       darkTheme: AppTheme.dark,
       themeMode: ref.watch(themeModeProvider),
       routerConfig: ref.watch(routerProvider),
+      builder: (context, child) => GridDensityScope(
+        density: ref.watch(gridDensityProvider),
+        child: child ?? const SizedBox.shrink(),
+      ),
       locale: ref.watch(localeProvider),
       localizationsDelegates: const [
         AppLocalizations.delegate,

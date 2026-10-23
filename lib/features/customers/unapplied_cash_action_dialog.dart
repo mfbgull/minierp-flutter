@@ -317,6 +317,7 @@ class _UnappliedCashActionDialogState
       child: MovableDialog(
         dialogId: _reverse ? 'unapplied_reverse' : 'unapplied_refund',
         enableEscapeKey: true,
+        autofocusEscape: true,
         maxWidth: 560,
         maxHeight: height,
         child: Column(

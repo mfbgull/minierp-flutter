@@ -495,7 +495,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
         ValueListenableBuilder<Set<int>>(
           valueListenable: _bulk.selected,
           builder: (context, sel, _) {
-            if (sel.isEmpty) return const SizedBox.shrink();
+            if (sel.isEmpty) return const BulkActionBar(count: 0);
             final user = ref.watch(authProvider).user;
             return BulkActionBar(
               count: sel.length,
