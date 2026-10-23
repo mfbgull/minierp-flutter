@@ -23,7 +23,10 @@ import '../../widgets/date_range_picker.dart' show DateRangeFilter;
 import '../../widgets/offline_cache_badge.dart';
 import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
 import '../reports/report_providers.dart'
-    show applyGlobalReportRange, globalReportFromDateProvider, globalReportToDateProvider;
+    show
+        applyGlobalReportRange,
+        globalReportFromDateProvider,
+        globalReportToDateProvider;
 import '../inventory/batch_management_screen.dart'
     show showBatchManagementScreen;
 import 'cash_opening_balance_dialog.dart' show showCashOpeningBalanceDialog;
@@ -42,7 +45,9 @@ import 'dashboard_providers.dart';
 import 'panels/active_loans_panel.dart';
 import 'panels/sales_vs_purchases_panel.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
+import 'package:minierp_app/core/theme/app_motion.dart';
 import 'package:minierp_app/widgets/skeleton_loader.dart';
+import 'kpi_error_strip.dart';
 
 /// Landing screen behind the auth gate — renders the server-side
 /// aggregated KPIs (GET /dashboard/summary, PORTING.md §10). The
@@ -216,8 +221,7 @@ class _CashPositionStrip extends ConsumerStatefulWidget {
   const _CashPositionStrip();
 
   @override
-  ConsumerState<_CashPositionStrip> createState() =>
-      _CashPositionStripState();
+  ConsumerState<_CashPositionStrip> createState() => _CashPositionStripState();
 }
 
 class _CashPositionStripState extends ConsumerState<_CashPositionStrip> {
@@ -253,8 +257,7 @@ class _CashPositionStripState extends ConsumerState<_CashPositionStrip> {
                   ),
                 ),
                 TextButton.icon(
-                  onPressed: () =>
-                      showCashOpeningBalanceDialog(context, ref),
+                  onPressed: () => showCashOpeningBalanceDialog(context, ref),
                   icon: const Icon(Icons.playlist_add, size: 15),
                   label: Text(l10n.dashboardOpeningbalance),
                   style: TextButton.styleFrom(
@@ -272,9 +275,7 @@ class _CashPositionStripState extends ConsumerState<_CashPositionStrip> {
                   ),
                 ),
                 IconButton(
-                  icon: Icon(
-                    _expanded ? Icons.expand_less : Icons.expand_more,
-                  ),
+                  icon: Icon(_expanded ? Icons.expand_less : Icons.expand_more),
                   onPressed: () => setState(() => _expanded = !_expanded),
                   visualDensity: VisualDensity.compact,
                   tooltip: _expanded ? l10n.commonHide : l10n.commonShow,
@@ -282,7 +283,10 @@ class _CashPositionStripState extends ConsumerState<_CashPositionStrip> {
               ],
             ),
             AnimatedCrossFade(
-              duration: const Duration(milliseconds: 200),
+              duration: AppMotion.duration(
+                context,
+                const Duration(milliseconds: 200),
+              ),
               crossFadeState: _expanded
                   ? CrossFadeState.showFirst
                   : CrossFadeState.showSecond,
@@ -293,30 +297,32 @@ class _CashPositionStripState extends ConsumerState<_CashPositionStrip> {
                   child: position.when(
                     // Compact strip skeleton matching the real cards:
                     // 4 placeholder cards sized to the 86px strip.
-                    loading: () => ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: 4,
-                      separatorBuilder: (_, _) => const SizedBox(width: 10),
-                      itemBuilder: (_, _) => Container(
-                        width: 190,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: scheme.surfaceContainerHighest.withValues(
-                            alpha: 0.5,
+                    loading: () => SkeletonShimmer(
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: 4,
+                        separatorBuilder: (_, _) => const SizedBox(width: 10),
+                        itemBuilder: (_, _) => Container(
+                          width: 190,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
                           ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            SkeletonBar(height: 10, width: 80),
-                            SizedBox(height: 6),
-                            SkeletonBar(height: 16, width: 100),
-                          ],
+                          decoration: BoxDecoration(
+                            color: scheme.surfaceContainerHighest.withValues(
+                              alpha: 0.5,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              SkeletonBar(height: 10, width: 80),
+                              SizedBox(height: 6),
+                              SkeletonBar(height: 16, width: 100),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -368,85 +374,90 @@ class _CashPositionCard extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final accent = _accents[account.key] ?? scheme.primary;
     final inColor = const Color(0xFF16A34A);
-    return GestureDetector(
-      onTap: () =>
-          showCashPositionDetailDialog(context, account: account),
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: Container(
-          width: 190,
-          margin: const EdgeInsets.only(right: 10),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: accent.withValues(alpha: 0.08),
-            borderRadius: AppBorderRadius.mdRadius,
-            border: Border.all(color: accent.withValues(alpha: 0.35)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.savings_outlined, size: 15, color: accent),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      account.name,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  Formatters.currency(account.balance),
-                  maxLines: 1,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: accent,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 2),
-              // Compact money-in / money-out so the balance is traceable
-              // at a glance: +inflow / −outflow. Tap opens the detail.
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+    return Padding(
+      padding: const EdgeInsets.only(right: 10),
+      child: Semantics(
+        button: true,
+        label: '${account.name}: ${Formatters.currency(account.balance)}',
+        child: InkWell(
+          borderRadius: AppBorderRadius.mdRadius,
+          onTap: () => showCashPositionDetailDialog(context, account: account),
+          hoverColor: accent.withValues(alpha: 0.06),
+          focusColor: accent.withValues(alpha: 0.12),
+          child: Ink(
+            width: 190,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.08),
+              borderRadius: AppBorderRadius.mdRadius,
+              border: Border.all(color: accent.withValues(alpha: 0.35)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Row(
                   children: [
-                    Icon(Icons.arrow_upward, size: 11, color: inColor),
-                    const SizedBox(width: 2),
-                    Text(
-                      Formatters.number(account.inflow),
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: inColor,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Icon(Icons.arrow_downward, size: 11, color: scheme.error),
-                    const SizedBox(width: 2),
-                    Text(
-                      Formatters.number(account.outflow),
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: scheme.error,
-                        fontWeight: FontWeight.w600,
+                    Icon(Icons.savings_outlined, size: 15, color: accent),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        account.name,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: scheme.onSurfaceVariant,
+                        ),
                       ),
                     ),
                   ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 4),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    Formatters.currency(account.balance),
+                    maxLines: 1,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: accent,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                // Compact money-in / money-out so the balance is traceable
+                // at a glance: +inflow / −outflow. Tap opens the detail.
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.arrow_upward, size: 11, color: inColor),
+                      const SizedBox(width: 2),
+                      Text(
+                        Formatters.number(account.inflow),
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: inColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(Icons.arrow_downward, size: 11, color: scheme.error),
+                      const SizedBox(width: 2),
+                      Text(
+                        Formatters.number(account.outflow),
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: scheme.error,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -476,9 +487,9 @@ class _CashTotalCard extends StatelessWidget {
         children: [
           Text(
             AppLocalizations.of(context)!.commonTotal,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: scheme.onSurfaceVariant,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
           ),
           const SizedBox(height: 6),
           FittedBox(
@@ -487,9 +498,9 @@ class _CashTotalCard extends StatelessWidget {
             child: Text(
               Formatters.currency(total),
               maxLines: 1,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
             ),
           ),
         ],
@@ -509,6 +520,7 @@ class _KpiStrip extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
     final layout = ref.watch(dashboardLayoutControllerProvider);
+    final kpi = ref.watch(dashboardKpiBatchProvider);
     // Only KPI cards belong in the strip — panels + the cash strip are
     // rendered by their own widgets from the same layout.
     final visible = [
@@ -532,17 +544,31 @@ class _KpiStrip extends ConsumerWidget {
       );
     }
 
+    if (kpi.hasError) {
+      final error = kpi.error;
+      final message = error is ApiError ? error.message : l10n.errorsFailed;
+      return SizedBox(
+        height: kKpiCardHeight,
+        child: KpiErrorStrip(
+          message: message,
+          onRetry: () => invalidateDashboardBlocks(ref),
+        ),
+      );
+    }
+
+    if (kpi.isLoading && !kpi.hasValue) {
+      return KpiStripSkeleton(count: visible.length);
+    }
+
     return SizedBox(
       height: kKpiCardHeight,
       child: ReorderableListView.builder(
         scrollDirection: Axis.horizontal,
         buildDefaultDragHandles: false,
         itemCount: visible.length,
-        onReorderItem: (oldIndex, newIndex) =>
-            ref.read(dashboardLayoutControllerProvider.notifier).reorder(
-              oldIndex,
-              newIndex,
-            ),
+        onReorderItem: (oldIndex, newIndex) => ref
+            .read(dashboardLayoutControllerProvider.notifier)
+            .reorder(oldIndex, newIndex),
         itemBuilder: (context, index) {
           final block = visible[index];
           return _KpiMetricCard(
@@ -588,9 +614,9 @@ class _PanelRow extends ConsumerWidget {
         return ReorderableListView(
           scrollDirection: Axis.horizontal,
           buildDefaultDragHandles: false,
-          onReorderItem: (oldIndex, newIndex) =>
-              ref.read(dashboardLayoutControllerProvider.notifier)
-                  .reorderPanels(row, oldIndex, newIndex),
+          onReorderItem: (oldIndex, newIndex) => ref
+              .read(dashboardLayoutControllerProvider.notifier)
+              .reorderPanels(row, oldIndex, newIndex),
           children: [
             for (var i = 0; i < visible.length; i++)
               Padding(
@@ -701,11 +727,7 @@ class _PanelFrameState extends ConsumerState<_PanelFrame> {
 /// Draggable: a drag handle appears on hover (desktop); long-press
 /// starts the drag on touch (ReorderableDelayedDragStartListener).
 class _KpiMetricCard extends ConsumerStatefulWidget {
-  const _KpiMetricCard({
-    super.key,
-    required this.block,
-    required this.index,
-  });
+  const _KpiMetricCard({super.key, required this.block, required this.index});
 
   final DashboardBlock block;
 
@@ -742,8 +764,10 @@ class _KpiMetricCardState extends ConsumerState<_KpiMetricCard> {
       DashboardBlockSize.large => const EdgeInsets.all(16),
       _ => const EdgeInsets.all(12),
     };
-    final valueStyle = (Theme.of(context).textTheme.titleMedium ?? const TextStyle())
-        .copyWith(fontWeight: FontWeight.w700);
+    final valueStyle =
+        (Theme.of(context).textTheme.titleMedium ?? const TextStyle()).copyWith(
+          fontWeight: FontWeight.w700,
+        );
     final compactValueStyle = valueStyle.copyWith(
       fontSize: valueStyle.fontSize == null
           ? null
@@ -841,9 +865,7 @@ class _KpiMetricCardState extends ConsumerState<_KpiMetricCard> {
     final body = MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
-      child: hint == null
-          ? card
-          : Tooltip(message: hint, child: card),
+      child: hint == null ? card : Tooltip(message: hint, child: card),
     );
     return ReorderableDelayedDragStartListener(
       index: widget.index,
@@ -1248,8 +1270,7 @@ class _TopCustomersPanel extends ConsumerWidget {
                 loading: () => const ListPanelSkeleton(),
                 error: (error, _) => _PanelError(
                   message: error is ApiError ? error.message : error.toString(),
-                  onRetry: () =>
-                      ref.invalidate(dashboardTopCustomersProvider),
+                  onRetry: () => ref.invalidate(dashboardTopCustomersProvider),
                 ),
                 data: (data) => _TopCustomersBody(customers: data),
               ),
@@ -1481,68 +1502,68 @@ class _ExpiryAlertsPanel extends ConsumerWidget {
             Expanded(
               child: switch (alerts) {
                 AsyncError(:final error) => Center(
-                    child: Text(
-                      error is ApiError ? error.message : '$error',
-                      style: TextStyle(color: scheme.onSurfaceVariant),
-                    ),
-                  ),                AsyncLoading() => const ListPanelSkeleton(),
-                AsyncData(:final value) => value.isEmpty
-                    ? Center(
-                        child: Text(
-                          l10n.noExpiringBatches,
-                          style: TextStyle(color: scheme.onSurfaceVariant),
+                  child: Text(
+                    error is ApiError ? error.message : '$error',
+                    style: TextStyle(color: scheme.onSurfaceVariant),
+                  ),
+                ),
+                AsyncLoading() => const ListPanelSkeleton(),
+                AsyncData(:final value) =>
+                  value.isEmpty
+                      ? Center(
+                          child: Text(
+                            l10n.noExpiringBatches,
+                            style: TextStyle(color: scheme.onSurfaceVariant),
+                          ),
+                        )
+                      : ListView.separated(
+                          itemCount: value.length,
+                          separatorBuilder: (_, _) => const Divider(height: 1),
+                          itemBuilder: (context, index) {
+                            final a = value[index];
+                            final expired = a.daysRemaining < 0;
+                            final near = !expired && a.daysRemaining <= 30;
+                            final color = expired
+                                ? scheme.error
+                                : near
+                                ? const Color(0xffd97706)
+                                : scheme.onSurfaceVariant;
+                            return ListTile(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              leading: Icon(
+                                expired
+                                    ? Icons.event_busy_outlined
+                                    : Icons.event_repeat_outlined,
+                                color: color,
+                              ),
+                              title: Text(
+                                a.itemName,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                              subtitle: Text(
+                                '${a.batchNo} · ${a.warehouseName}',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              trailing: Text(
+                                expired
+                                    ? l10n.daysExpired(a.daysRemaining.abs())
+                                    : l10n.daysRemaining(a.daysRemaining),
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: color,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                              ),
+                              onTap: () => showBatchManagementScreen(
+                                context,
+                                itemId: a.itemId,
+                              ),
+                            );
+                          },
                         ),
-                      )
-                    : ListView.separated(
-                        itemCount: value.length,
-                        separatorBuilder: (_, _) => const Divider(height: 1),
-                        itemBuilder: (context, index) {
-                          final a = value[index];
-                          final expired = a.daysRemaining < 0;
-                          final near = !expired && a.daysRemaining <= 30;
-                          final color = expired
-                              ? scheme.error
-                              : near
-                                  ? const Color(0xffd97706)
-                                  : scheme.onSurfaceVariant;
-                          return ListTile(
-                            dense: true,
-                            contentPadding: EdgeInsets.zero,
-                            leading: Icon(
-                              expired
-                                  ? Icons.event_busy_outlined
-                                  : Icons.event_repeat_outlined,
-                              color: color,
-                            ),
-                            title: Text(
-                              a.itemName,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                            subtitle: Text(
-                              '${a.batchNo} · ${a.warehouseName}',
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            trailing: Text(
-                              expired
-                                  ? l10n.daysExpired(a.daysRemaining.abs())
-                                  : l10n.daysRemaining(a.daysRemaining),
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                    color: color,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                            ),
-                            onTap: () => showBatchManagementScreen(
-                              context,
-                              itemId: a.itemId,
-                            ),
-                          );
-                        },
-                      ),
-              _ => const SizedBox.shrink(),
+                _ => const SizedBox.shrink(),
               },
             ),
           ],

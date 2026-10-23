@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
+import '../core/theme/grid_density.dart';
 import '../core/theme/money_direction.dart';
 import '../l10n/app_localizations.dart';
 import 'grid_column_widths.dart';
@@ -70,6 +71,7 @@ class _DetailTabGridState<T> extends ConsumerState<DetailTabGrid<T>> {
   late List<PlutoColumn> _columns;
   PlutoGridConfiguration _configuration = const PlutoGridConfiguration();
   Brightness? _configurationBrightness;
+  GridDensity? _configurationDensity;
   bool _columnsReady = false;
   GridColumnWidths? _widthTracker;
 
@@ -93,9 +95,12 @@ class _DetailTabGridState<T> extends ConsumerState<DetailTabGrid<T>> {
     // dark mode is respected (PlutoGrid re-applies it in
     // didUpdateWidget).
     final brightness = Theme.of(context).brightness;
-    if (_configurationBrightness != brightness) {
-      _configuration = plutoGridConfigurationFor(context, compact: true);
+    final density = GridDensityScope.of(context);
+    if (_configurationBrightness != brightness ||
+        _configurationDensity != density) {
+      _configuration = plutoGridConfigurationFor(context);
       _configurationBrightness = brightness;
+      _configurationDensity = density;
     }
   }
 

@@ -160,7 +160,8 @@ class _SearchableSelectField<T> extends StatefulWidget {
       _SearchableSelectFieldState<T>();
 }
 
-class _SearchableSelectFieldState<T> extends State<_SearchableSelectField<T>> {
+class _SearchableSelectFieldState<T> extends State<_SearchableSelectField<T>>
+    with WidgetsBindingObserver {
   final GlobalKey _anchorKey = GlobalKey();
   final FocusNode _focus = FocusNode();
   final FocusNode _searchFocus = FocusNode();
@@ -171,6 +172,10 @@ class _SearchableSelectFieldState<T> extends State<_SearchableSelectField<T>> {
   bool _open = false;
   List<T> _filtered = const [];
   int _selectedIndex = -1;
+  double _left = 0;
+  double _top = 0;
+  double _width = 240;
+  ScrollPosition? _scrollPosition;
 
   @override
   void initState() {
@@ -244,12 +249,20 @@ class _SearchableSelectFieldState<T> extends State<_SearchableSelectField<T>> {
   @override
   void dispose() {
     widget.openSignal?.removeListener(_onOpenSignal);
+    _detachReposition();
     _removeOverlay();
     _focus.dispose();
     _searchFocus.dispose();
     _searchController.dispose();
     _scroll.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeMetrics() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _positionPopup();
+    });
   }
 
   void _onOpenSignal() {
@@ -261,8 +274,7 @@ class _SearchableSelectFieldState<T> extends State<_SearchableSelectField<T>> {
     }
   }
 
-  String _labelOf(T item) =>
-      widget.labelBuilder?.call(item) ?? item.toString();
+  String _labelOf(T item) => widget.labelBuilder?.call(item) ?? item.toString();
 
   void _toggle() {
     if (_open) {
@@ -276,35 +288,9 @@ class _SearchableSelectFieldState<T> extends State<_SearchableSelectField<T>> {
     if (!mounted) return;
     final box = _anchorKey.currentContext?.findRenderObject() as RenderBox?;
     if (box == null || !box.attached) return;
-    final screen = MediaQuery.sizeOf(context);
     final overlay = Overlay.of(context);
-    final overlayBox =
-        overlay.context.findRenderObject() as RenderBox?;
-    final overlayOrigin = overlayBox?.localToGlobal(Offset.zero) ?? Offset.zero;
 
-    final width = math.min(math.max(box.size.width, 240.0), screen.width - 16);
-    var left = box.localToGlobal(Offset.zero).dx;
-    if (left + width > screen.width - 8) {
-      left = math.max(8.0, screen.width - width - 8);
-    }
-
-    final desiredTop = box.localToGlobal(Offset.zero).dy + box.size.height + 2;
-    final maxMenuHeight = widget.menuMaxHeight + 52;
-    var top = math.min(
-      desiredTop,
-      math.max(overlayOrigin.dy + 8.0, screen.height - maxMenuHeight),
-    );
-
-    // If not enough room below, consider flipping above, but still keep
-    // the menu below the trigger when it can fit.
-    final roomBelow = screen.height - desiredTop;
-    if (roomBelow < maxMenuHeight) {
-      final flippedTop = math.max(
-        overlayOrigin.dy + 8.0,
-        desiredTop - box.size.height - 2 - maxMenuHeight,
-      );
-      if (flippedTop < desiredTop) top = flippedTop;
-    }
+    _positionPopup();
 
     setState(() {
       _open = true;
@@ -314,8 +300,6 @@ class _SearchableSelectFieldState<T> extends State<_SearchableSelectField<T>> {
 
     _overlay = OverlayEntry(
       builder: (context) {
-        final localLeft = left - overlayOrigin.dx;
-        final localTop = top - overlayOrigin.dy;
         final theme = Theme.of(context);
         return Stack(
           children: [
@@ -326,12 +310,13 @@ class _SearchableSelectFieldState<T> extends State<_SearchableSelectField<T>> {
               ),
             ),
             Positioned(
-              left: localLeft,
-              top: localTop,
-              width: width,
+              left: _left,
+              top: _top,
+              width: _width,
               child: Material(
+                key: const Key('searchable_select_popup'),
                 elevation: 6,
-                borderRadius: AppBorderRadius.xsRadius,
+                borderRadius: AppBorderRadius.xlRadius,
                 clipBehavior: Clip.antiAlias,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -363,7 +348,9 @@ class _SearchableSelectFieldState<T> extends State<_SearchableSelectField<T>> {
                       ),
                     ),
                     ConstrainedBox(
-                      constraints: BoxConstraints(maxHeight: widget.menuMaxHeight),
+                      constraints: BoxConstraints(
+                        maxHeight: widget.menuMaxHeight,
+                      ),
                       child: _filtered.isEmpty
                           ? Padding(
                               padding: const EdgeInsets.all(12),
@@ -379,11 +366,8 @@ class _SearchableSelectFieldState<T> extends State<_SearchableSelectField<T>> {
                               controller: _scroll,
                               shrinkWrap: true,
                               itemCount: _filtered.length,
-                              itemBuilder: (context, index) => _option(
-                                context,
-                                _filtered[index],
-                                index,
-                              ),
+                              itemBuilder: (context, index) =>
+                                  _option(context, _filtered[index], index),
                             ),
                     ),
                   ],
@@ -395,13 +379,69 @@ class _SearchableSelectFieldState<T> extends State<_SearchableSelectField<T>> {
       },
     );
     overlay.insert(_overlay!);
+    _attachReposition();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && _open) _searchFocus.requestFocus();
     });
   }
 
+  /// Recomputes the overlay position from the field's current global
+  /// position. Called on open, on the nearest scrollable's scroll, and on
+  /// window metrics changes.
+  void _positionPopup() {
+    if (!mounted) return;
+    final box = _anchorKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.attached || !box.hasSize) return;
+
+    final screen = MediaQuery.sizeOf(context);
+    final overlay = Overlay.of(context);
+    final overlayBox = overlay.context.findRenderObject() as RenderBox?;
+    final overlayOrigin = overlayBox?.localToGlobal(Offset.zero) ?? Offset.zero;
+
+    final width = math.min(math.max(box.size.width, 240.0), screen.width - 16);
+    var left = box.localToGlobal(Offset.zero).dx;
+    if (left + width > screen.width - 8) {
+      left = math.max(8.0, screen.width - width - 8);
+    }
+
+    final desiredTop = box.localToGlobal(Offset.zero).dy + box.size.height + 2;
+    final maxMenuHeight = widget.menuMaxHeight + 52;
+    var top = math.min(
+      desiredTop,
+      math.max(overlayOrigin.dy + 8.0, screen.height - maxMenuHeight),
+    );
+
+    final roomBelow = screen.height - desiredTop;
+    if (roomBelow < maxMenuHeight) {
+      final flippedTop = math.max(
+        overlayOrigin.dy + 8.0,
+        desiredTop - box.size.height - 2 - maxMenuHeight,
+      );
+      if (flippedTop < desiredTop) top = flippedTop;
+    }
+
+    _left = left - overlayOrigin.dx;
+    _top = top - overlayOrigin.dy;
+    _width = width;
+    _overlay?.markNeedsBuild();
+  }
+
+  void _attachReposition() {
+    _scrollPosition?.removeListener(_positionPopup);
+    _scrollPosition = Scrollable.maybeOf(context)?.position;
+    _scrollPosition?.addListener(_positionPopup);
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  void _detachReposition() {
+    _scrollPosition?.removeListener(_positionPopup);
+    _scrollPosition = null;
+    WidgetsBinding.instance.removeObserver(this);
+  }
+
   void _close() {
+    _detachReposition();
     _removeOverlay();
     if (mounted) setState(() => _open = false);
   }

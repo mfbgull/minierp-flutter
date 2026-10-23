@@ -342,7 +342,7 @@ class _SalesOrdersScreenState extends ConsumerState<SalesOrdersScreen>
         ValueListenableBuilder<Set<int>>(
           valueListenable: bulkSelection.selected,
           builder: (context, sel, _) {
-            if (sel.isEmpty) return const SizedBox.shrink();
+            if (sel.isEmpty) return const BulkActionBar(count: 0);
             final user = ref.watch(authProvider).user;
             return BulkActionBar(
               count: sel.length,

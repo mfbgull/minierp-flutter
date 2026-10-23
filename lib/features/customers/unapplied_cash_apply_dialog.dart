@@ -366,6 +366,7 @@ class _UnappliedCashApplyDialogState
       child: MovableDialog(
         dialogId: 'unapplied_apply',
         enableEscapeKey: true,
+        autofocusEscape: true,
         maxWidth: 960,
         maxHeight: height,
         child: Column(

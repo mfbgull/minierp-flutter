@@ -19,11 +19,13 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
 import '../data/repositories/api_result.dart' show ApiError;
 import '../l10n/app_localizations.dart';
+import '../core/theme/grid_density.dart';
 import 'grid_column_widths.dart';
 import 'pluto_grid_shortcuts.dart';
 import 'screen_error_panel.dart';
@@ -209,12 +211,9 @@ class GridRowAction {
 
 /// Theme-aware PlutoGrid configuration: maps M3 [ColorScheme] tokens
 /// into PlutoGrid's [PlutoGridStyleConfig] so the grid visually matches
-/// the rest of the app.
-///
-/// `compact: true` renders the denser report-grid variant — 34px rows
-/// instead of PlutoGrid's 45px default, a slimmer header, tighter cell
-/// padding and 13px cell text. Read-only financial reports fit far more
-/// rows per screen; CRUD list screens keep the roomier default.
+/// the rest of the app. Row/header heights and cell text come from the
+/// user's [GridDensity]; a missing [GridDensityScope] falls back to
+/// [GridDensity.compact] for report-style grids and standard otherwise.
 PlutoGridConfiguration plutoGridConfigurationFor(
   BuildContext context, {
   PlutoGridShortcut? shortcut,
@@ -223,6 +222,9 @@ PlutoGridConfiguration plutoGridConfigurationFor(
   final sc = shortcut ?? const PlutoGridShortcut();
   final scheme = Theme.of(context).colorScheme;
   final textTheme = Theme.of(context).textTheme;
+  final density =
+      GridDensityScope.maybeOf(context) ??
+      (compact ? GridDensity.compact : GridDensity.standard);
 
   return PlutoGridConfiguration(
     shortcut: sc,
@@ -248,17 +250,13 @@ PlutoGridConfiguration plutoGridConfigurationFor(
       // so [GridColumnWidths] still records dragged widths.
       columnResizeIcon: const IconData(0x20),
       disabledIconColor: scheme.onSurface.withValues(alpha: 0.12),
-      iconSize: compact ? 16 : 18,
-      rowHeight: compact ? kCompactGridRowHeight : PlutoGridSettings.rowHeight,
-      columnHeight: compact
-          ? kCompactGridHeaderHeight
-          : PlutoGridSettings.rowHeight,
-      columnFilterHeight: compact
-          ? kCompactGridHeaderHeight
-          : PlutoGridSettings.rowHeight,
-      defaultCellPadding: compact
-          ? const EdgeInsets.symmetric(horizontal: 8)
-          : PlutoGridSettings.cellPadding,
+      iconSize: density == GridDensity.compact ? 16 : 18,
+      rowHeight: density.rowHeight,
+      columnHeight: density.headerHeight,
+      columnFilterHeight: density.headerHeight,
+      defaultCellPadding: density.horizontalPadding == null
+          ? PlutoGridSettings.cellPadding
+          : EdgeInsets.symmetric(horizontal: density.horizontalPadding!),
       columnTextStyle:
           textTheme.titleSmall?.copyWith(
             color: scheme.onSurface,
@@ -269,7 +267,7 @@ PlutoGridConfiguration plutoGridConfigurationFor(
       cellTextStyle:
           textTheme.bodyMedium?.copyWith(
             color: scheme.onSurface,
-            fontSize: compact ? 13 : null,
+            fontSize: density.fontSize,
           ) ??
           const TextStyle(),
       gridBorderRadius: AppBorderRadius.smRadius,
@@ -278,10 +276,9 @@ PlutoGridConfiguration plutoGridConfigurationFor(
   );
 }
 
-/// Row/header heights for the compact (`compact: true`) grid style —
-/// denser than [PlutoGridSettings.rowHeight] (45px).
-const double kCompactGridRowHeight = 34;
-const double kCompactGridHeaderHeight = 40;
+/// Row/header heights for the fallback report density.
+const double kCompactGridRowHeight = 32;
+const double kCompactGridHeaderHeight = 36;
 
 /// Upper bound for content auto-fitting: a very long free-text cell
 /// (remarks, narration) must not swallow the whole grid width — it
@@ -418,6 +415,7 @@ mixin PlutoGridScreen<T, S extends ConsumerStatefulWidget> on ConsumerState<S> {
   bool _columnsReady = false;
   PlutoGridConfiguration _gridConfiguration = const PlutoGridConfiguration();
   Brightness? _configurationBrightness;
+  GridDensity? _configurationDensity;
   GridColumnWidths? _widthTracker;
   ProviderSubscription<bool>? _tintToggleSubscription;
 
@@ -514,15 +512,10 @@ mixin PlutoGridScreen<T, S extends ConsumerStatefulWidget> on ConsumerState<S> {
         if (actions == null || actions.isEmpty) {
           return const SizedBox.shrink();
         }
-        return Listener(
-          behavior: HitTestBehavior.opaque,
-          onPointerDown: (_) => _openGridRowMenu(cellContext, ctx.row),
-          child: Center(
-            child: Icon(
-              Icons.more_vert,
-              size: 18,
-              color: Theme.of(cellContext).colorScheme.onSurfaceVariant,
-            ),
+        return Center(
+          child: _GridRowActionsButton(
+            tooltip: l10n.commonActions,
+            onPressed: () => _openGridRowMenu(cellContext, ctx.row),
           ),
         );
       },
@@ -599,15 +592,17 @@ mixin PlutoGridScreen<T, S extends ConsumerStatefulWidget> on ConsumerState<S> {
     // disposed — didChangeDependencies only runs while mounted, so
     // rebuilding here is safe.
     final brightness = Theme.of(context).brightness;
-    if (_configurationBrightness != brightness) {
+    final density = GridDensityScope.of(context);
+    if (_configurationBrightness != brightness ||
+        _configurationDensity != density) {
       _gridConfiguration = plutoGridConfigurationFor(
         context,
-        compact: true,
         shortcut: PlutoGridShortcut(
           actions: rowDetailShortcutActions(openRowDetail),
         ),
       );
       _configurationBrightness = brightness;
+      _configurationDensity = density;
     }
   }
 
@@ -789,6 +784,90 @@ mixin PlutoGridScreen<T, S extends ConsumerStatefulWidget> on ConsumerState<S> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// A 40x40 row-actions button that works inside a PlutoGrid cell.
+///
+/// The grid's own gesture recognizers win the arena for [IconButton] taps,
+/// so this uses a raw pointer listener (the same reliable pattern as the
+/// previous on-pointer-down menu) but opens on pointer-up and ignores drags.
+/// Hover, focus, keyboard activation and a semantics label are added.
+class _GridRowActionsButton extends StatefulWidget {
+  const _GridRowActionsButton({required this.tooltip, required this.onPressed});
+
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  @override
+  State<_GridRowActionsButton> createState() => _GridRowActionsButtonState();
+}
+
+class _GridRowActionsButtonState extends State<_GridRowActionsButton> {
+  bool _hovered = false;
+  bool _focused = false;
+  Offset? _downPosition;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final size = math.max(
+      32.0,
+      math.min(40.0, GridDensityScope.of(context).rowHeight),
+    );
+    return Semantics(
+      button: true,
+      label: widget.tooltip,
+      child: FocusableActionDetector(
+        mouseCursor: SystemMouseCursors.click,
+        onShowHoverHighlight: (value) => setState(() => _hovered = value),
+        onShowFocusHighlight: (value) => setState(() => _focused = value),
+        shortcuts: const {
+          SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
+          SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
+        },
+        actions: {
+          ActivateIntent: CallbackAction<ActivateIntent>(
+            onInvoke: (_) {
+              widget.onPressed();
+              return null;
+            },
+          ),
+        },
+        child: Tooltip(
+          message: widget.tooltip,
+          child: Listener(
+            behavior: HitTestBehavior.opaque,
+            onPointerDown: (event) => _downPosition = event.position,
+            onPointerCancel: (_) => _downPosition = null,
+            onPointerUp: (event) {
+              final start = _downPosition;
+              _downPosition = null;
+              if (start == null || (event.position - start).distance > 8) {
+                return;
+              }
+              widget.onPressed();
+            },
+            child: Container(
+              width: size,
+              height: size,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: _hovered || _focused
+                    ? scheme.onSurface.withValues(alpha: 0.08)
+                    : null,
+                borderRadius: AppBorderRadius.xsRadius,
+              ),
+              child: Icon(
+                Icons.more_vert,
+                size: 18,
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

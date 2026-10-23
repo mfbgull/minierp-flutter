@@ -9440,12 +9440,6 @@ abstract class AppLocalizations {
   /// **'No stock movements found'**
   String get inventoryStockledgerNoentries;
 
-  /// No description provided for @loginDevHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Default login: admin / admin123'**
-  String get loginDevHint;
-
   /// No description provided for @loginInvalidCredentials.
   ///
   /// In en, this message translates to:
@@ -9457,6 +9451,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Password'**
   String get loginPassword;
+
+  /// No description provided for @loginShowPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Show password'**
+  String get loginShowPassword;
+
+  /// No description provided for @loginHidePassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide password'**
+  String get loginHidePassword;
 
   /// No description provided for @loginServerUnreachable.
   ///
@@ -11173,6 +11179,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Date & Range'**
   String get settingsSectionDate;
+
+  /// No description provided for @settingsSectionDisplay.
+  ///
+  /// In en, this message translates to:
+  /// **'Display'**
+  String get settingsSectionDisplay;
+
+  /// No description provided for @settingsGridDensity.
+  ///
+  /// In en, this message translates to:
+  /// **'Grid density'**
+  String get settingsGridDensity;
+
+  /// No description provided for @settingsDensityCompact.
+  ///
+  /// In en, this message translates to:
+  /// **'Compact'**
+  String get settingsDensityCompact;
+
+  /// No description provided for @settingsDensityStandard.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard'**
+  String get settingsDensityStandard;
+
+  /// No description provided for @settingsDensityComfortable.
+  ///
+  /// In en, this message translates to:
+  /// **'Comfortable'**
+  String get settingsDensityComfortable;
 
   /// No description provided for @settingsSectionNumbering.
   ///

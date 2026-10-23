@@ -4837,13 +4837,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get inventoryStockledgerNoentries => 'No stock movements found';
 
   @override
-  String get loginDevHint => 'Default login: admin / admin123';
-
-  @override
   String get loginInvalidCredentials => 'Invalid username or password';
 
   @override
   String get loginPassword => 'Password';
+
+  @override
+  String get loginShowPassword => 'Show password';
+
+  @override
+  String get loginHidePassword => 'Hide password';
 
   @override
   String get loginServerUnreachable =>
@@ -5745,6 +5748,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsSectionDate => 'Date & Range';
+
+  @override
+  String get settingsSectionDisplay => 'Display';
+
+  @override
+  String get settingsGridDensity => 'Grid density';
+
+  @override
+  String get settingsDensityCompact => 'Compact';
+
+  @override
+  String get settingsDensityStandard => 'Standard';
+
+  @override
+  String get settingsDensityComfortable => 'Comfortable';
 
   @override
   String get settingsSectionNumbering => 'Document Numbering';

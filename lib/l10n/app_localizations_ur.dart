@@ -4836,13 +4836,16 @@ class AppLocalizationsUr extends AppLocalizations {
   String get inventoryStockledgerNoentries => 'کوئی اسٹاک ٹرانزیکشن نہیں ملی';
 
   @override
-  String get loginDevHint => 'ڈیفالٹ لاگ ان: admin / admin123';
-
-  @override
   String get loginInvalidCredentials => 'غلط صارف نام یا پاس ورڈ';
 
   @override
   String get loginPassword => 'پاس ورڈ';
+
+  @override
+  String get loginShowPassword => 'پاس ورڈ دکھائیں';
+
+  @override
+  String get loginHidePassword => 'پاس ورڈ چھپائیں';
 
   @override
   String get loginServerUnreachable =>
@@ -5738,6 +5741,21 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get settingsSectionDate => 'تاریخ اور رینج';
+
+  @override
+  String get settingsSectionDisplay => 'ڈسپلے';
+
+  @override
+  String get settingsGridDensity => 'گرڈ کثافت';
+
+  @override
+  String get settingsDensityCompact => 'کمپیکٹ';
+
+  @override
+  String get settingsDensityStandard => 'معیاری';
+
+  @override
+  String get settingsDensityComfortable => 'آرام دہ';
 
   @override
   String get settingsSectionNumbering => 'دستاویز نمبرنگ';

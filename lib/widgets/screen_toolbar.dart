@@ -33,6 +33,7 @@
 
 import 'package:flutter/material.dart';
 
+import '../core/theme/app_motion.dart';
 import '../l10n/app_localizations.dart';
 import 'searchable_select.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
@@ -216,58 +217,73 @@ class BulkActionBar extends StatelessWidget {
   /// type (D13).
   static Widget _disableWhenBusy(Widget action, bool busy) {
     if (!busy) return action;
-    return IgnorePointer(
-      child: Opacity(opacity: 0.38, child: action),
-    );
+    return IgnorePointer(child: Opacity(opacity: 0.38, child: action));
   }
 
   @override
   Widget build(BuildContext context) {
+    final duration = AppMotion.duration(
+      context,
+      const Duration(milliseconds: 180),
+    );
+
+    if (count == 0) {
+      return AnimatedSize(
+        duration: duration,
+        curve: Curves.easeOutCubic,
+        alignment: Alignment.topCenter,
+        child: const SizedBox(width: double.infinity, height: 0),
+      );
+    }
+
     final l10n = AppLocalizations.of(context)!;
     final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        decoration: BoxDecoration(
-          color: scheme.secondaryContainer.withValues(alpha: 0.4),
-          borderRadius: AppBorderRadius.smRadius,
-          border: Border.all(color: scheme.outlineVariant),
-        ),
-        child: Row(
-          children: [
-            if (busy)
-              const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            else
-              Icon(
-                Icons.checklist,
-                size: 18,
-                color: scheme.onSecondaryContainer,
+
+    return AnimatedSize(
+      duration: duration,
+      curve: Curves.easeOutCubic,
+      alignment: Alignment.topCenter,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: BoxDecoration(
+            color: scheme.secondaryContainer.withValues(alpha: 0.4),
+            borderRadius: AppBorderRadius.smRadius,
+            border: Border.all(color: scheme.outlineVariant),
+          ),
+          child: Row(
+            children: [
+              if (busy)
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                Icon(
+                  Icons.checklist,
+                  size: 18,
+                  color: scheme.onSecondaryContainer,
+                ),
+              const SizedBox(width: 8),
+              Text(
+                l10n.bulkSelectedCount(count),
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: scheme.onSecondaryContainer,
+                ),
               ),
-            const SizedBox(width: 8),
-            Text(
-              l10n.bulkSelectedCount(count),
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: scheme.onSecondaryContainer,
-              ),
-            ),
-            const Spacer(),
-            ...[
-              for (final action in actions)
-                _disableWhenBusy(action, busy),
+              const Spacer(),
+              ...[for (final action in actions) _disableWhenBusy(action, busy)],
+              if (onClearSelection != null && !busy)
+                IconButton(
+                  icon: const Icon(Icons.close, size: 18),
+                  tooltip: l10n.commonClear,
+                  onPressed: onClearSelection,
+                ),
             ],
-            if (onClearSelection != null && !busy)
-              IconButton(
-                icon: const Icon(Icons.close, size: 18),
-                tooltip: l10n.commonClear,
-                onPressed: onClearSelection,
-              ),
-          ],
+          ),
         ),
       ),
     );
@@ -363,7 +379,7 @@ class ScreenToolbarState extends State<ScreenToolbar> {
             // inert then).
             hintText: widget.searchEnabled
                 ? '${widget.searchHint ?? l10n.commonSearch}'
-                    ' ($kShortcutFindChord)'
+                      ' ($kShortcutFindChord)'
                 : widget.searchHint ?? l10n.commonSearch,
             border: OutlineInputBorder(borderRadius: AppBorderRadius.smRadius),
             suffixIcon: widget.onClearAll != null && widget.hasActiveFilters
@@ -376,7 +392,8 @@ class ScreenToolbarState extends State<ScreenToolbar> {
                 ? IconButton(
                     icon: const Icon(Icons.clear, size: 18),
                     tooltip: l10n.commonClear,
-                    onPressed: widget.onClearSearch ??
+                    onPressed:
+                        widget.onClearSearch ??
                         () {
                           // Cancel the screen's pending debounce so a
                           // stale timer can't resurrect the term.

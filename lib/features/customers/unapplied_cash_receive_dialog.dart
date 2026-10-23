@@ -188,6 +188,7 @@ class _UnappliedCashReceiveDialogState
       child: MovableDialog(
         dialogId: 'unapplied_receive',
         enableEscapeKey: true,
+        autofocusEscape: true,
         maxWidth: 560,
         maxHeight: math.max(160, math.min(720, height)),
         child: Column(
