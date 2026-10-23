@@ -252,6 +252,8 @@ export interface ReturnSpec {
   warehouseId?: number;
   settlements?: SettlementSpec[]; // omit → leave Unsettled
   reason?: string;
+  disposition?: 'refund' | 'credit' | 'adjust';
+  adjustInvoiceIds?: number[];
 }
 
 export async function processReturn(
@@ -268,6 +270,8 @@ export async function processReturn(
       warehouse_id: spec.warehouseId,
       reason: spec.reason ?? 'Spec test return',
       settlements: spec.settlements,
+      disposition: spec.disposition,
+      adjust_invoice_ids: spec.adjustInvoiceIds,
     });
   return {
     status: res.status,
