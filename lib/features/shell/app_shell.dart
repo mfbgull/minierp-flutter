@@ -52,7 +52,7 @@ class AppShell extends ConsumerWidget {
           title: Text((current.title ?? current.label)(l10n)),
           actions: [
             IconButton(
-              tooltip: 'Search (Ctrl+K)',
+              tooltip: '${l10n.commonSearch} (Ctrl+K)',
               icon: const Icon(Icons.search),
               onPressed: () => showGlobalSearchDialog(context),
             ),
@@ -155,15 +155,19 @@ class _NavRail extends StatelessWidget {
           NavigationRailDestination(
             icon: Icon(dest.icon),
             selectedIcon: Icon(dest.icon),
-            // Cap the label so the extended rail stays at its theme width
-            // (180px, matching the pre-M3 rail); without this the rail
-            // grows to fit the longest label and shrinks module grids.
-            label: SizedBox(
-              width: 100,
-              child: Text(
-                dest.label(l10n),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+            // Long module names wrap to two lines instead of widening
+            // the rail (which would shrink module grids). The tooltip
+            // always carries the full label.
+            label: Tooltip(
+              message: dest.label(l10n),
+              child: SizedBox(
+                width: 110,
+                child: Text(
+                  dest.label(l10n),
+                  maxLines: 2,
+                  softWrap: true,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ),
           ),

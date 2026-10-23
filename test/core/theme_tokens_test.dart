@@ -37,6 +37,10 @@ void main() {
       );
       expect(AppBorderRadius.xl, 12);
     });
+
+    test('the extended navigation rail keeps grid width', () {
+      expect(AppTheme.light.navigationRailTheme.minExtendedWidth, 180);
+    });
   });
 
   group('numeric typography', () {

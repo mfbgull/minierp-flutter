@@ -14,17 +14,29 @@ void showAppToast(
   Duration duration = const Duration(seconds: 3),
 }) {
   final messenger = ScaffoldMessenger.of(context);
+  final scheme = Theme.of(context).colorScheme;
+  final effectiveAction = action == null
+      ? null
+      : isError
+      ? SnackBarAction(
+          label: action.label,
+          onPressed: action.onPressed,
+          textColor: scheme.onError,
+          disabledTextColor: scheme.onError.withValues(alpha: 0.5),
+        )
+      : action;
   messenger
     ..hideCurrentSnackBar()
     ..showSnackBar(
       SnackBar(
-        content: Text(message),
-        backgroundColor: isError
-            ? Theme.of(context).colorScheme.error
-            : Theme.of(context).colorScheme.inverseSurface,
+        content: Text(
+          message,
+          style: isError ? TextStyle(color: scheme.onError) : null,
+        ),
+        backgroundColor: isError ? scheme.error : scheme.inverseSurface,
         behavior: SnackBarBehavior.floating,
         duration: duration,
-        action: action,
+        action: effectiveAction,
       ),
     );
 }

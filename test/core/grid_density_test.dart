@@ -51,4 +51,22 @@ void main() {
     expect(compact.style.rowHeight, GridDensity.compact.rowHeight);
     expect(standard.style.rowHeight, GridDensity.standard.rowHeight);
   });
+
+  testWidgets('column resize affordance is visible', (tester) async {
+    late PlutoGridConfiguration config;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: Builder(
+          builder: (context) {
+            config = plutoGridConfigurationFor(context);
+            return const SizedBox.shrink();
+          },
+        ),
+      ),
+    );
+
+    expect(config.style.columnResizeIcon, Icons.swap_horiz);
+  });
 }

@@ -244,11 +244,9 @@ PlutoGridConfiguration plutoGridConfigurationFor(
       activatedBorderColor: scheme.primary,
       inactivatedBorderColor: scheme.outlineVariant,
       iconColor: scheme.onSurfaceVariant,
-      // Hide the `<>` drag-resize handle PlutoGrid paints on every
-      // unsorted header (default Icons.code_sharp). A space glyph renders
-      // nothing but keeps the handle's layout box and drag gesture alive,
-      // so [GridColumnWidths] still records dragged widths.
-      columnResizeIcon: const IconData(0x20),
+      // Visible resize affordance on each resizable header. The icon keeps
+      // PlutoGrid's resize hit box and drag gesture.
+      columnResizeIcon: Icons.swap_horiz,
       disabledIconColor: scheme.onSurface.withValues(alpha: 0.12),
       iconSize: density == GridDensity.compact ? 16 : 18,
       rowHeight: density.rowHeight,

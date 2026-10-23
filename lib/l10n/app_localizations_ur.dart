@@ -2920,6 +2920,13 @@ class AppLocalizationsUr extends AppLocalizations {
   String get commonNoresults => 'کوئی نتیجہ نہیں ملی';
 
   @override
+  String get commonOffline => 'آف لائن';
+
+  @override
+  String get commonOfflineTooltip =>
+      'محفوظ شدہ ڈیٹا دکھایا جا رہا ہے — سرور سے رابطہ نہیں';
+
+  @override
   String get posItemNotFound => 'آئٹم نہیں ملا';
 
   @override

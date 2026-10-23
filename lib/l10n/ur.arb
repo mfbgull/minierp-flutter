@@ -894,6 +894,8 @@
   "commonSelectoption": "ایک آپشن انتخاب کریں",
   "commonEntervalue": "قدر درج کریں",
   "commonNoresults": "کوئی نتیجہ نہیں ملی",
+  "commonOffline": "آف لائن",
+  "commonOfflineTooltip": "محفوظ شدہ ڈیٹا دکھایا جا رہا ہے — سرور سے رابطہ نہیں",
   "posItemNotFound": "آئٹم نہیں ملا",
   "commonEntries": "اندراجات",
   "commonRequired": "ضروری",

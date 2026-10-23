@@ -171,9 +171,9 @@ abstract final class AppTheme {
         thickness: 1,
         space: 1,
       ),
-      // The M3 NavigationRail defaults to a 256px extended width; the
-      // previous custom rail was 180px. Keep 180 so module grids keep
-      // their viewport width (spec 3.2 — same width, M3 look).
+      // Keep the extended rail at 180px so module grids keep their
+      // viewport width. Long destination labels wrap to two lines
+      // (with a tooltip) instead of widening the rail.
       navigationRailTheme: const NavigationRailThemeData(minExtendedWidth: 180),
       splashFactory: InkSparkle.splashFactory,
     );

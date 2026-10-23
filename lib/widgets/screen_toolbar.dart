@@ -274,14 +274,25 @@ class BulkActionBar extends StatelessWidget {
                   color: scheme.onSecondaryContainer,
                 ),
               ),
-              const Spacer(),
-              ...[for (final action in actions) _disableWhenBusy(action, busy)],
-              if (onClearSelection != null && !busy)
-                IconButton(
-                  icon: const Icon(Icons.close, size: 18),
-                  tooltip: l10n.commonClear,
-                  onPressed: onClearSelection,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Wrap(
+                  alignment: WrapAlignment.end,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    for (final action in actions)
+                      _disableWhenBusy(action, busy),
+                    if (onClearSelection != null && !busy)
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 18),
+                        tooltip: l10n.commonClear,
+                        onPressed: onClearSelection,
+                      ),
+                  ],
                 ),
+              ),
             ],
           ),
         ),

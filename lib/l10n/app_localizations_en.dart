@@ -2920,6 +2920,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commonNoresults => 'No results found';
 
   @override
+  String get commonOffline => 'Offline';
+
+  @override
+  String get commonOfflineTooltip => 'Showing saved data — server unreachable';
+
+  @override
   String get posItemNotFound => 'Item not found';
 
   @override

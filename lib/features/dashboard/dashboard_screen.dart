@@ -686,32 +686,50 @@ class _PanelFrameState extends ConsumerState<_PanelFrame> {
       child: Stack(
         children: [
           panel,
-          if (_hovered)
-            Positioned(
-              top: 6,
-              right: 6,
-              child: ReorderableDragStartListener(
-                index: widget.index,
-                child: Container(
-                  padding: const EdgeInsets.all(2),
-                  decoration: BoxDecoration(
-                    color: scheme.surface,
-                    borderRadius: AppBorderRadius.xsRadius,
-                    boxShadow: [
-                      BoxShadow(
-                        color: scheme.shadow.withValues(alpha: 0.15),
-                        blurRadius: 2,
-                      ),
-                    ],
+          // The handle stays mounted at zero opacity so it fades in
+          // without a layout or paint jump.
+          Positioned(
+            top: 6,
+            right: 6,
+            child: IgnorePointer(
+              ignoring: !_hovered,
+              child: AnimatedOpacity(
+                opacity: _hovered ? 1 : 0,
+                duration: AppMotion.duration(
+                  context,
+                  const Duration(milliseconds: 120),
+                ),
+                child: AnimatedScale(
+                  scale: _hovered ? 1 : 0.95,
+                  duration: AppMotion.duration(
+                    context,
+                    const Duration(milliseconds: 120),
                   ),
-                  child: Icon(
-                    Icons.drag_indicator,
-                    size: 14,
-                    color: scheme.outline,
+                  child: ReorderableDragStartListener(
+                    index: widget.index,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: scheme.surface,
+                        borderRadius: AppBorderRadius.xsRadius,
+                        boxShadow: [
+                          BoxShadow(
+                            color: scheme.shadow.withValues(alpha: 0.15),
+                            blurRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        Icons.drag_indicator,
+                        size: 14,
+                        color: scheme.outline,
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
+          ),
         ],
       ),
     );
@@ -808,20 +826,30 @@ class _KpiMetricCardState extends ConsumerState<_KpiMetricCard> {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  // Hover drag handle (desktop). MouseRegion on the card
-                  // tracks hover; the handle starts the reorder drag.
-                  if (_hovered)
-                    ReorderableDragStartListener(
-                      index: widget.index,
-                      child: Padding(
-                        padding: const EdgeInsets.only(left: 4),
-                        child: Icon(
-                          Icons.drag_indicator,
-                          size: 14,
-                          color: scheme.outline,
+                  // Hover drag handle (desktop). The slot is always
+                  // reserved so revealing it never reflows the label.
+                  const SizedBox(width: 4),
+                  SizedBox(
+                    width: 18,
+                    child: IgnorePointer(
+                      ignoring: !_hovered,
+                      child: AnimatedOpacity(
+                        opacity: _hovered ? 1 : 0,
+                        duration: AppMotion.duration(
+                          context,
+                          const Duration(milliseconds: 120),
+                        ),
+                        child: ReorderableDragStartListener(
+                          index: widget.index,
+                          child: Icon(
+                            Icons.drag_indicator,
+                            size: 14,
+                            color: scheme.outline,
+                          ),
                         ),
                       ),
                     ),
+                  ),
                 ],
               ),
               // Scale down instead of wrapping — stat values must never

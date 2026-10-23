@@ -940,6 +940,8 @@
   "commonSelectoption": "Select an option",
   "commonEntervalue": "Enter value",
   "commonNoresults": "No results found",
+  "commonOffline": "Offline",
+  "commonOfflineTooltip": "Showing saved data — server unreachable",
   "posItemNotFound": "Item not found",
   "commonEntries": "entries",
   "commonRequired": "Required",
