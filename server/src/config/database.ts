@@ -883,6 +883,240 @@ function runBOMItemsColumnMigration(): void {
   }
 }
 
+interface LegacyBomRow {
+  id: number;
+  bom_no: string | null;
+  finished_item_id: number | null;
+  quantity: number | null;
+  is_active: number | null;
+  notes: string | null;
+  created_by: number | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+interface LegacyBomItemRow {
+  id: number;
+  bom_id: number;
+  item_id: number;
+  quantity: number;
+  unit_cost: number | null;
+  created_at: string | null;
+}
+
+/**
+ * `init.sql` created bom_items.bom_id referencing the legacy `bom` table,
+ * while BOMModel writes to `boms`. `add-bom-tables.sql` cannot replace the
+ * existing table (CREATE TABLE IF NOT EXISTS is a no-op), so the FK survived
+ * every boot and POST /api/boms failed with FOREIGN KEY constraint failed.
+ *
+ * Repair once: migrate any legacy `bom` rows into `boms`, rebuild
+ * `bom_items` with the documented FKs to boms/items, and keep every original
+ * row in `bom_items_legacy` (including rows that cannot be mapped) so no
+ * legacy data is silently discarded.
+ */
+export function repairLegacyBOMItemsSchema(
+  targetDb: Database.Database = db,
+): void {
+  const tableExists = (name: string): boolean =>
+    Boolean(
+      targetDb
+        .prepare(`SELECT 1 FROM sqlite_master WHERE type='table' AND name = ?`)
+        .get(name),
+    );
+
+  if (!tableExists('bom_items') || !tableExists('boms')) return;
+
+  const foreignKeys = targetDb
+    .prepare(`PRAGMA foreign_key_list('bom_items')`)
+    .all() as Array<{ table: string }>;
+  if (!foreignKeys.some((fk) => fk.table === 'bom')) return;
+
+  const legacyItemCount = (
+    targetDb.prepare(`SELECT COUNT(*) AS count FROM bom_items`).get() as {
+      count: number;
+    }
+  ).count;
+  const shouldArchive = legacyItemCount > 0;
+  if (shouldArchive && tableExists('bom_items_legacy')) {
+    throw new Error(
+      'bom_items_legacy already exists; refusing to overwrite a previous repair archive',
+    );
+  }
+
+  // Migrate legacy BOM headers into the current table. Preserve ids when
+  // free; otherwise allocate one and remap the item rows below.
+  const bomIdMap = new Map<number, number>();
+  if (tableExists('bom')) {
+    const legacyBoms = targetDb
+      .prepare(`
+        SELECT id, bom_no, finished_item_id, quantity, is_active, notes,
+               created_by, created_at, updated_at
+        FROM bom
+      `)
+      .all() as LegacyBomRow[];
+    const fallbackUser =
+      (
+        targetDb.prepare(`SELECT MIN(id) AS id FROM users`).get() as {
+          id: number | null;
+        }
+      ).id ?? 1;
+    const byNumber = targetDb.prepare(`SELECT id FROM boms WHERE bom_no = ?`);
+    const idTaken = targetDb.prepare(`SELECT 1 FROM boms WHERE id = ?`);
+    const insertWithId = targetDb.prepare(`
+      INSERT INTO boms (
+        id, bom_no, bom_name, finished_item_id, quantity, description,
+        is_active, created_by, created_at, updated_at
+      ) VALUES (
+        ?, ?, ?, ?, ?, ?, ?, ?,
+        COALESCE(?, CURRENT_TIMESTAMP), COALESCE(?, CURRENT_TIMESTAMP)
+      )
+    `);
+    const insertAuto = targetDb.prepare(`
+      INSERT INTO boms (
+        bom_no, bom_name, finished_item_id, quantity, description,
+        is_active, created_by, created_at, updated_at
+      ) VALUES (
+        ?, ?, ?, ?, ?, ?, ?,
+        COALESCE(?, CURRENT_TIMESTAMP), COALESCE(?, CURRENT_TIMESTAMP)
+      )
+    `);
+
+    for (const legacy of legacyBoms) {
+      const legacyId = Number(legacy.id);
+      const bomNo =
+        String(legacy.bom_no ?? '').trim() || `BOM-${legacyId || 'LEGACY'}`;
+      const existing = byNumber.get(bomNo) as { id: number } | undefined;
+      if (existing) {
+        bomIdMap.set(legacyId, existing.id);
+        continue;
+      }
+
+      const createdBy = Number(legacy.created_by) || fallbackUser;
+      const finishedItemId = Number(legacy.finished_item_id) || 0;
+      const quantity = Number(legacy.quantity) || 1;
+      const isActive = legacy.is_active ?? 1;
+      const values = [
+        bomNo,
+        bomNo,
+        finishedItemId,
+        quantity,
+        legacy.notes ?? null,
+        isActive,
+        createdBy,
+        legacy.created_at ?? null,
+        legacy.updated_at ?? null,
+      ] as const;
+
+      if (!idTaken.get(legacyId)) {
+        insertWithId.run(legacyId, ...values);
+        bomIdMap.set(legacyId, legacyId);
+      } else {
+        const result = insertAuto.run(...values);
+        bomIdMap.set(legacyId, Number(result.lastInsertRowid));
+      }
+    }
+  }
+
+  if (shouldArchive) {
+    targetDb.exec('ALTER TABLE bom_items RENAME TO bom_items_legacy');
+  } else {
+    targetDb.exec('DROP TABLE bom_items');
+  }
+  targetDb.exec('DROP INDEX IF EXISTS idx_bom_items_bom');
+  targetDb.exec('DROP INDEX IF EXISTS idx_bom_items_item');
+  targetDb.exec(`
+    CREATE TABLE bom_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      bom_id INTEGER NOT NULL,
+      item_id INTEGER NOT NULL,
+      quantity DECIMAL(15,3) NOT NULL,
+      unit_cost DECIMAL(15,2),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (bom_id) REFERENCES boms(id) ON DELETE CASCADE,
+      FOREIGN KEY (item_id) REFERENCES items(id)
+    )
+  `);
+
+  const legacyColumns = new Set(
+    shouldArchive
+      ? (
+          targetDb
+            .prepare(`PRAGMA table_info('bom_items_legacy')`)
+            .all() as Array<{ name: string }>
+        ).map((column) => column.name)
+      : [],
+  );
+  const hasUnitCost = legacyColumns.has('unit_cost');
+  const hasCreatedAt = legacyColumns.has('created_at');
+  let legacyRows: LegacyBomItemRow[] = [];
+  if (shouldArchive) {
+    let legacySelect: string;
+    if (hasUnitCost && hasCreatedAt) {
+      legacySelect = `SELECT id, bom_id, item_id, quantity, unit_cost, created_at
+                      FROM bom_items_legacy`;
+    } else if (hasUnitCost) {
+      legacySelect = `SELECT id, bom_id, item_id, quantity, unit_cost,
+                             NULL AS created_at FROM bom_items_legacy`;
+    } else if (hasCreatedAt) {
+      legacySelect = `SELECT id, bom_id, item_id, quantity, NULL AS unit_cost,
+                             created_at FROM bom_items_legacy`;
+    } else {
+      legacySelect = `SELECT id, bom_id, item_id, quantity, NULL AS unit_cost,
+                             NULL AS created_at FROM bom_items_legacy`;
+    }
+    legacyRows = targetDb.prepare(legacySelect).all() as LegacyBomItemRow[];
+  }
+  const bomExists = targetDb.prepare(`SELECT 1 FROM boms WHERE id = ?`);
+  const itemExists = targetDb.prepare(`SELECT 1 FROM items WHERE id = ?`);
+  const insertItem = targetDb.prepare(`
+    INSERT INTO bom_items (id, bom_id, item_id, quantity, unit_cost, created_at)
+    VALUES (?, ?, ?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP))
+  `);
+
+  let copied = 0;
+  let archivedOrphans = 0;
+  for (const row of legacyRows) {
+    const bomId = bomIdMap.get(Number(row.bom_id)) ?? Number(row.bom_id);
+    if (!bomExists.get(bomId) || !itemExists.get(row.item_id)) {
+      archivedOrphans += 1;
+      continue;
+    }
+    insertItem.run(
+      row.id,
+      bomId,
+      row.item_id,
+      row.quantity,
+      row.unit_cost ?? null,
+      row.created_at ?? null,
+    );
+    copied += 1;
+  }
+
+  targetDb.exec(
+    'CREATE INDEX IF NOT EXISTS idx_bom_items_bom ON bom_items(bom_id)',
+  );
+  targetDb.exec(
+    'CREATE INDEX IF NOT EXISTS idx_bom_items_item ON bom_items(item_id)',
+  );
+
+  const violations = targetDb
+    .prepare(`PRAGMA foreign_key_check('bom_items')`)
+    .all();
+  if (violations.length > 0) {
+    throw new Error(
+      `BOM items repair left ${violations.length} foreign-key violation(s)`,
+    );
+  }
+
+  logger.info(
+    `Repaired legacy bom_items schema: ${bomIdMap.size} BOM(s) mapped, ` +
+      `${copied} line(s) copied, ${archivedOrphans} orphan(s) ${
+        shouldArchive ? 'retained in bom_items_legacy' : 'found'
+      }`,
+  );
+}
+
 function runSalesMigration(): void {
   try {
     // Drop legacy sales table — POS and direct sales now use invoices+invoice_items
@@ -1765,6 +1999,9 @@ export function applyPendingMigrations(): void {
   runLedgered('fn.runProductionsMigration', runProductionsMigration);
   runLedgered('fn.runBOMMigration', runBOMMigration);
   runLedgered('fn.runBOMItemsColumnMigration', runBOMItemsColumnMigration);
+  runLedgered('fn.repairLegacyBOMItemsSchema', () =>
+    repairLegacyBOMItemsSchema(),
+  );
   runLedgered('fn.runSalesMigration', runSalesMigration);
   runLedgered('fn.runSupplierLedgerMigration', runSupplierLedgerMigration);
   runLedgered('fn.runActivityLogMigration', runActivityLogMigration);
