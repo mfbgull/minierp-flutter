@@ -437,7 +437,7 @@ class InvoiceModel {
     const countRow = db
       .prepare(`SELECT COUNT(*) as total FROM invoices i
         LEFT JOIN customers c ON i.customer_id = c.id
-        WHERE 1=1${where}`)
+        WHERE 1=1 AND i.deleted_at IS NULL${where}`)
       .get(...params) as { total: number };
 
     // Get items for each invoice
