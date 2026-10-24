@@ -270,11 +270,17 @@ class ActivityLogModel {
       `).all(...params) as { action: string; count: number }[];
 
       // Get top users
+      // The users join makes a bare `created_at` ambiguous (users has one
+      // too), which used to throw for every ranged call and zero the whole
+      // stats payload via the catch below.
+      const userFilter = dateFilter
+        ? ' WHERE al.user_id IS NOT NULL AND al.created_at >= ? AND al.created_at < ?'
+        : ' WHERE al.user_id IS NOT NULL';
       const users = db.prepare(`
         SELECT u.username, COUNT(*) as count
         FROM activity_log al
         LEFT JOIN users u ON al.user_id = u.id
-        ${dateFilter ? dateFilter.replace('WHERE', 'WHERE al.user_id IS NOT NULL AND') : 'WHERE al.user_id IS NOT NULL'}
+        ${userFilter}
         GROUP BY al.user_id
         ORDER BY count DESC
         LIMIT 10

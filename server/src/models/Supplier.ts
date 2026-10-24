@@ -65,6 +65,9 @@ const ALLOWED_SORT_COLUMNS = [
   'transaction_date', 'debit', 'credit', 'balance',
 ];
 const ALLOWED_SORT_DIRECTIONS = ['ASC', 'DESC'];
+const LEDGER_SORT_COLUMNS = [
+  'id', 'transaction_date', 'reference_no', 'debit', 'credit', 'balance', 'created_at',
+];
 
 function safeSortBy(sortBy: string | undefined, sortOrder: string | undefined): { sortBy: string; sortOrder: string } {
   const sb = (sortBy || 'supplier_name').trim().toLowerCase();
@@ -175,7 +178,12 @@ class SupplierModel {
   }
 
   static getLedger(id: number, sortBy: string, sortOrder: string, db: Database.Database, page = 1, limit = 0, fromDate?: string, toDate?: string): { rows: LedgerEntry[]; total: number } {
-    const { sortBy: safeBy, sortOrder: safeOrder } = safeSortBy(sortBy, sortOrder);
+    // Ledger rows have no supplier_name column, so the shared supplier-list
+    // allowlist (whose default is supplier_name) cannot drive this sort.
+    const requestedBy = (sortBy || 'transaction_date').trim().toLowerCase();
+    const requestedOrder = (sortOrder || 'ASC').trim().toUpperCase();
+    const safeBy = LEDGER_SORT_COLUMNS.includes(requestedBy) ? requestedBy : 'transaction_date';
+    const safeOrder = ALLOWED_SORT_DIRECTIONS.includes(requestedOrder) ? requestedOrder : 'ASC';
     // Task 8.7: bounded pagination; limit 0 keeps the legacy unbounded shape.
     // Active-set parity with the customer ledger (and SupplierLedgerModel's
     // getBalance/rebuildBalances): voided originals and their reversal rows
