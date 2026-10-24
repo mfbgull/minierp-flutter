@@ -4,6 +4,7 @@ import request from 'supertest';
 import app from '../app';
 import db from '../config/database';
 import RoleModel from '../models/Role';
+import PeriodModel from '../models/Period';
 import SupplierModel from '../models/Supplier';
 import UserModel from '../models/User';
 import accountingController from '../controllers/accountingController';
@@ -212,13 +213,21 @@ describe('accounting periods', () => {
       end_date: '2026-02-15',
     });
     expect(overlap.status).toBe(409);
+  });
 
-    const duplicate = await open({
-      period_name: 'COV-2026-01',
-      start_date: '2027-01-01',
-      end_date: '2027-01-31',
+  it('maps a duplicate period name to 409', async () => {
+    jest.spyOn(PeriodModel, 'openPeriod').mockImplementation(() => {
+      throw new Error('UNIQUE constraint failed: accounting_periods.period_name');
     });
-    expect(duplicate.status).toBe(409);
+
+    const res = await open({
+      period_name: 'Dup period',
+      start_date: '2028-01-01',
+      end_date: '2028-01-31',
+    });
+
+    expect(res.status).toBe(409);
+    expect(res.body.error.message).toBe('A period with that name already exists');
   });
 
   it('validates the open-period payload when called directly', async () => {

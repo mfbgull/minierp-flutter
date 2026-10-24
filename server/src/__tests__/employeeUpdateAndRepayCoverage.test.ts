@@ -4,6 +4,7 @@ import app from '../app';
 import db from '../config/database';
 import EmployeeModel from '../models/Employee';
 import EmployeeLoanModel from '../models/EmployeeLoan';
+import AccountingService from '../services/accountingService';
 import logger from '../utils/logger';
 import { getAuthCookie } from './helpers/invoiceReturnSpec';
 
@@ -142,6 +143,59 @@ describe('employee update and loan repayment guards', () => {
       const noDate = await repay(employeeId, loanId, { amount: 100 });
       expect(noDate.status).toBe(422);
       expect(noDate.body).toEqual({ success: false, error: 'Payment date is required' });
+    });
+
+    it('records a direct repayment against the loan balance', async () => {
+      const res = await repay(employeeId, loanId, {
+        amount: 100,
+        payment_date: '2026-09-10',
+        payment_method: 'Cash',
+      });
+
+      expect(res.status).toBe(201);
+      expect(res.body.data.amount).toBe(100);
+      const loan = db
+        .prepare('SELECT balance FROM employee_loans WHERE id = ?')
+        .get(loanId) as { balance: number };
+      expect(loan.balance).toBe(900);
+    });
+
+    it('records the repayment when the employee row is gone', async () => {
+      jest.spyOn(EmployeeModel, 'getById').mockReturnValue(undefined);
+
+      const res = await repay(employeeId, loanId, {
+        amount: 50,
+        payment_date: '2026-09-10',
+      });
+
+      expect(res.status).toBe(201);
+      expect(res.body.data.journal_entry_id).toBeNull();
+      const loan = db
+        .prepare('SELECT balance FROM employee_loans WHERE id = ?')
+        .get(loanId) as { balance: number };
+      expect(loan.balance).toBe(950);
+    });
+
+    it('rolls back when the GL posting fails', async () => {
+      jest.spyOn(AccountingService, 'postLoanRepayment').mockImplementation(() => {
+        throw new Error('forced GL failure');
+      });
+
+      const res = await repay(employeeId, loanId, {
+        amount: 100,
+        payment_date: '2026-09-10',
+        payment_method: 'Cash',
+      });
+
+      expect(res.status).toBe(500);
+      const loan = db
+        .prepare('SELECT balance FROM employee_loans WHERE id = ?')
+        .get(loanId) as { balance: number };
+      expect(loan.balance).toBe(1000);
+      const repayments = db
+        .prepare('SELECT COUNT(*) AS n FROM employee_loan_repayments WHERE loan_id = ?')
+        .get(loanId) as { n: number };
+      expect(repayments.n).toBe(0);
     });
   });
 });
