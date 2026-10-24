@@ -1277,7 +1277,7 @@ export function correctBatchReconciliation(req: AuthRequest, res: Response): Res
           movement_no, item_id, warehouse_id, movement_type,
           quantity, unit_cost, reference_doctype, reference_docno,
           remarks, movement_date, created_by, batch_id
-        ) VALUES (?, ?, ?, 'ADJUSTMENT', ?, 0, 'BATCH_RECONCILIATION', ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, 'ADJUSTMENT', ?, 0, 'BATCH_RECONCILIATION', ?, ?, ?, ?, ?)
       `).run(
         movementNo,
         (db.prepare(`SELECT item_id FROM stock_batches WHERE id = ?`).get(batch_id) as { item_id: number }).item_id,
