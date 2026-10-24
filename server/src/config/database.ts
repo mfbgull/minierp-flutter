@@ -1344,10 +1344,10 @@ function optionalStockBatchDefinitions(columnNames: readonly string[]): string[]
     .map(([, definition]) => definition);
 }
 
-function runBatchSourceTypeRebuild(): void {
+export function runBatchSourceTypeRebuild(targetDb: Database.Database = db): void {
   // INV-10 / INV-22: widen stock_batches.source_type to a disjoint
   // namespace per origin table and re-stamp existing rows.
-  const currentCheck = db.prepare(`
+  const currentCheck = targetDb.prepare(`
     SELECT sql FROM sqlite_master WHERE type='table' AND name='stock_batches'
   `).get() as { sql: string } | undefined;
   if (!currentCheck) return; // fresh DB — add-batch-costing.sql creates the widened schema
@@ -1360,14 +1360,14 @@ function runBatchSourceTypeRebuild(): void {
   if (!needsWiden) return;
 
   logger.info('Rebuilding stock_batches with widened source_type CHECK...');
-  db.pragma('foreign_keys = OFF');
+  targetDb.pragma('foreign_keys = OFF');
   try {
-    db.transaction(() => {
+    targetDb.transaction(() => {
       // Re-stamp into disjoint namespaces (INV-10):
       //  - synthetic reconciliation rows (source_id = 0) → RECON
       //  - source_id resolves to goods_receipt_items     → GOODS_RECEIPT
       //  - everything else stays PURCHASE / PRODUCTION as written
-      const batchCols = db.prepare(`SELECT name FROM pragma_table_info('stock_batches')`).all() as Array<{ name: string }>;
+      const batchCols = targetDb.prepare(`SELECT name FROM pragma_table_info('stock_batches')`).all() as Array<{ name: string }>;
       const hasExpiry = batchCols.some((c) => c.name === 'expiry_date');
       const hasCreatedAt = batchCols.some((c) => c.name === 'created_at');
       const hasHalted = batchCols.some((c) => c.name === 'halted');
@@ -1410,8 +1410,8 @@ function runBatchSourceTypeRebuild(): void {
             received_date   DATE NOT NULL${optionalCols.length ? ',\n            ' + optionalCols.join(',\n            ') : ''}
         );
       `;
-      db.exec(newTableSQL);
-      db.exec(`
+      targetDb.exec(newTableSQL);
+      targetDb.exec(`
         INSERT INTO stock_batches_new (${insertCols.join(', ')})
         SELECT ${copyCols.join(', ')}
         FROM stock_batches;
@@ -1419,7 +1419,7 @@ function runBatchSourceTypeRebuild(): void {
 
 
       // Post-migration assertion: no row left in an unknown namespace.
-      const bad = db.prepare(`
+      const bad = targetDb.prepare(`
         SELECT COUNT(*) AS n FROM stock_batches_new
         WHERE source_type NOT IN ${BATCH_SOURCE_TYPES.replace(/^\(/, '(')}
            OR (source_type = 'PURCHASE' AND source_id > 0
@@ -1429,35 +1429,35 @@ function runBatchSourceTypeRebuild(): void {
         throw new Error(`${bad.n} stock_batches row(s) failed source_type re-stamping`);
       }
 
-      const countsBefore = (db.prepare('SELECT COUNT(*) AS n FROM stock_batches').get() as { n: number }).n;
-      db.exec('DROP TABLE stock_batches');
-      db.exec('ALTER TABLE stock_batches_new RENAME TO stock_batches');
+      const countsBefore = (targetDb.prepare('SELECT COUNT(*) AS n FROM stock_batches').get() as { n: number }).n;
+      targetDb.exec('DROP TABLE stock_batches');
+      targetDb.exec('ALTER TABLE stock_batches_new RENAME TO stock_batches');
 
-      const countsAfter = (db.prepare('SELECT COUNT(*) AS n FROM stock_batches').get() as { n: number }).n;
+      const countsAfter = (targetDb.prepare('SELECT COUNT(*) AS n FROM stock_batches').get() as { n: number }).n;
       if (countsAfter !== countsBefore) {
         throw new Error(`stock_batches rebuild lost rows (${countsBefore} -> ${countsAfter})`);
       }
 
       // Restore indexes from add-batch-costing.sql (+ expiry index when present).
-      db.exec(`
+      targetDb.exec(`
         CREATE INDEX IF NOT EXISTS idx_stock_batches_item ON stock_batches(item_id, warehouse_id);
         CREATE INDEX IF NOT EXISTS idx_stock_batches_source ON stock_batches(source_type, source_id);
         CREATE INDEX IF NOT EXISTS idx_stock_batches_batch_no ON stock_batches(batch_no);
       `);
       if (hasExpiry) {
-        db.exec('CREATE INDEX IF NOT EXISTS idx_stock_batches_expiry ON stock_batches(expiry_date) WHERE expiry_date IS NOT NULL');
+        targetDb.exec('CREATE INDEX IF NOT EXISTS idx_stock_batches_expiry ON stock_batches(expiry_date) WHERE expiry_date IS NOT NULL');
       }
     })();
   } finally {
-    db.pragma('foreign_keys = ON');
+    targetDb.pragma('foreign_keys = ON');
   }
-  if ((db.pragma('foreign_keys', { simple: true }) as number) !== 1) {
+  if ((targetDb.pragma('foreign_keys', { simple: true }) as number) !== 1) {
     throw new Error('FATAL: stock_batches rebuild failed to restore PRAGMA foreign_keys=ON');
   }
   logger.info('✅ stock_batches source_type widened and re-stamped');
 }
 
-function runStockCoverageReconciliation(): void {
+export function runStockCoverageReconciliation(targetDb: Database.Database = db): void {
   // One-off reconciliation of known live drift (inventory-integrity Phase 4):
   // stock_batches coverage must equal stock_balances.quantity per
   // (item, warehouse) before the INV-21 CHECK constraints can be applied.
@@ -1465,7 +1465,7 @@ function runStockCoverageReconciliation(): void {
   //  - Under-coverage: a RECON layer is minted at the warehouse's inbound
   //    weighted cost with a balancing journal entry.
   // Idempotent: no-op when coverage already matches everywhere.
-  const mismatches = db.prepare(`
+  const mismatches = targetDb.prepare(`
     SELECT * FROM (
       SELECT sb.item_id, sb.warehouse_id, sb.quantity AS balance_qty,
              COALESCE((SELECT SUM(b.quantity_remaining) FROM stock_batches b
@@ -1480,7 +1480,7 @@ function runStockCoverageReconciliation(): void {
 
   const trimOvercoverage = (m: typeof mismatches[number], delta: number): void => {
     let toTrim = -delta;
-    const layers = db.prepare(`
+    const layers = targetDb.prepare(`
       SELECT id, quantity_remaining FROM stock_batches
       WHERE item_id = ? AND warehouse_id = ? AND quantity_remaining > 0
       ORDER BY received_date DESC, id DESC
@@ -1488,31 +1488,31 @@ function runStockCoverageReconciliation(): void {
     for (const layer of layers) {
       if (toTrim <= 0.0005) break;
       const trim = Math.min(layer.quantity_remaining, toTrim);
-      db.prepare('UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?').run(trim, layer.id);
+      targetDb.prepare('UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?').run(trim, layer.id);
       toTrim -= trim;
     }
     logger.info(`  item ${m.item_id}/wh ${m.warehouse_id}: trimmed over-coverage by ${(-delta).toFixed(3)}`);
   };
 
-  const run = db.transaction(() => {
+  const run = targetDb.transaction(() => {
     for (const m of mismatches) {
       const delta = m.balance_qty - m.covered; // >0 under-covered, <0 over-covered
       if (delta < 0) {
         trimOvercoverage(m, delta);
       } else {
-        const avg = db.prepare(`
+        const avg = targetDb.prepare(`
           SELECT COALESCE(SUM(quantity * unit_cost) * 1.0 / NULLIF(SUM(quantity), 0), 0) AS cost
           FROM stock_movements
           WHERE item_id = ? AND warehouse_id = ? AND quantity > 0
             AND movement_type IN ('PURCHASE','PRODUCTION')
         `).get(m.item_id, m.warehouse_id) as { cost: number };
-        const unitCost = avg.cost > 0 ? avg.cost : ((db.prepare('SELECT standard_cost FROM items WHERE id = ?').get(m.item_id) as { standard_cost: number } | undefined)?.standard_cost || 0);
+        const unitCost = avg.cost > 0 ? avg.cost : ((targetDb.prepare('SELECT standard_cost FROM items WHERE id = ?').get(m.item_id) as { standard_cost: number } | undefined)?.standard_cost || 0);
 
-        const nextNo = getNextSequenceNumber(db, 'BATCH_RECON_last_no');
+        const nextNo = getNextSequenceNumber(targetDb, 'BATCH_RECON_last_no');
         const reconDate = new Date();
         const reconMonth = String(reconDate.getMonth() + 1).padStart(2, '0');
         const reconYear = String(reconDate.getFullYear()).slice(-2);
-        db.prepare(`
+        targetDb.prepare(`
           INSERT INTO stock_batches (
             batch_no, item_id, warehouse_id, source_type,
             source_id, quantity_original, quantity_remaining,
@@ -1524,7 +1524,7 @@ function runStockCoverageReconciliation(): void {
           new Date().toISOString().split('T')[0]
         );
 
-        postInventoryReconciliationEntry(db, {
+        postInventoryReconciliationEntry(targetDb, {
           description: `Coverage reconciliation: +${delta} units @ ${unitCost} (item ${m.item_id}, warehouse ${m.warehouse_id})`,
           inventoryLineDescription: 'Inventory increase (coverage reconciliation)',
           adjustmentLineDescription: 'Coverage reconciliation adjustment',
@@ -1535,7 +1535,7 @@ function runStockCoverageReconciliation(): void {
     }
 
     // Post-condition: coverage must now match everywhere.
-    const remaining = db.prepare(`
+    const remaining = targetDb.prepare(`
       SELECT COUNT(*) AS n FROM (
         SELECT 1 AS ok FROM stock_balances sb
         WHERE ABS(sb.quantity - COALESCE((SELECT SUM(b.quantity_remaining) FROM stock_batches b
