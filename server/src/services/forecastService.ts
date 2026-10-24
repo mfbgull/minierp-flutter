@@ -327,7 +327,7 @@ function runModel(
 // 3. TREND DETECTION (unchanged from original)
 // ============================================================
 
-function detectTrend(sales: number[]): { direction: 'growing' | 'stable' | 'declining'; percentage: number } {
+export function detectTrend(sales: number[]): { direction: 'growing' | 'stable' | 'declining'; percentage: number } {
   if (sales.length === 0) {
     return { direction: 'stable', percentage: 0 };
   }
