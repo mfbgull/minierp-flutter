@@ -288,6 +288,9 @@ class BOMModel {
     }
 
     const resolvedFinishedItemId = finished_item_id ?? existingBOM.finished_item_id;
+    const resolvedBomName = bom_name ?? existingBOM.bom_name;
+    const resolvedDescription = description !== undefined ? description || null : existingBOM.description;
+    const resolvedQuantity = quantity ?? existingBOM.quantity;
     const item = db.prepare('SELECT id FROM items WHERE id = ?').get(resolvedFinishedItemId) as { id: number } | undefined;
     if (!item) {
       throw new Error(`Item with id ${resolvedFinishedItemId} not found`);
@@ -301,10 +304,10 @@ class BOMModel {
       `);
 
       updateBOM.run(
-        bom_name,
+        resolvedBomName,
         resolvedFinishedItemId,
-        description || null,
-        quantity,
+        resolvedDescription,
+        resolvedQuantity,
         is_active !== undefined ? is_active : existingBOM.is_active,
         id
       );
