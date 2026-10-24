@@ -3,6 +3,7 @@ import request from 'supertest';
 import app from '../app';
 import db from '../config/database';
 import InvoiceModel from '../models/Invoice';
+import PaymentModel from '../models/Payment';
 import AccountingService from '../services/accountingService';
 import ledgerUtils from '../utils/ledgerUtils';
 import logger from '../utils/logger';
@@ -116,6 +117,66 @@ describe('invoice delete transaction', () => {
     expect(row.status).toBe('Deleted');
     expect(row.deleted_at).toBeTruthy();
     expect(row.deleted_from_status).toBe('Draft');
+  });
+
+  it('aborts when the invoice vanishes inside the transaction', async () => {
+    jest.spyOn(logger, 'error').mockImplementation(() => logger);
+    const id = insertInvoice({ status: 'Draft', total: 50 });
+    mockDeletePath();
+    let reads = 0;
+    jest.spyOn(InvoiceModel, 'getById').mockImplementation(() => {
+      reads += 1;
+      return reads === 1 ? invoiceRecord(id) : undefined;
+    });
+
+    const res = await del(id);
+
+    expect(res.status).toBe(404);
+    expect(res.body.error).toContain('Invoice not found');
+    const row = db
+      .prepare('SELECT deleted_at FROM invoices WHERE id = ?')
+      .get(id) as { deleted_at: string | null };
+    expect(row.deleted_at).toBeNull();
+  });
+
+  it('voids an orphaned payment left with no other allocation', async () => {
+    const id = insertInvoice({ status: 'Draft', total: 50 });
+    mockDeletePath();
+    jest
+      .spyOn(PaymentModel, 'getAllocationsByInvoiceId')
+      .mockReturnValue([{ payment_id: 9, amount: 10 }]);
+    jest.spyOn(PaymentModel, 'getAllocationsByPaymentId').mockReturnValue([]);
+    jest
+      .spyOn(PaymentModel, 'getById')
+      .mockReturnValue({ id: 9, payment_no: 'PAY-9' } as unknown as ReturnType<
+        typeof PaymentModel.getById
+      >);
+    const removePayment = jest.spyOn(PaymentModel, 'delete').mockImplementation(() => {});
+
+    const res = await del(id);
+
+    expect(res.status).toBe(200);
+    expect(removePayment).toHaveBeenCalledTimes(1);
+    const call = removePayment.mock.calls[0];
+    expect(call[1]).toBe(9);
+    expect(typeof call[2]?.voidedBy).toBe('number');
+  });
+
+  it('keeps a payment that still allocates to another invoice', async () => {
+    const id = insertInvoice({ status: 'Draft', total: 50 });
+    mockDeletePath();
+    jest
+      .spyOn(PaymentModel, 'getAllocationsByInvoiceId')
+      .mockReturnValue([{ payment_id: 9, amount: 10 }]);
+    jest
+      .spyOn(PaymentModel, 'getAllocationsByPaymentId')
+      .mockReturnValue([{ invoice_id: 999 }]);
+    const removePayment = jest.spyOn(PaymentModel, 'delete').mockImplementation(() => {});
+
+    const res = await del(id);
+
+    expect(res.status).toBe(200);
+    expect(removePayment).not.toHaveBeenCalled();
   });
 
   it('refuses to delete when no journal lines were voided', async () => {
