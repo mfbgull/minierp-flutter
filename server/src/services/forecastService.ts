@@ -178,7 +178,7 @@ function calculateHolts(sales: number[], alpha: number = 0.3, beta: number = 0.1
  * Assumes seasonal_periods (e.g., 12 for monthly data).
  * Returns the next period forecast.
  */
-function calculateHoltWinters(
+export function calculateHoltWinters(
   sales: number[],
   seasonalPeriods: number = 12,
   alpha: number = 0.3,
@@ -228,7 +228,7 @@ function calculateHoltWinters(
  * approximation for basic time series with trend.
  * Uses: first-order differencing + AR(1) coefficient estimate.
  */
-function calculateSimpleARIMA(sales: number[]): number {
+export function calculateSimpleARIMA(sales: number[]): number {
   if (sales.length === 0) return 0;
   if (sales.length < 3) return calculateWMA(sales);
 
