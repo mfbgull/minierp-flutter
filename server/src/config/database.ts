@@ -944,80 +944,141 @@ export function repairLegacyBOMItemsSchema(
     );
   }
 
-  // Migrate legacy BOM headers into the current table. Preserve ids when
-  // free; otherwise allocate one and remap the item rows below.
   const bomIdMap = new Map<number, number>();
-  if (tableExists('bom')) {
-    const legacyBoms = targetDb
-      .prepare(`
-        SELECT id, bom_no, finished_item_id, quantity, is_active, notes,
-               created_by, created_at, updated_at
-        FROM bom
-      `)
-      .all() as LegacyBomRow[];
-    const fallbackUser =
-      (
-        targetDb.prepare(`SELECT MIN(id) AS id FROM users`).get() as {
-          id: number | null;
-        }
-      ).id ?? 1;
-    const byNumber = targetDb.prepare(`SELECT id FROM boms WHERE bom_no = ?`);
-    const idTaken = targetDb.prepare(`SELECT 1 FROM boms WHERE id = ?`);
-    const insertWithId = targetDb.prepare(`
-      INSERT INTO boms (
-        id, bom_no, bom_name, finished_item_id, quantity, description,
-        is_active, created_by, created_at, updated_at
-      ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?,
-        COALESCE(?, CURRENT_TIMESTAMP), COALESCE(?, CURRENT_TIMESTAMP)
-      )
-    `);
-    const insertAuto = targetDb.prepare(`
-      INSERT INTO boms (
-        bom_no, bom_name, finished_item_id, quantity, description,
-        is_active, created_by, created_at, updated_at
-      ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?,
-        COALESCE(?, CURRENT_TIMESTAMP), COALESCE(?, CURRENT_TIMESTAMP)
-      )
-    `);
+  migrateLegacyBomHeaders(targetDb, tableExists, bomIdMap);
 
-    for (const legacy of legacyBoms) {
-      const legacyId = Number(legacy.id);
-      const bomNo =
-        String(legacy.bom_no ?? '').trim() || `BOM-${legacyId || 'LEGACY'}`;
-      const existing = byNumber.get(bomNo) as { id: number } | undefined;
-      if (existing) {
-        bomIdMap.set(legacyId, existing.id);
-        continue;
-      }
+  rebuildBomItemsTable(targetDb, shouldArchive);
 
-      const createdBy = Number(legacy.created_by) || fallbackUser;
-      const finishedItemId = Number(legacy.finished_item_id) || 0;
-      const quantity = Number(legacy.quantity) || 1;
-      const isActive = legacy.is_active ?? 1;
-      const values = [
-        bomNo,
-        bomNo,
-        finishedItemId,
-        quantity,
-        legacy.notes ?? null,
-        isActive,
-        createdBy,
-        legacy.created_at ?? null,
-        legacy.updated_at ?? null,
-      ] as const;
+  const legacyColumns = new Set(
+    shouldArchive
+      ? (
+          targetDb
+            .prepare(`PRAGMA table_info('bom_items_legacy')`)
+            .all() as Array<{ name: string }>
+        ).map((column) => column.name)
+      : [],
+  );
+  const legacyRows = shouldArchive
+    ? (targetDb
+        .prepare(
+          legacyBomItemsSelectSql(
+            legacyColumns.has('unit_cost'),
+            legacyColumns.has('created_at'),
+          ),
+        )
+        .all() as LegacyBomItemRow[])
+    : [];
+  const { copied, archivedOrphans } = copyLegacyBomItems(
+    targetDb,
+    legacyRows,
+    bomIdMap,
+  );
 
-      if (!idTaken.get(legacyId)) {
-        insertWithId.run(legacyId, ...values);
-        bomIdMap.set(legacyId, legacyId);
-      } else {
-        const result = insertAuto.run(...values);
-        bomIdMap.set(legacyId, Number(result.lastInsertRowid));
-      }
-    }
+  targetDb.exec(
+    'CREATE INDEX IF NOT EXISTS idx_bom_items_bom ON bom_items(bom_id)',
+  );
+  targetDb.exec(
+    'CREATE INDEX IF NOT EXISTS idx_bom_items_item ON bom_items(item_id)',
+  );
+
+  const violations = targetDb
+    .prepare(`PRAGMA foreign_key_check('bom_items')`)
+    .all();
+  if (violations.length > 0) {
+    throw new Error(
+      `BOM items repair left ${violations.length} foreign-key violation(s)`,
+    );
   }
 
+  logger.info(
+    `Repaired legacy bom_items schema: ${bomIdMap.size} BOM(s) mapped, ` +
+      `${copied} line(s) copied, ${archivedOrphans} orphan(s) ${
+        shouldArchive ? 'retained in bom_items_legacy' : 'found'
+      }`,
+  );
+}
+
+function migrateLegacyBomHeaders(
+  targetDb: Database.Database,
+  tableExists: (name: string) => boolean,
+  bomIdMap: Map<number, number>,
+): void {
+  if (!tableExists('bom')) return;
+
+  const legacyBoms = targetDb
+    .prepare(`
+      SELECT id, bom_no, finished_item_id, quantity, is_active, notes,
+             created_by, created_at, updated_at
+      FROM bom
+    `)
+    .all() as LegacyBomRow[];
+  const fallbackUser =
+    (
+      targetDb.prepare(`SELECT MIN(id) AS id FROM users`).get() as {
+        id: number | null;
+      }
+    ).id ?? 1;
+  const byNumber = targetDb.prepare(`SELECT id FROM boms WHERE bom_no = ?`);
+  const idTaken = targetDb.prepare(`SELECT 1 FROM boms WHERE id = ?`);
+  const insertWithId = targetDb.prepare(`
+    INSERT INTO boms (
+      id, bom_no, bom_name, finished_item_id, quantity, description,
+      is_active, created_by, created_at, updated_at
+    ) VALUES (
+      ?, ?, ?, ?, ?, ?, ?, ?,
+      COALESCE(?, CURRENT_TIMESTAMP), COALESCE(?, CURRENT_TIMESTAMP)
+    )
+  `);
+  const insertAuto = targetDb.prepare(`
+    INSERT INTO boms (
+      bom_no, bom_name, finished_item_id, quantity, description,
+      is_active, created_by, created_at, updated_at
+    ) VALUES (
+      ?, ?, ?, ?, ?, ?, ?,
+      COALESCE(?, CURRENT_TIMESTAMP), COALESCE(?, CURRENT_TIMESTAMP)
+    )
+  `);
+
+  for (const legacy of legacyBoms) {
+    const legacyId = Number(legacy.id);
+    const bomNo =
+      String(legacy.bom_no ?? '').trim() || `BOM-${legacyId || 'LEGACY'}`;
+    const existing = byNumber.get(bomNo) as { id: number } | undefined;
+    if (existing) {
+      bomIdMap.set(legacyId, existing.id);
+      continue;
+    }
+
+    const createdBy = Number(legacy.created_by) || fallbackUser;
+    const finishedItemId = Number(legacy.finished_item_id) || 0;
+    const quantity = Number(legacy.quantity) || 1;
+    const isActive = legacy.is_active ?? 1;
+    const values = [
+      bomNo,
+      bomNo,
+      finishedItemId,
+      quantity,
+      legacy.notes ?? null,
+      isActive,
+      createdBy,
+      legacy.created_at ?? null,
+      legacy.updated_at ?? null,
+    ] as const;
+
+    if (!idTaken.get(legacyId)) {
+      insertWithId.run(legacyId, ...values);
+      bomIdMap.set(legacyId, legacyId);
+    } else {
+      const result = insertAuto.run(...values);
+      bomIdMap.set(legacyId, Number(result.lastInsertRowid));
+    }
+  }
+}
+
+function rebuildBomItemsTable(
+  targetDb: Database.Database,
+  shouldArchive: boolean,
+): void {
   if (shouldArchive) {
     targetDb.exec('ALTER TABLE bom_items RENAME TO bom_items_legacy');
   } else {
@@ -1037,36 +1098,33 @@ export function repairLegacyBOMItemsSchema(
       FOREIGN KEY (item_id) REFERENCES items(id)
     )
   `);
+}
 
-  const legacyColumns = new Set(
-    shouldArchive
-      ? (
-          targetDb
-            .prepare(`PRAGMA table_info('bom_items_legacy')`)
-            .all() as Array<{ name: string }>
-        ).map((column) => column.name)
-      : [],
-  );
-  const hasUnitCost = legacyColumns.has('unit_cost');
-  const hasCreatedAt = legacyColumns.has('created_at');
-  let legacyRows: LegacyBomItemRow[] = [];
-  if (shouldArchive) {
-    let legacySelect: string;
-    if (hasUnitCost && hasCreatedAt) {
-      legacySelect = `SELECT id, bom_id, item_id, quantity, unit_cost, created_at
-                      FROM bom_items_legacy`;
-    } else if (hasUnitCost) {
-      legacySelect = `SELECT id, bom_id, item_id, quantity, unit_cost,
-                             NULL AS created_at FROM bom_items_legacy`;
-    } else if (hasCreatedAt) {
-      legacySelect = `SELECT id, bom_id, item_id, quantity, NULL AS unit_cost,
-                             created_at FROM bom_items_legacy`;
-    } else {
-      legacySelect = `SELECT id, bom_id, item_id, quantity, NULL AS unit_cost,
-                             NULL AS created_at FROM bom_items_legacy`;
-    }
-    legacyRows = targetDb.prepare(legacySelect).all() as LegacyBomItemRow[];
+function legacyBomItemsSelectSql(
+  hasUnitCost: boolean,
+  hasCreatedAt: boolean,
+): string {
+  if (hasUnitCost && hasCreatedAt) {
+    return `SELECT id, bom_id, item_id, quantity, unit_cost, created_at
+            FROM bom_items_legacy`;
   }
+  if (hasUnitCost) {
+    return `SELECT id, bom_id, item_id, quantity, unit_cost,
+                   NULL AS created_at FROM bom_items_legacy`;
+  }
+  if (hasCreatedAt) {
+    return `SELECT id, bom_id, item_id, quantity, NULL AS unit_cost,
+                   created_at FROM bom_items_legacy`;
+  }
+  return `SELECT id, bom_id, item_id, quantity, NULL AS unit_cost,
+                 NULL AS created_at FROM bom_items_legacy`;
+}
+
+function copyLegacyBomItems(
+  targetDb: Database.Database,
+  legacyRows: LegacyBomItemRow[],
+  bomIdMap: Map<number, number>,
+): { copied: number; archivedOrphans: number } {
   const bomExists = targetDb.prepare(`SELECT 1 FROM boms WHERE id = ?`);
   const itemExists = targetDb.prepare(`SELECT 1 FROM items WHERE id = ?`);
   const insertItem = targetDb.prepare(`
@@ -1093,28 +1151,7 @@ export function repairLegacyBOMItemsSchema(
     copied += 1;
   }
 
-  targetDb.exec(
-    'CREATE INDEX IF NOT EXISTS idx_bom_items_bom ON bom_items(bom_id)',
-  );
-  targetDb.exec(
-    'CREATE INDEX IF NOT EXISTS idx_bom_items_item ON bom_items(item_id)',
-  );
-
-  const violations = targetDb
-    .prepare(`PRAGMA foreign_key_check('bom_items')`)
-    .all();
-  if (violations.length > 0) {
-    throw new Error(
-      `BOM items repair left ${violations.length} foreign-key violation(s)`,
-    );
-  }
-
-  logger.info(
-    `Repaired legacy bom_items schema: ${bomIdMap.size} BOM(s) mapped, ` +
-      `${copied} line(s) copied, ${archivedOrphans} orphan(s) ${
-        shouldArchive ? 'retained in bom_items_legacy' : 'found'
-      }`,
-  );
+  return { copied, archivedOrphans };
 }
 
 function runSalesMigration(): void {
