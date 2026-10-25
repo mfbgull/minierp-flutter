@@ -1,0 +1,1941 @@
+{
+  "run": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/backend-run-uSDrDf",
+  "guard": "Every SQLite constructor restricted to newly created run directory",
+  "api": [
+    {
+      "method": "post",
+      "url": "/api/owner-equity/capital",
+      "body": {
+        "amount": 10000,
+        "capital_date": "2026-01-01",
+        "payment_method": "Bank"
+      },
+      "status": 201,
+      "response": {
+        "success": true,
+        "message": "Owner capital recorded successfully",
+        "data": {
+          "id": 1,
+          "capital_no": "CAP-2601-00001",
+          "amount": 10000
+        }
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/employees",
+      "body": {
+        "employee_code": "BACKEND-AUDIT",
+        "first_name": "Audit",
+        "last_name": "Employee",
+        "salary": 1000
+      },
+      "status": 201,
+      "response": {
+        "success": true,
+        "data": {
+          "id": 1,
+          "employee_code": "EMP-1026-00001",
+          "first_name": "Audit",
+          "last_name": "Employee",
+          "email": null,
+          "phone": null,
+          "mobile": null,
+          "cnic_no": null,
+          "address": null,
+          "city": null,
+          "state": null,
+          "postal_code": null,
+          "country": "Pakistan",
+          "date_of_birth": null,
+          "gender": null,
+          "department": null,
+          "designation": null,
+          "employment_type": "Full-time",
+          "date_of_joining": null,
+          "date_of_leaving": null,
+          "salary": 1000,
+          "bank_name": null,
+          "bank_account_no": null,
+          "bank_iban": null,
+          "emergency_contact_name": null,
+          "emergency_contact_phone": null,
+          "profile_photo": null,
+          "notes": null,
+          "is_active": 1,
+          "created_by": 1,
+          "created_at": "2026-10-25 03:19:29",
+          "updated_at": "2026-10-25 03:19:29"
+        }
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/employees/1/salary/pay",
+      "body": {
+        "amount": 1200,
+        "payment_date": "2026-08-20",
+        "payment_method": "Bank",
+        "payment_type": "partial"
+      },
+      "status": 201,
+      "response": {
+        "success": true,
+        "data": {
+          "id": 1,
+          "journal_entry_id": 2,
+          "advance_created": 2
+        }
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/employees/1/salary/pay",
+      "body": {
+        "amount": 800,
+        "payment_date": "2026-09-20",
+        "payment_method": "Bank",
+        "payment_type": "full"
+      },
+      "status": 201,
+      "response": {
+        "success": true,
+        "data": {
+          "id": 3,
+          "journal_entry_id": 4,
+          "advance_created": null
+        }
+      }
+    },
+    {
+      "method": "get",
+      "url": "/api/employees/1/salary/history",
+      "status": 200,
+      "response": {
+        "success": true,
+        "data": [
+          {
+            "pay_period": "2026-09",
+            "employee_salary": 1000,
+            "total_paid": 1000,
+            "remaining": 0,
+            "status": "paid",
+            "payment_count": 2,
+            "advance_carryover": 200,
+            "advance_source_period": "2026-08",
+            "first_payment_date": "2026-08-20",
+            "last_payment_date": "2026-09-20"
+          },
+          {
+            "pay_period": "2026-08",
+            "employee_salary": 1000,
+            "total_paid": 1000,
+            "remaining": 0,
+            "status": "paid",
+            "payment_count": 1,
+            "advance_carryover": 0,
+            "advance_source_period": null,
+            "first_payment_date": "2026-08-20",
+            "last_payment_date": "2026-08-20"
+          }
+        ]
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/employees/1/loans",
+      "body": {
+        "amount": 500,
+        "disbursement_date": "2026-09-15",
+        "payment_method": "Bank"
+      },
+      "status": 201,
+      "response": {
+        "success": true,
+        "data": {
+          "id": 1,
+          "employee_id": 1,
+          "amount": 500,
+          "balance": 500,
+          "purpose": null,
+          "payment_method": "Bank",
+          "disbursement_date": "2026-09-15",
+          "due_date": null,
+          "monthly_installment": 0,
+          "status": "active",
+          "written_off_amount": 0,
+          "notes": null,
+          "journal_entry_id": 5,
+          "created_by": 1,
+          "created_at": "2026-10-25 03:19:31",
+          "updated_at": "2026-10-25 03:19:31",
+          "voided_at": null,
+          "voided_by": null,
+          "void_reason": null
+        }
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/employees/1/loans/1/repay",
+      "body": {
+        "amount": 200,
+        "payment_date": "2026-09-01",
+        "payment_method": "Bank"
+      },
+      "status": 201,
+      "response": {
+        "success": true,
+        "data": {
+          "id": 1,
+          "amount": 200,
+          "loan_balance": 300,
+          "loan_status": "active",
+          "journal_entry_id": 6
+        }
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/inventory/items",
+      "body": {
+        "item_code": "AUDIT-RAW",
+        "item_name": "AUDIT-RAW",
+        "unit_of_measure": "Nos",
+        "is_purchased": true,
+        "is_manufactured": true,
+        "standard_cost": 0,
+        "standard_selling_price": 1
+      },
+      "status": 201,
+      "response": {
+        "id": 1,
+        "item_code": "AUDIT-RAW",
+        "item_name": "AUDIT-RAW",
+        "description": null,
+        "category": null,
+        "unit_of_measure": "Nos",
+        "current_stock": 0,
+        "reorder_level": 0,
+        "standard_cost": 0,
+        "standard_selling_price": 1,
+        "is_raw_material": 0,
+        "is_finished_good": 0,
+        "is_purchased": 1,
+        "is_manufactured": 1,
+        "is_active": 1,
+        "created_by": 1,
+        "created_at": "2026-10-25 03:19:31",
+        "updated_at": "2026-10-25 03:19:31",
+        "has_expiry": 0,
+        "near_expiry_threshold_days": 30,
+        "sale_type": "packed",
+        "qty_decimal_precision": 0,
+        "rounding_step": null,
+        "deleted_at": null,
+        "deleted_by": null
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/inventory/items",
+      "body": {
+        "item_code": "AUDIT-OUT-0",
+        "item_name": "AUDIT-OUT-0",
+        "unit_of_measure": "Nos",
+        "is_purchased": true,
+        "is_manufactured": true,
+        "standard_cost": 0,
+        "standard_selling_price": 1
+      },
+      "status": 201,
+      "response": {
+        "id": 2,
+        "item_code": "AUDIT-OUT-0",
+        "item_name": "AUDIT-OUT-0",
+        "description": null,
+        "category": null,
+        "unit_of_measure": "Nos",
+        "current_stock": 0,
+        "reorder_level": 0,
+        "standard_cost": 0,
+        "standard_selling_price": 1,
+        "is_raw_material": 0,
+        "is_finished_good": 0,
+        "is_purchased": 1,
+        "is_manufactured": 1,
+        "is_active": 1,
+        "created_by": 1,
+        "created_at": "2026-10-25 03:19:31",
+        "updated_at": "2026-10-25 03:19:31",
+        "has_expiry": 0,
+        "near_expiry_threshold_days": 30,
+        "sale_type": "packed",
+        "qty_decimal_precision": 0,
+        "rounding_step": null,
+        "deleted_at": null,
+        "deleted_by": null
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/inventory/items",
+      "body": {
+        "item_code": "AUDIT-OUT-1",
+        "item_name": "AUDIT-OUT-1",
+        "unit_of_measure": "Nos",
+        "is_purchased": true,
+        "is_manufactured": true,
+        "standard_cost": 0,
+        "standard_selling_price": 1
+      },
+      "status": 201,
+      "response": {
+        "id": 3,
+        "item_code": "AUDIT-OUT-1",
+        "item_name": "AUDIT-OUT-1",
+        "description": null,
+        "category": null,
+        "unit_of_measure": "Nos",
+        "current_stock": 0,
+        "reorder_level": 0,
+        "standard_cost": 0,
+        "standard_selling_price": 1,
+        "is_raw_material": 0,
+        "is_finished_good": 0,
+        "is_purchased": 1,
+        "is_manufactured": 1,
+        "is_active": 1,
+        "created_by": 1,
+        "created_at": "2026-10-25 03:19:31",
+        "updated_at": "2026-10-25 03:19:31",
+        "has_expiry": 0,
+        "near_expiry_threshold_days": 30,
+        "sale_type": "packed",
+        "qty_decimal_precision": 0,
+        "rounding_step": null,
+        "deleted_at": null,
+        "deleted_by": null
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/inventory/items",
+      "body": {
+        "item_code": "AUDIT-OUT-2",
+        "item_name": "AUDIT-OUT-2",
+        "unit_of_measure": "Nos",
+        "is_purchased": true,
+        "is_manufactured": true,
+        "standard_cost": 0,
+        "standard_selling_price": 1
+      },
+      "status": 201,
+      "response": {
+        "id": 4,
+        "item_code": "AUDIT-OUT-2",
+        "item_name": "AUDIT-OUT-2",
+        "description": null,
+        "category": null,
+        "unit_of_measure": "Nos",
+        "current_stock": 0,
+        "reorder_level": 0,
+        "standard_cost": 0,
+        "standard_selling_price": 1,
+        "is_raw_material": 0,
+        "is_finished_good": 0,
+        "is_purchased": 1,
+        "is_manufactured": 1,
+        "is_active": 1,
+        "created_by": 1,
+        "created_at": "2026-10-25 03:19:31",
+        "updated_at": "2026-10-25 03:19:31",
+        "has_expiry": 0,
+        "near_expiry_threshold_days": 30,
+        "sale_type": "packed",
+        "qty_decimal_precision": 0,
+        "rounding_step": null,
+        "deleted_at": null,
+        "deleted_by": null
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/inventory/items",
+      "body": {
+        "item_code": "AUDIT-OUT-3",
+        "item_name": "AUDIT-OUT-3",
+        "unit_of_measure": "Nos",
+        "is_purchased": true,
+        "is_manufactured": true,
+        "standard_cost": 0,
+        "standard_selling_price": 1
+      },
+      "status": 201,
+      "response": {
+        "id": 5,
+        "item_code": "AUDIT-OUT-3",
+        "item_name": "AUDIT-OUT-3",
+        "description": null,
+        "category": null,
+        "unit_of_measure": "Nos",
+        "current_stock": 0,
+        "reorder_level": 0,
+        "standard_cost": 0,
+        "standard_selling_price": 1,
+        "is_raw_material": 0,
+        "is_finished_good": 0,
+        "is_purchased": 1,
+        "is_manufactured": 1,
+        "is_active": 1,
+        "created_by": 1,
+        "created_at": "2026-10-25 03:19:31",
+        "updated_at": "2026-10-25 03:19:31",
+        "has_expiry": 0,
+        "near_expiry_threshold_days": 30,
+        "sale_type": "packed",
+        "qty_decimal_precision": 0,
+        "rounding_step": null,
+        "deleted_at": null,
+        "deleted_by": null
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/suppliers",
+      "body": {
+        "supplier_code": "BACKEND-AUDIT-SUP",
+        "supplier_name": "Audit supplier",
+        "phone": "03001234567"
+      },
+      "status": 201,
+      "response": {
+        "success": true,
+        "data": {
+          "id": 1,
+          "supplier_code": "BACKEND-AUDIT-SUP",
+          "supplier_name": "Audit supplier",
+          "phone": "03001234567"
+        }
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/purchases",
+      "body": {
+        "item_id": 1,
+        "warehouse_id": 1,
+        "quantity": 1,
+        "unit_cost": 0.02,
+        "purchase_date": "2026-09-01",
+        "supplier_id": 1
+      },
+      "status": 201,
+      "response": {
+        "id": 1,
+        "purchase_no": "PURCH-1026-0001",
+        "item_id": 1,
+        "warehouse_id": 1,
+        "quantity": 1,
+        "unit_cost": 0.02,
+        "total_cost": 0.02,
+        "supplier_name": "Audit supplier",
+        "purchase_date": "2026-09-01",
+        "invoice_no": null,
+        "remarks": null,
+        "created_by": 1,
+        "created_at": "2026-10-25 03:19:31",
+        "updated_at": "2026-10-25 03:19:31",
+        "supplier_id": 1,
+        "returned_quantity": 0,
+        "batch_id": 1,
+        "batch_no": "BATCH-1026-PUR-00001",
+        "voided_at": null,
+        "voided_by": null,
+        "void_reason": null,
+        "input_tax_amount": 0,
+        "item_code": "AUDIT-RAW",
+        "item_name": "AUDIT-RAW",
+        "unit_of_measure": "Nos",
+        "warehouse_code": "WH-001",
+        "warehouse_name": "Main Warehouse",
+        "created_by_username": "admin",
+        "paid_amount": 0,
+        "total_payable": 0.02,
+        "balance_amount": 0.02
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/production",
+      "body": {
+        "warehouse_id": 1,
+        "production_date": "2026-09-20",
+        "input_items": [
+          {
+            "item_id": 1,
+            "quantity": 1
+          }
+        ],
+        "outputs": [
+          {
+            "item_id": 2,
+            "quantity": 1
+          },
+          {
+            "item_id": 3,
+            "quantity": 1
+          },
+          {
+            "item_id": 4,
+            "quantity": 1
+          },
+          {
+            "item_id": 5,
+            "quantity": 1
+          }
+        ]
+      },
+      "status": 404,
+      "response": {}
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "BACKEND-SALARY-ADVANCE-RECOGNITION",
+      "independentExpected": {
+        "august": {
+          "salaryExpense": 1000,
+          "advanceAsset": 200,
+          "bank": 8800
+        },
+        "september": {
+          "salaryExpense": 2000,
+          "advanceAsset": 0,
+          "bank": 8000
+        }
+      },
+      "actual": {
+        "august": {
+          "salaryExpense": 1000,
+          "advanceAsset": 200,
+          "bank": 8800
+        },
+        "september": {
+          "salaryExpense": 1800,
+          "advanceAsset": 200,
+          "bank": 8000
+        },
+        "history": {
+          "success": true,
+          "data": [
+            {
+              "pay_period": "2026-09",
+              "employee_salary": 1000,
+              "total_paid": 1000,
+              "remaining": 0,
+              "status": "paid",
+              "payment_count": 2,
+              "advance_carryover": 200,
+              "advance_source_period": "2026-08",
+              "first_payment_date": "2026-08-20",
+              "last_payment_date": "2026-09-20"
+            },
+            {
+              "pay_period": "2026-08",
+              "employee_salary": 1000,
+              "total_paid": 1000,
+              "remaining": 0,
+              "status": "paid",
+              "payment_count": 1,
+              "advance_carryover": 0,
+              "advance_source_period": null,
+              "first_payment_date": "2026-08-20",
+              "last_payment_date": "2026-08-20"
+            }
+          ]
+        }
+      },
+      "defectReproduced": true
+    },
+    {
+      "id": "BACKEND-LOAN-PREDISBURSEMENT",
+      "independentExpected": {
+        "status": "4xx",
+        "loanReceivableBeforeDisbursement": 0
+      },
+      "actual": {
+        "status": 201,
+        "loanReceivableBeforeDisbursement": -200
+      },
+      "defectReproduced": true
+    },
+    {
+      "id": "BACKEND-PRODUCTION-ROUNDING",
+      "independentExpected": {
+        "allocationSum": 0.02,
+        "allCostsNonnegative": true,
+        "inventoryAfter": 0.02,
+        "clearingAfter": 0
+      },
+      "actual": {
+        "status": 404,
+        "outputRows": [],
+        "productionBefore": {
+          "inventory": 0.02,
+          "clearing": 0
+        },
+        "productionAfter": {
+          "inventory": 0.02,
+          "clearing": 0
+        }
+      },
+      "defectReproduced": false
+    }
+  ],
+  "schema": [
+    {
+      "type": "table",
+      "name": "accounting_periods",
+      "sql": "CREATE TABLE accounting_periods (\n    id              INTEGER PRIMARY KEY AUTOINCREMENT,\n    period_name     TEXT UNIQUE NOT NULL,          -- e.g. '2026-01', 'FY2026-Q2'\n    start_date      DATE NOT NULL,\n    end_date        DATE NOT NULL,\n    status          TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','closed')),\n    closed_at       TIMESTAMP,\n    closed_by       INTEGER REFERENCES users(id),\n    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n)"
+    },
+    {
+      "type": "table",
+      "name": "activity_log",
+      "sql": "CREATE TABLE activity_log (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    user_id INTEGER,\n    action VARCHAR(50) NOT NULL, -- CREATE, UPDATE, DELETE, LOGIN, LOGOUT\n    entity_type VARCHAR(50) NOT NULL, -- Item, PurchaseOrder, SalesOrder, etc.\n    entity_id INTEGER,\n    description TEXT,\n    created_at DATETIME DEFAULT CURRENT_TIMESTAMP, log_level VARCHAR(20) DEFAULT 'INFO', ip_address VARCHAR(45), user_agent TEXT, metadata TEXT, duration_ms INTEGER, old_value TEXT, new_value TEXT, reason TEXT, correlation_id TEXT,\n    FOREIGN KEY (user_id) REFERENCES users(id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "batch_stock_by_location",
+      "sql": "CREATE TABLE batch_stock_by_location (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    batch_id INTEGER NOT NULL REFERENCES stock_batches(id),\n    location_id INTEGER NOT NULL REFERENCES locations(id),\n    quantity_physical DECIMAL(15,3) NOT NULL DEFAULT 0,\n    quantity_reserved DECIMAL(15,3) NOT NULL DEFAULT 0,\n    quantity_available DECIMAL(15,3) NOT NULL DEFAULT 0,\n    status_override VARCHAR(20),\n    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n    UNIQUE(batch_id, location_id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "bom",
+      "sql": "CREATE TABLE bom (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    bom_no VARCHAR(50) UNIQUE NOT NULL,\n    finished_item_id INTEGER NOT NULL,\n    quantity DECIMAL(15,3) DEFAULT 1, -- BOM produces this quantity\n    is_active BOOLEAN DEFAULT 1,\n    notes TEXT,\n    created_by INTEGER,\n    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n    FOREIGN KEY (finished_item_id) REFERENCES items(id),\n    FOREIGN KEY (created_by) REFERENCES users(id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "bom_items",
+      "sql": "CREATE TABLE bom_items (\n      id INTEGER PRIMARY KEY AUTOINCREMENT,\n      bom_id INTEGER NOT NULL,\n      item_id INTEGER NOT NULL,\n      quantity DECIMAL(15,3) NOT NULL,\n      unit_cost DECIMAL(15,2),\n      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n      FOREIGN KEY (bom_id) REFERENCES boms(id) ON DELETE CASCADE,\n      FOREIGN KEY (item_id) REFERENCES items(id)\n    )"
+    },
+    {
+      "type": "table",
+      "name": "boms",
+      "sql": "CREATE TABLE boms (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    bom_no VARCHAR(50) UNIQUE NOT NULL,\n    bom_name VARCHAR(200) NOT NULL,\n    finished_item_id INTEGER NOT NULL,\n    quantity DECIMAL(15,3) NOT NULL DEFAULT 1,\n    description TEXT,\n    is_active BOOLEAN DEFAULT 1,\n    created_by INTEGER NOT NULL,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n)"
+    },
+    {
+      "type": "table",
+      "name": "cash_reconciliations",
+      "sql": "CREATE TABLE cash_reconciliations (\n    id                  INTEGER PRIMARY KEY AUTOINCREMENT,\n    reconciliation_date DATE NOT NULL,\n    account_key         TEXT NOT NULL,   -- 'cash' | 'bank' | 'easypaisa' | 'jazzcash' | 'upaisa'\n    account_name        TEXT NOT NULL,\n    expected_balance    DECIMAL(15,2) NOT NULL DEFAULT 0,  -- book balance snapshot at save time\n    counted_balance     DECIMAL(15,2),                     -- NULL until the day is counted\n    variance            DECIMAL(15,2),                     -- counted - expected (NULL until counted)\n    notes               TEXT,\n    reconciled_by       INTEGER REFERENCES users(id),\n    created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    UNIQUE(reconciliation_date, account_key)\n)"
+    },
+    {
+      "type": "table",
+      "name": "chart_of_accounts",
+      "sql": "CREATE TABLE chart_of_accounts (\n    id              INTEGER PRIMARY KEY AUTOINCREMENT,\n    code            TEXT UNIQUE NOT NULL,           -- e.g. '1100', '4000'\n    name            TEXT NOT NULL,                  -- e.g. 'Accounts Receivable'\n    type            TEXT NOT NULL,                  -- asset | liability | equity | revenue | expense\n    normal_balance  TEXT NOT NULL CHECK (normal_balance IN ('debit','credit')),\n    parent_id       INTEGER REFERENCES chart_of_accounts(id),  -- for hierarchies\n    text_code       TEXT,                           -- legacy text code for joining old journal_entries\n    is_active       BOOLEAN DEFAULT TRUE,\n    description     TEXT,\n    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n)"
+    },
+    {
+      "type": "table",
+      "name": "credit_applications",
+      "sql": "CREATE TABLE credit_applications (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  application_key TEXT NOT NULL,\n  customer_id INTEGER NOT NULL REFERENCES customers(id),\n  operation TEXT NOT NULL CHECK (operation IN ('APPLY', 'REFUND')),\n  total_amount DECIMAL(15,2) NOT NULL,\n  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP\n, request_hash TEXT, operation_date TEXT, payment_id INTEGER REFERENCES payments(id))"
+    },
+    {
+      "type": "table",
+      "name": "credit_notes",
+      "sql": "CREATE TABLE credit_notes (\n    id           INTEGER PRIMARY KEY AUTOINCREMENT,\n    credit_no    TEXT NOT NULL UNIQUE,             -- CN-2026-0001\n    credit_date  TEXT NOT NULL,\n    supplier_id  INTEGER REFERENCES suppliers(id),\n    source_type  TEXT NOT NULL,                    -- 'PURCHASE_RETURN'\n    source_id    INTEGER NOT NULL,                 -- purchase_returns.id\n    amount       NUMERIC(15,3) NOT NULL,\n    status       TEXT NOT NULL DEFAULT 'POSTED',   -- 'POSTED' | 'VOIDED'\n    posted_by    INTEGER REFERENCES users(id),\n    posted_at    TEXT NOT NULL DEFAULT (datetime('now')),\n    voided_at    TEXT,\n    voided_by    INTEGER REFERENCES users(id)\n, disposition TEXT)"
+    },
+    {
+      "type": "table",
+      "name": "credit_source_consumptions",
+      "sql": "CREATE TABLE credit_source_consumptions (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  source_id INTEGER NOT NULL REFERENCES customer_credit_sources(id),\n  application_id INTEGER NOT NULL REFERENCES credit_applications(id),\n  kind TEXT NOT NULL CHECK (kind IN ('APPLY','REFUND')),\n  invoice_id INTEGER,\n  payment_id INTEGER,\n  amount DECIMAL(15,2) NOT NULL CHECK (amount>0),\n  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  voided_at TIMESTAMP\n)"
+    },
+    {
+      "type": "table",
+      "name": "custom_reports",
+      "sql": "CREATE TABLE custom_reports (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  user_id INTEGER NOT NULL,\n  name VARCHAR(100) NOT NULL,\n  description TEXT,\n  config TEXT NOT NULL,              -- JSON blob\n  is_active BOOLEAN DEFAULT 1,\n  last_run_at DATETIME,\n  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP\n)"
+    },
+    {
+      "type": "table",
+      "name": "customer_credit_sources",
+      "sql": "CREATE TABLE customer_credit_sources (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  customer_id INTEGER NOT NULL REFERENCES customers(id),\n  kind TEXT NOT NULL CHECK (kind IN ('RETURN_CREDIT','UNAPPLIED_CASH')),\n  origin_payment_id INTEGER,\n  origin_invoice_id INTEGER,\n  credited_amount DECIMAL(15,2) NOT NULL,\n  consumed_amount DECIMAL(15,2) NOT NULL DEFAULT 0,\n  refunded_amount DECIMAL(15,2) NOT NULL DEFAULT 0,\n  remaining_amount DECIMAL(15,2)\n    GENERATED ALWAYS AS (ROUND(credited_amount-consumed_amount-refunded_amount,2)) VIRTUAL,\n  refundable_cash_amount DECIMAL(15,2) NOT NULL DEFAULT 0,\n  credited_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  voided_at TIMESTAMP,\n  CONSTRAINT c_nonneg_consumed CHECK (consumed_amount>=0),\n  CONSTRAINT c_refund_le_credited CHECK (refunded_amount<=credited_amount),\n  CONSTRAINT c_refundable_nonneg CHECK (refundable_cash_amount>=0),\n  CONSTRAINT c_refundable_le_remaining CHECK (refundable_cash_amount<=remaining_amount)\n)"
+    },
+    {
+      "type": "table",
+      "name": "customer_ledger",
+      "sql": "CREATE TABLE customer_ledger (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    customer_id INTEGER NOT NULL,\n    transaction_date DATE NOT NULL,\n    transaction_type VARCHAR(50), -- INVOICE, PAYMENT, ADJUSTMENT, OPENING_BALANCE\n    reference_no VARCHAR(100),\n    debit DECIMAL(15,2) DEFAULT 0,\n    credit DECIMAL(15,2) DEFAULT 0,\n    balance DECIMAL(15,2) NOT NULL,\n    description TEXT,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, voided BOOLEAN DEFAULT 0, reversed_by INTEGER REFERENCES customer_ledger(id),\n    FOREIGN KEY (customer_id) REFERENCES customers(id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "customers",
+      "sql": "CREATE TABLE customers (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    customer_code VARCHAR(50) UNIQUE NOT NULL,\n    customer_name VARCHAR(200) NOT NULL,\n    contact_person VARCHAR(100),\n    email VARCHAR(100),\n    phone VARCHAR(20),\n    billing_address TEXT,\n    shipping_address TEXT,\n    payment_terms VARCHAR(100),\n    is_active BOOLEAN DEFAULT 1,\n    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP\n, credit_limit DECIMAL(15,2) DEFAULT 0, current_balance DECIMAL(15,2) DEFAULT 0, opening_balance DECIMAL(15,2) DEFAULT 0, payment_terms_days INTEGER DEFAULT 14, credit_balance DECIMAL(15,2) NOT NULL DEFAULT 0, deleted_at TEXT, deleted_by INTEGER)"
+    },
+    {
+      "type": "table",
+      "name": "dashboard_layouts",
+      "sql": "CREATE TABLE dashboard_layouts (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  user_id INTEGER NOT NULL,\n  layout_name TEXT DEFAULT 'Default',\n  blocks TEXT NOT NULL DEFAULT '[]',\n  is_active INTEGER DEFAULT 1,\n  created_at TEXT DEFAULT (datetime('now')),\n  updated_at TEXT DEFAULT (datetime('now')),\n  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,\n  UNIQUE(user_id, layout_name)\n)"
+    },
+    {
+      "type": "table",
+      "name": "demand_forecasts",
+      "sql": "CREATE TABLE demand_forecasts (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  item_id INTEGER NOT NULL,\n  forecast_date DATE NOT NULL,\n  period TEXT NOT NULL CHECK(period IN ('next_week', 'next_month', 'next_quarter')),\n  predicted_quantity REAL NOT NULL,\n  confidence_level REAL DEFAULT 0,\n  trend_direction TEXT DEFAULT 'stable' CHECK(trend_direction IN ('growing', 'stable', 'declining')),\n  trend_percentage REAL DEFAULT 0,\n  model_type TEXT DEFAULT 'weighted_moving_average',\n  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, is_manual_override INTEGER DEFAULT 0, override_reason TEXT DEFAULT NULL, override_expires DATE DEFAULT NULL, bias_adjustment REAL DEFAULT NULL, seasonal_multiplier REAL DEFAULT NULL, run_id TEXT DEFAULT NULL,\n  FOREIGN KEY (item_id) REFERENCES items(id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "employee_documents",
+      "sql": "CREATE TABLE employee_documents (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    employee_id INTEGER NOT NULL,\n    document_name VARCHAR(200) NOT NULL,\n    document_type VARCHAR(50),\n    document_number VARCHAR(100),\n    issue_date DATE,\n    expiry_date DATE,\n    file_path TEXT,\n    notes TEXT,\n    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n    FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE\n)"
+    },
+    {
+      "type": "table",
+      "name": "employee_loan_repayments",
+      "sql": "CREATE TABLE employee_loan_repayments (\n    id              INTEGER PRIMARY KEY AUTOINCREMENT,\n    loan_id         INTEGER NOT NULL REFERENCES employee_loans(id),\n    employee_id     INTEGER NOT NULL REFERENCES employees(id),\n    amount          REAL NOT NULL,                   -- repayment amount\n    payment_date    TEXT NOT NULL,                   -- YYYY-MM-DD\n    payment_method  TEXT DEFAULT 'cash',             -- cash | bank\n    reference_no    TEXT,\n    notes           TEXT,\n    repayment_type  TEXT NOT NULL DEFAULT 'direct'   -- direct | salary_deduction\n        CHECK (repayment_type IN ('direct', 'salary_deduction')),\n    journal_entry_id INTEGER,                        -- GL journal entry (direct only)\n    salary_payment_id INTEGER,                       -- linked salary payment (salary_deduction only)\n    created_by      INTEGER REFERENCES users(id),\n    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n, voided_at TEXT, voided_by INTEGER REFERENCES users(id), void_reason TEXT)"
+    },
+    {
+      "type": "table",
+      "name": "employee_loans",
+      "sql": "CREATE TABLE employee_loans (\n    id              INTEGER PRIMARY KEY AUTOINCREMENT,\n    employee_id     INTEGER NOT NULL REFERENCES employees(id),\n    amount          REAL NOT NULL,                   -- total loan amount disbursed\n    balance         REAL NOT NULL,                   -- remaining balance\n    purpose         TEXT,                            -- e.g. \"Medical\", \"Personal\"\n    payment_method  TEXT DEFAULT 'cash',             -- cash | bank\n    disbursement_date TEXT NOT NULL,                 -- YYYY-MM-DD\n    due_date        TEXT,                            -- YYYY-MM-DD\n    monthly_installment REAL DEFAULT 0,              -- suggested monthly amount\n    status          TEXT NOT NULL DEFAULT 'active'   -- active | completed | overdue | written_off\n        CHECK (status IN ('active', 'completed', 'overdue', 'written_off')),\n    written_off_amount REAL DEFAULT 0,              -- amount forgiven\n    notes           TEXT,\n    journal_entry_id INTEGER,                        -- GL journal entry for disbursement\n    created_by      INTEGER REFERENCES users(id),\n    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n, voided_at TEXT, voided_by INTEGER REFERENCES users(id), void_reason TEXT)"
+    },
+    {
+      "type": "table",
+      "name": "employees",
+      "sql": "CREATE TABLE employees (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    employee_code VARCHAR(50) UNIQUE NOT NULL,\n    first_name VARCHAR(100) NOT NULL,\n    last_name VARCHAR(100) NOT NULL,\n    email VARCHAR(100),\n    phone VARCHAR(50),\n    mobile VARCHAR(50),\n    cnic_no VARCHAR(20),\n    address TEXT,\n    city VARCHAR(100),\n    state VARCHAR(100),\n    postal_code VARCHAR(20),\n    country VARCHAR(100) DEFAULT 'Pakistan',\n    date_of_birth DATE,\n    gender VARCHAR(10),\n    department VARCHAR(100),\n    designation VARCHAR(100),\n    employment_type VARCHAR(50) DEFAULT 'Full-time',\n    date_of_joining DATE,\n    date_of_leaving DATE,\n    salary DECIMAL(15,2) DEFAULT 0,\n    bank_name VARCHAR(100),\n    bank_account_no VARCHAR(50),\n    bank_iban VARCHAR(50),\n    emergency_contact_name VARCHAR(100),\n    emergency_contact_phone VARCHAR(50),\n    profile_photo TEXT,\n    notes TEXT,\n    is_active BOOLEAN DEFAULT 1,\n    created_by INTEGER,\n    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n    FOREIGN KEY (created_by) REFERENCES users(id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "expense_categories",
+      "sql": "CREATE TABLE expense_categories (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    category_name VARCHAR(100) UNIQUE NOT NULL,\n    description TEXT,\n    is_active BOOLEAN DEFAULT 1,\n    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP\n)"
+    },
+    {
+      "type": "table",
+      "name": "expense_payments",
+      "sql": "CREATE TABLE expense_payments (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    expense_id INTEGER NOT NULL REFERENCES expenses(id),\n    payment_date TEXT NOT NULL,\n    amount REAL NOT NULL CHECK (amount > 0),\n    payment_method TEXT NOT NULL,\n    reference_no TEXT,\n    created_by INTEGER REFERENCES users(id),\n    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    voided_at TEXT,\n    voided_by INTEGER REFERENCES users(id),\n    void_reason TEXT\n)"
+    },
+    {
+      "type": "table",
+      "name": "expenses",
+      "sql": "CREATE TABLE expenses (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    expense_no VARCHAR(50) UNIQUE NOT NULL,\n    expense_category VARCHAR(100) NOT NULL,\n    description TEXT,\n    amount DECIMAL(15,2) NOT NULL,\n    expense_date DATE NOT NULL,\n    payment_method VARCHAR(50), -- Cash, Check, Bank Transfer, Card, Credit\n    reference_no VARCHAR(100), -- Receipt number, check number, etc.\n    vendor_name VARCHAR(200), -- Name of vendor/supplier\n    project VARCHAR(100), -- Project or department associated with expense\n    status VARCHAR(20) DEFAULT 'Draft', -- Draft, Recorded, Cancelled (TASK 25 Option A)\n    created_by INTEGER,\n    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n    FOREIGN KEY (created_by) REFERENCES users(id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "forecast_accuracy",
+      "sql": "CREATE TABLE forecast_accuracy (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  forecast_date DATE NOT NULL,\n  item_id INTEGER NOT NULL,\n  period TEXT NOT NULL CHECK(period IN ('next_week', 'next_month', 'next_quarter')),\n  model_type TEXT NOT NULL DEFAULT 'weighted_moving_average',\n  predicted_quantity REAL NOT NULL,\n  actual_quantity REAL DEFAULT NULL,\n  mape REAL DEFAULT NULL,\n  mae REAL DEFAULT NULL,\n  smape REAL DEFAULT NULL,\n  is_override INTEGER DEFAULT 0,\n  computed_at DATETIME DEFAULT NULL,\n  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n  FOREIGN KEY (item_id) REFERENCES items(id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "forecast_model_config",
+      "sql": "CREATE TABLE forecast_model_config (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  item_id INTEGER DEFAULT NULL,\n  category TEXT DEFAULT NULL,\n  model_type TEXT NOT NULL DEFAULT 'weighted_moving_average',\n  ses_alpha REAL DEFAULT NULL,\n  holt_alpha REAL DEFAULT NULL,\n  holt_beta REAL DEFAULT NULL,\n  hw_alpha REAL DEFAULT NULL,\n  hw_beta REAL DEFAULT NULL,\n  hw_gamma REAL DEFAULT NULL,\n  seasonal_periods INTEGER DEFAULT 12,\n  service_level REAL DEFAULT 0.95,\n  lead_time_days INTEGER DEFAULT 7,\n  bias_correction INTEGER DEFAULT 1,\n  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n  FOREIGN KEY (item_id) REFERENCES items(id),\n  CHECK (item_id IS NOT NULL OR category IS NOT NULL)\n)"
+    },
+    {
+      "type": "table",
+      "name": "forecast_runs",
+      "sql": "CREATE TABLE forecast_runs (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  run_id TEXT NOT NULL UNIQUE,\n  run_type TEXT NOT NULL DEFAULT 'auto' CHECK(run_type IN ('auto', 'manual', 'scheduled')),\n  started_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n  completed_at DATETIME DEFAULT NULL,\n  items_processed INTEGER DEFAULT 0,\n  errors INTEGER DEFAULT 0,\n  status TEXT NOT NULL DEFAULT 'running' CHECK(status IN ('running', 'completed', 'failed')),\n  error_message TEXT DEFAULT NULL\n)"
+    },
+    {
+      "type": "table",
+      "name": "forecast_seasonal_events",
+      "sql": "CREATE TABLE forecast_seasonal_events (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  event_name TEXT NOT NULL,\n  start_date DATE NOT NULL,\n  end_date DATE NOT NULL,\n  multiplier REAL NOT NULL DEFAULT 1.0,\n  applies_to_category TEXT DEFAULT NULL,\n  applies_to_item_id INTEGER DEFAULT NULL,\n  is_recurring INTEGER DEFAULT 0,\n  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n  FOREIGN KEY (applies_to_item_id) REFERENCES items(id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "goods_receipt_items",
+      "sql": "CREATE TABLE goods_receipt_items (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    receipt_id INTEGER NOT NULL,\n    po_item_id INTEGER NOT NULL,\n    item_id INTEGER NOT NULL,\n    received_quantity DECIMAL(15,3) NOT NULL, input_tax_amount REAL NOT NULL DEFAULT 0 CHECK (input_tax_amount >= 0),\n    FOREIGN KEY (receipt_id) REFERENCES goods_receipts(id) ON DELETE CASCADE,\n    FOREIGN KEY (po_item_id) REFERENCES purchase_order_items(id),\n    FOREIGN KEY (item_id) REFERENCES items(id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "goods_receipts",
+      "sql": "CREATE TABLE goods_receipts (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    receipt_no VARCHAR(50) UNIQUE NOT NULL,\n    po_id INTEGER NOT NULL,\n    receipt_date DATE NOT NULL,\n    warehouse_id INTEGER NOT NULL,\n    remarks TEXT,\n    created_by INTEGER,\n    created_at DATETIME DEFAULT CURRENT_TIMESTAMP, voided_at TEXT, voided_by INTEGER, void_reason TEXT,\n    FOREIGN KEY (po_id) REFERENCES purchase_orders(id),\n    FOREIGN KEY (warehouse_id) REFERENCES warehouses(id),\n    FOREIGN KEY (created_by) REFERENCES users(id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "idempotency_keys",
+      "sql": "CREATE TABLE \"idempotency_keys\" (\n    id            INTEGER PRIMARY KEY AUTOINCREMENT,\n    key           TEXT NOT NULL,\n    scope         TEXT NOT NULL,                -- e.g. 'payments.customer'\n    request_hash  TEXT NOT NULL,                -- sha256 of canonical JSON body\n    resource_id   INTEGER,                      -- created document id (NULL until committed)\n    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    completed_at  TIMESTAMP,\n    UNIQUE(scope, key)\n)"
+    },
+    {
+      "type": "table",
+      "name": "invoice_drafts",
+      "sql": "CREATE TABLE invoice_drafts (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    session_id VARCHAR(100) NOT NULL,\n    customer_id INTEGER,\n    invoice_date DATE,\n    due_date DATE,\n    terms VARCHAR(50),\n    notes TEXT,\n    items_data TEXT,  -- JSON array of items\n    status VARCHAR(20) DEFAULT 'draft',\n    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n    expires_at DATETIME DEFAULT (datetime('now', '+7 days')),\n    FOREIGN KEY (customer_id) REFERENCES customers(id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "invoice_items",
+      "sql": "CREATE TABLE invoice_items (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    invoice_id INTEGER NOT NULL,\n    item_id INTEGER NOT NULL,\n    quantity DECIMAL(15,3) NOT NULL,\n    unit_price DECIMAL(15,2) NOT NULL,\n    amount DECIMAL(15,2) NOT NULL, tax_rate DECIMAL(5,2) DEFAULT 0, discount_type VARCHAR(20) DEFAULT 'percentage', discount_value DECIMAL(15,2) DEFAULT 0, returned_qty DECIMAL(15,3) NOT NULL DEFAULT 0, expiry_date DATE, is_expired_at_sale BOOLEAN DEFAULT 0, net_amount DECIMAL(15,2) NOT NULL DEFAULT 0, tax_amount DECIMAL(15,2) NOT NULL DEFAULT 0,\n    FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE,\n    FOREIGN KEY (item_id) REFERENCES items(id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "invoice_return_batches",
+      "sql": "CREATE TABLE invoice_return_batches (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    invoice_id INTEGER NOT NULL REFERENCES invoices(id),\n    invoice_item_id INTEGER,\n    batch_id INTEGER NOT NULL REFERENCES stock_batches(id),\n    location_id INTEGER NOT NULL REFERENCES locations(id),\n    quantity DECIMAL(15,3) NOT NULL,\n    reference_doctype VARCHAR(30) DEFAULT 'RETURN',\n    reference_docno VARCHAR(50),\n    created_at DATETIME DEFAULT CURRENT_TIMESTAMP\n)"
+    },
+    {
+      "type": "table",
+      "name": "invoice_return_items",
+      "sql": "CREATE TABLE invoice_return_items (\n    id              INTEGER PRIMARY KEY AUTOINCREMENT,\n    return_id       INTEGER NOT NULL REFERENCES invoice_returns(id),\n    invoice_item_id INTEGER NOT NULL REFERENCES invoice_items(id),\n    item_id         INTEGER NOT NULL,\n    quantity        REAL NOT NULL CHECK (quantity > 0),  -- ≤ sold − already returned (enforced in service)\n    unit_price      REAL NOT NULL,                       -- original sale price\n    tax_amount      REAL NOT NULL DEFAULT 0,             -- proportional mirror (spec §3.5, additive)\n    line_amount     REAL NOT NULL CHECK (line_amount >= 0), stock_movement_id INTEGER REFERENCES stock_movements(id),  -- net of item discount, incl. tax\n    UNIQUE (return_id, invoice_item_id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "invoice_returns",
+      "sql": "CREATE TABLE invoice_returns (\n    id              INTEGER PRIMARY KEY AUTOINCREMENT,\n    return_no       TEXT NOT NULL UNIQUE,               -- RET-0926-00001\n    invoice_id      INTEGER NOT NULL REFERENCES invoices(id),\n    customer_id     INTEGER NOT NULL REFERENCES customers(id),\n    return_date     TEXT NOT NULL,                      -- user-pickable (spec D14)\n    reason          TEXT,\n    status          TEXT NOT NULL DEFAULT 'Unsettled'\n                    CHECK (status IN ('Unsettled', 'Settled', 'Voided')),\n    fee_type        TEXT CHECK (fee_type IN ('none', 'fixed', 'percentage')),\n    fee_value       REAL NOT NULL DEFAULT 0,            -- 10 (percent) or 150 (fixed)\n    fee_amount      REAL NOT NULL DEFAULT 0,            -- resolved amount\n    returned_amount REAL NOT NULL DEFAULT 0,            -- tax-inclusive gross returned value\n    net_amount      REAL NOT NULL DEFAULT 0,            -- returned_amount − fee_amount\n    settled_amount  REAL NOT NULL DEFAULT 0,            -- Σ allocations (≤ net_amount)\n    warehouse_id    INTEGER,                            -- restock warehouse\n    created_by      INTEGER NOT NULL REFERENCES users(id),\n    created_at      TEXT NOT NULL DEFAULT (datetime('now')),\n    voided_at       TEXT,\n    voided_by       INTEGER REFERENCES users(id),\n    CHECK (fee_amount >= 0 AND returned_amount >= 0 AND settled_amount >= 0)\n)"
+    },
+    {
+      "type": "table",
+      "name": "invoices",
+      "sql": "CREATE TABLE invoices (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    invoice_no VARCHAR(50) UNIQUE NOT NULL,\n    customer_id INTEGER NOT NULL,\n    so_id INTEGER, -- Can be null for direct invoices\n    invoice_date DATE NOT NULL,\n    due_date DATE,\n    status VARCHAR(20) DEFAULT 'Unpaid', -- Unpaid, Partially Paid, Paid, Overdue\n    total_amount DECIMAL(15,2) DEFAULT 0,\n    paid_amount DECIMAL(15,2) DEFAULT 0,\n    balance_amount DECIMAL(15,2) DEFAULT 0,\n    notes TEXT,\n    created_by INTEGER,\n    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, discount_scope VARCHAR(20) DEFAULT 'invoice', discount_type VARCHAR(20) DEFAULT 'percentage', discount_value DECIMAL(15,2) DEFAULT 0, terms TEXT, returned_amount DECIMAL(15,2) NOT NULL DEFAULT 0, return_fee DECIMAL(15,2) NOT NULL DEFAULT 0, source_type VARCHAR(20), quotation_id INTEGER, customer_name VARCHAR(200), expiry_notes TEXT, override_sale INTEGER DEFAULT 0, deleted_at TEXT, deleted_by INTEGER, deleted_from_status TEXT, credit_offset DECIMAL(15,2) NOT NULL DEFAULT 0, payment_status TEXT NOT NULL DEFAULT 'Unpaid', return_status TEXT NOT NULL DEFAULT 'None', deleted_from_payment_status TEXT, deleted_from_return_status TEXT,\n    FOREIGN KEY (customer_id) REFERENCES customers(id),\n    FOREIGN KEY (so_id) REFERENCES sales_orders(id),\n    FOREIGN KEY (created_by) REFERENCES users(id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "items",
+      "sql": "CREATE TABLE items (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    item_code VARCHAR(50) UNIQUE NOT NULL,\n    item_name VARCHAR(200) NOT NULL,\n    description TEXT,\n    category VARCHAR(100),\n    unit_of_measure VARCHAR(20) DEFAULT 'Nos', -- Nos, Kg, Ltr, Box, etc.\n    current_stock DECIMAL(15,3) DEFAULT 0,\n    reorder_level DECIMAL(15,3) DEFAULT 0,\n    standard_cost DECIMAL(15,2) DEFAULT 0,\n    standard_selling_price DECIMAL(15,2) DEFAULT 0,\n    is_raw_material BOOLEAN DEFAULT 0,\n    is_finished_good BOOLEAN DEFAULT 0,\n    is_purchased BOOLEAN DEFAULT 1,\n    is_manufactured BOOLEAN DEFAULT 0,\n    is_active BOOLEAN DEFAULT 1,\n    created_by INTEGER,\n    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, has_expiry BOOLEAN DEFAULT 0, near_expiry_threshold_days INTEGER DEFAULT 30, sale_type TEXT NOT NULL DEFAULT 'packed' CHECK(sale_type IN ('packed','loose')), qty_decimal_precision INTEGER NOT NULL DEFAULT 0, rounding_step REAL DEFAULT NULL, deleted_at TEXT, deleted_by INTEGER,\n    FOREIGN KEY (created_by) REFERENCES users(id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "journal_balance_zero",
+      "sql": "CREATE TABLE journal_balance_zero (\n  value INTEGER PRIMARY KEY CHECK (value = 0)\n)"
+    },
+    {
+      "type": "table",
+      "name": "journal_entries",
+      "sql": "CREATE TABLE journal_entries (\n          id              INTEGER PRIMARY KEY AUTOINCREMENT,\n          reference_type  TEXT NOT NULL,\n          reference_id    INTEGER NOT NULL,\n          entry_date      DATE NOT NULL,\n          description     TEXT,\n          debit_account   TEXT NOT NULL,\n          credit_account  TEXT NOT NULL,\n          amount          DECIMAL(15,4) NOT NULL,\n          created_by      INTEGER REFERENCES users(id),\n          voided          BOOLEAN DEFAULT FALSE,\n          created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n        )"
+    },
+    {
+      "type": "table",
+      "name": "journal_entry_balances",
+      "sql": "CREATE TABLE journal_entry_balances (\n  journal_entry_id INTEGER PRIMARY KEY,\n  balance_cents INTEGER NOT NULL REFERENCES journal_balance_zero(value)\n    DEFERRABLE INITIALLY DEFERRED\n)"
+    },
+    {
+      "type": "table",
+      "name": "journal_lines",
+      "sql": "CREATE TABLE journal_lines (\n    id              INTEGER PRIMARY KEY AUTOINCREMENT,\n    journal_entry_id INTEGER NOT NULL,             -- logical grouping; no FK to journal_entries since that table may be missing for fresh installs\n    account_id      INTEGER NOT NULL REFERENCES chart_of_accounts(id),\n    debit           DECIMAL(15,4) NOT NULL DEFAULT 0,\n    credit          DECIMAL(15,4) NOT NULL DEFAULT 0,\n    description     TEXT,\n    line_date       DATE NOT NULL,\n    reference_type  TEXT,\n    reference_id    INTEGER,\n    voided          BOOLEAN DEFAULT FALSE,\n    created_by      INTEGER REFERENCES users(id),\n    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP, voided_at TIMESTAMP, voided_by INTEGER REFERENCES users(id), void_reason TEXT,\n    CHECK (debit = 0 OR credit = 0),               -- a line is either debit or credit, not both\n    CHECK (debit >= 0 AND credit >= 0)\n)"
+    },
+    {
+      "type": "table",
+      "name": "locations",
+      "sql": "CREATE TABLE locations (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    warehouse_id INTEGER NOT NULL REFERENCES warehouses(id),\n    location_code VARCHAR(50) NOT NULL,\n    location_name VARCHAR(100) NOT NULL,\n    is_active BOOLEAN DEFAULT 1,\n    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n    UNIQUE(warehouse_id, location_code)\n)"
+    },
+    {
+      "type": "table",
+      "name": "material_consumption",
+      "sql": "CREATE TABLE material_consumption (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    wo_id INTEGER NOT NULL,\n    item_id INTEGER NOT NULL,\n    consumed_quantity DECIMAL(15,3) NOT NULL,\n    consumption_date DATE NOT NULL,\n    created_by INTEGER,\n    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n    FOREIGN KEY (wo_id) REFERENCES work_orders(id),\n    FOREIGN KEY (item_id) REFERENCES items(id),\n    FOREIGN KEY (created_by) REFERENCES users(id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "opening_balances",
+      "sql": "CREATE TABLE opening_balances (\n    account_key TEXT PRIMARY KEY,   -- 'cash' | 'bank' | 'easypaisa' | 'jazzcash' | 'upaisa'\n    amount      DECIMAL(15,2) NOT NULL DEFAULT 0,\n    updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n)"
+    },
+    {
+      "type": "table",
+      "name": "owner_capital",
+      "sql": "CREATE TABLE owner_capital (\n    id              INTEGER PRIMARY KEY AUTOINCREMENT,\n    capital_no      VARCHAR(50) UNIQUE NOT NULL,\n    capital_date    DATE NOT NULL,\n    amount          DECIMAL(15,2) NOT NULL CHECK (amount > 0),\n    payment_method  VARCHAR(50),\n    note            TEXT,\n    status          VARCHAR(20) NOT NULL DEFAULT 'posted' CHECK (status IN ('posted','voided')),\n    voided_at       TIMESTAMP,\n    voided_by       INTEGER REFERENCES users(id),\n    void_reason     TEXT,\n    created_by      INTEGER REFERENCES users(id),\n    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n)"
+    },
+    {
+      "type": "table",
+      "name": "owner_personal_loan_borrowers",
+      "sql": "CREATE TABLE owner_personal_loan_borrowers (\n    id              INTEGER PRIMARY KEY AUTOINCREMENT,\n    name            VARCHAR(200) NOT NULL,              -- borrower name\n    phone           VARCHAR(50),                        -- optional phone number\n    linked_type     TEXT CHECK (linked_type IS NULL OR linked_type IN ('customer', 'supplier')),\n    linked_id       INTEGER,                            -- FK to customers(id) or suppliers(id)\n    is_active       INTEGER NOT NULL DEFAULT 1,          -- soft-delete: 0 = deactivated\n    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    UNIQUE(name, linked_type, linked_id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "owner_personal_loan_repayments",
+      "sql": "CREATE TABLE owner_personal_loan_repayments (\n    id              INTEGER PRIMARY KEY AUTOINCREMENT,\n    loan_id         INTEGER NOT NULL REFERENCES owner_personal_loans(id),\n    amount          DECIMAL(15,2) NOT NULL CHECK (amount > 0),  -- repayment amount received\n    payment_date    DATE NOT NULL,                      -- date repayment was received\n    notes           TEXT,\n    created_by      INTEGER REFERENCES users(id),\n    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n)"
+    },
+    {
+      "type": "table",
+      "name": "owner_personal_loans",
+      "sql": "CREATE TABLE owner_personal_loans (\n    id              INTEGER PRIMARY KEY AUTOINCREMENT,\n    loan_no         VARCHAR(50) UNIQUE NOT NULL,        -- auto-generated: PL-2026-0001\n    borrower_name   VARCHAR(200) NOT NULL,              -- free-text borrower name (snapshot)\n    borrower_id     INTEGER,                            -- nullable FK to owner_personal_loan_borrowers(id)\n    borrower_type   TEXT CHECK (borrower_type IS NULL OR borrower_type IN ('customer', 'supplier')),\n    -- 'customer' | 'supplier' | null (snapshot)\n    amount          DECIMAL(15,2) NOT NULL CHECK (amount > 0),  -- total loan amount given\n    balance         DECIMAL(15,2) NOT NULL,             -- remaining balance (= amount - repaid)\n    currency        VARCHAR(3) DEFAULT 'PKR',           -- ISO 4217 currency code\n    loan_date       DATE NOT NULL,                      -- date loan was given\n    due_date        DATE,                               -- optional — informational only\n    purpose         VARCHAR(100),                       -- e.g. \"Medical\", \"Family\", \"Personal\"\n    status          VARCHAR(20) NOT NULL DEFAULT 'pending'\n        CHECK (status IN ('pending', 'partial', 'settled', 'written_off')),\n    notes           TEXT,\n    created_by      INTEGER REFERENCES users(id),\n    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n)"
+    },
+    {
+      "type": "table",
+      "name": "owner_withdrawal_items",
+      "sql": "CREATE TABLE owner_withdrawal_items (\n    id             INTEGER PRIMARY KEY AUTOINCREMENT,\n    withdrawal_id  INTEGER NOT NULL REFERENCES owner_withdrawals(id) ON DELETE CASCADE,\n    item_id        INTEGER NOT NULL REFERENCES items(id),\n    warehouse_id   INTEGER NOT NULL REFERENCES warehouses(id),\n    quantity       DECIMAL(15,3) NOT NULL CHECK (quantity > 0)\n)"
+    },
+    {
+      "type": "table",
+      "name": "owner_withdrawals",
+      "sql": "CREATE TABLE owner_withdrawals (\n    id               INTEGER PRIMARY KEY AUTOINCREMENT,\n    withdrawal_no    VARCHAR(50) UNIQUE NOT NULL,\n    withdrawal_date  DATE NOT NULL,\n    kind             VARCHAR(10) NOT NULL CHECK (kind IN ('cash','goods')),\n    amount           DECIMAL(15,2) NOT NULL DEFAULT 0 CHECK (amount >= 0),\n    payment_method   VARCHAR(50),\n    note             TEXT,\n    status           VARCHAR(20) NOT NULL DEFAULT 'posted' CHECK (status IN ('posted','voided')),\n    voided_at        TIMESTAMP,\n    voided_by        INTEGER REFERENCES users(id),\n    void_reason      TEXT,\n    created_by       INTEGER REFERENCES users(id),\n    created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    CHECK (kind != 'cash' OR amount > 0)\n)"
+    },
+    {
+      "type": "table",
+      "name": "payment_allocations",
+      "sql": "CREATE TABLE payment_allocations (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    payment_id INTEGER NOT NULL,\n    invoice_id INTEGER NOT NULL,\n    amount DECIMAL(15,2) NOT NULL,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, voided_at TEXT,\n    FOREIGN KEY (payment_id) REFERENCES payments(id) ON DELETE CASCADE,\n    FOREIGN KEY (invoice_id) REFERENCES invoices(id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "payment_terms",
+      "sql": "CREATE TABLE payment_terms (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    name VARCHAR(50) NOT NULL,\n    days INTEGER NOT NULL DEFAULT 0,\n    description TEXT,\n    is_default BOOLEAN DEFAULT 0,\n    is_active BOOLEAN DEFAULT 1,\n    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP\n)"
+    },
+    {
+      "type": "table",
+      "name": "payments",
+      "sql": "CREATE TABLE \"payments\" (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    payment_no VARCHAR(50) UNIQUE NOT NULL,\n    customer_id INTEGER,\n    supplier_id INTEGER REFERENCES suppliers(id),\n    invoice_id INTEGER,\n    payment_date DATE NOT NULL,\n    amount DECIMAL(15,2) NOT NULL,\n    payment_method VARCHAR(50) NOT NULL DEFAULT 'Cash',\n    reference_no VARCHAR(100),\n    notes TEXT,\n    purchase_order_id INTEGER REFERENCES purchase_orders(id),\n    created_by INTEGER,\n    created_at DATETIME DEFAULT CURRENT_TIMESTAMP, voided_at TEXT, voided_by INTEGER REFERENCES users(id), void_reason TEXT, payment_kind TEXT NOT NULL DEFAULT 'RECEIPT'\n  CHECK (payment_kind IN ('RECEIPT', 'UNAPPLIED_RECEIPT', 'REFUND', 'CREDIT_APPLICATION')),\n    CHECK ((customer_id IS NULL) <> (supplier_id IS NULL)),\n    FOREIGN KEY (customer_id) REFERENCES customers(id),\n    FOREIGN KEY (supplier_id) REFERENCES suppliers(id),\n    FOREIGN KEY (invoice_id) REFERENCES invoices(id),\n    FOREIGN KEY (purchase_order_id) REFERENCES purchase_orders(id),\n    FOREIGN KEY (created_by) REFERENCES users(id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "permissions",
+      "sql": "CREATE TABLE permissions (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    permission_name VARCHAR(100) UNIQUE NOT NULL,\n    module VARCHAR(50) NOT NULL, -- e.g., 'users', 'inventory', 'sales', 'purchases', etc.\n    action VARCHAR(20) NOT NULL, -- 'read', 'create', 'update', 'delete', 'approve', etc.\n    description TEXT,\n    created_at DATETIME DEFAULT CURRENT_TIMESTAMP\n)"
+    },
+    {
+      "type": "table",
+      "name": "physical_count_items",
+      "sql": "CREATE TABLE physical_count_items (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    count_id INTEGER NOT NULL,\n    item_id INTEGER NOT NULL,\n    system_quantity DECIMAL(15,3) NOT NULL, -- Snapshot at count time\n    counted_quantity DECIMAL(15,3), -- NULL until counted\n    variance DECIMAL(15,3), -- counted - system (computed)\n    unit_cost DECIMAL(15,2), -- For variance valuation\n    variance_value DECIMAL(15,2), -- variance * unit_cost\n    adjustment_posted BOOLEAN DEFAULT FALSE,\n    adjustment_movement_id INTEGER, -- FK to stock_movements after adjustment\n    counted_at DATETIME,\n    counted_by INTEGER,\n    notes TEXT,\n    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n    FOREIGN KEY (count_id) REFERENCES physical_counts(id) ON DELETE CASCADE,\n    FOREIGN KEY (item_id) REFERENCES items(id),\n    FOREIGN KEY (counted_by) REFERENCES users(id),\n    FOREIGN KEY (adjustment_movement_id) REFERENCES stock_movements(id),\n    UNIQUE(count_id, item_id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "physical_counts",
+      "sql": "CREATE TABLE physical_counts (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    count_no VARCHAR(50) UNIQUE NOT NULL,\n    count_date DATE NOT NULL,\n    warehouse_id INTEGER NOT NULL,\n    status VARCHAR(20) DEFAULT 'Draft', -- Draft, In Progress, Completed, Cancelled\n    notes TEXT,\n    created_by INTEGER,\n    completed_by INTEGER,\n    completed_at DATETIME,\n    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, corrected_at TEXT, corrected_by INTEGER REFERENCES users(id),\n    FOREIGN KEY (warehouse_id) REFERENCES warehouses(id),\n    FOREIGN KEY (created_by) REFERENCES users(id),\n    FOREIGN KEY (completed_by) REFERENCES users(id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "po_allocations",
+      "sql": "CREATE TABLE po_allocations (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    payment_id INTEGER NOT NULL,\n    po_id INTEGER NOT NULL,\n    amount DECIMAL(15,2) NOT NULL,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, voided_at TEXT,\n    FOREIGN KEY (payment_id) REFERENCES payments(id) ON DELETE CASCADE,\n    FOREIGN KEY (po_id) REFERENCES purchase_orders(id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "production_inputs",
+      "sql": "CREATE TABLE production_inputs (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    production_id INTEGER NOT NULL,\n    item_id INTEGER NOT NULL,\n    quantity DECIMAL(15,3) NOT NULL, warehouse_id INTEGER,\n    FOREIGN KEY (production_id) REFERENCES productions(id) ON DELETE CASCADE,\n    FOREIGN KEY (item_id) REFERENCES items(id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "production_outputs",
+      "sql": "CREATE TABLE production_outputs (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    production_id INTEGER NOT NULL,\n    item_id INTEGER NOT NULL,\n    quantity DECIMAL(15,3) NOT NULL,\n    -- unit cost derived from this row's allocated_cost / quantity\n    unit_cost DECIMAL(15,6) DEFAULT 0,\n    -- share of joint cost (materials + overhead) allocated by relative\n    -- sales value; rows always sum to the production's total batch cost\n    allocated_cost DECIMAL(15,2) DEFAULT 0,\n    FOREIGN KEY (production_id) REFERENCES productions(id) ON DELETE CASCADE,\n    FOREIGN KEY (item_id) REFERENCES items(id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "productions",
+      "sql": "CREATE TABLE productions (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    production_no VARCHAR(50) UNIQUE NOT NULL,\n    output_item_id INTEGER NOT NULL,\n    output_quantity DECIMAL(15,3) NOT NULL,\n    warehouse_id INTEGER NOT NULL,\n    production_date DATE NOT NULL,\n    raw_materials_warehouse_id INTEGER,\n    bom_id INTEGER,\n    overhead_cost DECIMAL(15,2) DEFAULT 0,\n    remarks TEXT,\n    created_by INTEGER NOT NULL,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, batch_id INTEGER REFERENCES stock_batches(id), batch_no VARCHAR(50), unit_cost DECIMAL(15,4) DEFAULT 0, total_material_cost DECIMAL(15,4) DEFAULT 0, total_batch_cost DECIMAL(15,4) DEFAULT 0, expiry_date DATE,\n    FOREIGN KEY (output_item_id) REFERENCES items(id),\n    FOREIGN KEY (warehouse_id) REFERENCES warehouses(id),\n    FOREIGN KEY (created_by) REFERENCES users(id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "purchase_allocations",
+      "sql": "CREATE TABLE purchase_allocations (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    payment_id INTEGER NOT NULL,\n    purchase_id INTEGER NOT NULL,\n    amount DECIMAL(15,2) NOT NULL,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, voided_at TEXT,\n    FOREIGN KEY (payment_id) REFERENCES payments(id) ON DELETE CASCADE,\n    FOREIGN KEY (purchase_id) REFERENCES purchases(id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "purchase_order_items",
+      "sql": "CREATE TABLE purchase_order_items (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    po_id INTEGER NOT NULL,\n    item_id INTEGER NOT NULL,\n    quantity DECIMAL(15,3) NOT NULL,\n    received_quantity DECIMAL(15,3) DEFAULT 0,\n    unit_price DECIMAL(15,2) NOT NULL,\n    amount DECIMAL(15,2) NOT NULL, returned_quantity DECIMAL(15,3) NOT NULL DEFAULT 0, expiry_date DATE, input_tax_amount REAL NOT NULL DEFAULT 0 CHECK (input_tax_amount >= 0),\n    FOREIGN KEY (po_id) REFERENCES purchase_orders(id) ON DELETE CASCADE,\n    FOREIGN KEY (item_id) REFERENCES items(id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "purchase_orders",
+      "sql": "CREATE TABLE purchase_orders (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    po_no VARCHAR(50) UNIQUE NOT NULL,\n    supplier_id INTEGER NOT NULL,\n    po_date DATE NOT NULL,\n    expected_delivery_date DATE,\n    status VARCHAR(20) DEFAULT 'Draft', -- Draft, Submitted, Partially Received, Completed, Cancelled\n    total_amount DECIMAL(15,2) DEFAULT 0,\n    notes TEXT,\n    warehouse_id INTEGER,\n    created_by INTEGER,\n    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n    FOREIGN KEY (supplier_id) REFERENCES suppliers(id),\n    FOREIGN KEY (warehouse_id) REFERENCES warehouses(id),\n    FOREIGN KEY (created_by) REFERENCES users(id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "purchase_return_batches",
+      "sql": "CREATE TABLE purchase_return_batches (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    return_line_id INTEGER NOT NULL REFERENCES purchase_return_items(id),\n    batch_id INTEGER NOT NULL REFERENCES stock_batches(id),\n    quantity DECIMAL(15,4) NOT NULL,\n    created_at DATETIME DEFAULT CURRENT_TIMESTAMP\n, location_id INTEGER REFERENCES locations(id))"
+    },
+    {
+      "type": "table",
+      "name": "purchase_return_items",
+      "sql": "CREATE TABLE purchase_return_items (\n    id                INTEGER PRIMARY KEY AUTOINCREMENT,\n    purchase_return_id INTEGER NOT NULL REFERENCES purchase_returns(id),\n    source_item_id    INTEGER,                     -- purchases.id | purchase_order_items.id (nullable: legacy source lines may have been deleted)\n    item_id           INTEGER NOT NULL REFERENCES items(id),\n    item_name         TEXT NOT NULL,               -- denormalized\n    unit_cost         NUMERIC(15,3) NOT NULL,\n    quantity          NUMERIC(15,3) NOT NULL,      -- positive magnitude\n    amount            NUMERIC(15,3) NOT NULL\n, input_tax_amount REAL NOT NULL DEFAULT 0 CHECK (input_tax_amount >= 0))"
+    },
+    {
+      "type": "table",
+      "name": "purchase_returns",
+      "sql": "CREATE TABLE purchase_returns (\n    id             INTEGER PRIMARY KEY AUTOINCREMENT,\n    return_no      TEXT NOT NULL UNIQUE,           -- PR-2026-0001\n    return_date    TEXT NOT NULL,                  -- user-selectable, YYYY-MM-DD\n    return_type    TEXT NOT NULL,                  -- 'PURCHASE_RETURN' | 'PO_RETURN'\n    source_type    TEXT NOT NULL,                  -- 'PURCHASE' | 'PURCHASE_ORDER'\n    source_id      INTEGER,                        -- purchases.id | purchase_orders.id (nullable: legacy source docs may have been deleted)\n    source_no      TEXT NOT NULL,                  -- denormalized doc number\n    warehouse_id   INTEGER NOT NULL,               -- restock target (user-selectable)\n    reason         TEXT,\n    status         TEXT NOT NULL DEFAULT 'POSTED', -- 'POSTED' | 'VOIDED'\n    total_qty      NUMERIC(15,3) NOT NULL,\n    total_amount   NUMERIC(15,3) NOT NULL,\n    credit_note_id INTEGER REFERENCES credit_notes(id),  -- NULL until credit posted\n    voided_at      TEXT,\n    voided_by      INTEGER REFERENCES users(id),\n    voided_reason  TEXT,\n    created_by     INTEGER REFERENCES users(id),\n    created_at     TEXT NOT NULL DEFAULT (datetime('now'))\n, disposition TEXT, input_tax_amount REAL NOT NULL DEFAULT 0 CHECK (input_tax_amount >= 0))"
+    },
+    {
+      "type": "table",
+      "name": "purchase_submission_items",
+      "sql": "CREATE TABLE purchase_submission_items (\n  root_purchase_id INTEGER NOT NULL REFERENCES purchases(id),\n  purchase_id INTEGER NOT NULL UNIQUE REFERENCES purchases(id),\n  line_index INTEGER NOT NULL CHECK (line_index >= 0),\n  PRIMARY KEY (root_purchase_id, line_index)\n)"
+    },
+    {
+      "type": "table",
+      "name": "purchases",
+      "sql": "CREATE TABLE purchases (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    purchase_no VARCHAR(50) UNIQUE NOT NULL,\n    item_id INTEGER NOT NULL,\n    warehouse_id INTEGER NOT NULL,\n    quantity DECIMAL(15,3) NOT NULL,\n    unit_cost DECIMAL(15,2) NOT NULL,\n    total_cost DECIMAL(15,2) NOT NULL,\n    supplier_name VARCHAR(200),\n    purchase_date DATE NOT NULL,\n    invoice_no VARCHAR(100),\n    remarks TEXT,\n    created_by INTEGER NOT NULL,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, supplier_id INTEGER REFERENCES suppliers(id), returned_quantity DECIMAL(15,3) NOT NULL DEFAULT 0, batch_id INTEGER REFERENCES stock_batches(id), batch_no VARCHAR(50), voided_at TEXT, voided_by INTEGER REFERENCES users(id), void_reason TEXT, input_tax_amount REAL NOT NULL DEFAULT 0 CHECK (input_tax_amount >= 0),\n    FOREIGN KEY (item_id) REFERENCES items(id),\n    FOREIGN KEY (warehouse_id) REFERENCES warehouses(id),\n    FOREIGN KEY (created_by) REFERENCES users(id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "quotation_items",
+      "sql": "CREATE TABLE quotation_items (\n            id INTEGER PRIMARY KEY AUTOINCREMENT,\n            quotation_id INTEGER NOT NULL,\n            item_id INTEGER NOT NULL,\n            item_code VARCHAR(50),\n            item_name VARCHAR(200),\n            quantity DECIMAL(15,3) NOT NULL,\n            unit_price DECIMAL(15,2) NOT NULL,\n            discount_type VARCHAR(20) DEFAULT 'none',\n            discount_value DECIMAL(15,2) DEFAULT 0,\n            tax_rate DECIMAL(5,2) DEFAULT 0,\n            amount DECIMAL(15,2) NOT NULL\n          )"
+    },
+    {
+      "type": "table",
+      "name": "quotations",
+      "sql": "CREATE TABLE quotations (\n            id INTEGER PRIMARY KEY AUTOINCREMENT,\n            quotation_no VARCHAR(50) UNIQUE NOT NULL,\n            customer_id INTEGER NOT NULL,\n            customer_name VARCHAR(200),\n            quotation_date DATE NOT NULL,\n            expiry_date DATE,\n            status VARCHAR(20) DEFAULT 'Draft',\n            source_type VARCHAR(20),\n            total_amount DECIMAL(15,2) DEFAULT 0,\n            notes TEXT,\n            terms TEXT,\n            warehouse_id INTEGER,\n            created_by INTEGER NOT NULL,\n            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP\n          )"
+    },
+    {
+      "type": "table",
+      "name": "return_settlements",
+      "sql": "CREATE TABLE return_settlements (\n    id                INTEGER PRIMARY KEY AUTOINCREMENT,\n    return_id         INTEGER NOT NULL REFERENCES invoice_returns(id),\n    settlement_no     TEXT NOT NULL UNIQUE,             -- CR-… / payment no / ADJ ref\n    type              TEXT NOT NULL CHECK (type IN ('refund', 'credit', 'adjust')),\n    amount            REAL NOT NULL CHECK (amount > 0),\n    method            TEXT,                             -- refund only: Cash | Bank | Card …\n    reference         TEXT,                             -- payment no / target invoice no\n    target_invoice_id INTEGER,                          -- adjust only\n    payment_id        INTEGER,                          -- links to payments row (refund/adjust)\n    settled_date      TEXT NOT NULL,\n    created_by        INTEGER NOT NULL REFERENCES users(id),\n    created_at        TEXT NOT NULL DEFAULT (datetime('now')),\n    voided_at         TEXT\n, voided_by INTEGER REFERENCES users(id))"
+    },
+    {
+      "type": "table",
+      "name": "role_permissions",
+      "sql": "CREATE TABLE role_permissions (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    role_id INTEGER NOT NULL,\n    permission_id INTEGER NOT NULL,\n    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n    FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE,\n    FOREIGN KEY (permission_id) REFERENCES permissions(id) ON DELETE CASCADE,\n    UNIQUE(role_id, permission_id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "roles",
+      "sql": "CREATE TABLE roles (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    role_name VARCHAR(50) UNIQUE NOT NULL,\n    description TEXT,\n    is_system_role BOOLEAN DEFAULT 0, -- System roles (Admin, User) cannot be deleted\n    is_active BOOLEAN DEFAULT 1,\n    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP\n)"
+    },
+    {
+      "type": "table",
+      "name": "salary_payments",
+      "sql": "CREATE TABLE salary_payments (\n    id              INTEGER PRIMARY KEY AUTOINCREMENT,\n    employee_id     INTEGER NOT NULL REFERENCES employees(id),\n    amount          DECIMAL(15,2) NOT NULL,\n    payment_date    DATE NOT NULL,\n    payment_method  TEXT DEFAULT 'bank',     -- 'cash' | 'bank'\n    reference_no    TEXT,\n    notes           TEXT,\n    journal_entry_id INTEGER,                -- links to journal_lines grouping\n    status          TEXT DEFAULT 'paid' CHECK (status IN ('paid','cancelled')),\n    paid_by         INTEGER REFERENCES users(id),\n    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n, pay_period TEXT, payment_type TEXT DEFAULT 'full'\n  CHECK (payment_type IN ('full', 'advance', 'partial')), voided_at TEXT, voided_by INTEGER REFERENCES users(id), void_reason TEXT, parent_payment_id INTEGER REFERENCES salary_payments(id))"
+    },
+    {
+      "type": "table",
+      "name": "sales_order_items",
+      "sql": "CREATE TABLE sales_order_items (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    so_id INTEGER NOT NULL,\n    item_id INTEGER NOT NULL,\n    quantity DECIMAL(15,3) NOT NULL,\n    delivered_quantity DECIMAL(15,3) DEFAULT 0,\n    unit_price DECIMAL(15,2) NOT NULL,\n    amount DECIMAL(15,2) NOT NULL,\n    FOREIGN KEY (so_id) REFERENCES sales_orders(id) ON DELETE CASCADE,\n    FOREIGN KEY (item_id) REFERENCES items(id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "sales_orders",
+      "sql": "CREATE TABLE sales_orders (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    so_no VARCHAR(50) UNIQUE NOT NULL,\n    customer_id INTEGER NOT NULL,\n    so_date DATE NOT NULL,\n    delivery_date DATE,\n    status VARCHAR(20) DEFAULT 'Draft', -- Draft, Confirmed, Delivered, Invoiced, Completed, Cancelled\n    total_amount DECIMAL(15,2) DEFAULT 0,\n    notes TEXT,\n    warehouse_id INTEGER,\n    created_by INTEGER,\n    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, source_type VARCHAR(20), source_id INTEGER, customer_name VARCHAR(200),\n    FOREIGN KEY (customer_id) REFERENCES customers(id),\n    FOREIGN KEY (warehouse_id) REFERENCES warehouses(id),\n    FOREIGN KEY (created_by) REFERENCES users(id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "schema_migrations",
+      "sql": "CREATE TABLE schema_migrations (\n      filename TEXT PRIMARY KEY,\n      applied_at TEXT NOT NULL,\n      checksum TEXT NOT NULL\n    )"
+    },
+    {
+      "type": "table",
+      "name": "settings",
+      "sql": "CREATE TABLE settings (\n    key VARCHAR(50) PRIMARY KEY,\n    value TEXT,\n    description TEXT,\n    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP\n)"
+    },
+    {
+      "type": "table",
+      "name": "sqlite_sequence",
+      "sql": "CREATE TABLE sqlite_sequence(name,seq)"
+    },
+    {
+      "type": "table",
+      "name": "sqlite_stat1",
+      "sql": "CREATE TABLE sqlite_stat1(tbl,idx,stat)"
+    },
+    {
+      "type": "table",
+      "name": "sqlite_stat4",
+      "sql": "CREATE TABLE sqlite_stat4(tbl,idx,neq,nlt,ndlt,sample)"
+    },
+    {
+      "type": "table",
+      "name": "stock_balances",
+      "sql": "CREATE TABLE \"stock_balances\" (\n              item_id INTEGER NOT NULL REFERENCES items(id),\n              warehouse_id INTEGER NOT NULL REFERENCES warehouses(id),\n              quantity DECIMAL(15,3) NOT NULL DEFAULT 0 CHECK(quantity >= 0),\n              last_updated DATETIME, quantity_physical DECIMAL(15,3), quantity_reserved DECIMAL(15,3), quantity_available DECIMAL(15,3),\n              PRIMARY KEY (item_id, warehouse_id)\n          )"
+    },
+    {
+      "type": "table",
+      "name": "stock_batches",
+      "sql": "CREATE TABLE \"stock_batches\" (\n              id INTEGER PRIMARY KEY AUTOINCREMENT,\n              batch_no VARCHAR(50) UNIQUE NOT NULL,\n              item_id INTEGER NOT NULL REFERENCES items(id),\n              warehouse_id INTEGER NOT NULL REFERENCES warehouses(id),\n              source_type VARCHAR(20) NOT NULL CHECK(source_type IN ('PRODUCTION','PURCHASE','GOODS_RECEIPT','RETURN','ADJUSTMENT','OPENING','TRANSFER','RECON')),\n              source_id INTEGER NOT NULL,\n              quantity_original DECIMAL(15,3) NOT NULL DEFAULT 0,\n              quantity_remaining DECIMAL(15,3) NOT NULL DEFAULT 0\n                CHECK(quantity_remaining >= 0 AND quantity_remaining <= quantity_original),\n              unit_cost DECIMAL(15,4) NOT NULL DEFAULT 0,\n              received_date DATE NOT NULL,\n              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n              expiry_date DATE,\n              halted BOOLEAN DEFAULT 0,\n              halted_reason TEXT\n          )"
+    },
+    {
+      "type": "table",
+      "name": "stock_movements",
+      "sql": "CREATE TABLE stock_movements (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    movement_no VARCHAR(50) UNIQUE NOT NULL,\n    item_id INTEGER NOT NULL,\n    warehouse_id INTEGER NOT NULL,\n    movement_type VARCHAR(50) NOT NULL, -- PURCHASE, SALE, TRANSFER, PRODUCTION, ADJUSTMENT\n    quantity DECIMAL(15,3) NOT NULL, -- Positive for IN, Negative for OUT\n    unit_cost DECIMAL(15,2),\n    reference_doctype VARCHAR(50), -- PurchaseOrder, SalesOrder, WorkOrder\n    reference_docno VARCHAR(50),\n    remarks TEXT,\n    movement_date DATE NOT NULL,\n    created_by INTEGER,\n    created_at DATETIME DEFAULT CURRENT_TIMESTAMP, purchase_return_id INTEGER REFERENCES purchase_returns(id), financial_value DECIMAL(15,4) DEFAULT 0, financial_posted BOOLEAN DEFAULT FALSE, journal_entry_id INTEGER REFERENCES journal_entries(id), batch_id INTEGER REFERENCES stock_batches(id),\n    FOREIGN KEY (item_id) REFERENCES items(id),\n    FOREIGN KEY (warehouse_id) REFERENCES warehouses(id),\n    FOREIGN KEY (created_by) REFERENCES users(id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "stock_reservations",
+      "sql": "CREATE TABLE stock_reservations (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    item_id INTEGER NOT NULL REFERENCES items(id),\n    warehouse_id INTEGER NOT NULL REFERENCES warehouses(id),\n    location_id INTEGER REFERENCES locations(id),\n    batch_id INTEGER REFERENCES stock_batches(id),\n    quantity_reserved DECIMAL(15,3) NOT NULL,\n    reference_doctype VARCHAR(30) NOT NULL,\n    reference_docno VARCHAR(50) NOT NULL,\n    reference_line_id INTEGER,\n    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',\n    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n    released_at DATETIME,\n    consumed_at DATETIME\n)"
+    },
+    {
+      "type": "table",
+      "name": "supplier_bill_allocations",
+      "sql": "CREATE TABLE supplier_bill_allocations (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    payment_id INTEGER NOT NULL REFERENCES payments(id),\n    bill_id INTEGER NOT NULL REFERENCES supplier_bills(id),\n    amount REAL NOT NULL CHECK (amount > 0),\n    voided_at TEXT,\n    UNIQUE (payment_id, bill_id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "supplier_bills",
+      "sql": "CREATE TABLE supplier_bills (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    supplier_id INTEGER NOT NULL REFERENCES suppliers(id),\n    bill_no TEXT NOT NULL,\n    bill_date TEXT NOT NULL,\n    due_date TEXT,\n    description TEXT NOT NULL,\n    net_amount REAL NOT NULL CHECK (net_amount > 0),\n    input_tax_amount REAL NOT NULL DEFAULT 0 CHECK (input_tax_amount >= 0),\n    total_amount REAL NOT NULL CHECK (total_amount > 0),\n    created_by INTEGER NOT NULL REFERENCES users(id),\n    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    voided_at TEXT,\n    voided_by INTEGER REFERENCES users(id),\n    void_reason TEXT\n)"
+    },
+    {
+      "type": "table",
+      "name": "supplier_ledger",
+      "sql": "CREATE TABLE supplier_ledger (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    supplier_id INTEGER NOT NULL,\n    transaction_date DATE NOT NULL,\n    transaction_type VARCHAR(50), -- PURCHASE_ORDER, RECEIPT, PAYMENT, ADJUSTMENT, OPENING_BALANCE\n    reference_no VARCHAR(100),\n    debit DECIMAL(15,2) DEFAULT 0,\n    credit DECIMAL(15,2) DEFAULT 0,\n    balance DECIMAL(15,2) NOT NULL,\n    description TEXT,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, voided BOOLEAN DEFAULT 0, reversed_by INTEGER REFERENCES supplier_ledger(id),\n    FOREIGN KEY (supplier_id) REFERENCES suppliers(id)\n)"
+    },
+    {
+      "type": "table",
+      "name": "supplier_prepayment_applications",
+      "sql": "CREATE TABLE supplier_prepayment_applications (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    prepayment_id INTEGER NOT NULL REFERENCES supplier_prepayments(id),\n    payment_id INTEGER NOT NULL UNIQUE REFERENCES payments(id),\n    amount REAL NOT NULL CHECK (amount > 0),\n    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP\n)"
+    },
+    {
+      "type": "table",
+      "name": "supplier_prepayments",
+      "sql": "CREATE TABLE supplier_prepayments (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    supplier_id INTEGER NOT NULL REFERENCES suppliers(id),\n    prepay_date TEXT NOT NULL,\n    amount REAL NOT NULL CHECK (amount > 0),\n    payment_method TEXT NOT NULL,\n    reference_no TEXT,\n    notes TEXT,\n    created_by INTEGER NOT NULL REFERENCES users(id),\n    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    voided_at TEXT,\n    voided_by INTEGER REFERENCES users(id),\n    void_reason TEXT\n)"
+    },
+    {
+      "type": "table",
+      "name": "supplier_refunds",
+      "sql": "CREATE TABLE supplier_refunds (\n    id             INTEGER PRIMARY KEY AUTOINCREMENT,\n    refund_no      TEXT NOT NULL UNIQUE,            -- SR-2026-0001\n    refund_date    TEXT NOT NULL,\n    supplier_id    INTEGER NOT NULL REFERENCES suppliers(id),\n    credit_note_id INTEGER NOT NULL REFERENCES credit_notes(id),\n    return_id      INTEGER REFERENCES purchase_returns(id),\n    amount         NUMERIC(15,3) NOT NULL,\n    payment_method TEXT NOT NULL DEFAULT 'cash',\n    reference_no   TEXT,\n    status         TEXT NOT NULL DEFAULT 'POSTED',  -- 'POSTED' | 'VOIDED'\n    voided_at      TEXT,\n    voided_by      INTEGER REFERENCES users(id),\n    voided_reason  TEXT,\n    created_by     INTEGER REFERENCES users(id),\n    created_at     TEXT NOT NULL DEFAULT (datetime('now'))\n)"
+    },
+    {
+      "type": "table",
+      "name": "suppliers",
+      "sql": "CREATE TABLE suppliers (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    supplier_code VARCHAR(50) UNIQUE NOT NULL,\n    supplier_name VARCHAR(200) NOT NULL,\n    contact_person VARCHAR(100),\n    email VARCHAR(100),\n    phone VARCHAR(20),\n    address TEXT,\n    payment_terms VARCHAR(100), -- Net 30, Net 60, COD\n    is_active BOOLEAN DEFAULT 1,\n    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP\n, current_balance DECIMAL(15,2) DEFAULT 0)"
+    },
+    {
+      "type": "table",
+      "name": "tax_rates",
+      "sql": "CREATE TABLE tax_rates (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    name VARCHAR(50) NOT NULL,\n    rate DECIMAL(5,2) NOT NULL,\n    description TEXT,\n    is_default BOOLEAN DEFAULT 0,\n    is_active BOOLEAN DEFAULT 1,\n    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP\n)"
+    },
+    {
+      "type": "table",
+      "name": "unapplied_receipt_replays",
+      "sql": "CREATE TABLE unapplied_receipt_replays (\n  customer_id INTEGER NOT NULL REFERENCES customers(id),\n  idempotency_key TEXT NOT NULL CHECK (length(idempotency_key) BETWEEN 8 AND 200),\n  request_hash TEXT NOT NULL,\n  payment_id INTEGER NOT NULL UNIQUE REFERENCES payments(id),\n  amount DECIMAL(15,2) NOT NULL CHECK (amount > 0),\n  PRIMARY KEY (customer_id, idempotency_key)\n)"
+    },
+    {
+      "type": "table",
+      "name": "user_preferences",
+      "sql": "CREATE TABLE user_preferences (\n    user_id       INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,\n    week_start    TEXT NOT NULL DEFAULT 'monday',   -- 'monday' | 'saturday' | 'sunday'\n    default_range TEXT,                             -- JSON { \"from\": \"YYYY-MM-DD\", \"to\": \"YYYY-MM-DD\" } or NULL\n    presets       TEXT NOT NULL DEFAULT '[]',       -- JSON array of { id, name, from, to }\n    updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n)"
+    },
+    {
+      "type": "table",
+      "name": "users",
+      "sql": "CREATE TABLE users (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    username VARCHAR(50) UNIQUE NOT NULL,\n    email VARCHAR(100) UNIQUE NOT NULL,\n    password_hash VARCHAR(255) NOT NULL,\n    full_name VARCHAR(100) NOT NULL,\n    role VARCHAR(20) DEFAULT 'user', -- admin, user\n    is_active BOOLEAN DEFAULT 1,\n    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP\n, role_id INTEGER REFERENCES roles(id))"
+    },
+    {
+      "type": "table",
+      "name": "warehouses",
+      "sql": "CREATE TABLE warehouses (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    warehouse_code VARCHAR(50) UNIQUE NOT NULL,\n    warehouse_name VARCHAR(100) NOT NULL,\n    location TEXT,\n    is_active BOOLEAN DEFAULT 1,\n    created_at DATETIME DEFAULT CURRENT_TIMESTAMP\n, is_system BOOLEAN NOT NULL DEFAULT 0)"
+    },
+    {
+      "type": "table",
+      "name": "work_orders",
+      "sql": "CREATE TABLE work_orders (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    wo_no VARCHAR(50) UNIQUE NOT NULL,\n    bom_id INTEGER NOT NULL,\n    finished_item_id INTEGER NOT NULL,\n    planned_quantity DECIMAL(15,3) NOT NULL,\n    produced_quantity DECIMAL(15,3) DEFAULT 0,\n    status VARCHAR(20) DEFAULT 'Draft', -- Draft, In Progress, Completed, Cancelled\n    start_date DATE,\n    expected_completion_date DATE,\n    actual_completion_date DATE,\n    warehouse_id INTEGER, -- Where finished goods will be stored\n    notes TEXT,\n    created_by INTEGER,\n    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n    FOREIGN KEY (bom_id) REFERENCES bom(id),\n    FOREIGN KEY (finished_item_id) REFERENCES items(id),\n    FOREIGN KEY (warehouse_id) REFERENCES warehouses(id),\n    FOREIGN KEY (created_by) REFERENCES users(id)\n)"
+    },
+    {
+      "type": "trigger",
+      "name": "journal_balance_delete",
+      "sql": "CREATE TRIGGER journal_balance_delete\nAFTER DELETE ON journal_lines\nBEGIN\n  UPDATE journal_entry_balances\n  SET balance_cents = balance_cents - CASE WHEN OLD.voided = 0\n    THEN CAST(ROUND(OLD.debit * 100) - ROUND(OLD.credit * 100) AS INTEGER) ELSE 0 END\n  WHERE journal_entry_id = OLD.journal_entry_id;\nEND"
+    },
+    {
+      "type": "trigger",
+      "name": "journal_balance_insert",
+      "sql": "CREATE TRIGGER journal_balance_insert\nAFTER INSERT ON journal_lines\nBEGIN\n  INSERT OR IGNORE INTO journal_balance_zero (value) VALUES (0);\n  INSERT INTO journal_entry_balances (journal_entry_id, balance_cents)\n  VALUES (NEW.journal_entry_id, CASE WHEN NEW.voided = 0\n    THEN CAST(ROUND(NEW.debit * 100) - ROUND(NEW.credit * 100) AS INTEGER) ELSE 0 END)\n  ON CONFLICT (journal_entry_id) DO UPDATE\n    SET balance_cents = balance_cents + excluded.balance_cents;\nEND"
+    },
+    {
+      "type": "trigger",
+      "name": "journal_balance_no_replace_insert",
+      "sql": "CREATE TRIGGER journal_balance_no_replace_insert\nBEFORE INSERT ON journal_lines\nWHEN EXISTS (SELECT 1 FROM journal_lines WHERE id = NEW.id)\nBEGIN\n  SELECT RAISE(ABORT, 'Journal lines must be updated, not replaced');\nEND"
+    },
+    {
+      "type": "trigger",
+      "name": "journal_balance_no_replace_update",
+      "sql": "CREATE TRIGGER journal_balance_no_replace_update\nBEFORE UPDATE OF id ON journal_lines\nWHEN NEW.id != OLD.id AND EXISTS (SELECT 1 FROM journal_lines WHERE id = NEW.id)\nBEGIN\n  SELECT RAISE(ABORT, 'Journal lines must be updated, not replaced');\nEND"
+    },
+    {
+      "type": "trigger",
+      "name": "journal_balance_update",
+      "sql": "CREATE TRIGGER journal_balance_update\nAFTER UPDATE OF journal_entry_id, debit, credit, voided ON journal_lines\nBEGIN\n  UPDATE journal_entry_balances\n  SET balance_cents = balance_cents - CASE WHEN OLD.voided = 0\n    THEN CAST(ROUND(OLD.debit * 100) - ROUND(OLD.credit * 100) AS INTEGER) ELSE 0 END\n  WHERE journal_entry_id = OLD.journal_entry_id;\n  INSERT INTO journal_entry_balances (journal_entry_id, balance_cents)\n  VALUES (NEW.journal_entry_id, CASE WHEN NEW.voided = 0\n    THEN CAST(ROUND(NEW.debit * 100) - ROUND(NEW.credit * 100) AS INTEGER) ELSE 0 END)\n  ON CONFLICT (journal_entry_id) DO UPDATE\n    SET balance_cents = balance_cents + excluded.balance_cents;\nEND"
+    },
+    {
+      "type": "trigger",
+      "name": "trg_batch_stock_available",
+      "sql": "CREATE TRIGGER trg_batch_stock_available\nAFTER UPDATE OF quantity_physical, quantity_reserved ON batch_stock_by_location\nFOR EACH ROW\nBEGIN\n  UPDATE batch_stock_by_location\n  SET quantity_available = MAX(0, NEW.quantity_physical - NEW.quantity_reserved)\n  WHERE id = NEW.id;\nEND"
+    },
+    {
+      "type": "trigger",
+      "name": "trg_batch_stock_available_insert",
+      "sql": "CREATE TRIGGER trg_batch_stock_available_insert\nAFTER INSERT ON batch_stock_by_location\nFOR EACH ROW\nBEGIN\n  UPDATE batch_stock_by_location\n  SET quantity_available = MAX(0, NEW.quantity_physical - NEW.quantity_reserved)\n  WHERE id = NEW.id;\nEND"
+    },
+    {
+      "type": "trigger",
+      "name": "trg_employee_documents_updated_at",
+      "sql": "CREATE TRIGGER trg_employee_documents_updated_at\nAFTER UPDATE ON employee_documents\nFOR EACH ROW\nBEGIN\n    UPDATE employee_documents SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;\nEND"
+    },
+    {
+      "type": "trigger",
+      "name": "trg_employees_updated_at",
+      "sql": "CREATE TRIGGER trg_employees_updated_at\nAFTER UPDATE ON employees\nFOR EACH ROW\nBEGIN\n    UPDATE employees SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;\nEND"
+    },
+    {
+      "type": "trigger",
+      "name": "trg_invoice_returns_settled_ceiling",
+      "sql": "CREATE TRIGGER trg_invoice_returns_settled_ceiling\nBEFORE INSERT ON invoice_returns\nWHEN NEW.settled_amount > NEW.net_amount\nBEGIN\n    SELECT RAISE(ABORT, 'settled_amount cannot exceed net_amount (returned_amount − fee_amount)');\nEND"
+    },
+    {
+      "type": "trigger",
+      "name": "trg_invoice_returns_settled_ceiling_update",
+      "sql": "CREATE TRIGGER trg_invoice_returns_settled_ceiling_update\nBEFORE UPDATE OF settled_amount, net_amount, returned_amount, fee_amount ON invoice_returns\nWHEN NEW.settled_amount > NEW.net_amount\nBEGIN\n    SELECT RAISE(ABORT, 'settled_amount cannot exceed net_amount (returned_amount − fee_amount)');\nEND"
+    },
+    {
+      "type": "trigger",
+      "name": "trg_warehouses_no_delete_system",
+      "sql": "CREATE TRIGGER trg_warehouses_no_delete_system\nBEFORE DELETE ON warehouses\nWHEN OLD.is_system = 1\nBEGIN\n    SELECT RAISE(ABORT, 'Cannot delete system warehouse');\nEND"
+    }
+  ],
+  "accounts": [
+    {
+      "id": 1,
+      "code": "1000",
+      "name": "Cash",
+      "type": "asset",
+      "normal_balance": "debit",
+      "parent_id": null,
+      "text_code": "cash",
+      "is_active": 1,
+      "description": "On-hand cash",
+      "created_at": "2026-10-25 03:18:07"
+    },
+    {
+      "id": 2,
+      "code": "1010",
+      "name": "Bank",
+      "type": "asset",
+      "normal_balance": "debit",
+      "parent_id": null,
+      "text_code": "bank",
+      "is_active": 1,
+      "description": "Bank balances",
+      "created_at": "2026-10-25 03:18:07"
+    },
+    {
+      "id": 19,
+      "code": "1020",
+      "name": "Easypaisa / Mobile Wallet",
+      "type": "asset",
+      "normal_balance": "debit",
+      "parent_id": null,
+      "text_code": "easypaisa",
+      "is_active": 1,
+      "description": "Easypaisa / mobile wallet balances",
+      "created_at": "2026-10-25 03:18:08"
+    },
+    {
+      "id": 20,
+      "code": "1030",
+      "name": "JazzCash",
+      "type": "asset",
+      "normal_balance": "debit",
+      "parent_id": null,
+      "text_code": "jazzcash",
+      "is_active": 1,
+      "description": "JazzCash wallet balances",
+      "created_at": "2026-10-25 03:18:08"
+    },
+    {
+      "id": 21,
+      "code": "1040",
+      "name": "UPaisa",
+      "type": "asset",
+      "normal_balance": "debit",
+      "parent_id": null,
+      "text_code": "upaisa",
+      "is_active": 1,
+      "description": "UPaisa wallet balances",
+      "created_at": "2026-10-25 03:18:08"
+    },
+    {
+      "id": 3,
+      "code": "1100",
+      "name": "Accounts Receivable",
+      "type": "asset",
+      "normal_balance": "debit",
+      "parent_id": null,
+      "text_code": "accounts_receivable",
+      "is_active": 1,
+      "description": "Customer balances",
+      "created_at": "2026-10-25 03:18:07"
+    },
+    {
+      "id": 18,
+      "code": "1110",
+      "name": "Customer Credit",
+      "type": "asset",
+      "normal_balance": "credit",
+      "parent_id": null,
+      "text_code": "customer_credit",
+      "is_active": 1,
+      "description": "Customer credit balances from returns/overpayments — contra-asset offsetting AR",
+      "created_at": "2026-10-25 03:18:08"
+    },
+    {
+      "id": 4,
+      "code": "1200",
+      "name": "Inventory Asset",
+      "type": "asset",
+      "normal_balance": "debit",
+      "parent_id": null,
+      "text_code": "inventory_asset",
+      "is_active": 1,
+      "description": "On-hand inventory at cost",
+      "created_at": "2026-10-25 03:18:07"
+    },
+    {
+      "id": 22,
+      "code": "1300",
+      "name": "Employee Loan Receivable",
+      "type": "asset",
+      "normal_balance": "debit",
+      "parent_id": null,
+      "text_code": "employee_loan_receivable",
+      "is_active": 1,
+      "description": "Loans advanced to employees",
+      "created_at": "2026-10-25 03:18:08"
+    },
+    {
+      "id": 26,
+      "code": "1310",
+      "name": "Employee Salary Advances",
+      "type": "asset",
+      "normal_balance": "debit",
+      "parent_id": null,
+      "text_code": "employee_salary_advances",
+      "is_active": 1,
+      "description": "Unearned salary advances receivable",
+      "created_at": "2026-10-25 03:18:19"
+    },
+    {
+      "id": 34,
+      "code": "1320",
+      "name": "Recoverable Input Tax",
+      "type": "asset",
+      "normal_balance": "debit",
+      "parent_id": null,
+      "text_code": "recoverable_input_tax",
+      "is_active": 1,
+      "description": null,
+      "created_at": "2026-10-25 03:18:19"
+    },
+    {
+      "id": 35,
+      "code": "1330",
+      "name": "Supplier Prepayments",
+      "type": "asset",
+      "normal_balance": "debit",
+      "parent_id": null,
+      "text_code": "supplier_prepayments",
+      "is_active": 1,
+      "description": null,
+      "created_at": "2026-10-25 03:18:19"
+    },
+    {
+      "id": 5,
+      "code": "2000",
+      "name": "Accounts Payable",
+      "type": "liability",
+      "normal_balance": "credit",
+      "parent_id": null,
+      "text_code": "accounts_payable",
+      "is_active": 1,
+      "description": "Supplier balances",
+      "created_at": "2026-10-25 03:18:07"
+    },
+    {
+      "id": 6,
+      "code": "2100",
+      "name": "Tax Payable",
+      "type": "liability",
+      "normal_balance": "credit",
+      "parent_id": null,
+      "text_code": "tax_payable",
+      "is_active": 1,
+      "description": "Sales tax collected",
+      "created_at": "2026-10-25 03:18:07"
+    },
+    {
+      "id": 32,
+      "code": "2110",
+      "name": "Unapplied Customer Payments",
+      "type": "liability",
+      "normal_balance": "credit",
+      "parent_id": null,
+      "text_code": "unapplied_customer_payments",
+      "is_active": 1,
+      "description": null,
+      "created_at": "2026-10-25 03:18:19"
+    },
+    {
+      "id": 33,
+      "code": "2115",
+      "name": "Expense Payables",
+      "type": "liability",
+      "normal_balance": "credit",
+      "parent_id": null,
+      "text_code": "expense_payables",
+      "is_active": 1,
+      "description": null,
+      "created_at": "2026-10-25 03:18:19"
+    },
+    {
+      "id": 31,
+      "code": "2200",
+      "name": "Accrued Production Overhead",
+      "type": "liability",
+      "normal_balance": "credit",
+      "parent_id": null,
+      "text_code": "production_overhead_payable",
+      "is_active": 1,
+      "description": "Unpaid overhead absorbed into production inventory, owed until settled",
+      "created_at": "2026-10-25 03:18:19"
+    },
+    {
+      "id": 7,
+      "code": "3000",
+      "name": "Owner's Equity",
+      "type": "equity",
+      "normal_balance": "credit",
+      "parent_id": null,
+      "text_code": "owners_equity",
+      "is_active": 1,
+      "description": "Capital contributions",
+      "created_at": "2026-10-25 03:18:07"
+    },
+    {
+      "id": 8,
+      "code": "3100",
+      "name": "Retained Earnings",
+      "type": "equity",
+      "normal_balance": "credit",
+      "parent_id": null,
+      "text_code": "opening_retained_earnings",
+      "is_active": 1,
+      "description": "Cumulative profit/loss carried forward",
+      "created_at": "2026-10-25 03:18:07"
+    },
+    {
+      "id": 24,
+      "code": "3200",
+      "name": "Owner Capital",
+      "type": "equity",
+      "normal_balance": "credit",
+      "parent_id": 7,
+      "text_code": "owner_capital",
+      "is_active": 1,
+      "description": "Cash contributed by the owner",
+      "created_at": "2026-10-25 03:18:18"
+    },
+    {
+      "id": 25,
+      "code": "3300",
+      "name": "Owner Drawings",
+      "type": "equity",
+      "normal_balance": "debit",
+      "parent_id": 7,
+      "text_code": "owner_drawings",
+      "is_active": 1,
+      "description": "Cash/goods taken by the owner (contra-equity)",
+      "created_at": "2026-10-25 03:18:18"
+    },
+    {
+      "id": 9,
+      "code": "4000",
+      "name": "Sales Revenue",
+      "type": "revenue",
+      "normal_balance": "credit",
+      "parent_id": null,
+      "text_code": "sales_revenue",
+      "is_active": 1,
+      "description": "Revenue from invoices and POS",
+      "created_at": "2026-10-25 03:18:07"
+    },
+    {
+      "id": 10,
+      "code": "4100",
+      "name": "Sales Returns",
+      "type": "revenue",
+      "normal_balance": "debit",
+      "parent_id": null,
+      "text_code": "sales_returns",
+      "is_active": 1,
+      "description": "Contra-revenue: returned/credited sales",
+      "created_at": "2026-10-25 03:18:07"
+    },
+    {
+      "id": 11,
+      "code": "4150",
+      "name": "Restocking Fee Income",
+      "type": "revenue",
+      "normal_balance": "credit",
+      "parent_id": null,
+      "text_code": "restocking_fee_income",
+      "is_active": 1,
+      "description": "Fees charged on returned items",
+      "created_at": "2026-10-25 03:18:07"
+    },
+    {
+      "id": 12,
+      "code": "5000",
+      "name": "Cost of Goods Sold",
+      "type": "expense",
+      "normal_balance": "debit",
+      "parent_id": null,
+      "text_code": "cogs",
+      "is_active": 1,
+      "description": "Cost of items sold",
+      "created_at": "2026-10-25 03:18:07"
+    },
+    {
+      "id": 13,
+      "code": "6000",
+      "name": "Operating Expenses",
+      "type": "expense",
+      "normal_balance": "debit",
+      "parent_id": null,
+      "text_code": "operating_expenses",
+      "is_active": 1,
+      "description": "General operating costs",
+      "created_at": "2026-10-25 03:18:07"
+    },
+    {
+      "id": 14,
+      "code": "6100",
+      "name": "Wages & Salaries",
+      "type": "expense",
+      "normal_balance": "debit",
+      "parent_id": null,
+      "text_code": "wages_salaries",
+      "is_active": 1,
+      "description": "Payroll",
+      "created_at": "2026-10-25 03:18:07"
+    },
+    {
+      "id": 23,
+      "code": "6300",
+      "name": "Loan Write-off",
+      "type": "expense",
+      "normal_balance": "debit",
+      "parent_id": null,
+      "text_code": "loan_write_off",
+      "is_active": 1,
+      "description": "Employee loans written off / forgiven",
+      "created_at": "2026-10-25 03:18:08"
+    },
+    {
+      "id": 15,
+      "code": "7000",
+      "name": "Production Clearing",
+      "type": "expense",
+      "normal_balance": "debit",
+      "parent_id": null,
+      "text_code": "production_clearing",
+      "is_active": 1,
+      "description": "Clearing account for production cost flow",
+      "created_at": "2026-10-25 03:18:07"
+    },
+    {
+      "id": 16,
+      "code": "7100",
+      "name": "Inventory Correction",
+      "type": "expense",
+      "normal_balance": "debit",
+      "parent_id": null,
+      "text_code": "inventory_correction",
+      "is_active": 1,
+      "description": "Adjustments adding to inventory",
+      "created_at": "2026-10-25 03:18:07"
+    },
+    {
+      "id": 17,
+      "code": "7200",
+      "name": "Inventory Shrinkage",
+      "type": "expense",
+      "normal_balance": "debit",
+      "parent_id": null,
+      "text_code": "inventory_shrinkage",
+      "is_active": 1,
+      "description": "Losses / removals from inventory",
+      "created_at": "2026-10-25 03:18:07"
+    },
+    {
+      "id": 27,
+      "code": "7201",
+      "name": "Expired Goods Loss",
+      "type": "expense",
+      "normal_balance": "debit",
+      "parent_id": 17,
+      "text_code": "expired_goods_loss",
+      "is_active": 1,
+      "description": "Written-off expired stock (write-off endpoint)",
+      "created_at": "2026-10-25 03:18:19"
+    },
+    {
+      "id": 28,
+      "code": "7202",
+      "name": "Damaged Goods Loss",
+      "type": "expense",
+      "normal_balance": "debit",
+      "parent_id": 17,
+      "text_code": "damaged_goods_loss",
+      "is_active": 1,
+      "description": "Written-off damaged stock",
+      "created_at": "2026-10-25 03:18:19"
+    },
+    {
+      "id": 29,
+      "code": "7203",
+      "name": "Stock Shortage Loss",
+      "type": "expense",
+      "normal_balance": "debit",
+      "parent_id": 17,
+      "text_code": "stock_shortage_loss",
+      "is_active": 1,
+      "description": "Physical count shortages written off",
+      "created_at": "2026-10-25 03:18:19"
+    },
+    {
+      "id": 30,
+      "code": "7204",
+      "name": "Obsolete Stock Loss",
+      "type": "expense",
+      "normal_balance": "debit",
+      "parent_id": 17,
+      "text_code": "obsolete_stock_loss",
+      "is_active": 1,
+      "description": "Written-off obsolete stock",
+      "created_at": "2026-10-25 03:18:19"
+    }
+  ],
+  "salaryRows": [
+    {
+      "id": 1,
+      "employee_id": 1,
+      "amount": 1000,
+      "payment_date": "2026-08-20",
+      "payment_method": "Bank",
+      "reference_no": null,
+      "notes": null,
+      "journal_entry_id": 2,
+      "status": "paid",
+      "paid_by": 1,
+      "created_at": "2026-10-25 03:19:30",
+      "updated_at": "2026-10-25 03:19:30",
+      "pay_period": "2026-08",
+      "payment_type": "partial",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "parent_payment_id": null
+    },
+    {
+      "id": 2,
+      "employee_id": 1,
+      "amount": 200,
+      "payment_date": "2026-08-20",
+      "payment_method": "Bank",
+      "reference_no": "ADV-2026-08",
+      "notes": "Auto-advance from overpayment in 2026-08",
+      "journal_entry_id": 3,
+      "status": "paid",
+      "paid_by": 1,
+      "created_at": "2026-10-25 03:19:30",
+      "updated_at": "2026-10-25 03:19:30",
+      "pay_period": "2026-09",
+      "payment_type": "advance",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "parent_payment_id": 1
+    },
+    {
+      "id": 3,
+      "employee_id": 1,
+      "amount": 800,
+      "payment_date": "2026-09-20",
+      "payment_method": "Bank",
+      "reference_no": null,
+      "notes": null,
+      "journal_entry_id": 4,
+      "status": "paid",
+      "paid_by": 1,
+      "created_at": "2026-10-25 03:19:30",
+      "updated_at": "2026-10-25 03:19:30",
+      "pay_period": "2026-09",
+      "payment_type": "full",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "parent_payment_id": null
+    }
+  ],
+  "loanRows": [
+    {
+      "id": 1,
+      "employee_id": 1,
+      "amount": 500,
+      "balance": 300,
+      "purpose": null,
+      "payment_method": "Bank",
+      "disbursement_date": "2026-09-15",
+      "due_date": null,
+      "monthly_installment": 0,
+      "status": "active",
+      "written_off_amount": 0,
+      "notes": null,
+      "journal_entry_id": 5,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:19:31",
+      "updated_at": "2026-10-25 03:19:31",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null
+    }
+  ],
+  "loanRepayments": [
+    {
+      "id": 1,
+      "loan_id": 1,
+      "employee_id": 1,
+      "amount": 200,
+      "payment_date": "2026-09-01",
+      "payment_method": "Bank",
+      "reference_no": null,
+      "notes": null,
+      "repayment_type": "direct",
+      "journal_entry_id": 6,
+      "salary_payment_id": null,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:19:31",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null
+    }
+  ],
+  "journal": [
+    {
+      "id": 1,
+      "journal_entry_id": 1,
+      "account_id": 2,
+      "debit": 10000,
+      "credit": 0,
+      "description": "Capital contributed via CAP-2601-00001",
+      "line_date": "2026-01-01",
+      "reference_type": "OWNER_CAPITAL",
+      "reference_id": 1,
+      "voided": 0,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:19:29",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "code": "1010"
+    },
+    {
+      "id": 2,
+      "journal_entry_id": 1,
+      "account_id": 24,
+      "debit": 0,
+      "credit": 10000,
+      "description": "Owner contribution CAP-2601-00001",
+      "line_date": "2026-01-01",
+      "reference_type": "OWNER_CAPITAL",
+      "reference_id": 1,
+      "voided": 0,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:19:29",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "code": "3200"
+    },
+    {
+      "id": 3,
+      "journal_entry_id": 2,
+      "account_id": 14,
+      "debit": 1000,
+      "credit": 0,
+      "description": "Salary for EMP-1026-00001",
+      "line_date": "2026-08-20",
+      "reference_type": "SALARY_PAYMENT",
+      "reference_id": 1,
+      "voided": 0,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:19:30",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "code": "6100"
+    },
+    {
+      "id": 4,
+      "journal_entry_id": 2,
+      "account_id": 2,
+      "debit": 0,
+      "credit": 1000,
+      "description": "Salary paid to EMP-1026-00001",
+      "line_date": "2026-08-20",
+      "reference_type": "SALARY_PAYMENT",
+      "reference_id": 1,
+      "voided": 0,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:19:30",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "code": "1010"
+    },
+    {
+      "id": 5,
+      "journal_entry_id": 3,
+      "account_id": 26,
+      "debit": 200,
+      "credit": 0,
+      "description": "Salary for EMP-1026-00001",
+      "line_date": "2026-08-20",
+      "reference_type": "SALARY_PAYMENT",
+      "reference_id": 2,
+      "voided": 0,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:19:30",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "code": "1310"
+    },
+    {
+      "id": 6,
+      "journal_entry_id": 3,
+      "account_id": 2,
+      "debit": 0,
+      "credit": 200,
+      "description": "Salary paid to EMP-1026-00001",
+      "line_date": "2026-08-20",
+      "reference_type": "SALARY_PAYMENT",
+      "reference_id": 2,
+      "voided": 0,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:19:30",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "code": "1010"
+    },
+    {
+      "id": 7,
+      "journal_entry_id": 4,
+      "account_id": 14,
+      "debit": 800,
+      "credit": 0,
+      "description": "Salary for EMP-1026-00001",
+      "line_date": "2026-09-20",
+      "reference_type": "SALARY_PAYMENT",
+      "reference_id": 3,
+      "voided": 0,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:19:30",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "code": "6100"
+    },
+    {
+      "id": 8,
+      "journal_entry_id": 4,
+      "account_id": 2,
+      "debit": 0,
+      "credit": 800,
+      "description": "Salary paid to EMP-1026-00001",
+      "line_date": "2026-09-20",
+      "reference_type": "SALARY_PAYMENT",
+      "reference_id": 3,
+      "voided": 0,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:19:30",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "code": "1010"
+    },
+    {
+      "id": 9,
+      "journal_entry_id": 5,
+      "account_id": 22,
+      "debit": 500,
+      "credit": 0,
+      "description": "Loan receivable for EMP-1026-00001",
+      "line_date": "2026-09-15",
+      "reference_type": "LOAN_DISBURSEMENT",
+      "reference_id": 1,
+      "voided": 0,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:19:31",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "code": "1300"
+    },
+    {
+      "id": 10,
+      "journal_entry_id": 5,
+      "account_id": 2,
+      "debit": 0,
+      "credit": 500,
+      "description": "Cash disbursed to EMP-1026-00001",
+      "line_date": "2026-09-15",
+      "reference_type": "LOAN_DISBURSEMENT",
+      "reference_id": 1,
+      "voided": 0,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:19:31",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "code": "1010"
+    },
+    {
+      "id": 11,
+      "journal_entry_id": 6,
+      "account_id": 2,
+      "debit": 200,
+      "credit": 0,
+      "description": "Cash received from EMP-1026-00001",
+      "line_date": "2026-09-01",
+      "reference_type": "LOAN_REPAYMENT",
+      "reference_id": 1,
+      "voided": 0,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:19:31",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "code": "1010"
+    },
+    {
+      "id": 12,
+      "journal_entry_id": 6,
+      "account_id": 22,
+      "debit": 0,
+      "credit": 200,
+      "description": "Loan receivable reduced for EMP-1026-00001",
+      "line_date": "2026-09-01",
+      "reference_type": "LOAN_REPAYMENT",
+      "reference_id": 1,
+      "voided": 0,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:19:31",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "code": "1300"
+    },
+    {
+      "id": 13,
+      "journal_entry_id": 7,
+      "account_id": 4,
+      "debit": 0.02,
+      "credit": 0,
+      "description": "Inventory received via PURCH-1026-0001",
+      "line_date": "2026-09-01",
+      "reference_type": "PURCHASE",
+      "reference_id": 1,
+      "voided": 0,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:19:31",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "code": "1200"
+    },
+    {
+      "id": 14,
+      "journal_entry_id": 7,
+      "account_id": 5,
+      "debit": 0,
+      "credit": 0.02,
+      "description": "Obligation for PURCH-1026-0001",
+      "line_date": "2026-09-01",
+      "reference_type": "PURCHASE",
+      "reference_id": 1,
+      "voided": 0,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:19:31",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "code": "2000"
+    }
+  ],
+  "integrity": [
+    {
+      "integrity_check": "ok"
+    }
+  ],
+  "foreignKeys": [],
+  "completed": true
+}

@@ -1,0 +1,316 @@
+[
+  {
+    "method": "post",
+    "url": "/api/owner-equity/capital",
+    "body": {
+      "capital_date": "2026-09-01",
+      "amount": 10000
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "message": "Owner capital recorded successfully",
+      "data": {
+        "id": 1,
+        "capital_no": "CAP-2609-00001",
+        "amount": 10000
+      }
+    },
+    "economicHashBefore": "46bf863c1a51da43d7a9e9c6beb584cb118849ac55078dba24688d4ebc5301ea",
+    "economicHashAfter": "475408e095877add52018ac1ee2dcbc451d0741de9403d93c0a0b8dbf54ee419"
+  },
+  {
+    "method": "post",
+    "url": "/api/inventory/items",
+    "body": {
+      "item_code": "OR-1",
+      "item_name": "supplier-early-return",
+      "unit_of_measure": "pcs"
+    },
+    "status": 201,
+    "response": {
+      "id": 1,
+      "item_code": "OR-1",
+      "item_name": "supplier-early-return",
+      "description": null,
+      "category": null,
+      "unit_of_measure": "pcs",
+      "current_stock": 0,
+      "reorder_level": 0,
+      "standard_cost": 0,
+      "standard_selling_price": 0,
+      "is_raw_material": 0,
+      "is_finished_good": 0,
+      "is_purchased": 1,
+      "is_manufactured": 0,
+      "is_active": 1,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:40:02",
+      "updated_at": "2026-10-25 03:40:02",
+      "has_expiry": 0,
+      "near_expiry_threshold_days": 30,
+      "sale_type": "packed",
+      "qty_decimal_precision": 0,
+      "rounding_step": null,
+      "deleted_at": null,
+      "deleted_by": null
+    },
+    "economicHashBefore": "475408e095877add52018ac1ee2dcbc451d0741de9403d93c0a0b8dbf54ee419",
+    "economicHashAfter": "475408e095877add52018ac1ee2dcbc451d0741de9403d93c0a0b8dbf54ee419"
+  },
+  {
+    "method": "post",
+    "url": "/api/suppliers",
+    "body": {
+      "supplier_code": "OR-S-1",
+      "supplier_name": "supplier-early-return"
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 1,
+        "supplier_code": "OR-S-1",
+        "supplier_name": "supplier-early-return"
+      }
+    },
+    "economicHashBefore": "475408e095877add52018ac1ee2dcbc451d0741de9403d93c0a0b8dbf54ee419",
+    "economicHashAfter": "30f02773eabfe9e5b2e62e43466694fccc5e7b41dd733f8efaaa9c3cff5e1549"
+  },
+  {
+    "method": "post",
+    "url": "/api/customers",
+    "body": {
+      "customer_code": "OR-C-1",
+      "customer_name": "supplier-early-return",
+      "phone": "0300-0000000"
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 1,
+        "customer_code": "CUST-1026-00001",
+        "customer_name": "supplier-early-return",
+        "contact_person": "",
+        "email": "",
+        "phone": "0300-0000000",
+        "billing_address": "",
+        "shipping_address": "",
+        "payment_terms": "",
+        "payment_terms_days": 14,
+        "credit_limit": 0,
+        "current_balance": 0,
+        "opening_balance": 0,
+        "credit_balance": 0,
+        "credit_utilization_percent": 0,
+        "is_active": 1,
+        "created_at": "2026-10-25 03:40:02",
+        "updated_at": "2026-10-25 03:40:02"
+      },
+      "message": "Customer created successfully"
+    },
+    "economicHashBefore": "30f02773eabfe9e5b2e62e43466694fccc5e7b41dd733f8efaaa9c3cff5e1549",
+    "economicHashAfter": "a8d4314e69aaa4eaf69a952e8d6906801b4a1b58d4c8aa64cebb685f24f7fac1"
+  },
+  {
+    "method": "post",
+    "url": "/api/purchases",
+    "body": {
+      "item_id": 1,
+      "supplier_id": 1,
+      "warehouse_id": 1,
+      "quantity": 10,
+      "unit_cost": 10,
+      "purchase_date": "2026-09-10"
+    },
+    "status": 201,
+    "response": {
+      "id": 1,
+      "purchase_no": "PURCH-1026-0001",
+      "item_id": 1,
+      "warehouse_id": 1,
+      "quantity": 10,
+      "unit_cost": 10,
+      "total_cost": 100,
+      "supplier_name": "supplier-early-return",
+      "purchase_date": "2026-09-10",
+      "invoice_no": null,
+      "remarks": null,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:40:02",
+      "updated_at": "2026-10-25 03:40:02",
+      "supplier_id": 1,
+      "returned_quantity": 0,
+      "batch_id": 1,
+      "batch_no": "BATCH-1026-PUR-00001",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "input_tax_amount": 0,
+      "item_code": "OR-1",
+      "item_name": "supplier-early-return",
+      "unit_of_measure": "pcs",
+      "warehouse_code": "WH-001",
+      "warehouse_name": "Main Warehouse",
+      "created_by_username": "admin",
+      "paid_amount": 0,
+      "total_payable": 100,
+      "balance_amount": 100
+    },
+    "economicHashBefore": "a8d4314e69aaa4eaf69a952e8d6906801b4a1b58d4c8aa64cebb685f24f7fac1",
+    "economicHashAfter": "e8f0603f2a76c33b10114ed84751f9746f5a662135c7670ba7119ac80d368fe5"
+  },
+  {
+    "method": "get",
+    "url": "/api/reports/balance-sheet?asOfDate=2026-09-09",
+    "status": 200,
+    "response": {
+      "success": true,
+      "data": {
+        "asOfDate": "2026-09-09",
+        "assets": {
+          "inventory": 0,
+          "accounts_receivable": 0,
+          "cash": 10000,
+          "other": 0,
+          "total": 10000
+        },
+        "liabilities": {
+          "accounts_payable": 0,
+          "tax_payable": 0,
+          "other": 0,
+          "total": 0
+        },
+        "equity": {
+          "opening_retained_earnings": 0,
+          "owner_capital": 10000,
+          "owner_drawings": 0,
+          "net_income_ytd": 0,
+          "revenue_ytd": 0,
+          "cogs_ytd": 0,
+          "expenses_ytd": 0,
+          "total": 10000
+        },
+        "totals": {
+          "total_assets": 10000,
+          "total_liabilities": 0,
+          "total_equity": 10000,
+          "total_liab_and_equity": 10000,
+          "balanced": true
+        }
+      }
+    },
+    "economicHashBefore": null,
+    "economicHashAfter": null
+  },
+  {
+    "method": "post",
+    "url": "/api/purchase-returns",
+    "body": {
+      "source_type": "PURCHASE",
+      "source_id": 1,
+      "warehouse_id": 1,
+      "return_date": "2026-09-09",
+      "disposition": "credit_on_account",
+      "items": [
+        {
+          "source_item_id": 1,
+          "quantity": 1
+        }
+      ]
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "message": "Purchase return PR-1026-0001 created successfully",
+      "data": {
+        "id": 1,
+        "return_no": "PR-1026-0001",
+        "return_date": "2026-09-09",
+        "return_type": "PURCHASE_RETURN",
+        "source_type": "PURCHASE",
+        "source_id": 1,
+        "source_no": "PURCH-1026-0001",
+        "warehouse_id": 1,
+        "reason": null,
+        "status": "POSTED",
+        "total_qty": 1,
+        "total_amount": 10,
+        "credit_note_id": 1,
+        "voided_at": null,
+        "voided_by": null,
+        "voided_reason": null,
+        "created_by": 1,
+        "created_at": "2026-10-25 03:40:02",
+        "disposition": "credit_on_account",
+        "input_tax_amount": 0,
+        "warehouse_code": "WH-001",
+        "warehouse_name": "Main Warehouse",
+        "created_by_username": "admin",
+        "credit_no": "CN-1026-0001",
+        "line_count": 1,
+        "items": [
+          {
+            "id": 1,
+            "purchase_return_id": 1,
+            "source_item_id": 1,
+            "item_id": 1,
+            "item_name": "supplier-early-return",
+            "unit_cost": 10,
+            "quantity": 1,
+            "amount": 10,
+            "input_tax_amount": 0,
+            "item_code": "OR-1",
+            "unit_of_measure": "pcs"
+          }
+        ]
+      }
+    },
+    "economicHashBefore": "e8f0603f2a76c33b10114ed84751f9746f5a662135c7670ba7119ac80d368fe5",
+    "economicHashAfter": "06f753c40dc0c8f61c05ab48dde4765802ceed7af94b6e72cdfeb1535501f8bd"
+  },
+  {
+    "method": "get",
+    "url": "/api/reports/balance-sheet?asOfDate=2026-09-09",
+    "status": 200,
+    "response": {
+      "success": true,
+      "data": {
+        "asOfDate": "2026-09-09",
+        "assets": {
+          "inventory": -10,
+          "accounts_receivable": 0,
+          "cash": 10000,
+          "other": 0,
+          "total": 9990
+        },
+        "liabilities": {
+          "accounts_payable": -10,
+          "tax_payable": 0,
+          "other": 0,
+          "total": -10
+        },
+        "equity": {
+          "opening_retained_earnings": 0,
+          "owner_capital": 10000,
+          "owner_drawings": 0,
+          "net_income_ytd": 0,
+          "revenue_ytd": 0,
+          "cogs_ytd": 0,
+          "expenses_ytd": 0,
+          "total": 10000
+        },
+        "totals": {
+          "total_assets": 9990,
+          "total_liabilities": -10,
+          "total_equity": 10000,
+          "total_liab_and_equity": 9990,
+          "balanced": true
+        }
+      }
+    },
+    "economicHashBefore": null,
+    "economicHashAfter": null
+  }
+]

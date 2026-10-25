@@ -1,0 +1,10 @@
+{
+  "status": "VERIFIED",
+  "positiveRun": "accounting-audit/evidence/backend-extension-run-OF2b8i",
+  "riskRun": "accounting-audit/evidence/backend-count-risk-run-ZBybHv",
+  "positiveScenarios": 3,
+  "reproducedCountDefects": 2,
+  "sqliteIntegrity": "ok",
+  "foreignKeyViolations": 0,
+  "unbalancedJournals": 0
+}

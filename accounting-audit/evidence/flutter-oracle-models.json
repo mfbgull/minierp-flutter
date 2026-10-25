@@ -1,0 +1,38 @@
+{
+  "source_events": "accounting-audit/evidence/oracle-run-AbsZeT/api-events.json",
+  "expected": {
+    "revenue": 210,
+    "cogs": 140,
+    "profit": 50,
+    "cash": 10170,
+    "ar": 30,
+    "ap": 700,
+    "inventory": 550,
+    "equity": 10050,
+    "trialDebit": 11490,
+    "trialCredit": 11490,
+    "cashFlowNet": 10170,
+    "arAging": 30,
+    "apAging": 700,
+    "stockQty": 55,
+    "stockValue": 550
+  },
+  "actual": {
+    "revenue": 210,
+    "cogs": 140,
+    "profit": 50,
+    "cash": 10170,
+    "ar": 30,
+    "ap": 700,
+    "inventory": 550,
+    "equity": 10050,
+    "trialDebit": 11490,
+    "trialCredit": 11490,
+    "cashFlowNet": 10170,
+    "arAging": 30,
+    "apAging": 700,
+    "stockQty": 55.0,
+    "stockValue": 550.0
+  },
+  "basis": "Owner capital10000; credit purchase70x10; sale15x15 collected; three returns1 each/refund15 each; resale2x15 unpaid; one damaged unit written off10; operating expense10. No other transactions at checkpoint."
+}

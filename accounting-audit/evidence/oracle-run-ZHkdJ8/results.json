@@ -1,0 +1,139 @@
+{
+  "runDir": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-ZHkdJ8",
+  "families": [
+    {
+      "id": "7c",
+      "name": "supplier return cannot precede purchase",
+      "status": "FAIL",
+      "checks": 21
+    }
+  ],
+  "checks": [
+    {
+      "label": "supplier return before purchase rejected",
+      "actual": false,
+      "expected": true,
+      "pass": false
+    },
+    {
+      "label": "supplier early return stock unchanged",
+      "actual": 9,
+      "expected": 10,
+      "pass": false
+    },
+    {
+      "label": "supplier early return historical inventory unchanged",
+      "actual": -10,
+      "expected": 0,
+      "pass": false
+    },
+    {
+      "label": "supplier early return historical AP unchanged",
+      "actual": -10,
+      "expected": 0,
+      "pass": false
+    },
+    {
+      "label": "supplier-early-return balanced journal groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-early-return customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-early-return supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-early-return stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-early-return arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-early-return apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-early-return inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-early-return cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-early-return orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-early-return unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-early-return creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-early-return creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-early-return receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-early-return supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-early-return expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-early-return inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-early-return signed AR GL vs customer net",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    }
+  ]
+}

@@ -1,0 +1,87 @@
+{
+  "input": {
+    "asOfDate": "2026-10-25",
+    "assets": {
+      "inventory": 200,
+      "accounts_receivable": 300,
+      "cash": 1000,
+      "other": 400,
+      "total": 1900
+    },
+    "liabilities": {
+      "accounts_payable": 500,
+      "tax_payable": 60,
+      "other": 70,
+      "total": 630
+    },
+    "equity": {
+      "opening_retained_earnings": 1000,
+      "owner_capital": 300,
+      "owner_drawings": -30,
+      "net_income_ytd": 0,
+      "revenue_ytd": 0,
+      "cogs_ytd": 0,
+      "expenses_ytd": 0,
+      "total": 1270
+    },
+    "totals": {
+      "total_assets": 1900,
+      "total_liabilities": 630,
+      "total_equity": 1270,
+      "total_liab_and_equity": 1900,
+      "balanced": true
+    }
+  },
+  "visible_text": [
+    "Balance Sheet",
+    "Oct 25, 2026",
+    "Today",
+    "Export to CSV",
+    "As of Oct 25, 2026",
+    "Assets",
+    "Inventory",
+    "Rs. 200.00",
+    "Accounts Receivable Reports",
+    "Rs. 300.00",
+    "Cash",
+    "Rs. 1,000.00",
+    "Total",
+    "Rs. 1,900.00",
+    "Liabilities",
+    "Accounts Payable",
+    "Rs. 500.00",
+    "Total",
+    "Rs. 630.00",
+    "Equity",
+    "Opening Retained Earnings",
+    "Rs. 1,000.00",
+    "Owner Capital",
+    "Rs. 300.00",
+    "Owner Drawings",
+    "-Rs. 30.00",
+    "Net Income (YTD)",
+    "Rs. 0.00",
+    "Revenue (YTD)",
+    "Rs. 0.00",
+    "COGS (YTD)",
+    "Rs. 0.00",
+    "Expenses (YTD)",
+    "Rs. 0.00",
+    "Total",
+    "Rs. 1,270.00",
+    "Total Assets",
+    "Rs. 1,900.00",
+    "Total Liabilities & Equity",
+    "Rs. 1,900.00",
+    "Balanced"
+  ],
+  "expected_nonzero_categories": {
+    "other_assets": 400,
+    "tax_payable": 60,
+    "other_liabilities": 70
+  },
+  "displayed_asset_components_sum": 1500,
+  "displayed_asset_total": 1900,
+  "displayed_liability_components_sum": 500,
+  "displayed_liability_total": 630
+}

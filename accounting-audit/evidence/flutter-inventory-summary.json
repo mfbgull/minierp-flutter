@@ -1,0 +1,12 @@
+{
+  "dart_files_scanned": 431,
+  "candidate_source_surfaces": 223,
+  "candidate_financial_numeric_lines": 4529,
+  "support_lines": 2468,
+  "definition": "All non-comment matching lines in production Dart features/widgets and CSV/export utilities; includes control/data definitions and nonmonetary stock quantities to avoid excluding potential financial dependencies.",
+  "limits": "Regex inventory, not AST data flow. Nested/imported callbacks can resolve beyond depth 3. Candidate endpoints are dependency sets, not proven per-line sources. Status requires manual report matrix and executed scenario override; this inventory is not a blanket PASS.",
+  "uncompiled_fragments": [
+    "lib/features/owner_equity/owner_capital_tab.dart.part1",
+    "lib/features/owner_equity/owner_capital_tab.dart.part2"
+  ]
+}

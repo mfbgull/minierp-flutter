@@ -1,0 +1,2148 @@
+[
+  {
+    "method": "post",
+    "url": "/api/owner-equity/capital",
+    "body": {
+      "capital_date": "2026-09-01",
+      "amount": 10000
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "message": "Owner capital recorded successfully",
+      "data": {
+        "id": 1,
+        "capital_no": "CAP-2609-00001",
+        "amount": 10000
+      }
+    },
+    "economicHashBefore": "46bf863c1a51da43d7a9e9c6beb584cb118849ac55078dba24688d4ebc5301ea",
+    "economicHashAfter": "3ba9329954be5b7682b77591497f951ffa36cc9cced77d0334c0ee3efadabb09"
+  },
+  {
+    "method": "post",
+    "url": "/api/inventory/items",
+    "body": {
+      "item_code": "OR-1",
+      "item_name": "supplier-paid-0",
+      "unit_of_measure": "pcs"
+    },
+    "status": 201,
+    "response": {
+      "id": 1,
+      "item_code": "OR-1",
+      "item_name": "supplier-paid-0",
+      "description": null,
+      "category": null,
+      "unit_of_measure": "pcs",
+      "current_stock": 0,
+      "reorder_level": 0,
+      "standard_cost": 0,
+      "standard_selling_price": 0,
+      "is_raw_material": 0,
+      "is_finished_good": 0,
+      "is_purchased": 1,
+      "is_manufactured": 0,
+      "is_active": 1,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:23:17",
+      "updated_at": "2026-10-25 03:23:17",
+      "has_expiry": 0,
+      "near_expiry_threshold_days": 30,
+      "sale_type": "packed",
+      "qty_decimal_precision": 0,
+      "rounding_step": null,
+      "deleted_at": null,
+      "deleted_by": null
+    },
+    "economicHashBefore": "3ba9329954be5b7682b77591497f951ffa36cc9cced77d0334c0ee3efadabb09",
+    "economicHashAfter": "3ba9329954be5b7682b77591497f951ffa36cc9cced77d0334c0ee3efadabb09"
+  },
+  {
+    "method": "post",
+    "url": "/api/suppliers",
+    "body": {
+      "supplier_code": "OR-S-1",
+      "supplier_name": "supplier-paid-0"
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 1,
+        "supplier_code": "OR-S-1",
+        "supplier_name": "supplier-paid-0"
+      }
+    },
+    "economicHashBefore": "3ba9329954be5b7682b77591497f951ffa36cc9cced77d0334c0ee3efadabb09",
+    "economicHashAfter": "ac97a6eddfd266a0c72da90c7d055ecf2d71dc2dcfce3c74f6cf3b285fb9c11c"
+  },
+  {
+    "method": "post",
+    "url": "/api/customers",
+    "body": {
+      "customer_code": "OR-C-1",
+      "customer_name": "supplier-paid-0",
+      "phone": "0300-0000000"
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 1,
+        "customer_code": "CUST-1026-00001",
+        "customer_name": "supplier-paid-0",
+        "contact_person": "",
+        "email": "",
+        "phone": "0300-0000000",
+        "billing_address": "",
+        "shipping_address": "",
+        "payment_terms": "",
+        "payment_terms_days": 14,
+        "credit_limit": 0,
+        "current_balance": 0,
+        "opening_balance": 0,
+        "credit_balance": 0,
+        "credit_utilization_percent": 0,
+        "is_active": 1,
+        "created_at": "2026-10-25 03:23:17",
+        "updated_at": "2026-10-25 03:23:17"
+      },
+      "message": "Customer created successfully"
+    },
+    "economicHashBefore": "ac97a6eddfd266a0c72da90c7d055ecf2d71dc2dcfce3c74f6cf3b285fb9c11c",
+    "economicHashAfter": "d672f827fdd91bdadf4886736cacbc8561c4e39393d5496bfc5487c3cd328bd3"
+  },
+  {
+    "method": "post",
+    "url": "/api/purchases",
+    "body": {
+      "item_id": 1,
+      "supplier_id": 1,
+      "warehouse_id": 1,
+      "quantity": 10,
+      "unit_cost": 10,
+      "purchase_date": "2026-09-01"
+    },
+    "status": 201,
+    "response": {
+      "id": 1,
+      "purchase_no": "PURCH-1026-0001",
+      "item_id": 1,
+      "warehouse_id": 1,
+      "quantity": 10,
+      "unit_cost": 10,
+      "total_cost": 100,
+      "supplier_name": "supplier-paid-0",
+      "purchase_date": "2026-09-01",
+      "invoice_no": null,
+      "remarks": null,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:23:17",
+      "updated_at": "2026-10-25 03:23:17",
+      "supplier_id": 1,
+      "returned_quantity": 0,
+      "batch_id": 1,
+      "batch_no": "BATCH-1026-PUR-00001",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "input_tax_amount": 0,
+      "item_code": "OR-1",
+      "item_name": "supplier-paid-0",
+      "unit_of_measure": "pcs",
+      "warehouse_code": "WH-001",
+      "warehouse_name": "Main Warehouse",
+      "created_by_username": "admin",
+      "paid_amount": 0,
+      "total_payable": 100,
+      "balance_amount": 100
+    },
+    "economicHashBefore": "d672f827fdd91bdadf4886736cacbc8561c4e39393d5496bfc5487c3cd328bd3",
+    "economicHashAfter": "27aff318778553f35508af4ec371c124b053c90fd13dc25343831b4feff03486"
+  },
+  {
+    "method": "post",
+    "url": "/api/purchase-returns",
+    "body": {
+      "source_type": "PURCHASE",
+      "source_id": 1,
+      "warehouse_id": 1,
+      "return_date": "2026-09-03",
+      "disposition": "refund_expected",
+      "items": [
+        {
+          "source_item_id": 1,
+          "quantity": 3
+        }
+      ]
+    },
+    "status": 400,
+    "response": {
+      "error": "Cannot refund 30.00 — nothing has been collected against this purchase. Use 'credit_on_account' instead."
+    },
+    "economicHashBefore": "27aff318778553f35508af4ec371c124b053c90fd13dc25343831b4feff03486",
+    "economicHashAfter": "27aff318778553f35508af4ec371c124b053c90fd13dc25343831b4feff03486"
+  },
+  {
+    "method": "post",
+    "url": "/api/inventory/items",
+    "body": {
+      "item_code": "OR-2",
+      "item_name": "warehouse-transfer",
+      "unit_of_measure": "pcs"
+    },
+    "status": 201,
+    "response": {
+      "id": 2,
+      "item_code": "OR-2",
+      "item_name": "warehouse-transfer",
+      "description": null,
+      "category": null,
+      "unit_of_measure": "pcs",
+      "current_stock": 0,
+      "reorder_level": 0,
+      "standard_cost": 0,
+      "standard_selling_price": 0,
+      "is_raw_material": 0,
+      "is_finished_good": 0,
+      "is_purchased": 1,
+      "is_manufactured": 0,
+      "is_active": 1,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:23:18",
+      "updated_at": "2026-10-25 03:23:18",
+      "has_expiry": 0,
+      "near_expiry_threshold_days": 30,
+      "sale_type": "packed",
+      "qty_decimal_precision": 0,
+      "rounding_step": null,
+      "deleted_at": null,
+      "deleted_by": null
+    },
+    "economicHashBefore": "27aff318778553f35508af4ec371c124b053c90fd13dc25343831b4feff03486",
+    "economicHashAfter": "27aff318778553f35508af4ec371c124b053c90fd13dc25343831b4feff03486"
+  },
+  {
+    "method": "post",
+    "url": "/api/suppliers",
+    "body": {
+      "supplier_code": "OR-S-2",
+      "supplier_name": "warehouse-transfer"
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 2,
+        "supplier_code": "OR-S-2",
+        "supplier_name": "warehouse-transfer"
+      }
+    },
+    "economicHashBefore": "27aff318778553f35508af4ec371c124b053c90fd13dc25343831b4feff03486",
+    "economicHashAfter": "fa3493585bdc106710b51dfaa29a965f5e6dbd3fe29ddcab2334c8f22ffec200"
+  },
+  {
+    "method": "post",
+    "url": "/api/customers",
+    "body": {
+      "customer_code": "OR-C-2",
+      "customer_name": "warehouse-transfer",
+      "phone": "0300-0000000"
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 2,
+        "customer_code": "CUST-1026-00002",
+        "customer_name": "warehouse-transfer",
+        "contact_person": "",
+        "email": "",
+        "phone": "0300-0000000",
+        "billing_address": "",
+        "shipping_address": "",
+        "payment_terms": "",
+        "payment_terms_days": 14,
+        "credit_limit": 0,
+        "current_balance": 0,
+        "opening_balance": 0,
+        "credit_balance": 0,
+        "credit_utilization_percent": 0,
+        "is_active": 1,
+        "created_at": "2026-10-25 03:23:18",
+        "updated_at": "2026-10-25 03:23:18"
+      },
+      "message": "Customer created successfully"
+    },
+    "economicHashBefore": "fa3493585bdc106710b51dfaa29a965f5e6dbd3fe29ddcab2334c8f22ffec200",
+    "economicHashAfter": "4db00cd05c68a2d095cc68849eadf50c5999db14f7613adf566581297bb0a8a3"
+  },
+  {
+    "method": "post",
+    "url": "/api/purchases",
+    "body": {
+      "item_id": 2,
+      "supplier_id": 2,
+      "warehouse_id": 1,
+      "quantity": 10,
+      "unit_cost": 10,
+      "purchase_date": "2026-09-01"
+    },
+    "status": 201,
+    "response": {
+      "id": 2,
+      "purchase_no": "PURCH-1026-0002",
+      "item_id": 2,
+      "warehouse_id": 1,
+      "quantity": 10,
+      "unit_cost": 10,
+      "total_cost": 100,
+      "supplier_name": "warehouse-transfer",
+      "purchase_date": "2026-09-01",
+      "invoice_no": null,
+      "remarks": null,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:23:18",
+      "updated_at": "2026-10-25 03:23:18",
+      "supplier_id": 2,
+      "returned_quantity": 0,
+      "batch_id": 2,
+      "batch_no": "BATCH-1026-PUR-00002",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "input_tax_amount": 0,
+      "item_code": "OR-2",
+      "item_name": "warehouse-transfer",
+      "unit_of_measure": "pcs",
+      "warehouse_code": "WH-001",
+      "warehouse_name": "Main Warehouse",
+      "created_by_username": "admin",
+      "paid_amount": 0,
+      "total_payable": 100,
+      "balance_amount": 100
+    },
+    "economicHashBefore": "4db00cd05c68a2d095cc68849eadf50c5999db14f7613adf566581297bb0a8a3",
+    "economicHashAfter": "a5a853ac81d7e47f3621607ef08702cb576269705030333be4048738ed3e8da9"
+  },
+  {
+    "method": "post",
+    "url": "/api/inventory/warehouses",
+    "body": {
+      "warehouse_code": "OR-SECOND",
+      "warehouse_name": "Second audit warehouse"
+    },
+    "status": 201,
+    "response": {
+      "id": 4,
+      "warehouse_code": "OR-SECOND",
+      "warehouse_name": "Second audit warehouse",
+      "location": null,
+      "is_active": 1,
+      "created_at": "2026-10-25 03:23:18",
+      "is_system": 0
+    },
+    "economicHashBefore": "a5a853ac81d7e47f3621607ef08702cb576269705030333be4048738ed3e8da9",
+    "economicHashAfter": "a5a853ac81d7e47f3621607ef08702cb576269705030333be4048738ed3e8da9"
+  },
+  {
+    "method": "post",
+    "url": "/api/inventory/stock-transfers",
+    "body": {
+      "item_id": 2,
+      "from_warehouse_id": 1,
+      "to_warehouse_id": 4,
+      "quantity": 3
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "out": {
+          "id": 3,
+          "movement_no": "STK-2026-0001"
+        },
+        "in": {
+          "id": 4,
+          "movement_no": "STK-2026-0002"
+        }
+      },
+      "error": null
+    },
+    "economicHashBefore": "a5a853ac81d7e47f3621607ef08702cb576269705030333be4048738ed3e8da9",
+    "economicHashAfter": "035bcbf22377b0ade5109b575dbc62c923eaf49d2875fd089bbce00dcdfcb8e3"
+  },
+  {
+    "method": "post",
+    "url": "/api/inventory/stock-transfers/STK-2026-0002/void",
+    "body": {
+      "reason": "audit"
+    },
+    "status": 400,
+    "response": {
+      "error": "Transfer STK-2026-0002 not found"
+    },
+    "economicHashBefore": "035bcbf22377b0ade5109b575dbc62c923eaf49d2875fd089bbce00dcdfcb8e3",
+    "economicHashAfter": "035bcbf22377b0ade5109b575dbc62c923eaf49d2875fd089bbce00dcdfcb8e3"
+  },
+  {
+    "method": "post",
+    "url": "/api/suppliers",
+    "body": {
+      "supplier_code": "OR-FEFO",
+      "supplier_name": "FEFO supplier"
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 3,
+        "supplier_code": "OR-FEFO",
+        "supplier_name": "FEFO supplier"
+      }
+    },
+    "economicHashBefore": "035bcbf22377b0ade5109b575dbc62c923eaf49d2875fd089bbce00dcdfcb8e3",
+    "economicHashAfter": "e687aeb3733692e613b72b91ee353b2e93773354c842764109e684388cfc1255"
+  },
+  {
+    "method": "post",
+    "url": "/api/customers",
+    "body": {
+      "customer_name": "FEFO customer",
+      "phone": "0300-0000001"
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 3,
+        "customer_code": "CUST-1026-00003",
+        "customer_name": "FEFO customer",
+        "contact_person": "",
+        "email": "",
+        "phone": "0300-0000001",
+        "billing_address": "",
+        "shipping_address": "",
+        "payment_terms": "",
+        "payment_terms_days": 14,
+        "credit_limit": 0,
+        "current_balance": 0,
+        "opening_balance": 0,
+        "credit_balance": 0,
+        "credit_utilization_percent": 0,
+        "is_active": 1,
+        "created_at": "2026-10-25 03:23:19",
+        "updated_at": "2026-10-25 03:23:19"
+      },
+      "message": "Customer created successfully"
+    },
+    "economicHashBefore": "e687aeb3733692e613b72b91ee353b2e93773354c842764109e684388cfc1255",
+    "economicHashAfter": "ca99dfcc789645acff25a9728e23ca0b6aeb4ff0d969c2322ee83cdd899de730"
+  },
+  {
+    "method": "post",
+    "url": "/api/inventory/items",
+    "body": {
+      "item_code": "OR-FEFO",
+      "item_name": "Expiry audit",
+      "has_expiry": true
+    },
+    "status": 201,
+    "response": {
+      "id": 3,
+      "item_code": "OR-FEFO",
+      "item_name": "Expiry audit",
+      "description": null,
+      "category": null,
+      "unit_of_measure": "Nos",
+      "current_stock": 0,
+      "reorder_level": 0,
+      "standard_cost": 0,
+      "standard_selling_price": 0,
+      "is_raw_material": 0,
+      "is_finished_good": 0,
+      "is_purchased": 1,
+      "is_manufactured": 0,
+      "is_active": 1,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:23:19",
+      "updated_at": "2026-10-25 03:23:19",
+      "has_expiry": 1,
+      "near_expiry_threshold_days": 30,
+      "sale_type": "packed",
+      "qty_decimal_precision": 0,
+      "rounding_step": null,
+      "deleted_at": null,
+      "deleted_by": null
+    },
+    "economicHashBefore": "ca99dfcc789645acff25a9728e23ca0b6aeb4ff0d969c2322ee83cdd899de730",
+    "economicHashAfter": "ca99dfcc789645acff25a9728e23ca0b6aeb4ff0d969c2322ee83cdd899de730"
+  },
+  {
+    "method": "post",
+    "url": "/api/purchases",
+    "body": {
+      "item_id": 3,
+      "supplier_id": 3,
+      "warehouse_id": 1,
+      "quantity": 2,
+      "unit_cost": 10,
+      "purchase_date": "2026-09-01",
+      "expiry_date": "2026-12-31"
+    },
+    "status": 201,
+    "response": {
+      "id": 3,
+      "purchase_no": "PURCH-1026-0003",
+      "item_id": 3,
+      "warehouse_id": 1,
+      "quantity": 2,
+      "unit_cost": 10,
+      "total_cost": 20,
+      "supplier_name": "FEFO supplier",
+      "purchase_date": "2026-09-01",
+      "invoice_no": null,
+      "remarks": null,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:23:19",
+      "updated_at": "2026-10-25 03:23:19",
+      "supplier_id": 3,
+      "returned_quantity": 0,
+      "batch_id": 4,
+      "batch_no": "BATCH-1026-PUR-00003",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "input_tax_amount": 0,
+      "item_code": "OR-FEFO",
+      "item_name": "Expiry audit",
+      "unit_of_measure": "Nos",
+      "warehouse_code": "WH-001",
+      "warehouse_name": "Main Warehouse",
+      "created_by_username": "admin",
+      "paid_amount": 0,
+      "total_payable": 20,
+      "balance_amount": 20
+    },
+    "economicHashBefore": "ca99dfcc789645acff25a9728e23ca0b6aeb4ff0d969c2322ee83cdd899de730",
+    "economicHashAfter": "4e266cc3d1cc8e1753b184719b48f5c4868687abe401bb00286ffea771f54f34"
+  },
+  {
+    "method": "post",
+    "url": "/api/purchases",
+    "body": {
+      "item_id": 3,
+      "supplier_id": 3,
+      "warehouse_id": 1,
+      "quantity": 2,
+      "unit_cost": 12,
+      "purchase_date": "2026-09-02",
+      "expiry_date": "2026-11-30"
+    },
+    "status": 201,
+    "response": {
+      "id": 4,
+      "purchase_no": "PURCH-1026-0004",
+      "item_id": 3,
+      "warehouse_id": 1,
+      "quantity": 2,
+      "unit_cost": 12,
+      "total_cost": 24,
+      "supplier_name": "FEFO supplier",
+      "purchase_date": "2026-09-02",
+      "invoice_no": null,
+      "remarks": null,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:23:19",
+      "updated_at": "2026-10-25 03:23:19",
+      "supplier_id": 3,
+      "returned_quantity": 0,
+      "batch_id": 5,
+      "batch_no": "BATCH-1026-PUR-00004",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "input_tax_amount": 0,
+      "item_code": "OR-FEFO",
+      "item_name": "Expiry audit",
+      "unit_of_measure": "Nos",
+      "warehouse_code": "WH-001",
+      "warehouse_name": "Main Warehouse",
+      "created_by_username": "admin",
+      "paid_amount": 0,
+      "total_payable": 24,
+      "balance_amount": 24
+    },
+    "economicHashBefore": "4e266cc3d1cc8e1753b184719b48f5c4868687abe401bb00286ffea771f54f34",
+    "economicHashAfter": "5fabf25bbbd12e630194ec99a3f9e5a3224b9d4ec808010539506aa501896f94"
+  },
+  {
+    "method": "post",
+    "url": "/api/invoices",
+    "body": {
+      "invoice_no": "OR-I-3",
+      "customer_id": 3,
+      "invoice_date": "2026-10-20",
+      "warehouse_id": 1,
+      "items": [
+        {
+          "item_id": 3,
+          "warehouse_id": 1,
+          "quantity": 2,
+          "unit_price": 20
+        }
+      ]
+    },
+    "status": 201,
+    "response": {
+      "id": 1,
+      "invoice_no": "INV-1026-00001",
+      "customer_id": 3,
+      "so_id": null,
+      "invoice_date": "2026-10-20",
+      "due_date": "2026-11-03",
+      "status": "Unpaid",
+      "total_amount": 40,
+      "paid_amount": 0,
+      "balance_amount": 40,
+      "notes": null,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:23:20",
+      "updated_at": "2026-10-25 03:23:20",
+      "discount_scope": "invoice",
+      "discount_type": "percentage",
+      "discount_value": 0,
+      "terms": null,
+      "returned_amount": 0,
+      "return_fee": 0,
+      "source_type": "DIRECT",
+      "quotation_id": null,
+      "customer_name": "FEFO customer",
+      "expiry_notes": null,
+      "override_sale": 0,
+      "deleted_at": null,
+      "deleted_by": null,
+      "deleted_from_status": null,
+      "credit_offset": 0,
+      "payment_status": "Unpaid",
+      "return_status": "None",
+      "deleted_from_payment_status": null,
+      "deleted_from_return_status": null,
+      "customer_email": "",
+      "customer_phone": "0300-0000001",
+      "customer_address": ""
+    },
+    "economicHashBefore": "5fabf25bbbd12e630194ec99a3f9e5a3224b9d4ec808010539506aa501896f94",
+    "economicHashAfter": "aa1d9900118f7179bcb46c9c14e784b0d117fd489805ac0ab5d6f3126195d021"
+  },
+  {
+    "method": "post",
+    "url": "/api/inventory/items",
+    "body": {
+      "item_code": "OR-4",
+      "item_name": "nonexpiry",
+      "unit_of_measure": "pcs"
+    },
+    "status": 201,
+    "response": {
+      "id": 4,
+      "item_code": "OR-4",
+      "item_name": "nonexpiry",
+      "description": null,
+      "category": null,
+      "unit_of_measure": "pcs",
+      "current_stock": 0,
+      "reorder_level": 0,
+      "standard_cost": 0,
+      "standard_selling_price": 0,
+      "is_raw_material": 0,
+      "is_finished_good": 0,
+      "is_purchased": 1,
+      "is_manufactured": 0,
+      "is_active": 1,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:23:20",
+      "updated_at": "2026-10-25 03:23:20",
+      "has_expiry": 0,
+      "near_expiry_threshold_days": 30,
+      "sale_type": "packed",
+      "qty_decimal_precision": 0,
+      "rounding_step": null,
+      "deleted_at": null,
+      "deleted_by": null
+    },
+    "economicHashBefore": "aa1d9900118f7179bcb46c9c14e784b0d117fd489805ac0ab5d6f3126195d021",
+    "economicHashAfter": "aa1d9900118f7179bcb46c9c14e784b0d117fd489805ac0ab5d6f3126195d021"
+  },
+  {
+    "method": "post",
+    "url": "/api/suppliers",
+    "body": {
+      "supplier_code": "OR-S-4",
+      "supplier_name": "nonexpiry"
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 4,
+        "supplier_code": "OR-S-4",
+        "supplier_name": "nonexpiry"
+      }
+    },
+    "economicHashBefore": "aa1d9900118f7179bcb46c9c14e784b0d117fd489805ac0ab5d6f3126195d021",
+    "economicHashAfter": "1f7a48d6546b705ad1e40c17b046f2ea997e404ed35bcc81d52da65d20114ef3"
+  },
+  {
+    "method": "post",
+    "url": "/api/customers",
+    "body": {
+      "customer_code": "OR-C-4",
+      "customer_name": "nonexpiry",
+      "phone": "0300-0000000"
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 4,
+        "customer_code": "CUST-1026-00004",
+        "customer_name": "nonexpiry",
+        "contact_person": "",
+        "email": "",
+        "phone": "0300-0000000",
+        "billing_address": "",
+        "shipping_address": "",
+        "payment_terms": "",
+        "payment_terms_days": 14,
+        "credit_limit": 0,
+        "current_balance": 0,
+        "opening_balance": 0,
+        "credit_balance": 0,
+        "credit_utilization_percent": 0,
+        "is_active": 1,
+        "created_at": "2026-10-25 03:23:20",
+        "updated_at": "2026-10-25 03:23:20"
+      },
+      "message": "Customer created successfully"
+    },
+    "economicHashBefore": "1f7a48d6546b705ad1e40c17b046f2ea997e404ed35bcc81d52da65d20114ef3",
+    "economicHashAfter": "faaee08b56f636491821ac9a9976f2f9527541cee02ed7bd6c05abef7a742525"
+  },
+  {
+    "method": "post",
+    "url": "/api/purchases",
+    "body": {
+      "item_id": 4,
+      "supplier_id": 4,
+      "warehouse_id": 1,
+      "quantity": 2,
+      "unit_cost": 10,
+      "purchase_date": "2026-09-01"
+    },
+    "status": 201,
+    "response": {
+      "id": 5,
+      "purchase_no": "PURCH-1026-0005",
+      "item_id": 4,
+      "warehouse_id": 1,
+      "quantity": 2,
+      "unit_cost": 10,
+      "total_cost": 20,
+      "supplier_name": "nonexpiry",
+      "purchase_date": "2026-09-01",
+      "invoice_no": null,
+      "remarks": null,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:23:20",
+      "updated_at": "2026-10-25 03:23:20",
+      "supplier_id": 4,
+      "returned_quantity": 0,
+      "batch_id": 6,
+      "batch_no": "BATCH-1026-PUR-00005",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "input_tax_amount": 0,
+      "item_code": "OR-4",
+      "item_name": "nonexpiry",
+      "unit_of_measure": "pcs",
+      "warehouse_code": "WH-001",
+      "warehouse_name": "Main Warehouse",
+      "created_by_username": "admin",
+      "paid_amount": 0,
+      "total_payable": 20,
+      "balance_amount": 20
+    },
+    "economicHashBefore": "faaee08b56f636491821ac9a9976f2f9527541cee02ed7bd6c05abef7a742525",
+    "economicHashAfter": "b9401fd8514c05183304abb61d07b40ddf5edc16b4aee3639b40bb9124a7eaa0"
+  },
+  {
+    "method": "post",
+    "url": "/api/purchases",
+    "body": {
+      "item_id": 4,
+      "supplier_id": 4,
+      "warehouse_id": 1,
+      "quantity": 1,
+      "unit_cost": 10,
+      "purchase_date": "2026-09-02",
+      "expiry_date": "2026-12-31"
+    },
+    "status": 201,
+    "response": {
+      "id": 6,
+      "purchase_no": "PURCH-1026-0006",
+      "item_id": 4,
+      "warehouse_id": 1,
+      "quantity": 1,
+      "unit_cost": 10,
+      "total_cost": 10,
+      "supplier_name": "nonexpiry",
+      "purchase_date": "2026-09-02",
+      "invoice_no": null,
+      "remarks": null,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:23:20",
+      "updated_at": "2026-10-25 03:23:20",
+      "supplier_id": 4,
+      "returned_quantity": 0,
+      "batch_id": 7,
+      "batch_no": "BATCH-1026-PUR-00006",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "input_tax_amount": 0,
+      "item_code": "OR-4",
+      "item_name": "nonexpiry",
+      "unit_of_measure": "pcs",
+      "warehouse_code": "WH-001",
+      "warehouse_name": "Main Warehouse",
+      "created_by_username": "admin",
+      "paid_amount": 0,
+      "total_payable": 10,
+      "balance_amount": 10
+    },
+    "economicHashBefore": "b9401fd8514c05183304abb61d07b40ddf5edc16b4aee3639b40bb9124a7eaa0",
+    "economicHashAfter": "9fde3ee113cf681c7918b417fc6e748191f1c0e07f46fc13e391c56eb4c5bc5c"
+  },
+  {
+    "method": "post",
+    "url": "/api/inventory/items",
+    "body": {
+      "item_code": "OR-5",
+      "item_name": "stock-funds",
+      "unit_of_measure": "pcs"
+    },
+    "status": 201,
+    "response": {
+      "id": 5,
+      "item_code": "OR-5",
+      "item_name": "stock-funds",
+      "description": null,
+      "category": null,
+      "unit_of_measure": "pcs",
+      "current_stock": 0,
+      "reorder_level": 0,
+      "standard_cost": 0,
+      "standard_selling_price": 0,
+      "is_raw_material": 0,
+      "is_finished_good": 0,
+      "is_purchased": 1,
+      "is_manufactured": 0,
+      "is_active": 1,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:23:20",
+      "updated_at": "2026-10-25 03:23:20",
+      "has_expiry": 0,
+      "near_expiry_threshold_days": 30,
+      "sale_type": "packed",
+      "qty_decimal_precision": 0,
+      "rounding_step": null,
+      "deleted_at": null,
+      "deleted_by": null
+    },
+    "economicHashBefore": "9fde3ee113cf681c7918b417fc6e748191f1c0e07f46fc13e391c56eb4c5bc5c",
+    "economicHashAfter": "9fde3ee113cf681c7918b417fc6e748191f1c0e07f46fc13e391c56eb4c5bc5c"
+  },
+  {
+    "method": "post",
+    "url": "/api/suppliers",
+    "body": {
+      "supplier_code": "OR-S-5",
+      "supplier_name": "stock-funds"
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 5,
+        "supplier_code": "OR-S-5",
+        "supplier_name": "stock-funds"
+      }
+    },
+    "economicHashBefore": "9fde3ee113cf681c7918b417fc6e748191f1c0e07f46fc13e391c56eb4c5bc5c",
+    "economicHashAfter": "49f52b7a21d8873651ada8e06c3a80aecdffc5ff112f7c3224fab1106a7582bf"
+  },
+  {
+    "method": "post",
+    "url": "/api/customers",
+    "body": {
+      "customer_code": "OR-C-5",
+      "customer_name": "stock-funds",
+      "phone": "0300-0000000"
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 5,
+        "customer_code": "CUST-1026-00005",
+        "customer_name": "stock-funds",
+        "contact_person": "",
+        "email": "",
+        "phone": "0300-0000000",
+        "billing_address": "",
+        "shipping_address": "",
+        "payment_terms": "",
+        "payment_terms_days": 14,
+        "credit_limit": 0,
+        "current_balance": 0,
+        "opening_balance": 0,
+        "credit_balance": 0,
+        "credit_utilization_percent": 0,
+        "is_active": 1,
+        "created_at": "2026-10-25 03:23:20",
+        "updated_at": "2026-10-25 03:23:20"
+      },
+      "message": "Customer created successfully"
+    },
+    "economicHashBefore": "49f52b7a21d8873651ada8e06c3a80aecdffc5ff112f7c3224fab1106a7582bf",
+    "economicHashAfter": "3766d9030332cd1f535e98df15bbf7c5fc421506b60bf4d6755af0a3a84cdf57"
+  },
+  {
+    "method": "post",
+    "url": "/api/purchases",
+    "body": {
+      "item_id": 5,
+      "supplier_id": 5,
+      "warehouse_id": 1,
+      "quantity": 2,
+      "unit_cost": 10,
+      "purchase_date": "2026-09-01"
+    },
+    "status": 201,
+    "response": {
+      "id": 7,
+      "purchase_no": "PURCH-1026-0007",
+      "item_id": 5,
+      "warehouse_id": 1,
+      "quantity": 2,
+      "unit_cost": 10,
+      "total_cost": 20,
+      "supplier_name": "stock-funds",
+      "purchase_date": "2026-09-01",
+      "invoice_no": null,
+      "remarks": null,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:23:20",
+      "updated_at": "2026-10-25 03:23:20",
+      "supplier_id": 5,
+      "returned_quantity": 0,
+      "batch_id": 8,
+      "batch_no": "BATCH-1026-PUR-00007",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "input_tax_amount": 0,
+      "item_code": "OR-5",
+      "item_name": "stock-funds",
+      "unit_of_measure": "pcs",
+      "warehouse_code": "WH-001",
+      "warehouse_name": "Main Warehouse",
+      "created_by_username": "admin",
+      "paid_amount": 0,
+      "total_payable": 20,
+      "balance_amount": 20
+    },
+    "economicHashBefore": "3766d9030332cd1f535e98df15bbf7c5fc421506b60bf4d6755af0a3a84cdf57",
+    "economicHashAfter": "0644adf7a147df7f40ea5d12b32d4117e765626e2619011c562e91839845fb25"
+  },
+  {
+    "method": "post",
+    "url": "/api/invoices",
+    "body": {
+      "customer_id": 5,
+      "invoice_date": "2026-09-02",
+      "warehouse_id": 1,
+      "items": [
+        {
+          "item_id": 5,
+          "warehouse_id": 1,
+          "quantity": 3,
+          "unit_price": 15
+        }
+      ]
+    },
+    "status": 400,
+    "response": {
+      "error": "stock-funds: sellable stock 2, requested 3 (expired, halted, or location-blocked batches are excluded from sale)"
+    },
+    "economicHashBefore": "0644adf7a147df7f40ea5d12b32d4117e765626e2619011c562e91839845fb25",
+    "economicHashAfter": "0644adf7a147df7f40ea5d12b32d4117e765626e2619011c562e91839845fb25"
+  },
+  {
+    "method": "post",
+    "url": "/api/payments",
+    "body": {
+      "supplier_id": 5,
+      "payment_date": "2026-09-02",
+      "amount": 1,
+      "payment_method": "bank",
+      "purchase_allocations": [
+        {
+          "purchase_id": 7,
+          "amount": 1
+        }
+      ]
+    },
+    "status": 400,
+    "response": {
+      "success": false,
+      "error": "Insufficient funds in Bank: available 0.00, required 1.00 — supplier payment PAY-1026-00001. Record your starting cash (Dashboard → Opening balance) or owner capital first."
+    },
+    "economicHashBefore": "0644adf7a147df7f40ea5d12b32d4117e765626e2619011c562e91839845fb25",
+    "economicHashAfter": "0644adf7a147df7f40ea5d12b32d4117e765626e2619011c562e91839845fb25"
+  },
+  {
+    "method": "post",
+    "url": "/api/inventory/items",
+    "body": {
+      "item_code": "OR-6",
+      "item_name": "year-boundary",
+      "unit_of_measure": "pcs"
+    },
+    "status": 201,
+    "response": {
+      "id": 6,
+      "item_code": "OR-6",
+      "item_name": "year-boundary",
+      "description": null,
+      "category": null,
+      "unit_of_measure": "pcs",
+      "current_stock": 0,
+      "reorder_level": 0,
+      "standard_cost": 0,
+      "standard_selling_price": 0,
+      "is_raw_material": 0,
+      "is_finished_good": 0,
+      "is_purchased": 1,
+      "is_manufactured": 0,
+      "is_active": 1,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:23:21",
+      "updated_at": "2026-10-25 03:23:21",
+      "has_expiry": 0,
+      "near_expiry_threshold_days": 30,
+      "sale_type": "packed",
+      "qty_decimal_precision": 0,
+      "rounding_step": null,
+      "deleted_at": null,
+      "deleted_by": null
+    },
+    "economicHashBefore": "0644adf7a147df7f40ea5d12b32d4117e765626e2619011c562e91839845fb25",
+    "economicHashAfter": "0644adf7a147df7f40ea5d12b32d4117e765626e2619011c562e91839845fb25"
+  },
+  {
+    "method": "post",
+    "url": "/api/suppliers",
+    "body": {
+      "supplier_code": "OR-S-6",
+      "supplier_name": "year-boundary"
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 6,
+        "supplier_code": "OR-S-6",
+        "supplier_name": "year-boundary"
+      }
+    },
+    "economicHashBefore": "0644adf7a147df7f40ea5d12b32d4117e765626e2619011c562e91839845fb25",
+    "economicHashAfter": "1c98d859bde963070dcc561fb4c3f2bb83b8da20f5d867e44b8757c448fb609a"
+  },
+  {
+    "method": "post",
+    "url": "/api/customers",
+    "body": {
+      "customer_code": "OR-C-6",
+      "customer_name": "year-boundary",
+      "phone": "0300-0000000"
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 6,
+        "customer_code": "CUST-1026-00006",
+        "customer_name": "year-boundary",
+        "contact_person": "",
+        "email": "",
+        "phone": "0300-0000000",
+        "billing_address": "",
+        "shipping_address": "",
+        "payment_terms": "",
+        "payment_terms_days": 14,
+        "credit_limit": 0,
+        "current_balance": 0,
+        "opening_balance": 0,
+        "credit_balance": 0,
+        "credit_utilization_percent": 0,
+        "is_active": 1,
+        "created_at": "2026-10-25 03:23:21",
+        "updated_at": "2026-10-25 03:23:21"
+      },
+      "message": "Customer created successfully"
+    },
+    "economicHashBefore": "1c98d859bde963070dcc561fb4c3f2bb83b8da20f5d867e44b8757c448fb609a",
+    "economicHashAfter": "ca2ea37853e6ffca1d35875b939da9ecac976b865d211240ee3154ccae64c68b"
+  },
+  {
+    "method": "post",
+    "url": "/api/purchases",
+    "body": {
+      "item_id": 6,
+      "supplier_id": 6,
+      "warehouse_id": 1,
+      "quantity": 10,
+      "unit_cost": 10,
+      "purchase_date": "2025-12-30"
+    },
+    "status": 201,
+    "response": {
+      "id": 8,
+      "purchase_no": "PURCH-1026-0008",
+      "item_id": 6,
+      "warehouse_id": 1,
+      "quantity": 10,
+      "unit_cost": 10,
+      "total_cost": 100,
+      "supplier_name": "year-boundary",
+      "purchase_date": "2025-12-30",
+      "invoice_no": null,
+      "remarks": null,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:23:21",
+      "updated_at": "2026-10-25 03:23:21",
+      "supplier_id": 6,
+      "returned_quantity": 0,
+      "batch_id": 9,
+      "batch_no": "BATCH-1026-PUR-00008",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "input_tax_amount": 0,
+      "item_code": "OR-6",
+      "item_name": "year-boundary",
+      "unit_of_measure": "pcs",
+      "warehouse_code": "WH-001",
+      "warehouse_name": "Main Warehouse",
+      "created_by_username": "admin",
+      "paid_amount": 0,
+      "total_payable": 100,
+      "balance_amount": 100
+    },
+    "economicHashBefore": "ca2ea37853e6ffca1d35875b939da9ecac976b865d211240ee3154ccae64c68b",
+    "economicHashAfter": "fc0504e3b2d8d2edcff203b1c8998f4ba2c28f7162437841381ecec743b1e679"
+  },
+  {
+    "method": "post",
+    "url": "/api/invoices",
+    "body": {
+      "invoice_no": "OR-I-7",
+      "customer_id": 6,
+      "invoice_date": "2025-12-31",
+      "warehouse_id": 1,
+      "items": [
+        {
+          "item_id": 6,
+          "warehouse_id": 1,
+          "quantity": 3,
+          "unit_price": 15
+        }
+      ]
+    },
+    "status": 201,
+    "response": {
+      "id": 2,
+      "invoice_no": "INV-1026-00002",
+      "customer_id": 6,
+      "so_id": null,
+      "invoice_date": "2025-12-31",
+      "due_date": "2026-01-14",
+      "status": "Unpaid",
+      "total_amount": 45,
+      "paid_amount": 0,
+      "balance_amount": 45,
+      "notes": null,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:23:21",
+      "updated_at": "2026-10-25 03:23:21",
+      "discount_scope": "invoice",
+      "discount_type": "percentage",
+      "discount_value": 0,
+      "terms": null,
+      "returned_amount": 0,
+      "return_fee": 0,
+      "source_type": "DIRECT",
+      "quotation_id": null,
+      "customer_name": "year-boundary",
+      "expiry_notes": null,
+      "override_sale": 0,
+      "deleted_at": null,
+      "deleted_by": null,
+      "deleted_from_status": null,
+      "credit_offset": 0,
+      "payment_status": "Unpaid",
+      "return_status": "None",
+      "deleted_from_payment_status": null,
+      "deleted_from_return_status": null,
+      "customer_email": "",
+      "customer_phone": "0300-0000000",
+      "customer_address": ""
+    },
+    "economicHashBefore": "fc0504e3b2d8d2edcff203b1c8998f4ba2c28f7162437841381ecec743b1e679",
+    "economicHashAfter": "bef029de94775169e30027853e55c59c4f65dbcad31eb2d8eee1ae1775aa952d"
+  },
+  {
+    "method": "post",
+    "url": "/api/payments",
+    "body": {
+      "customer_id": 6,
+      "payment_date": "2026-01-01",
+      "amount": 45,
+      "payment_method": "cash",
+      "invoice_allocations": [
+        {
+          "invoice_id": 2,
+          "amount": 45
+        }
+      ]
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 1,
+        "payment_no": "PAY-1026-00001",
+        "customer_id": 6,
+        "customer_name": "year-boundary",
+        "supplier_id": null,
+        "invoice_id": null,
+        "invoice_no": null,
+        "payment_date": "2026-01-01",
+        "amount": 45,
+        "payment_method": "cash",
+        "reference_no": "",
+        "notes": "",
+        "created_at": "2026-10-25 03:23:21",
+        "voided_at": null,
+        "payment_kind": "RECEIPT",
+        "allocated_invoices": "2",
+        "allocation_amounts": "45",
+        "allocation_ids": "1",
+        "allocations": [
+          {
+            "id": 1,
+            "payment_id": 1,
+            "invoice_id": 2,
+            "invoice_no": "INV-1026-00002",
+            "amount": 45
+          }
+        ]
+      }
+    },
+    "economicHashBefore": "bef029de94775169e30027853e55c59c4f65dbcad31eb2d8eee1ae1775aa952d",
+    "economicHashAfter": "4bba59079564198d717583560055890d72bf159c3c0fbf71c002dc7a910f6318"
+  },
+  {
+    "method": "get",
+    "url": "/api/reports/balance-sheet?asOfDate=2025-12-31",
+    "status": 200,
+    "response": {
+      "success": true,
+      "data": {
+        "asOfDate": "2025-12-31",
+        "assets": {
+          "inventory": 70,
+          "accounts_receivable": 45,
+          "cash": 0,
+          "other": 0,
+          "total": 115
+        },
+        "liabilities": {
+          "accounts_payable": 100,
+          "tax_payable": 0,
+          "other": 0,
+          "total": 100
+        },
+        "equity": {
+          "opening_retained_earnings": 0,
+          "owner_capital": 0,
+          "owner_drawings": 0,
+          "net_income_ytd": 15,
+          "revenue_ytd": 45,
+          "cogs_ytd": 30,
+          "expenses_ytd": 0,
+          "total": 15
+        },
+        "totals": {
+          "total_assets": 115,
+          "total_liabilities": 100,
+          "total_equity": 15,
+          "total_liab_and_equity": 115,
+          "balanced": true
+        }
+      }
+    },
+    "economicHashBefore": null,
+    "economicHashAfter": null
+  },
+  {
+    "method": "get",
+    "url": "/api/reports/balance-sheet?asOfDate=2026-01-01",
+    "status": 200,
+    "response": {
+      "success": true,
+      "data": {
+        "asOfDate": "2026-01-01",
+        "assets": {
+          "inventory": 70,
+          "accounts_receivable": 0,
+          "cash": 45,
+          "other": 0,
+          "total": 115
+        },
+        "liabilities": {
+          "accounts_payable": 100,
+          "tax_payable": 0,
+          "other": 0,
+          "total": 100
+        },
+        "equity": {
+          "opening_retained_earnings": 0,
+          "owner_capital": 0,
+          "owner_drawings": 0,
+          "net_income_ytd": 15,
+          "revenue_ytd": 45,
+          "cogs_ytd": 30,
+          "expenses_ytd": 0,
+          "total": 15
+        },
+        "totals": {
+          "total_assets": 115,
+          "total_liabilities": 100,
+          "total_equity": 15,
+          "total_liab_and_equity": 115,
+          "balanced": true
+        }
+      }
+    },
+    "economicHashBefore": null,
+    "economicHashAfter": null
+  },
+  {
+    "method": "get",
+    "url": "/api/reports/profit-loss?fromDate=2026-01-01&toDate=2026-01-31",
+    "status": 200,
+    "response": {
+      "success": true,
+      "data": {
+        "startDate": "2026-01-01",
+        "endDate": "2026-01-31",
+        "totalRevenue": 0,
+        "totalCogs": 0,
+        "grossProfit": 0,
+        "expenses": [],
+        "totalExpenses": 0,
+        "netProfit": 0,
+        "grossProfitMargin": 0,
+        "netProfitMargin": 0
+      }
+    },
+    "economicHashBefore": null,
+    "economicHashAfter": null
+  },
+  {
+    "method": "post",
+    "url": "/api/inventory/items",
+    "body": {
+      "item_code": "OR-8",
+      "item_name": "tax-residual",
+      "unit_of_measure": "pcs"
+    },
+    "status": 201,
+    "response": {
+      "id": 7,
+      "item_code": "OR-8",
+      "item_name": "tax-residual",
+      "description": null,
+      "category": null,
+      "unit_of_measure": "pcs",
+      "current_stock": 0,
+      "reorder_level": 0,
+      "standard_cost": 0,
+      "standard_selling_price": 0,
+      "is_raw_material": 0,
+      "is_finished_good": 0,
+      "is_purchased": 1,
+      "is_manufactured": 0,
+      "is_active": 1,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:23:22",
+      "updated_at": "2026-10-25 03:23:22",
+      "has_expiry": 0,
+      "near_expiry_threshold_days": 30,
+      "sale_type": "packed",
+      "qty_decimal_precision": 0,
+      "rounding_step": null,
+      "deleted_at": null,
+      "deleted_by": null
+    },
+    "economicHashBefore": "4bba59079564198d717583560055890d72bf159c3c0fbf71c002dc7a910f6318",
+    "economicHashAfter": "4bba59079564198d717583560055890d72bf159c3c0fbf71c002dc7a910f6318"
+  },
+  {
+    "method": "post",
+    "url": "/api/suppliers",
+    "body": {
+      "supplier_code": "OR-S-8",
+      "supplier_name": "tax-residual"
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 7,
+        "supplier_code": "OR-S-8",
+        "supplier_name": "tax-residual"
+      }
+    },
+    "economicHashBefore": "4bba59079564198d717583560055890d72bf159c3c0fbf71c002dc7a910f6318",
+    "economicHashAfter": "380f9d58104b2bdde2aefd061b6ae043b79bb21bc700bd9eb6cc70cbfbc339c1"
+  },
+  {
+    "method": "post",
+    "url": "/api/customers",
+    "body": {
+      "customer_code": "OR-C-8",
+      "customer_name": "tax-residual",
+      "phone": "0300-0000000"
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 7,
+        "customer_code": "CUST-1026-00007",
+        "customer_name": "tax-residual",
+        "contact_person": "",
+        "email": "",
+        "phone": "0300-0000000",
+        "billing_address": "",
+        "shipping_address": "",
+        "payment_terms": "",
+        "payment_terms_days": 14,
+        "credit_limit": 0,
+        "current_balance": 0,
+        "opening_balance": 0,
+        "credit_balance": 0,
+        "credit_utilization_percent": 0,
+        "is_active": 1,
+        "created_at": "2026-10-25 03:23:22",
+        "updated_at": "2026-10-25 03:23:22"
+      },
+      "message": "Customer created successfully"
+    },
+    "economicHashBefore": "380f9d58104b2bdde2aefd061b6ae043b79bb21bc700bd9eb6cc70cbfbc339c1",
+    "economicHashAfter": "ca9b32c2d36050956cc7d797402525de6f71dede945be76520bb15b0bbc329cf"
+  },
+  {
+    "method": "post",
+    "url": "/api/purchases",
+    "body": {
+      "item_id": 7,
+      "supplier_id": 7,
+      "warehouse_id": 1,
+      "quantity": 1,
+      "unit_cost": 10,
+      "purchase_date": "2026-09-01"
+    },
+    "status": 201,
+    "response": {
+      "id": 9,
+      "purchase_no": "PURCH-1026-0009",
+      "item_id": 7,
+      "warehouse_id": 1,
+      "quantity": 1,
+      "unit_cost": 10,
+      "total_cost": 10,
+      "supplier_name": "tax-residual",
+      "purchase_date": "2026-09-01",
+      "invoice_no": null,
+      "remarks": null,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:23:22",
+      "updated_at": "2026-10-25 03:23:22",
+      "supplier_id": 7,
+      "returned_quantity": 0,
+      "batch_id": 10,
+      "batch_no": "BATCH-1026-PUR-00009",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "input_tax_amount": 0,
+      "item_code": "OR-8",
+      "item_name": "tax-residual",
+      "unit_of_measure": "pcs",
+      "warehouse_code": "WH-001",
+      "warehouse_name": "Main Warehouse",
+      "created_by_username": "admin",
+      "paid_amount": 0,
+      "total_payable": 10,
+      "balance_amount": 10
+    },
+    "economicHashBefore": "ca9b32c2d36050956cc7d797402525de6f71dede945be76520bb15b0bbc329cf",
+    "economicHashAfter": "4c67644289e6bb7f5a5bf9c83c116b77a40c957d9d0c8657e212422bfe23033c"
+  },
+  {
+    "method": "post",
+    "url": "/api/purchase-orders",
+    "body": {
+      "supplier_id": 7,
+      "warehouse_id": 1,
+      "po_date": "2026-09-02",
+      "items": [
+        {
+          "item_id": 7,
+          "quantity": 7,
+          "unit_price": 3.33,
+          "input_tax_amount": 1.01
+        }
+      ]
+    },
+    "status": 201,
+    "response": {
+      "id": 1,
+      "po_no": "PO-1026-0001",
+      "supplier_id": 7,
+      "po_date": "2026-09-02",
+      "expected_delivery_date": null,
+      "status": "Draft",
+      "total_amount": 24.32,
+      "notes": null,
+      "warehouse_id": 1,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:23:22",
+      "updated_at": "2026-10-25 03:23:22",
+      "supplier_name": "tax-residual",
+      "supplier_code": "OR-S-8",
+      "warehouse_name": "Main Warehouse",
+      "warehouse_code": "WH-001",
+      "created_by_username": "admin",
+      "paid_amount": 0,
+      "balance_amount": 24.32
+    },
+    "economicHashBefore": "4c67644289e6bb7f5a5bf9c83c116b77a40c957d9d0c8657e212422bfe23033c",
+    "economicHashAfter": "4c67644289e6bb7f5a5bf9c83c116b77a40c957d9d0c8657e212422bfe23033c"
+  },
+  {
+    "method": "post",
+    "url": "/api/purchase-orders/1/status",
+    "body": {
+      "status": "Submitted"
+    },
+    "status": 200,
+    "response": {
+      "id": 1,
+      "po_no": "PO-1026-0001",
+      "supplier_id": 7,
+      "po_date": "2026-09-02",
+      "expected_delivery_date": null,
+      "status": "Submitted",
+      "total_amount": 24.32,
+      "notes": null,
+      "warehouse_id": 1,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:23:22",
+      "updated_at": "2026-10-25 03:23:22",
+      "supplier_name": "tax-residual",
+      "supplier_code": "OR-S-8",
+      "warehouse_name": "Main Warehouse",
+      "warehouse_code": "WH-001",
+      "created_by_username": "admin",
+      "paid_amount": 0,
+      "balance_amount": 24.32
+    },
+    "economicHashBefore": "4c67644289e6bb7f5a5bf9c83c116b77a40c957d9d0c8657e212422bfe23033c",
+    "economicHashAfter": "4c67644289e6bb7f5a5bf9c83c116b77a40c957d9d0c8657e212422bfe23033c"
+  },
+  {
+    "method": "post",
+    "url": "/api/purchase-orders/1/receipts",
+    "body": {
+      "receipt_date": "2026-09-03",
+      "warehouse_id": 1,
+      "items": [
+        {
+          "po_item_id": 1,
+          "received_quantity": 2
+        }
+      ]
+    },
+    "status": 201,
+    "response": {
+      "id": 1,
+      "receipt_no": "GR-1026-0001",
+      "po_id": 1,
+      "receipt_date": "2026-09-03",
+      "warehouse_id": 1,
+      "remarks": null,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:23:22",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "warehouse_name": "Main Warehouse",
+      "created_by_username": "admin"
+    },
+    "economicHashBefore": "4c67644289e6bb7f5a5bf9c83c116b77a40c957d9d0c8657e212422bfe23033c",
+    "economicHashAfter": "19f8ae1c7e0907caee730023bdd251f42b5307a4ad0c59d21ecb2fd8168ae9df"
+  },
+  {
+    "method": "post",
+    "url": "/api/purchase-orders/1/receipts",
+    "body": {
+      "receipt_date": "2026-09-04",
+      "warehouse_id": 1,
+      "items": [
+        {
+          "po_item_id": 1,
+          "received_quantity": 5
+        }
+      ]
+    },
+    "status": 201,
+    "response": {
+      "id": 2,
+      "receipt_no": "GR-1026-0002",
+      "po_id": 1,
+      "receipt_date": "2026-09-04",
+      "warehouse_id": 1,
+      "remarks": null,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:23:23",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "warehouse_name": "Main Warehouse",
+      "created_by_username": "admin"
+    },
+    "economicHashBefore": "19f8ae1c7e0907caee730023bdd251f42b5307a4ad0c59d21ecb2fd8168ae9df",
+    "economicHashAfter": "bbed5a8e1209fae6eae008bef0eae4ed9fda4ace1be8c938e33b13f7ff375070"
+  },
+  {
+    "method": "post",
+    "url": "/api/purchase-orders/1/receipts/2/void",
+    "body": {
+      "reason": "audit"
+    },
+    "status": 200,
+    "response": {
+      "id": 2,
+      "receipt_no": "GR-1026-0002",
+      "po_id": 1,
+      "receipt_date": "2026-09-04",
+      "warehouse_id": 1,
+      "remarks": null,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:23:23",
+      "voided_at": "2026-10-25 03:23:23",
+      "voided_by": 1,
+      "void_reason": "audit",
+      "warehouse_name": "Main Warehouse",
+      "created_by_username": "admin",
+      "total_quantity": 5,
+      "total_amount": 17.369999999999997,
+      "input_tax_amount": 0.72
+    },
+    "economicHashBefore": "bbed5a8e1209fae6eae008bef0eae4ed9fda4ace1be8c938e33b13f7ff375070",
+    "economicHashAfter": "5f15765c85be685968e7833d798a40b10793b013b905e093cf767c4d1dc2c254"
+  },
+  {
+    "method": "post",
+    "url": "/api/inventory/items",
+    "body": {
+      "item_code": "OR-9",
+      "item_name": "credit-two-targets",
+      "unit_of_measure": "pcs"
+    },
+    "status": 201,
+    "response": {
+      "id": 8,
+      "item_code": "OR-9",
+      "item_name": "credit-two-targets",
+      "description": null,
+      "category": null,
+      "unit_of_measure": "pcs",
+      "current_stock": 0,
+      "reorder_level": 0,
+      "standard_cost": 0,
+      "standard_selling_price": 0,
+      "is_raw_material": 0,
+      "is_finished_good": 0,
+      "is_purchased": 1,
+      "is_manufactured": 0,
+      "is_active": 1,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:23:23",
+      "updated_at": "2026-10-25 03:23:23",
+      "has_expiry": 0,
+      "near_expiry_threshold_days": 30,
+      "sale_type": "packed",
+      "qty_decimal_precision": 0,
+      "rounding_step": null,
+      "deleted_at": null,
+      "deleted_by": null
+    },
+    "economicHashBefore": "5f15765c85be685968e7833d798a40b10793b013b905e093cf767c4d1dc2c254",
+    "economicHashAfter": "5f15765c85be685968e7833d798a40b10793b013b905e093cf767c4d1dc2c254"
+  },
+  {
+    "method": "post",
+    "url": "/api/suppliers",
+    "body": {
+      "supplier_code": "OR-S-9",
+      "supplier_name": "credit-two-targets"
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 8,
+        "supplier_code": "OR-S-9",
+        "supplier_name": "credit-two-targets"
+      }
+    },
+    "economicHashBefore": "5f15765c85be685968e7833d798a40b10793b013b905e093cf767c4d1dc2c254",
+    "economicHashAfter": "ce6a8326bde3251d92bcf882e6f6c18d84bd58508a4c38870549611feec33983"
+  },
+  {
+    "method": "post",
+    "url": "/api/customers",
+    "body": {
+      "customer_code": "OR-C-9",
+      "customer_name": "credit-two-targets",
+      "phone": "0300-0000000"
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 8,
+        "customer_code": "CUST-1026-00008",
+        "customer_name": "credit-two-targets",
+        "contact_person": "",
+        "email": "",
+        "phone": "0300-0000000",
+        "billing_address": "",
+        "shipping_address": "",
+        "payment_terms": "",
+        "payment_terms_days": 14,
+        "credit_limit": 0,
+        "current_balance": 0,
+        "opening_balance": 0,
+        "credit_balance": 0,
+        "credit_utilization_percent": 0,
+        "is_active": 1,
+        "created_at": "2026-10-25 03:23:23",
+        "updated_at": "2026-10-25 03:23:23"
+      },
+      "message": "Customer created successfully"
+    },
+    "economicHashBefore": "ce6a8326bde3251d92bcf882e6f6c18d84bd58508a4c38870549611feec33983",
+    "economicHashAfter": "b7a247c6255b94907e70b58df71e796076a32fa7d3f2a941f6b0aceb6b5bffa6"
+  },
+  {
+    "method": "post",
+    "url": "/api/purchases",
+    "body": {
+      "item_id": 8,
+      "supplier_id": 8,
+      "warehouse_id": 1,
+      "quantity": 20,
+      "unit_cost": 10,
+      "purchase_date": "2026-09-01"
+    },
+    "status": 201,
+    "response": {
+      "id": 10,
+      "purchase_no": "PURCH-1026-0010",
+      "item_id": 8,
+      "warehouse_id": 1,
+      "quantity": 20,
+      "unit_cost": 10,
+      "total_cost": 200,
+      "supplier_name": "credit-two-targets",
+      "purchase_date": "2026-09-01",
+      "invoice_no": null,
+      "remarks": null,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:23:23",
+      "updated_at": "2026-10-25 03:23:23",
+      "supplier_id": 8,
+      "returned_quantity": 0,
+      "batch_id": 13,
+      "batch_no": "BATCH-1026-PUR-00012",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "input_tax_amount": 0,
+      "item_code": "OR-9",
+      "item_name": "credit-two-targets",
+      "unit_of_measure": "pcs",
+      "warehouse_code": "WH-001",
+      "warehouse_name": "Main Warehouse",
+      "created_by_username": "admin",
+      "paid_amount": 0,
+      "total_payable": 200,
+      "balance_amount": 200
+    },
+    "economicHashBefore": "b7a247c6255b94907e70b58df71e796076a32fa7d3f2a941f6b0aceb6b5bffa6",
+    "economicHashAfter": "32a826ab8b6fa7ea78e941fab898320b0dffe96063bbb14eb3e7e6f9be60b687"
+  },
+  {
+    "method": "post",
+    "url": "/api/invoices",
+    "body": {
+      "invoice_no": "OR-I-10",
+      "customer_id": 8,
+      "invoice_date": "2026-09-02",
+      "warehouse_id": 1,
+      "items": [
+        {
+          "item_id": 8,
+          "warehouse_id": 1,
+          "quantity": 10,
+          "unit_price": 15
+        }
+      ]
+    },
+    "status": 201,
+    "response": {
+      "id": 3,
+      "invoice_no": "INV-1026-00003",
+      "customer_id": 8,
+      "so_id": null,
+      "invoice_date": "2026-09-02",
+      "due_date": "2026-09-16",
+      "status": "Unpaid",
+      "total_amount": 150,
+      "paid_amount": 0,
+      "balance_amount": 150,
+      "notes": null,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:23:23",
+      "updated_at": "2026-10-25 03:23:23",
+      "discount_scope": "invoice",
+      "discount_type": "percentage",
+      "discount_value": 0,
+      "terms": null,
+      "returned_amount": 0,
+      "return_fee": 0,
+      "source_type": "DIRECT",
+      "quotation_id": null,
+      "customer_name": "credit-two-targets",
+      "expiry_notes": null,
+      "override_sale": 0,
+      "deleted_at": null,
+      "deleted_by": null,
+      "deleted_from_status": null,
+      "credit_offset": 0,
+      "payment_status": "Unpaid",
+      "return_status": "None",
+      "deleted_from_payment_status": null,
+      "deleted_from_return_status": null,
+      "customer_email": "",
+      "customer_phone": "0300-0000000",
+      "customer_address": ""
+    },
+    "economicHashBefore": "32a826ab8b6fa7ea78e941fab898320b0dffe96063bbb14eb3e7e6f9be60b687",
+    "economicHashAfter": "aab46fcbd1098ad6f2cdd10aff42c097c5bb8695a9ebcf6bf65eba3037cacd9c"
+  },
+  {
+    "method": "post",
+    "url": "/api/payments",
+    "body": {
+      "customer_id": 8,
+      "payment_date": "2026-09-02",
+      "amount": 150,
+      "payment_method": "cash",
+      "invoice_allocations": [
+        {
+          "invoice_id": 3,
+          "amount": 150
+        }
+      ]
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 2,
+        "payment_no": "PAY-1026-00002",
+        "customer_id": 8,
+        "customer_name": "credit-two-targets",
+        "supplier_id": null,
+        "invoice_id": null,
+        "invoice_no": null,
+        "payment_date": "2026-09-02",
+        "amount": 150,
+        "payment_method": "cash",
+        "reference_no": "",
+        "notes": "",
+        "created_at": "2026-10-25 03:23:24",
+        "voided_at": null,
+        "payment_kind": "RECEIPT",
+        "allocated_invoices": "3",
+        "allocation_amounts": "150",
+        "allocation_ids": "2",
+        "allocations": [
+          {
+            "id": 2,
+            "payment_id": 2,
+            "invoice_id": 3,
+            "invoice_no": "INV-1026-00003",
+            "amount": 150
+          }
+        ]
+      }
+    },
+    "economicHashBefore": "aab46fcbd1098ad6f2cdd10aff42c097c5bb8695a9ebcf6bf65eba3037cacd9c",
+    "economicHashAfter": "97a51e0ec34a437cac0fdec78809bbbb7c9f803803947f7a841a76ae26b4f481"
+  },
+  {
+    "method": "post",
+    "url": "/api/invoices/3/return",
+    "body": {
+      "return_date": "2026-09-03",
+      "items": [
+        {
+          "invoice_item_id": 3,
+          "return_quantity": 4
+        }
+      ],
+      "settlements": [
+        {
+          "type": "credit",
+          "amount": 60
+        }
+      ]
+    },
+    "status": 200,
+    "response": {
+      "success": true,
+      "message": "Return processed successfully",
+      "data": {
+        "returnId": 1,
+        "returnNo": "RET-1026-00001",
+        "status": "Settled",
+        "returnedAmount": 60,
+        "feeAmount": 0,
+        "netAmount": 60,
+        "settledAmount": 60,
+        "settlements": [
+          {
+            "id": 1,
+            "return_id": 1,
+            "settlement_no": "CR-1026-00001",
+            "type": "credit",
+            "amount": 60,
+            "method": null,
+            "reference": "CR-1026-00001",
+            "target_invoice_id": null,
+            "payment_id": null,
+            "settled_date": "2026-10-25",
+            "created_by": 1,
+            "created_at": "2026-10-25 03:23:24",
+            "voided_at": null,
+            "voided_by": null
+          }
+        ],
+        "position": {
+          "originalTotal": 150,
+          "totalReturned": 60,
+          "currentInvoiceValue": 90,
+          "totalPaid": 150,
+          "totalFees": 0,
+          "netPosition": 60,
+          "refundCreditDue": 60,
+          "totalSettled": 60,
+          "remainingRefundDue": 0,
+          "balanceDue": 0,
+          "remainingSettlementCapacity": 0,
+          "settledAmount": 60
+        },
+        "returnAmount": 60,
+        "deduction": 0,
+        "netReturn": 60,
+        "refundAmount": 0,
+        "retainedCredit": 60,
+        "totalItems": 1,
+        "returnedItems": [
+          {
+            "invoice_item_id": 3,
+            "item_id": 8,
+            "quantity": 4
+          }
+        ]
+      }
+    },
+    "economicHashBefore": "97a51e0ec34a437cac0fdec78809bbbb7c9f803803947f7a841a76ae26b4f481",
+    "economicHashAfter": "86b33135f48958b65fd8c91aad68651ce68b8a3afbd38351077e5a3d4c7399d7"
+  },
+  {
+    "method": "post",
+    "url": "/api/invoices",
+    "body": {
+      "invoice_no": "OR-I-11",
+      "customer_id": 8,
+      "invoice_date": "2026-09-04",
+      "warehouse_id": 1,
+      "items": [
+        {
+          "item_id": 8,
+          "warehouse_id": 1,
+          "quantity": 2,
+          "unit_price": 15
+        }
+      ],
+      "credit_offset": 30
+    },
+    "status": 201,
+    "response": {
+      "id": 4,
+      "invoice_no": "INV-1026-00004",
+      "customer_id": 8,
+      "so_id": null,
+      "invoice_date": "2026-09-04",
+      "due_date": "2026-09-18",
+      "status": "Paid",
+      "total_amount": 30,
+      "paid_amount": 30,
+      "balance_amount": 0,
+      "notes": null,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:23:24",
+      "updated_at": "2026-10-25 03:23:24",
+      "discount_scope": "invoice",
+      "discount_type": "percentage",
+      "discount_value": 0,
+      "terms": null,
+      "returned_amount": 0,
+      "return_fee": 0,
+      "source_type": "DIRECT",
+      "quotation_id": null,
+      "customer_name": "credit-two-targets",
+      "expiry_notes": null,
+      "override_sale": 0,
+      "deleted_at": null,
+      "deleted_by": null,
+      "deleted_from_status": null,
+      "credit_offset": 30,
+      "payment_status": "Paid",
+      "return_status": "None",
+      "deleted_from_payment_status": null,
+      "deleted_from_return_status": null,
+      "customer_email": "",
+      "customer_phone": "0300-0000000",
+      "customer_address": ""
+    },
+    "economicHashBefore": "86b33135f48958b65fd8c91aad68651ce68b8a3afbd38351077e5a3d4c7399d7",
+    "economicHashAfter": "5e49f9d64e0651cf8b686e694601559258a2e6cb24003f74aa49dbd1be3a39c3"
+  },
+  {
+    "method": "post",
+    "url": "/api/invoices",
+    "body": {
+      "invoice_no": "OR-I-12",
+      "customer_id": 8,
+      "invoice_date": "2026-09-04",
+      "warehouse_id": 1,
+      "items": [
+        {
+          "item_id": 8,
+          "warehouse_id": 1,
+          "quantity": 3,
+          "unit_price": 15
+        }
+      ],
+      "credit_offset": 30
+    },
+    "status": 201,
+    "response": {
+      "id": 5,
+      "invoice_no": "INV-1026-00005",
+      "customer_id": 8,
+      "so_id": null,
+      "invoice_date": "2026-09-04",
+      "due_date": "2026-09-18",
+      "status": "Partially Paid",
+      "total_amount": 45,
+      "paid_amount": 30,
+      "balance_amount": 15,
+      "notes": null,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:23:24",
+      "updated_at": "2026-10-25 03:23:24",
+      "discount_scope": "invoice",
+      "discount_type": "percentage",
+      "discount_value": 0,
+      "terms": null,
+      "returned_amount": 0,
+      "return_fee": 0,
+      "source_type": "DIRECT",
+      "quotation_id": null,
+      "customer_name": "credit-two-targets",
+      "expiry_notes": null,
+      "override_sale": 0,
+      "deleted_at": null,
+      "deleted_by": null,
+      "deleted_from_status": null,
+      "credit_offset": 30,
+      "payment_status": "Partially Paid",
+      "return_status": "None",
+      "deleted_from_payment_status": null,
+      "deleted_from_return_status": null,
+      "customer_email": "",
+      "customer_phone": "0300-0000000",
+      "customer_address": ""
+    },
+    "economicHashBefore": "5e49f9d64e0651cf8b686e694601559258a2e6cb24003f74aa49dbd1be3a39c3",
+    "economicHashAfter": "78d86749eab40a09c7fad5e1d820302e6022885388c0b5f29b49494220f15499"
+  },
+  {
+    "method": "post",
+    "url": "/api/return-settlements/1/void",
+    "body": {},
+    "status": 200,
+    "response": {
+      "success": true,
+      "message": "Settlement voided successfully"
+    },
+    "economicHashBefore": "78d86749eab40a09c7fad5e1d820302e6022885388c0b5f29b49494220f15499",
+    "economicHashAfter": "9343039d9e0ff6db35497ab016ca4dc73445b28e0bd3387900afb775e917ebd7"
+  }
+]

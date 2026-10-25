@@ -1,0 +1,1205 @@
+{
+  "project": "media-fawad-26F2EFA7F2EF7987-D-minierp-flutter",
+  "signal": "best_effort",
+  "indexed_at": "2026-10-25T03:03:34Z",
+  "metadata": {
+    "generation": "2026-10-25T03:03:34Z",
+    "index_mode": "full",
+    "recorded_at": "2026-10-25T03:03:36Z",
+    "recording_status": "complete",
+    "ignored_files_stored": 203,
+    "ignored_files_total": 203,
+    "hash_records_complete": true,
+    "coverage_version": 3,
+    "generation_matches": true
+  },
+  "paths": [],
+  "scopes": [
+    {
+      "requested_scope": "server/src",
+      "scope": "server/src",
+      "total": 62,
+      "has_more": false,
+      "entries": [
+        {
+          "path": "server/src/__tests__/adminBackupDotfileDownload.test.ts",
+          "kind": "parse_partial",
+          "detail": "33-33,33-33",
+          "ranges": [
+            {
+              "start": 33,
+              "end": 33
+            },
+            {
+              "start": 33,
+              "end": 33
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/108_unapplied_customer_payments.sql",
+          "kind": "parse_partial",
+          "detail": "31-31,34-34,54-54,63-63",
+          "ranges": [
+            {
+              "start": 31,
+              "end": 31
+            },
+            {
+              "start": 34,
+              "end": 34
+            },
+            {
+              "start": 54,
+              "end": 54
+            },
+            {
+              "start": 63,
+              "end": 63
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/110_unapplied_currency_precision.sql",
+          "kind": "parse_partial",
+          "detail": "5-5,32-32",
+          "ranges": [
+            {
+              "start": 5,
+              "end": 5
+            },
+            {
+              "start": 32,
+              "end": 32
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/111_unapplied_receipt_replay.sql",
+          "kind": "parse_partial",
+          "detail": "3-3,3-5",
+          "ranges": [
+            {
+              "start": 3,
+              "end": 3
+            },
+            {
+              "start": 3,
+              "end": 5
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/112_expense_payables.sql",
+          "kind": "parse_partial",
+          "detail": "11-11,15-15",
+          "ranges": [
+            {
+              "start": 11,
+              "end": 11
+            },
+            {
+              "start": 15,
+              "end": 15
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/113_supplier_bills.sql",
+          "kind": "parse_partial",
+          "detail": "11-11,15-15,33-33",
+          "ranges": [
+            {
+              "start": 11,
+              "end": 11
+            },
+            {
+              "start": 15,
+              "end": 15
+            },
+            {
+              "start": 33,
+              "end": 33
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/114_supplier_prepayments.sql",
+          "kind": "parse_partial",
+          "detail": "11-11,15-15,31-31",
+          "ranges": [
+            {
+              "start": 11,
+              "end": 11
+            },
+            {
+              "start": 15,
+              "end": 15
+            },
+            {
+              "start": 31,
+              "end": 31
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-activity-log-purge-permission.sql",
+          "kind": "parse_partial",
+          "detail": "4-4,7-7",
+          "ranges": [
+            {
+              "start": 4,
+              "end": 4
+            },
+            {
+              "start": 7,
+              "end": 7
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-batch-costing.sql",
+          "kind": "parse_partial",
+          "detail": "7-7",
+          "ranges": [
+            {
+              "start": 7,
+              "end": 7
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-batch-location-model.sql",
+          "kind": "parse_partial",
+          "detail": "8-8,20-20,24-24,28-28,45-45,69-69,89-111",
+          "ranges": [
+            {
+              "start": 8,
+              "end": 8
+            },
+            {
+              "start": 20,
+              "end": 20
+            },
+            {
+              "start": 24,
+              "end": 24
+            },
+            {
+              "start": 28,
+              "end": 28
+            },
+            {
+              "start": 45,
+              "end": 45
+            },
+            {
+              "start": 69,
+              "end": 69
+            },
+            {
+              "start": 89,
+              "end": 111
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-bom-tables.sql",
+          "kind": "parse_partial",
+          "detail": "5-5,9-9,23-23,31-31",
+          "ranges": [
+            {
+              "start": 5,
+              "end": 5
+            },
+            {
+              "start": 9,
+              "end": 9
+            },
+            {
+              "start": 23,
+              "end": 23
+            },
+            {
+              "start": 31,
+              "end": 31
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-cash-accounts.sql",
+          "kind": "parse_partial",
+          "detail": "16-16,25-25",
+          "ranges": [
+            {
+              "start": 16,
+              "end": 16
+            },
+            {
+              "start": 25,
+              "end": 25
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-custom-reports.sql",
+          "kind": "parse_partial",
+          "detail": "8-8",
+          "ranges": [
+            {
+              "start": 8,
+              "end": 8
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-customer-credit-account.sql",
+          "kind": "parse_partial",
+          "detail": "5-5",
+          "ranges": [
+            {
+              "start": 5,
+              "end": 5
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-demand-forecasts.sql",
+          "kind": "parse_partial",
+          "detail": "5-5",
+          "ranges": [
+            {
+              "start": 5,
+              "end": 5
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-disposition-and-supplier-refunds.sql",
+          "kind": "parse_partial",
+          "detail": "20-20",
+          "ranges": [
+            {
+              "start": 20,
+              "end": 20
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-employee-loans.sql",
+          "kind": "parse_partial",
+          "detail": "9-9,13-13,19-19,44-44",
+          "ranges": [
+            {
+              "start": 9,
+              "end": 9
+            },
+            {
+              "start": 13,
+              "end": 13
+            },
+            {
+              "start": 19,
+              "end": 19
+            },
+            {
+              "start": 44,
+              "end": 44
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-employees-table.sql",
+          "kind": "parse_partial",
+          "detail": "3-3,40-40,55-74",
+          "ranges": [
+            {
+              "start": 3,
+              "end": 3
+            },
+            {
+              "start": 40,
+              "end": 40
+            },
+            {
+              "start": 55,
+              "end": 74
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-expenses-table.sql",
+          "kind": "parse_partial",
+          "detail": "5-5,24-24,33-33",
+          "ranges": [
+            {
+              "start": 5,
+              "end": 5
+            },
+            {
+              "start": 24,
+              "end": 24
+            },
+            {
+              "start": 33,
+              "end": 33
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-expired-stock.sql",
+          "kind": "parse_partial",
+          "detail": "19-19,38-38,45-50",
+          "ranges": [
+            {
+              "start": 19,
+              "end": 19
+            },
+            {
+              "start": 38,
+              "end": 38
+            },
+            {
+              "start": 45,
+              "end": 50
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-full-sales-cycle.sql",
+          "kind": "parse_partial",
+          "detail": "11-11,32-32",
+          "ranges": [
+            {
+              "start": 11,
+              "end": 11
+            },
+            {
+              "start": 32,
+              "end": 32
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-gl-foundation.sql",
+          "kind": "parse_partial",
+          "detail": "17-17,35-35,58-58,83-83",
+          "ranges": [
+            {
+              "start": 17,
+              "end": 17
+            },
+            {
+              "start": 35,
+              "end": 35
+            },
+            {
+              "start": 58,
+              "end": 58
+            },
+            {
+              "start": 83,
+              "end": 83
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-idempotency-keys.sql",
+          "kind": "parse_partial",
+          "detail": "13-14",
+          "ranges": [
+            {
+              "start": 13,
+              "end": 14
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-integration-settings.sql",
+          "kind": "parse_partial",
+          "detail": "4-4,11-11,18-18,24-24,29-29,36-36",
+          "ranges": [
+            {
+              "start": 4,
+              "end": 4
+            },
+            {
+              "start": 11,
+              "end": 11
+            },
+            {
+              "start": 18,
+              "end": 18
+            },
+            {
+              "start": 24,
+              "end": 24
+            },
+            {
+              "start": 29,
+              "end": 29
+            },
+            {
+              "start": 36,
+              "end": 36
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-invoice-discount-tax-fields.sql",
+          "kind": "parse_partial",
+          "detail": "15-15",
+          "ranges": [
+            {
+              "start": 15,
+              "end": 15
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-invoice-return-settled-ceiling.sql",
+          "kind": "parse_partial",
+          "detail": "24-36",
+          "ranges": [
+            {
+              "start": 24,
+              "end": 36
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-invoice-returns.sql",
+          "kind": "parse_partial",
+          "detail": "17-17,47-47,65-65",
+          "ranges": [
+            {
+              "start": 17,
+              "end": 17
+            },
+            {
+              "start": 47,
+              "end": 47
+            },
+            {
+              "start": 65,
+              "end": 65
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-item-locations.sql",
+          "kind": "parse_partial",
+          "detail": "5-5",
+          "ranges": [
+            {
+              "start": 5,
+              "end": 5
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-journal-balance-commit-guard.sql",
+          "kind": "parse_partial",
+          "detail": "9-9,20-66",
+          "ranges": [
+            {
+              "start": 9,
+              "end": 9
+            },
+            {
+              "start": 20,
+              "end": 66
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-missing-fk-indexes.sql",
+          "kind": "parse_partial",
+          "detail": "40-51",
+          "ranges": [
+            {
+              "start": 40,
+              "end": 51
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-missing-guarded-permissions.sql",
+          "kind": "parse_partial",
+          "detail": "28-28,48-48",
+          "ranges": [
+            {
+              "start": 28,
+              "end": 28
+            },
+            {
+              "start": 48,
+              "end": 48
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-missing-indexes.sql",
+          "kind": "parse_partial",
+          "detail": "15-17",
+          "ranges": [
+            {
+              "start": 15,
+              "end": 17
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-mobile-invoice-tables.sql",
+          "kind": "parse_partial",
+          "detail": "10-10,37-37,49-50,54-54,54-54,58-58,58-58,62-62,62-62,66-66,66-66,72-72,85-85,85-85,89-89,89-89,93-93,93-93,97-97,97-97,101-101,101-101,105-105,105-105,109-109,109-109,113-113,113-113",
+          "ranges": [
+            {
+              "start": 10,
+              "end": 10
+            },
+            {
+              "start": 37,
+              "end": 37
+            },
+            {
+              "start": 49,
+              "end": 50
+            },
+            {
+              "start": 54,
+              "end": 54
+            },
+            {
+              "start": 54,
+              "end": 54
+            },
+            {
+              "start": 58,
+              "end": 58
+            },
+            {
+              "start": 58,
+              "end": 58
+            },
+            {
+              "start": 62,
+              "end": 62
+            },
+            {
+              "start": 62,
+              "end": 62
+            },
+            {
+              "start": 66,
+              "end": 66
+            },
+            {
+              "start": 66,
+              "end": 66
+            },
+            {
+              "start": 72,
+              "end": 72
+            },
+            {
+              "start": 85,
+              "end": 85
+            },
+            {
+              "start": 85,
+              "end": 85
+            },
+            {
+              "start": 89,
+              "end": 89
+            },
+            {
+              "start": 89,
+              "end": 89
+            },
+            {
+              "start": 93,
+              "end": 93
+            },
+            {
+              "start": 93,
+              "end": 93
+            },
+            {
+              "start": 97,
+              "end": 97
+            },
+            {
+              "start": 97,
+              "end": 97
+            },
+            {
+              "start": 101,
+              "end": 101
+            },
+            {
+              "start": 101,
+              "end": 101
+            },
+            {
+              "start": 105,
+              "end": 105
+            },
+            {
+              "start": 105,
+              "end": 105
+            },
+            {
+              "start": 109,
+              "end": 109
+            },
+            {
+              "start": 109,
+              "end": 109
+            },
+            {
+              "start": 113,
+              "end": 113
+            },
+            {
+              "start": 113,
+              "end": 113
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-opening-balances.sql",
+          "kind": "parse_partial",
+          "detail": "13-13",
+          "ranges": [
+            {
+              "start": 13,
+              "end": 13
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-owner-equity.sql",
+          "kind": "parse_partial",
+          "detail": "18-18,30-30,54-54,72-72",
+          "ranges": [
+            {
+              "start": 18,
+              "end": 18
+            },
+            {
+              "start": 30,
+              "end": 30
+            },
+            {
+              "start": 54,
+              "end": 54
+            },
+            {
+              "start": 72,
+              "end": 72
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-owner-personal-loans.sql",
+          "kind": "parse_partial",
+          "detail": "15-15,35-35,66-66",
+          "ranges": [
+            {
+              "start": 15,
+              "end": 15
+            },
+            {
+              "start": 35,
+              "end": 35
+            },
+            {
+              "start": 66,
+              "end": 66
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-payments-counterparty-check.sql",
+          "kind": "parse_partial",
+          "detail": "16-16",
+          "ranges": [
+            {
+              "start": 16,
+              "end": 16
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-performance-indexes.sql",
+          "kind": "parse_partial",
+          "detail": "73-73",
+          "ranges": [
+            {
+              "start": 73,
+              "end": 73
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-physical-counts.sql",
+          "kind": "parse_partial",
+          "detail": "6-6,24-24",
+          "ranges": [
+            {
+              "start": 6,
+              "end": 6
+            },
+            {
+              "start": 24,
+              "end": 24
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-production-outputs.sql",
+          "kind": "parse_partial",
+          "detail": "9-9",
+          "ranges": [
+            {
+              "start": 9,
+              "end": 9
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-production-overhead-payable.sql",
+          "kind": "parse_partial",
+          "detail": "12-12",
+          "ranges": [
+            {
+              "start": 12,
+              "end": 12
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-production-tables.sql",
+          "kind": "parse_partial",
+          "detail": "3-3,23-23",
+          "ranges": [
+            {
+              "start": 3,
+              "end": 3
+            },
+            {
+              "start": 23,
+              "end": 23
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-purchase-return-batches.sql",
+          "kind": "parse_partial",
+          "detail": "8-8",
+          "ranges": [
+            {
+              "start": 8,
+              "end": 8
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-purchase-returns-tables.sql",
+          "kind": "parse_partial",
+          "detail": "21-21,51-51,71-71",
+          "ranges": [
+            {
+              "start": 21,
+              "end": 21
+            },
+            {
+              "start": 51,
+              "end": 51
+            },
+            {
+              "start": 71,
+              "end": 71
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-purchase-supplier-payment.sql",
+          "kind": "parse_partial",
+          "detail": "11-11",
+          "ranges": [
+            {
+              "start": 11,
+              "end": 11
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-purchases-table.sql",
+          "kind": "parse_partial",
+          "detail": "3-3",
+          "ranges": [
+            {
+              "start": 3,
+              "end": 3
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-raw-materials-warehouse.sql",
+          "kind": "parse_partial",
+          "detail": "18-18",
+          "ranges": [
+            {
+              "start": 18,
+              "end": 18
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-roles-permissions.sql",
+          "kind": "parse_partial",
+          "detail": "7-7,18-18,28-28,42-42",
+          "ranges": [
+            {
+              "start": 7,
+              "end": 7
+            },
+            {
+              "start": 18,
+              "end": 18
+            },
+            {
+              "start": 28,
+              "end": 28
+            },
+            {
+              "start": 42,
+              "end": 42
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-salary-payments.sql",
+          "kind": "parse_partial",
+          "detail": "7-7",
+          "ranges": [
+            {
+              "start": 7,
+              "end": 7
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-sales-table.sql",
+          "kind": "parse_partial",
+          "detail": "3-3",
+          "ranges": [
+            {
+              "start": 3,
+              "end": 3
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-stock-adjustment-financial.sql",
+          "kind": "parse_partial",
+          "detail": "8-8",
+          "ranges": [
+            {
+              "start": 8,
+              "end": 8
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/add-supplier-payment-support.sql",
+          "kind": "parse_partial",
+          "detail": "10-10",
+          "ranges": [
+            {
+              "start": 10,
+              "end": 10
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/create-customer-ledger.sql",
+          "kind": "parse_partial",
+          "detail": "5-5",
+          "ranges": [
+            {
+              "start": 5,
+              "end": 5
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/create-payment-allocations.sql",
+          "kind": "parse_partial",
+          "detail": "5-5",
+          "ranges": [
+            {
+              "start": 5,
+              "end": 5
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/create-supplier-ledger.sql",
+          "kind": "parse_partial",
+          "detail": "5-5",
+          "ranges": [
+            {
+              "start": 5,
+              "end": 5
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/customer-ar-migration.sql",
+          "kind": "parse_partial",
+          "detail": "12-12,27-27",
+          "ranges": [
+            {
+              "start": 12,
+              "end": 12
+            },
+            {
+              "start": 27,
+              "end": 27
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/dashboard-layouts.sql",
+          "kind": "parse_partial",
+          "detail": "10-10",
+          "ranges": [
+            {
+              "start": 10,
+              "end": 10
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/enhance-forecasts.sql",
+          "kind": "parse_partial",
+          "detail": "23-23,42-42,69-69,86-86,97-97",
+          "ranges": [
+            {
+              "start": 23,
+              "end": 23
+            },
+            {
+              "start": 42,
+              "end": 42
+            },
+            {
+              "start": 69,
+              "end": 69
+            },
+            {
+              "start": 86,
+              "end": 86
+            },
+            {
+              "start": 97,
+              "end": 97
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/init.sql",
+          "kind": "parse_partial",
+          "detail": "12-12,37-37,60-60,70-70,90-90,106-106,121-121,140-140,153-153,167-167,183-183,199-199,218-218,231-231,252-252,264-264,286-286,301-301,312-312,335-335,352-352",
+          "ranges": [
+            {
+              "start": 12,
+              "end": 12
+            },
+            {
+              "start": 37,
+              "end": 37
+            },
+            {
+              "start": 60,
+              "end": 60
+            },
+            {
+              "start": 70,
+              "end": 70
+            },
+            {
+              "start": 90,
+              "end": 90
+            },
+            {
+              "start": 106,
+              "end": 106
+            },
+            {
+              "start": 121,
+              "end": 121
+            },
+            {
+              "start": 140,
+              "end": 140
+            },
+            {
+              "start": 153,
+              "end": 153
+            },
+            {
+              "start": 167,
+              "end": 167
+            },
+            {
+              "start": 183,
+              "end": 183
+            },
+            {
+              "start": 199,
+              "end": 199
+            },
+            {
+              "start": 218,
+              "end": 218
+            },
+            {
+              "start": 231,
+              "end": 231
+            },
+            {
+              "start": 252,
+              "end": 252
+            },
+            {
+              "start": 264,
+              "end": 264
+            },
+            {
+              "start": 286,
+              "end": 286
+            },
+            {
+              "start": 301,
+              "end": 301
+            },
+            {
+              "start": 312,
+              "end": 312
+            },
+            {
+              "start": 335,
+              "end": 335
+            },
+            {
+              "start": 352,
+              "end": 352
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/normalize-payment-methods.sql",
+          "kind": "parse_partial",
+          "detail": "13-13",
+          "ranges": [
+            {
+              "start": 13,
+              "end": 13
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/scope-idempotency-keys.sql",
+          "kind": "parse_partial",
+          "detail": "23-24,33-33",
+          "ranges": [
+            {
+              "start": 23,
+              "end": 24
+            },
+            {
+              "start": 33,
+              "end": 33
+            }
+          ]
+        },
+        {
+          "path": "server/src/migrations/seed-expense-sequence.sql",
+          "kind": "parse_partial",
+          "detail": "6-6",
+          "ranges": [
+            {
+              "start": 6,
+              "end": 6
+            }
+          ]
+        }
+      ],
+      "status": "known_gaps"
+    },
+    {
+      "requested_scope": "lib",
+      "scope": "lib",
+      "total": 3,
+      "has_more": false,
+      "entries": [
+        {
+          "path": "lib/data/models/activity_log.dart",
+          "kind": "parse_partial",
+          "detail": "10-10",
+          "ranges": [
+            {
+              "start": 10,
+              "end": 10
+            }
+          ]
+        },
+        {
+          "path": "lib/data/models/json_helpers.dart",
+          "kind": "parse_partial",
+          "detail": "8-8",
+          "ranges": [
+            {
+              "start": 8,
+              "end": 8
+            }
+          ]
+        },
+        {
+          "path": "lib/data/models/setting.dart",
+          "kind": "parse_partial",
+          "detail": "5-5",
+          "ranges": [
+            {
+              "start": 5,
+              "end": 5
+            }
+          ]
+        }
+      ],
+      "status": "known_gaps"
+    },
+    {
+      "requested_scope": "test",
+      "scope": "test",
+      "total": 0,
+      "has_more": false,
+      "entries": [],
+      "status": "no_recorded_issue"
+    },
+    {
+      "requested_scope": "integration_test",
+      "scope": "integration_test",
+      "total": 0,
+      "has_more": false,
+      "entries": [],
+      "status": "no_recorded_issue"
+    }
+  ],
+  "caveat": "Best-effort signal only. No recorded issue does not prove graph or source completeness; read flagged source and qualify claims when metadata is changed or unavailable."
+}

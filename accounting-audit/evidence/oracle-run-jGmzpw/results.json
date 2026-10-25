@@ -1,0 +1,85 @@
+{
+  "runDir": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-jGmzpw",
+  "families": [
+    {
+      "id": 1,
+      "name": "retail: 70 @10, sell 15 @15, return 3, resale 2",
+      "status": "BLOCKED",
+      "error": "Error: post /api/customers 400 {\"success\":false,\"error\":{\"code\":\"VALIDATION_ERROR\",\"message\":\"Validation failed\",\"details\":[{\"field\":\"phone\",\"message\":\"Invalid input: expected string, received undefined\"}]}}"
+    },
+    {
+      "id": 2,
+      "name": "partial payment return, credit and settlement cap",
+      "status": "BLOCKED",
+      "error": "Error: post /api/customers 400 {\"success\":false,\"error\":{\"code\":\"VALIDATION_ERROR\",\"message\":\"Validation failed\",\"details\":[{\"field\":\"phone\",\"message\":\"Invalid input: expected string, received undefined\"}]}}"
+    },
+    {
+      "id": 3,
+      "name": "supplier return credit and refund",
+      "status": "BLOCKED",
+      "error": "Error: post /api/customers 400 {\"success\":false,\"error\":{\"code\":\"VALIDATION_ERROR\",\"message\":\"Validation failed\",\"details\":[{\"field\":\"phone\",\"message\":\"Invalid input: expected string, received undefined\"}]}}"
+    },
+    {
+      "id": 4,
+      "name": "purchase order partial receipt and partial payment",
+      "status": "BLOCKED",
+      "error": "Error: post /api/customers 400 {\"success\":false,\"error\":{\"code\":\"VALIDATION_ERROR\",\"message\":\"Validation failed\",\"details\":[{\"field\":\"phone\",\"message\":\"Invalid input: expected string, received undefined\"}]}}"
+    },
+    {
+      "id": 5,
+      "name": "damaged warehouse transfer and write-off",
+      "status": "BLOCKED",
+      "error": "Error: post /api/customers 400 {\"success\":false,\"error\":{\"code\":\"VALIDATION_ERROR\",\"message\":\"Validation failed\",\"details\":[{\"field\":\"phone\",\"message\":\"Invalid input: expected string, received undefined\"}]}}"
+    },
+    {
+      "id": 6,
+      "name": "payment then invoice reversal, double request",
+      "status": "BLOCKED",
+      "error": "Error: post /api/customers 400 {\"success\":false,\"error\":{\"code\":\"VALIDATION_ERROR\",\"message\":\"Validation failed\",\"details\":[{\"field\":\"phone\",\"message\":\"Invalid input: expected string, received undefined\"}]}}"
+    },
+    {
+      "id": 7,
+      "name": "backdated sale before inventory acquisition",
+      "status": "BLOCKED",
+      "error": "Error: post /api/customers 400 {\"success\":false,\"error\":{\"code\":\"VALIDATION_ERROR\",\"message\":\"Validation failed\",\"details\":[{\"field\":\"phone\",\"message\":\"Invalid input: expected string, received undefined\"}]}}"
+    },
+    {
+      "id": 8,
+      "name": "idempotency replay and changed payload",
+      "status": "BLOCKED",
+      "error": "Error: post /api/customers 400 {\"success\":false,\"error\":{\"code\":\"VALIDATION_ERROR\",\"message\":\"Validation failed\",\"details\":[{\"field\":\"phone\",\"message\":\"Invalid input: expected string, received undefined\"}]}}"
+    },
+    {
+      "id": 9,
+      "name": "closed accounting period rejects posting",
+      "status": "PASS",
+      "checks": 3
+    },
+    {
+      "id": 10,
+      "name": "zero negative and fractional quantities",
+      "status": "BLOCKED",
+      "error": "Error: post /api/customers 400 {\"success\":false,\"error\":{\"code\":\"VALIDATION_ERROR\",\"message\":\"Validation failed\",\"details\":[{\"field\":\"phone\",\"message\":\"Invalid input: expected string, received undefined\"}]}}"
+    }
+  ],
+  "checks": [
+    {
+      "label": "closed period capital rejected",
+      "actual": true,
+      "expected": true,
+      "pass": true
+    },
+    {
+      "label": "closed period cash unchanged",
+      "actual": 1000000,
+      "expected": 1000000,
+      "pass": true
+    },
+    {
+      "label": "period balanced journal groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    }
+  ]
+}

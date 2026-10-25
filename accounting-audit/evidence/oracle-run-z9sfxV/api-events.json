@@ -1,0 +1,619 @@
+[
+  {
+    "method": "post",
+    "url": "/api/owner-equity/capital",
+    "body": {
+      "capital_date": "2026-09-01",
+      "amount": 10000
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "message": "Owner capital recorded successfully",
+      "data": {
+        "id": 1,
+        "capital_no": "CAP-2609-00001",
+        "amount": 10000
+      }
+    },
+    "economicHashBefore": "46bf863c1a51da43d7a9e9c6beb584cb118849ac55078dba24688d4ebc5301ea",
+    "economicHashAfter": "e17689a89ac072b99257f4c1db4bfe2fcead890c3d4b75e32e7d1535f7b4cbd4"
+  },
+  {
+    "method": "post",
+    "url": "/api/inventory/items",
+    "body": {
+      "item_code": "OR-1",
+      "item_name": "credit-two-targets",
+      "unit_of_measure": "pcs"
+    },
+    "status": 201,
+    "response": {
+      "id": 1,
+      "item_code": "OR-1",
+      "item_name": "credit-two-targets",
+      "description": null,
+      "category": null,
+      "unit_of_measure": "pcs",
+      "current_stock": 0,
+      "reorder_level": 0,
+      "standard_cost": 0,
+      "standard_selling_price": 0,
+      "is_raw_material": 0,
+      "is_finished_good": 0,
+      "is_purchased": 1,
+      "is_manufactured": 0,
+      "is_active": 1,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:27:04",
+      "updated_at": "2026-10-25 03:27:04",
+      "has_expiry": 0,
+      "near_expiry_threshold_days": 30,
+      "sale_type": "packed",
+      "qty_decimal_precision": 0,
+      "rounding_step": null,
+      "deleted_at": null,
+      "deleted_by": null
+    },
+    "economicHashBefore": "e17689a89ac072b99257f4c1db4bfe2fcead890c3d4b75e32e7d1535f7b4cbd4",
+    "economicHashAfter": "e17689a89ac072b99257f4c1db4bfe2fcead890c3d4b75e32e7d1535f7b4cbd4"
+  },
+  {
+    "method": "post",
+    "url": "/api/suppliers",
+    "body": {
+      "supplier_code": "OR-S-1",
+      "supplier_name": "credit-two-targets"
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 1,
+        "supplier_code": "OR-S-1",
+        "supplier_name": "credit-two-targets"
+      }
+    },
+    "economicHashBefore": "e17689a89ac072b99257f4c1db4bfe2fcead890c3d4b75e32e7d1535f7b4cbd4",
+    "economicHashAfter": "e0badab5760201d387ccdcaaa36b61ae58496bde5b7392cb89405a7b4a098c38"
+  },
+  {
+    "method": "post",
+    "url": "/api/customers",
+    "body": {
+      "customer_code": "OR-C-1",
+      "customer_name": "credit-two-targets",
+      "phone": "0300-0000000"
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 1,
+        "customer_code": "CUST-1026-00001",
+        "customer_name": "credit-two-targets",
+        "contact_person": "",
+        "email": "",
+        "phone": "0300-0000000",
+        "billing_address": "",
+        "shipping_address": "",
+        "payment_terms": "",
+        "payment_terms_days": 14,
+        "credit_limit": 0,
+        "current_balance": 0,
+        "opening_balance": 0,
+        "credit_balance": 0,
+        "credit_utilization_percent": 0,
+        "is_active": 1,
+        "created_at": "2026-10-25 03:27:04",
+        "updated_at": "2026-10-25 03:27:04"
+      },
+      "message": "Customer created successfully"
+    },
+    "economicHashBefore": "e0badab5760201d387ccdcaaa36b61ae58496bde5b7392cb89405a7b4a098c38",
+    "economicHashAfter": "a7c2a89483026a55712fbe50ff856ff963e260022f1afc075d4cdcbda007f80a"
+  },
+  {
+    "method": "post",
+    "url": "/api/purchases",
+    "body": {
+      "item_id": 1,
+      "supplier_id": 1,
+      "warehouse_id": 1,
+      "quantity": 20,
+      "unit_cost": 10,
+      "purchase_date": "2026-09-01"
+    },
+    "status": 201,
+    "response": {
+      "id": 1,
+      "purchase_no": "PURCH-1026-0001",
+      "item_id": 1,
+      "warehouse_id": 1,
+      "quantity": 20,
+      "unit_cost": 10,
+      "total_cost": 200,
+      "supplier_name": "credit-two-targets",
+      "purchase_date": "2026-09-01",
+      "invoice_no": null,
+      "remarks": null,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:27:04",
+      "updated_at": "2026-10-25 03:27:04",
+      "supplier_id": 1,
+      "returned_quantity": 0,
+      "batch_id": 1,
+      "batch_no": "BATCH-1026-PUR-00001",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "input_tax_amount": 0,
+      "item_code": "OR-1",
+      "item_name": "credit-two-targets",
+      "unit_of_measure": "pcs",
+      "warehouse_code": "WH-001",
+      "warehouse_name": "Main Warehouse",
+      "created_by_username": "admin",
+      "paid_amount": 0,
+      "total_payable": 200,
+      "balance_amount": 200
+    },
+    "economicHashBefore": "a7c2a89483026a55712fbe50ff856ff963e260022f1afc075d4cdcbda007f80a",
+    "economicHashAfter": "8419b65be2b936cef11d6149e28ebedd340b531ceebf88423df63180e2b10cda"
+  },
+  {
+    "method": "post",
+    "url": "/api/invoices",
+    "body": {
+      "invoice_no": "OR-I-2",
+      "customer_id": 1,
+      "invoice_date": "2026-09-02",
+      "warehouse_id": 1,
+      "items": [
+        {
+          "item_id": 1,
+          "warehouse_id": 1,
+          "quantity": 10,
+          "unit_price": 15
+        }
+      ]
+    },
+    "status": 201,
+    "response": {
+      "id": 1,
+      "invoice_no": "INV-1026-00001",
+      "customer_id": 1,
+      "so_id": null,
+      "invoice_date": "2026-09-02",
+      "due_date": "2026-09-16",
+      "status": "Unpaid",
+      "total_amount": 150,
+      "paid_amount": 0,
+      "balance_amount": 150,
+      "notes": null,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:27:05",
+      "updated_at": "2026-10-25 03:27:05",
+      "discount_scope": "invoice",
+      "discount_type": "percentage",
+      "discount_value": 0,
+      "terms": null,
+      "returned_amount": 0,
+      "return_fee": 0,
+      "source_type": "DIRECT",
+      "quotation_id": null,
+      "customer_name": "credit-two-targets",
+      "expiry_notes": null,
+      "override_sale": 0,
+      "deleted_at": null,
+      "deleted_by": null,
+      "deleted_from_status": null,
+      "credit_offset": 0,
+      "payment_status": "Unpaid",
+      "return_status": "None",
+      "deleted_from_payment_status": null,
+      "deleted_from_return_status": null,
+      "customer_email": "",
+      "customer_phone": "0300-0000000",
+      "customer_address": ""
+    },
+    "economicHashBefore": "8419b65be2b936cef11d6149e28ebedd340b531ceebf88423df63180e2b10cda",
+    "economicHashAfter": "c016544dc3a975023cf604bcfd18232c3f5004c942a221b576ef1c9727faa40b"
+  },
+  {
+    "method": "post",
+    "url": "/api/payments",
+    "body": {
+      "customer_id": 1,
+      "payment_date": "2026-09-02",
+      "amount": 150,
+      "payment_method": "cash",
+      "invoice_allocations": [
+        {
+          "invoice_id": 1,
+          "amount": 150
+        }
+      ]
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 1,
+        "payment_no": "PAY-1026-00001",
+        "customer_id": 1,
+        "customer_name": "credit-two-targets",
+        "supplier_id": null,
+        "invoice_id": null,
+        "invoice_no": null,
+        "payment_date": "2026-09-02",
+        "amount": 150,
+        "payment_method": "cash",
+        "reference_no": "",
+        "notes": "",
+        "created_at": "2026-10-25 03:27:05",
+        "voided_at": null,
+        "payment_kind": "RECEIPT",
+        "allocated_invoices": "1",
+        "allocation_amounts": "150",
+        "allocation_ids": "1",
+        "allocations": [
+          {
+            "id": 1,
+            "payment_id": 1,
+            "invoice_id": 1,
+            "invoice_no": "INV-1026-00001",
+            "amount": 150
+          }
+        ]
+      }
+    },
+    "economicHashBefore": "c016544dc3a975023cf604bcfd18232c3f5004c942a221b576ef1c9727faa40b",
+    "economicHashAfter": "4276b9bc94094e15457967d2d1743513262b7e162e11f423be7d51ed9cbd2ed4"
+  },
+  {
+    "method": "post",
+    "url": "/api/invoices/1/return",
+    "body": {
+      "return_date": "2026-09-03",
+      "items": [
+        {
+          "invoice_item_id": 1,
+          "return_quantity": 4
+        }
+      ],
+      "settlements": [
+        {
+          "type": "credit",
+          "amount": 60
+        }
+      ]
+    },
+    "status": 200,
+    "response": {
+      "success": true,
+      "message": "Return processed successfully",
+      "data": {
+        "returnId": 1,
+        "returnNo": "RET-1026-00001",
+        "status": "Settled",
+        "returnedAmount": 60,
+        "feeAmount": 0,
+        "netAmount": 60,
+        "settledAmount": 60,
+        "settlements": [
+          {
+            "id": 1,
+            "return_id": 1,
+            "settlement_no": "CR-1026-00001",
+            "type": "credit",
+            "amount": 60,
+            "method": null,
+            "reference": "CR-1026-00001",
+            "target_invoice_id": null,
+            "payment_id": null,
+            "settled_date": "2026-10-25",
+            "created_by": 1,
+            "created_at": "2026-10-25 03:27:05",
+            "voided_at": null,
+            "voided_by": null
+          }
+        ],
+        "position": {
+          "originalTotal": 150,
+          "totalReturned": 60,
+          "currentInvoiceValue": 90,
+          "totalPaid": 150,
+          "totalFees": 0,
+          "netPosition": 60,
+          "refundCreditDue": 60,
+          "totalSettled": 60,
+          "remainingRefundDue": 0,
+          "balanceDue": 0,
+          "remainingSettlementCapacity": 0,
+          "settledAmount": 60
+        },
+        "returnAmount": 60,
+        "deduction": 0,
+        "netReturn": 60,
+        "refundAmount": 0,
+        "retainedCredit": 60,
+        "totalItems": 1,
+        "returnedItems": [
+          {
+            "invoice_item_id": 1,
+            "item_id": 1,
+            "quantity": 4
+          }
+        ]
+      }
+    },
+    "economicHashBefore": "4276b9bc94094e15457967d2d1743513262b7e162e11f423be7d51ed9cbd2ed4",
+    "economicHashAfter": "1ddeca2bfff4abc5ff8dab50fb7a95dc8f47ad808331ed10630317eec3590fa2"
+  },
+  {
+    "method": "post",
+    "url": "/api/invoices",
+    "body": {
+      "invoice_no": "OR-I-3",
+      "customer_id": 1,
+      "invoice_date": "2026-09-04",
+      "warehouse_id": 1,
+      "items": [
+        {
+          "item_id": 1,
+          "warehouse_id": 1,
+          "quantity": 2,
+          "unit_price": 15
+        }
+      ],
+      "credit_offset": 30
+    },
+    "status": 201,
+    "response": {
+      "id": 2,
+      "invoice_no": "INV-1026-00002",
+      "customer_id": 1,
+      "so_id": null,
+      "invoice_date": "2026-09-04",
+      "due_date": "2026-09-18",
+      "status": "Paid",
+      "total_amount": 30,
+      "paid_amount": 30,
+      "balance_amount": 0,
+      "notes": null,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:27:05",
+      "updated_at": "2026-10-25 03:27:05",
+      "discount_scope": "invoice",
+      "discount_type": "percentage",
+      "discount_value": 0,
+      "terms": null,
+      "returned_amount": 0,
+      "return_fee": 0,
+      "source_type": "DIRECT",
+      "quotation_id": null,
+      "customer_name": "credit-two-targets",
+      "expiry_notes": null,
+      "override_sale": 0,
+      "deleted_at": null,
+      "deleted_by": null,
+      "deleted_from_status": null,
+      "credit_offset": 30,
+      "payment_status": "Paid",
+      "return_status": "None",
+      "deleted_from_payment_status": null,
+      "deleted_from_return_status": null,
+      "customer_email": "",
+      "customer_phone": "0300-0000000",
+      "customer_address": ""
+    },
+    "economicHashBefore": "1ddeca2bfff4abc5ff8dab50fb7a95dc8f47ad808331ed10630317eec3590fa2",
+    "economicHashAfter": "a2ef93b82b5b5f7b4b2086110bb461118c9dda9c05bc16015ba1df8a5e517dd0"
+  },
+  {
+    "method": "post",
+    "url": "/api/invoices",
+    "body": {
+      "invoice_no": "OR-I-4",
+      "customer_id": 1,
+      "invoice_date": "2026-09-04",
+      "warehouse_id": 1,
+      "items": [
+        {
+          "item_id": 1,
+          "warehouse_id": 1,
+          "quantity": 3,
+          "unit_price": 15
+        }
+      ],
+      "credit_offset": 30
+    },
+    "status": 201,
+    "response": {
+      "id": 3,
+      "invoice_no": "INV-1026-00003",
+      "customer_id": 1,
+      "so_id": null,
+      "invoice_date": "2026-09-04",
+      "due_date": "2026-09-18",
+      "status": "Partially Paid",
+      "total_amount": 45,
+      "paid_amount": 30,
+      "balance_amount": 15,
+      "notes": null,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:27:05",
+      "updated_at": "2026-10-25 03:27:05",
+      "discount_scope": "invoice",
+      "discount_type": "percentage",
+      "discount_value": 0,
+      "terms": null,
+      "returned_amount": 0,
+      "return_fee": 0,
+      "source_type": "DIRECT",
+      "quotation_id": null,
+      "customer_name": "credit-two-targets",
+      "expiry_notes": null,
+      "override_sale": 0,
+      "deleted_at": null,
+      "deleted_by": null,
+      "deleted_from_status": null,
+      "credit_offset": 30,
+      "payment_status": "Partially Paid",
+      "return_status": "None",
+      "deleted_from_payment_status": null,
+      "deleted_from_return_status": null,
+      "customer_email": "",
+      "customer_phone": "0300-0000000",
+      "customer_address": ""
+    },
+    "economicHashBefore": "a2ef93b82b5b5f7b4b2086110bb461118c9dda9c05bc16015ba1df8a5e517dd0",
+    "economicHashAfter": "6a04e0699143b7b1f14d656ac44a08b28feec6497b7b6b7c315a0fd4eaac402c"
+  },
+  {
+    "method": "post",
+    "url": "/api/return-settlements/1/void",
+    "body": {},
+    "status": 200,
+    "response": {
+      "success": true,
+      "message": "Settlement voided successfully"
+    },
+    "economicHashBefore": "6a04e0699143b7b1f14d656ac44a08b28feec6497b7b6b7c315a0fd4eaac402c",
+    "economicHashAfter": "a691757b33ecd6a40d38d93c15ff74461c4b62f344f05e4d0dc8c106fb4875e0"
+  },
+  {
+    "method": "post",
+    "url": "/api/invoice-returns/1/settle",
+    "body": {
+      "allocations": [
+        {
+          "type": "credit",
+          "amount": 60
+        }
+      ]
+    },
+    "status": 200,
+    "response": {
+      "success": true,
+      "message": "Return settled successfully",
+      "data": {
+        "returnId": 1,
+        "returnNo": "RET-1026-00001",
+        "status": "Settled",
+        "returnedAmount": 60,
+        "feeAmount": 0,
+        "netAmount": 60,
+        "settledAmount": 60,
+        "settlements": [
+          {
+            "id": 2,
+            "return_id": 1,
+            "settlement_no": "CR-1026-00002",
+            "type": "credit",
+            "amount": 60,
+            "method": null,
+            "reference": "CR-1026-00002",
+            "target_invoice_id": null,
+            "payment_id": null,
+            "settled_date": "2026-10-25",
+            "created_by": 1,
+            "created_at": "2026-10-25 03:27:06",
+            "voided_at": null,
+            "voided_by": null
+          }
+        ],
+        "position": {
+          "originalTotal": 150,
+          "totalReturned": 60,
+          "currentInvoiceValue": 90,
+          "totalPaid": 150,
+          "totalFees": 0,
+          "netPosition": 60,
+          "refundCreditDue": 60,
+          "totalSettled": 60,
+          "remainingRefundDue": 0,
+          "balanceDue": 0,
+          "remainingSettlementCapacity": 0,
+          "settledAmount": 60
+        },
+        "returnAmount": 60,
+        "deduction": 0,
+        "netReturn": 60,
+        "refundAmount": 0,
+        "retainedCredit": 60,
+        "totalItems": 1,
+        "returnedItems": [
+          {
+            "invoice_item_id": 1,
+            "item_id": 1,
+            "quantity": 4
+          }
+        ]
+      }
+    },
+    "economicHashBefore": "a691757b33ecd6a40d38d93c15ff74461c4b62f344f05e4d0dc8c106fb4875e0",
+    "economicHashAfter": "c024343fdbe1f96bb8f6fd7c8b99ff7cf789463f0e672ada5073f5cf71cd0d6a"
+  },
+  {
+    "method": "post",
+    "url": "/api/invoices",
+    "body": {
+      "invoice_no": "OR-I-5",
+      "customer_id": 1,
+      "invoice_date": "2026-10-25",
+      "warehouse_id": 1,
+      "items": [
+        {
+          "item_id": 1,
+          "warehouse_id": 1,
+          "quantity": 4,
+          "unit_price": 15
+        }
+      ],
+      "credit_offset": 60
+    },
+    "status": 201,
+    "response": {
+      "id": 4,
+      "invoice_no": "INV-1026-00004",
+      "customer_id": 1,
+      "so_id": null,
+      "invoice_date": "2026-10-25",
+      "due_date": "2026-11-08",
+      "status": "Paid",
+      "total_amount": 60,
+      "paid_amount": 60,
+      "balance_amount": 0,
+      "notes": null,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:27:06",
+      "updated_at": "2026-10-25 03:27:06",
+      "discount_scope": "invoice",
+      "discount_type": "percentage",
+      "discount_value": 0,
+      "terms": null,
+      "returned_amount": 0,
+      "return_fee": 0,
+      "source_type": "DIRECT",
+      "quotation_id": null,
+      "customer_name": "credit-two-targets",
+      "expiry_notes": null,
+      "override_sale": 0,
+      "deleted_at": null,
+      "deleted_by": null,
+      "deleted_from_status": null,
+      "credit_offset": 60,
+      "payment_status": "Paid",
+      "return_status": "None",
+      "deleted_from_payment_status": null,
+      "deleted_from_return_status": null,
+      "customer_email": "",
+      "customer_phone": "0300-0000000",
+      "customer_address": ""
+    },
+    "economicHashBefore": "c024343fdbe1f96bb8f6fd7c8b99ff7cf789463f0e672ada5073f5cf71cd0d6a",
+    "economicHashAfter": "d221c2a3b010d3c33353f3d1792a7d1f5ef030fd71259910fb2b952c4bd570ce"
+  }
+]

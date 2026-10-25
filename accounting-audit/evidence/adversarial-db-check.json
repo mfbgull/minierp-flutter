@@ -1,0 +1,307 @@
+{
+  "oracle-run-z9sfxV": {
+    "integrity": [
+      {
+        "integrity_check": "ok"
+      }
+    ],
+    "fk": [],
+    "gl": [
+      {
+        "code": "1000",
+        "net": 10150
+      },
+      {
+        "code": "1100",
+        "net": -45
+      },
+      {
+        "code": "1110",
+        "net": 120
+      },
+      {
+        "code": "1200",
+        "net": 50
+      },
+      {
+        "code": "2000",
+        "net": -200
+      },
+      {
+        "code": "3200",
+        "net": -10000
+      },
+      {
+        "code": "4000",
+        "net": -285
+      },
+      {
+        "code": "4100",
+        "net": 60
+      },
+      {
+        "code": "5000",
+        "net": 150
+      }
+    ],
+    "unbalanced": [],
+    "customers": [
+      {
+        "id": 1,
+        "current_balance": 15,
+        "credit_balance": 0
+      }
+    ],
+    "invoices": [
+      {
+        "id": 1,
+        "total_amount": 150,
+        "paid_amount": 150,
+        "balance_amount": 0,
+        "credit_offset": 0
+      },
+      {
+        "id": 2,
+        "total_amount": 30,
+        "paid_amount": 30,
+        "balance_amount": 0,
+        "credit_offset": 30
+      },
+      {
+        "id": 3,
+        "total_amount": 45,
+        "paid_amount": 30,
+        "balance_amount": 15,
+        "credit_offset": 30
+      },
+      {
+        "id": 4,
+        "total_amount": 60,
+        "paid_amount": 60,
+        "balance_amount": 0,
+        "credit_offset": 60
+      }
+    ],
+    "settlements": [
+      {
+        "id": 1,
+        "return_id": 1,
+        "settlement_no": "CR-1026-00001",
+        "type": "credit",
+        "amount": 60,
+        "method": null,
+        "reference": "CR-1026-00001",
+        "target_invoice_id": null,
+        "payment_id": null,
+        "settled_date": "2026-10-25",
+        "created_by": 1,
+        "created_at": "2026-10-25 03:27:05",
+        "voided_at": "2026-10-25T03:27:05.970Z",
+        "voided_by": 1
+      },
+      {
+        "id": 2,
+        "return_id": 1,
+        "settlement_no": "CR-1026-00002",
+        "type": "credit",
+        "amount": 60,
+        "method": null,
+        "reference": "CR-1026-00002",
+        "target_invoice_id": null,
+        "payment_id": null,
+        "settled_date": "2026-10-25",
+        "created_by": 1,
+        "created_at": "2026-10-25 03:27:06",
+        "voided_at": null,
+        "voided_by": null
+      }
+    ]
+  },
+  "backend-run-Lbw3la": {
+    "integrity": [
+      {
+        "integrity_check": "ok"
+      }
+    ],
+    "fk": [],
+    "gl": [
+      {
+        "code": "1010",
+        "net": 7700
+      },
+      {
+        "code": "1200",
+        "net": 0.03
+      },
+      {
+        "code": "1300",
+        "net": 300
+      },
+      {
+        "code": "1310",
+        "net": 200
+      },
+      {
+        "code": "2000",
+        "net": -100.02
+      },
+      {
+        "code": "2115",
+        "net": -100
+      },
+      {
+        "code": "3200",
+        "net": -10000
+      },
+      {
+        "code": "6000",
+        "net": 200
+      },
+      {
+        "code": "6100",
+        "net": 1800
+      },
+      {
+        "code": "7000",
+        "net": -0.01
+      }
+    ],
+    "unbalanced": [],
+    "salary": [
+      {
+        "amount": 1000,
+        "pay_period": "2026-08",
+        "payment_type": "partial"
+      },
+      {
+        "amount": 200,
+        "pay_period": "2026-09",
+        "payment_type": "advance"
+      },
+      {
+        "amount": 800,
+        "pay_period": "2026-09",
+        "payment_type": "full"
+      }
+    ],
+    "negative": [
+      {
+        "item_id": 5,
+        "unit_cost": -0.01,
+        "quantity_remaining": 1
+      }
+    ],
+    "loanBefore": [
+      {
+        "net": -200
+      }
+    ],
+    "outputs": [
+      {
+        "allocated_cost": 0.01
+      },
+      {
+        "allocated_cost": 0.01
+      },
+      {
+        "allocated_cost": 0.01
+      },
+      {
+        "allocated_cost": -0.01
+      }
+    ]
+  },
+  "oracle-run-AbsZeT": {
+    "integrity": [
+      {
+        "integrity_check": "ok"
+      }
+    ],
+    "fk": [],
+    "gl": [
+      {
+        "code": "1000",
+        "net": 10173
+      },
+      {
+        "code": "1100",
+        "net": 55.3
+      },
+      {
+        "code": "1110",
+        "net": 5
+      },
+      {
+        "code": "1200",
+        "net": 1080.7
+      },
+      {
+        "code": "2000",
+        "net": -1236
+      },
+      {
+        "code": "2110",
+        "net": -10
+      },
+      {
+        "code": "3200",
+        "net": -10000
+      },
+      {
+        "code": "4000",
+        "net": -465.3
+      },
+      {
+        "code": "4100",
+        "net": 120
+      },
+      {
+        "code": "5000",
+        "net": 230.3
+      },
+      {
+        "code": "6000",
+        "net": 17
+      },
+      {
+        "code": "7202",
+        "net": 30
+      }
+    ],
+    "unbalanced": [],
+    "earlyReturns": [
+      {
+        "return_date": "2026-09-09",
+        "invoice_date": "2026-09-11",
+        "line_date": "2026-09-09",
+        "code": "1100",
+        "debit": 0,
+        "credit": 15
+      },
+      {
+        "return_date": "2026-09-09",
+        "invoice_date": "2026-09-11",
+        "line_date": "2026-09-09",
+        "code": "4100",
+        "debit": 15,
+        "credit": 0
+      },
+      {
+        "return_date": "2026-09-09",
+        "invoice_date": "2026-09-11",
+        "line_date": "2026-09-09",
+        "code": "1200",
+        "debit": 10,
+        "credit": 0
+      },
+      {
+        "return_date": "2026-09-09",
+        "invoice_date": "2026-09-11",
+        "line_date": "2026-09-09",
+        "code": "5000",
+        "debit": 0,
+        "credit": 10
+      }
+    ]
+  }
+}

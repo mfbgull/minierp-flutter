@@ -1,0 +1,267 @@
+{
+  "run": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/backend-extension-run-Wi7tJX",
+  "guard": "Every SQLite constructor restricted to newly created run directory",
+  "api": [
+    {
+      "method": "post",
+      "url": "/api/suppliers",
+      "body": {
+        "supplier_code": "COUNT-SUP",
+        "supplier_name": "Count supplier",
+        "phone": "03001234567"
+      },
+      "status": 201,
+      "response": {
+        "success": true,
+        "data": {
+          "id": 1,
+          "supplier_code": "COUNT-SUP",
+          "supplier_name": "Count supplier",
+          "phone": "03001234567"
+        }
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/inventory/items",
+      "body": {
+        "item_code": "MIXED-COUNT",
+        "item_name": "MIXED-COUNT",
+        "unit_of_measure": "Nos",
+        "is_purchased": true,
+        "standard_cost": 10,
+        "standard_selling_price": 50
+      },
+      "status": 201,
+      "response": {
+        "id": 1,
+        "item_code": "MIXED-COUNT",
+        "item_name": "MIXED-COUNT",
+        "description": null,
+        "category": null,
+        "unit_of_measure": "Nos",
+        "current_stock": 0,
+        "reorder_level": 0,
+        "standard_cost": 10,
+        "standard_selling_price": 50,
+        "is_raw_material": 0,
+        "is_finished_good": 0,
+        "is_purchased": 1,
+        "is_manufactured": 0,
+        "is_active": 1,
+        "created_by": 1,
+        "created_at": "2026-10-25 03:41:01",
+        "updated_at": "2026-10-25 03:41:01",
+        "has_expiry": 0,
+        "near_expiry_threshold_days": 30,
+        "sale_type": "packed",
+        "qty_decimal_precision": 0,
+        "rounding_step": null,
+        "deleted_at": null,
+        "deleted_by": null
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/purchases",
+      "body": {
+        "item_id": 1,
+        "warehouse_id": 1,
+        "quantity": 5,
+        "unit_cost": 10,
+        "purchase_date": "2026-09-01",
+        "supplier_id": 1
+      },
+      "status": 201,
+      "response": {
+        "id": 1,
+        "purchase_no": "PURCH-1026-0001",
+        "item_id": 1,
+        "warehouse_id": 1,
+        "quantity": 5,
+        "unit_cost": 10,
+        "total_cost": 50,
+        "supplier_name": "Count supplier",
+        "purchase_date": "2026-09-01",
+        "invoice_no": null,
+        "remarks": null,
+        "created_by": 1,
+        "created_at": "2026-10-25 03:41:01",
+        "updated_at": "2026-10-25 03:41:01",
+        "supplier_id": 1,
+        "returned_quantity": 0,
+        "batch_id": 1,
+        "batch_no": "BATCH-1026-PUR-00001",
+        "voided_at": null,
+        "voided_by": null,
+        "void_reason": null,
+        "input_tax_amount": 0,
+        "item_code": "MIXED-COUNT",
+        "item_name": "MIXED-COUNT",
+        "unit_of_measure": "Nos",
+        "warehouse_code": "WH-001",
+        "warehouse_name": "Main Warehouse",
+        "created_by_username": "admin",
+        "paid_amount": 0,
+        "total_payable": 50,
+        "balance_amount": 50
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/purchases",
+      "body": {
+        "item_id": 1,
+        "warehouse_id": 1,
+        "quantity": 5,
+        "unit_cost": 20,
+        "purchase_date": "2026-09-02",
+        "supplier_id": 1
+      },
+      "status": 201,
+      "response": {
+        "id": 2,
+        "purchase_no": "PURCH-1026-0002",
+        "item_id": 1,
+        "warehouse_id": 1,
+        "quantity": 5,
+        "unit_cost": 20,
+        "total_cost": 100,
+        "supplier_name": "Count supplier",
+        "purchase_date": "2026-09-02",
+        "invoice_no": null,
+        "remarks": null,
+        "created_by": 1,
+        "created_at": "2026-10-25 03:41:01",
+        "updated_at": "2026-10-25 03:41:01",
+        "supplier_id": 1,
+        "returned_quantity": 0,
+        "batch_id": 2,
+        "batch_no": "BATCH-1026-PUR-00002",
+        "voided_at": null,
+        "voided_by": null,
+        "void_reason": null,
+        "input_tax_amount": 0,
+        "item_code": "MIXED-COUNT",
+        "item_name": "MIXED-COUNT",
+        "unit_of_measure": "Nos",
+        "warehouse_code": "WH-001",
+        "warehouse_name": "Main Warehouse",
+        "created_by_username": "admin",
+        "paid_amount": 0,
+        "total_payable": 100,
+        "balance_amount": 100
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/inventory/physical-counts",
+      "body": {
+        "warehouse_id": 1,
+        "count_date": "2026-09-03"
+      },
+      "status": 201,
+      "response": {
+        "id": 1,
+        "count_no": "PC-1026-00001",
+        "count_date": "2026-09-03",
+        "warehouse_id": 1,
+        "status": "Draft",
+        "notes": null,
+        "created_by": 1,
+        "completed_by": null,
+        "completed_at": null,
+        "created_at": "2026-10-25 03:41:01",
+        "updated_at": "2026-10-25 03:41:01",
+        "corrected_at": null,
+        "corrected_by": null,
+        "warehouse_code": "WH-001",
+        "warehouse_name": "Main Warehouse",
+        "created_by_name": "Administrator",
+        "completed_by_name": null,
+        "total_items": 1,
+        "counted_items": 0,
+        "variance_items": 0
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/inventory/physical-counts/1/items",
+      "body": {
+        "item_id": 1,
+        "counted_quantity": 2
+      },
+      "status": 200,
+      "response": {
+        "id": 1,
+        "count_id": 1,
+        "item_id": 1,
+        "system_quantity": 10,
+        "counted_quantity": 2,
+        "variance": -8,
+        "unit_cost": 10,
+        "variance_value": -80,
+        "adjustment_posted": 0,
+        "adjustment_movement_id": null,
+        "counted_at": "2026-10-25 03:41:01",
+        "counted_by": 1,
+        "notes": null,
+        "created_at": "2026-10-25 03:41:01",
+        "item_code": "MIXED-COUNT",
+        "item_name": "MIXED-COUNT",
+        "unit_of_measure": "Nos",
+        "category": null,
+        "counted_by_name": "Administrator"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/inventory/physical-counts/1/complete",
+      "body": {},
+      "status": 200,
+      "response": {
+        "id": 1,
+        "count_no": "PC-1026-00001",
+        "count_date": "2026-09-03",
+        "warehouse_id": 1,
+        "status": "Completed",
+        "notes": null,
+        "created_by": 1,
+        "completed_by": 1,
+        "completed_at": "2026-10-25 03:41:01",
+        "created_at": "2026-10-25 03:41:01",
+        "updated_at": "2026-10-25 03:41:01",
+        "corrected_at": null,
+        "corrected_by": null,
+        "warehouse_code": "WH-001",
+        "warehouse_name": "Main Warehouse",
+        "created_by_name": "Administrator",
+        "completed_by_name": "Administrator",
+        "total_items": 1,
+        "counted_items": 1,
+        "variance_items": 1
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/inventory/physical-counts/1/correct",
+      "body": {
+        "corrections": [
+          {
+            "item_id": 1,
+            "counted_quantity": 8
+          }
+        ]
+      },
+      "status": 500,
+      "response": {
+        "error": "CHECK constraint failed: quantity_remaining >= 0 AND quantity_remaining <= quantity_original"
+      }
+    }
+  ],
+  "scenarios": [],
+  "error": {
+    "message": "Expected values to be strictly equal:\n\n500 !== 200\n",
+    "stack": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n\n500 !== 200\n\n    at main (/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/tests/backend-count-risk.cjs:43:133)\n    at processTicksAndRejections (node:internal/process/task_queues:103:5)"
+  }
+}

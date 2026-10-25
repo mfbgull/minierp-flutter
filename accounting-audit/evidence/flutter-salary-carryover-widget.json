@@ -1,0 +1,45 @@
+{
+  "fixture": {
+    "salary": 1000,
+    "total_paid_including_advance": 200,
+    "advance_carryover": 200,
+    "remaining": 800,
+    "pay_period": "2026-10"
+  },
+  "source_capture": {
+    "source_artifact": "accounting-audit/evidence/backend-run-fPHem1/results.json",
+    "source_request": "GET /api/employees/1/salary/history",
+    "source_status": 200,
+    "row": {
+      "pay_period": "2026-09",
+      "employee_salary": 1000,
+      "total_paid": 200,
+      "remaining": 800,
+      "status": "advance",
+      "payment_count": 1,
+      "advance_carryover": 200,
+      "advance_source_period": "2026-08",
+      "first_payment_date": "2026-08-20",
+      "last_payment_date": "2026-08-20"
+    }
+  },
+  "fixture_adaptation": "pay_period relabeled to current month for default-date dialog; financial fields unchanged",
+  "visible_text": [
+    "Pay Salary",
+    "AUDIT · Audit Fixture",
+    "Amount *",
+    "Payment Date *",
+    "Oct 25, 2026",
+    "Payment Type",
+    "Full",
+    "Already paid this month: Rs. 200.00 + Advance from August 2026: Rs. 200.00 — Remaining Balance: Rs. 600.00",
+    "Payment Method",
+    "Bank Transfer",
+    "Reference No",
+    "Notes",
+    "Cancel",
+    "Pay Salary"
+  ],
+  "expected_remaining": 800,
+  "actual_remaining_from_client_expression": 600
+}

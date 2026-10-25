@@ -1,0 +1,75 @@
+const fs = require('node:fs');
+const path = require('node:path');
+const assert = require('node:assert/strict');
+const root = path.resolve(__dirname, '../..');
+const run = fs.mkdtempSync(path.join(root, 'accounting-audit/evidence/backend-run-'));
+process.env.NODE_ENV = 'test';
+process.env.DATABASE_PATH = run;
+process.env.JWT_SECRET = 'backend-audit-fixture-secret-only-2026';
+process.env.DEFAULT_ADMIN_PASSWORD = 'Backend-audit-fixture-password-2026!';
+process.env.LOG_DIR = path.join(run, 'logs');
+const sqlitePath = require.resolve(path.join(root, 'server/node_modules/better-sqlite3'));
+const Sqlite = require(sqlitePath);
+require.cache[sqlitePath].exports = new Proxy(Sqlite, {construct(target, args) {
+  const file = path.resolve(args[0]);
+  assert(file.startsWith(run + path.sep), `Refusing DB outside disposable fixture: ${file}`);
+  return Reflect.construct(target, args);
+}});
+require(path.join(root, 'server/node_modules/ts-node')).register({project:path.join(root,'server/tsconfig.json'),transpileOnly:true});
+const database = require(path.join(root,'server/src/config/database'));
+const db=database.default;
+const evidence={run,guard:'Every SQLite constructor restricted to newly created run directory',api:[],scenarios:[]};
+let cleanup;
+async function main(){
+  database.applyPendingMigrations(); await database.dbSeedReady;
+  const app=require(path.join(root,'server/src/app')).default;
+  const request=require(path.join(root,'server/node_modules/supertest'));
+  cleanup=()=>{require(path.join(root,'server/src/middleware/rateLimiter')).shutdownRateLimiters();require(path.join(root,'server/src/utils/logger')).default.close();};
+  const login=await request(app).post('/api/auth/login').send({username:'admin',password:process.env.DEFAULT_ADMIN_PASSWORD});
+  assert.equal(login.status,200);
+  const cookie=login.headers['set-cookie'].map(x=>x.split(';')[0]).join('; ');
+  async function api(method,url,body){const res=await request(app)[method](url).set('Cookie',cookie).send(body);evidence.api.push({method,url,body,status:res.status,response:res.body});return res;}
+  function net(code,until='9999-12-31'){return db.prepare('SELECT ROUND(COALESCE(SUM(j.debit-j.credit),0),2) AS amount FROM journal_lines j JOIN chart_of_accounts a ON a.id=j.account_id WHERE a.code=? AND j.voided=0 AND j.line_date<=?').get(code,until).amount;}
+  let res=await api('post','/api/owner-equity/capital',{amount:10000,capital_date:'2026-01-01',payment_method:'Bank'});assert.equal(res.status,201);
+  res=await api('post','/api/employees',{employee_code:'BACKEND-AUDIT',first_name:'Audit',last_name:'Employee',salary:1000});assert.equal(res.status,201);const employee=res.body.data.id;
+  res=await api('post',`/api/employees/${employee}/salary/pay`,{amount:1200,payment_date:'2026-08-20',payment_method:'Bank',payment_type:'partial'});assert.equal(res.status,201);
+  await api('get',`/api/employees/${employee}/salary/history`);
+  const august={salaryExpense:net('6100'),advanceAsset:net('1310'),bank:net('1010')};
+  res=await api('post',`/api/employees/${employee}/salary/pay`,{amount:800,payment_date:'2026-09-20',payment_method:'Bank',payment_type:'full'});assert.equal(res.status,201);
+  const september={salaryExpense:net('6100'),advanceAsset:net('1310'),bank:net('1010')};
+  const profitLoss=await api('get','/api/reports/profit-loss?fromDate=2026-08-01&toDate=2026-09-30');
+  const balanceSheet=await api('get','/api/reports/balance-sheet?asOfDate=2026-09-30');
+  const history=await api('get',`/api/employees/${employee}/salary/history`);
+  evidence.scenarios.push({id:'BACKEND-SALARY-ADVANCE-RECOGNITION',independentExpected:{august:{salaryExpense:1000,advanceAsset:200,bank:8800},september:{salaryExpense:2000,advanceAsset:0,bank:8000}},actual:{august,september,history:history.body,profitLoss:profitLoss.body,balanceSheet:balanceSheet.body},defectReproduced:september.salaryExpense===1800&&september.advanceAsset===200});
+  res=await api('post',`/api/employees/${employee}/loans`,{amount:500,disbursement_date:'2026-09-15',payment_method:'Bank'});assert.equal(res.status,201);const loan=res.body.data.id;
+  res=await api('post',`/api/employees/${employee}/loans/${loan}/repay`,{amount:200,payment_date:'2026-09-01',payment_method:'Bank'});
+  evidence.scenarios.push({id:'BACKEND-LOAN-PREDISBURSEMENT',independentExpected:{status:'4xx',loanReceivableBeforeDisbursement:0},actual:{status:res.status,loanReceivableBeforeDisbursement:net('1300','2026-09-01')},defectReproduced:res.status===201&&net('1300','2026-09-01')===-200});
+  const warehouse=db.prepare("SELECT id FROM warehouses WHERE is_active=1 AND warehouse_code NOT IN ('EXPIRED','DAMAGED') ORDER BY id LIMIT 1").get().id;
+  async function item(code,price){const x=await api('post','/api/inventory/items',{item_code:code,item_name:code,unit_of_measure:'Nos',is_purchased:true,is_manufactured:true,standard_cost:0,standard_selling_price:price});assert.equal(x.status,201);return x.body.id;}
+  const input=await item('AUDIT-RAW',1);const outputs=[];for(let n=0;n<4;n++) outputs.push({item_id:await item('AUDIT-OUT-'+n,1),quantity:1});
+  res=await api('post','/api/suppliers',{supplier_code:'BACKEND-AUDIT-SUP',supplier_name:'Audit supplier',phone:'03001234567'});assert.equal(res.status,201);const supplier=res.body.id??res.body.data?.id;
+  res=await api('post','/api/purchases',{item_id:input,warehouse_id:warehouse,quantity:1,unit_cost:0.02,purchase_date:'2026-09-01',supplier_id:supplier});assert.equal(res.status,201);
+  const productionBefore={inventory:net('1200'),clearing:net('7000')};
+  res=await api('post','/api/productions',{warehouse_id:warehouse,production_date:'2026-09-20',input_items:[{item_id:input,quantity:1}],outputs});
+  const outputRows=db.prepare('SELECT * FROM production_outputs ORDER BY id').all();
+  const productionAfter={inventory:net('1200'),clearing:net('7000')};
+  evidence.scenarios.push({id:'BACKEND-PRODUCTION-ROUNDING',independentExpected:{allocationSum:0.02,allCostsNonnegative:true,inventoryAfter:productionBefore.inventory,clearingAfter:0},actual:{status:res.status,outputRows,productionBefore,productionAfter},defectReproduced:outputRows.some(x=>x.allocated_cost<0)||productionAfter.clearing!==productionBefore.clearing});
+  const category=db.prepare('SELECT category_name FROM expense_categories LIMIT 1').get().category_name;
+  res=await api('post','/api/expenses',{expense_category:category,amount:100,expense_date:'2026-07-10',payment_method:'Credit',description:'Cross-period service accrual'});assert.equal(res.status,201);const expense=res.body.data.id;
+  res=await api('put',`/api/expenses/${expense}`,{status:'Recorded'});assert.equal(res.status,200);
+  res=await api('post','/api/supplier-bills',{supplier_id:supplier,bill_no:'AUDIT-JULY',bill_date:'2026-07-10',description:'Cross-period bill',net_amount:100,input_tax_amount:0});assert.equal(res.status,201);const bill=res.body.data.id;
+  const july=db.prepare("SELECT id FROM accounting_periods WHERE start_date<='2026-07-10' AND end_date>='2026-07-10'").get();
+  res=await api('post',`/api/accounting/periods/${july.id}/close`,{});assert.equal(res.status,200);
+  const beforeSettlement={bank:net('1010'),expensePayable:net('2115'),ap:net('2000')};
+  const expSettlement=await api('post',`/api/expenses/${expense}/payments`,{amount:100,payment_date:'2026-10-01',payment_method:'Bank'});
+  const billSettlement=await api('post',`/api/supplier-bills/${bill}/payments`,{amount:100,payment_date:'2026-10-01',payment_method:'Bank'});
+  evidence.scenarios.push({id:'BACKEND-CLOSED-SOURCE-SETTLEMENT',independentExpected:{expenseStatus:201,billStatus:201,bankDelta:-200,expensePayableDelta:100,apDelta:100,closedJulyUnchanged:true},actual:{expenseStatus:expSettlement.status,billStatus:billSettlement.status,beforeSettlement,afterSettlement:{bank:net('1010'),expensePayable:net('2115'),ap:net('2000')}},defectReproduced:expSettlement.status===409&&billSettlement.status===409});
+  evidence.schema=db.prepare("SELECT type,name,sql FROM sqlite_master WHERE type IN ('table','trigger') ORDER BY type,name").all();
+  evidence.accounts=db.prepare('SELECT * FROM chart_of_accounts ORDER BY code').all();
+  evidence.salaryRows=db.prepare('SELECT * FROM salary_payments').all();
+  evidence.loanRows=db.prepare('SELECT * FROM employee_loans').all();
+  evidence.loanRepayments=db.prepare('SELECT * FROM employee_loan_repayments').all();
+  evidence.journal=db.prepare('SELECT j.*,a.code FROM journal_lines j JOIN chart_of_accounts a ON a.id=j.account_id ORDER BY j.id').all();
+  evidence.integrity=db.pragma('integrity_check');evidence.foreignKeys=db.pragma('foreign_key_check');
+}
+main().then(()=>{evidence.completed=true;}).catch(error=>{evidence.error={message:error.message,stack:error.stack};process.exitCode=1;}).finally(()=>{fs.writeFileSync(path.join(run,'results.json'),JSON.stringify(evidence,null,2));fs.writeFileSync(path.join(root,'accounting-audit/evidence/backend-latest-run.txt'),run+'\n');db.close();if(cleanup)cleanup();console.log(JSON.stringify({run,completed:evidence.completed,scenarios:evidence.scenarios,error:evidence.error},null,2));});

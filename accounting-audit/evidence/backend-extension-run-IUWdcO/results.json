@@ -1,0 +1,676 @@
+{
+  "run": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/backend-extension-run-IUWdcO",
+  "guard": "Every SQLite constructor restricted to newly created run directory",
+  "api": [
+    {
+      "method": "post",
+      "url": "/api/owner-equity/capital",
+      "body": {
+        "amount": 1000,
+        "capital_date": "2026-09-01",
+        "payment_method": "Bank"
+      },
+      "status": 201,
+      "response": {
+        "success": true,
+        "message": "Owner capital recorded successfully",
+        "data": {
+          "id": 1,
+          "capital_no": "CAP-2609-00001",
+          "amount": 1000
+        }
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/inventory/items",
+      "body": {
+        "item_code": "EXT-RAW",
+        "item_name": "EXT-RAW",
+        "unit_of_measure": "Nos",
+        "is_purchased": true,
+        "is_manufactured": true,
+        "standard_cost": 10,
+        "standard_selling_price": 100
+      },
+      "status": 201,
+      "response": {
+        "id": 1,
+        "item_code": "EXT-RAW",
+        "item_name": "EXT-RAW",
+        "description": null,
+        "category": null,
+        "unit_of_measure": "Nos",
+        "current_stock": 0,
+        "reorder_level": 0,
+        "standard_cost": 10,
+        "standard_selling_price": 100,
+        "is_raw_material": 0,
+        "is_finished_good": 0,
+        "is_purchased": 1,
+        "is_manufactured": 1,
+        "is_active": 1,
+        "created_by": 1,
+        "created_at": "2026-10-25 03:40:09",
+        "updated_at": "2026-10-25 03:40:09",
+        "has_expiry": 0,
+        "near_expiry_threshold_days": 30,
+        "sale_type": "packed",
+        "qty_decimal_precision": 0,
+        "rounding_step": null,
+        "deleted_at": null,
+        "deleted_by": null
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/inventory/items",
+      "body": {
+        "item_code": "EXT-OUT-A",
+        "item_name": "EXT-OUT-A",
+        "unit_of_measure": "Nos",
+        "is_purchased": true,
+        "is_manufactured": true,
+        "standard_cost": 10,
+        "standard_selling_price": 30
+      },
+      "status": 201,
+      "response": {
+        "id": 2,
+        "item_code": "EXT-OUT-A",
+        "item_name": "EXT-OUT-A",
+        "description": null,
+        "category": null,
+        "unit_of_measure": "Nos",
+        "current_stock": 0,
+        "reorder_level": 0,
+        "standard_cost": 10,
+        "standard_selling_price": 30,
+        "is_raw_material": 0,
+        "is_finished_good": 0,
+        "is_purchased": 1,
+        "is_manufactured": 1,
+        "is_active": 1,
+        "created_by": 1,
+        "created_at": "2026-10-25 03:40:09",
+        "updated_at": "2026-10-25 03:40:09",
+        "has_expiry": 0,
+        "near_expiry_threshold_days": 30,
+        "sale_type": "packed",
+        "qty_decimal_precision": 0,
+        "rounding_step": null,
+        "deleted_at": null,
+        "deleted_by": null
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/inventory/items",
+      "body": {
+        "item_code": "EXT-OUT-B",
+        "item_name": "EXT-OUT-B",
+        "unit_of_measure": "Nos",
+        "is_purchased": true,
+        "is_manufactured": true,
+        "standard_cost": 10,
+        "standard_selling_price": 10
+      },
+      "status": 201,
+      "response": {
+        "id": 3,
+        "item_code": "EXT-OUT-B",
+        "item_name": "EXT-OUT-B",
+        "description": null,
+        "category": null,
+        "unit_of_measure": "Nos",
+        "current_stock": 0,
+        "reorder_level": 0,
+        "standard_cost": 10,
+        "standard_selling_price": 10,
+        "is_raw_material": 0,
+        "is_finished_good": 0,
+        "is_purchased": 1,
+        "is_manufactured": 1,
+        "is_active": 1,
+        "created_by": 1,
+        "created_at": "2026-10-25 03:40:09",
+        "updated_at": "2026-10-25 03:40:09",
+        "has_expiry": 0,
+        "near_expiry_threshold_days": 30,
+        "sale_type": "packed",
+        "qty_decimal_precision": 0,
+        "rounding_step": null,
+        "deleted_at": null,
+        "deleted_by": null
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/suppliers",
+      "body": {
+        "supplier_code": "EXT-SUP",
+        "supplier_name": "Extension supplier",
+        "phone": "03001234567"
+      },
+      "status": 201,
+      "response": {
+        "success": true,
+        "data": {
+          "id": 1,
+          "supplier_code": "EXT-SUP",
+          "supplier_name": "Extension supplier",
+          "phone": "03001234567"
+        }
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/purchases",
+      "body": {
+        "item_id": 1,
+        "warehouse_id": 1,
+        "quantity": 10,
+        "unit_cost": 10,
+        "purchase_date": "2026-09-02",
+        "supplier_id": 1
+      },
+      "status": 201,
+      "response": {
+        "id": 1,
+        "purchase_no": "PURCH-1026-0001",
+        "item_id": 1,
+        "warehouse_id": 1,
+        "quantity": 10,
+        "unit_cost": 10,
+        "total_cost": 100,
+        "supplier_name": "Extension supplier",
+        "purchase_date": "2026-09-02",
+        "invoice_no": null,
+        "remarks": null,
+        "created_by": 1,
+        "created_at": "2026-10-25 03:40:09",
+        "updated_at": "2026-10-25 03:40:09",
+        "supplier_id": 1,
+        "returned_quantity": 0,
+        "batch_id": 1,
+        "batch_no": "BATCH-1026-PUR-00001",
+        "voided_at": null,
+        "voided_by": null,
+        "void_reason": null,
+        "input_tax_amount": 0,
+        "item_code": "EXT-RAW",
+        "item_name": "EXT-RAW",
+        "unit_of_measure": "Nos",
+        "warehouse_code": "WH-001",
+        "warehouse_name": "Main Warehouse",
+        "created_by_username": "admin",
+        "paid_amount": 0,
+        "total_payable": 100,
+        "balance_amount": 100
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/productions",
+      "body": {
+        "warehouse_id": 1,
+        "production_date": "2026-09-03",
+        "input_items": [
+          {
+            "item_id": 1,
+            "quantity": 6
+          }
+        ],
+        "outputs": [
+          {
+            "item_id": 2,
+            "quantity": 2
+          },
+          {
+            "item_id": 3,
+            "quantity": 3
+          }
+        ],
+        "overhead_cost": 30
+      },
+      "status": 201,
+      "response": {
+        "id": 1,
+        "production_no": "PROD-1026-0001",
+        "output_item_id": 2,
+        "output_quantity": 2,
+        "warehouse_id": 1,
+        "production_date": "2026-09-03",
+        "raw_materials_warehouse_id": 1,
+        "bom_id": null,
+        "overhead_cost": 30,
+        "remarks": null,
+        "created_by": 1,
+        "created_at": "2026-10-25 03:40:09",
+        "updated_at": "2026-10-25 03:40:09",
+        "batch_id": 2,
+        "batch_no": "BATCH-1026-PRD-00002",
+        "unit_cost": 30,
+        "total_material_cost": 60,
+        "total_batch_cost": 90,
+        "expiry_date": null,
+        "output_item_code": "EXT-OUT-A",
+        "output_item_name": "EXT-OUT-A",
+        "output_uom": "Nos",
+        "finished_goods_warehouse_code": "WH-001",
+        "finished_goods_warehouse_name": "Main Warehouse",
+        "raw_materials_warehouse_code": "WH-001",
+        "raw_materials_warehouse_name": "Main Warehouse",
+        "created_by_username": "admin",
+        "inputs": [
+          {
+            "id": 1,
+            "production_id": 1,
+            "item_id": 1,
+            "quantity": 6,
+            "warehouse_id": 1,
+            "item_code": "EXT-RAW",
+            "item_name": "EXT-RAW",
+            "unit_of_measure": "Nos",
+            "warehouse_code": "WH-001",
+            "warehouse_name": "Main Warehouse"
+          }
+        ],
+        "outputs": [
+          {
+            "id": 1,
+            "production_id": 1,
+            "item_id": 2,
+            "quantity": 2,
+            "unit_cost": 30,
+            "allocated_cost": 60,
+            "item_code": "EXT-OUT-A",
+            "item_name": "EXT-OUT-A",
+            "unit_of_measure": "Nos"
+          },
+          {
+            "id": 2,
+            "production_id": 1,
+            "item_id": 3,
+            "quantity": 3,
+            "unit_cost": 10,
+            "allocated_cost": 30,
+            "item_code": "EXT-OUT-B",
+            "item_name": "EXT-OUT-B",
+            "unit_of_measure": "Nos"
+          }
+        ]
+      }
+    },
+    {
+      "method": "delete",
+      "url": "/api/productions/1",
+      "body": {
+        "reason": "Audit reversal"
+      },
+      "status": 200,
+      "response": {
+        "success": true,
+        "message": "Production deleted successfully"
+      }
+    },
+    {
+      "method": "delete",
+      "url": "/api/productions/1",
+      "body": {},
+      "status": 404,
+      "response": {
+        "error": "Production not found"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/owner-equity/withdrawals",
+      "body": {
+        "withdrawal_date": "2026-09-04",
+        "kind": "goods",
+        "items": [
+          {
+            "item_id": 1,
+            "warehouse_id": 1,
+            "quantity": 3
+          }
+        ]
+      },
+      "status": 201,
+      "response": {
+        "success": true,
+        "message": "Owner withdrawal recorded successfully",
+        "data": {
+          "id": 1,
+          "withdrawal_no": "WD-2609-00001",
+          "amount": 30
+        }
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/owner-equity/withdrawals",
+      "body": {
+        "withdrawal_date": "2026-09-04",
+        "kind": "cash",
+        "amount": 50,
+        "payment_method": "Bank"
+      },
+      "status": 201,
+      "response": {
+        "success": true,
+        "message": "Owner withdrawal recorded successfully",
+        "data": {
+          "id": 2,
+          "withdrawal_no": "WD-2609-00002",
+          "amount": 50
+        }
+      }
+    },
+    {
+      "method": "delete",
+      "url": "/api/owner-equity/withdrawals/1",
+      "body": {
+        "reason": "Audit reversal"
+      },
+      "status": 200,
+      "response": {
+        "success": true,
+        "message": "Owner withdrawal voided",
+        "data": {
+          "id": 1,
+          "status": "voided"
+        }
+      }
+    },
+    {
+      "method": "delete",
+      "url": "/api/owner-equity/withdrawals/2",
+      "body": {
+        "reason": "Audit reversal"
+      },
+      "status": 200,
+      "response": {
+        "success": true,
+        "message": "Owner withdrawal voided",
+        "data": {
+          "id": 2,
+          "status": "voided"
+        }
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/inventory/physical-counts",
+      "body": {
+        "warehouse_id": 1,
+        "count_date": "2026-09-05",
+        "notes": "Audit count"
+      },
+      "status": 201,
+      "response": {
+        "id": 1,
+        "count_no": "PC-1026-00001",
+        "count_date": "2026-09-05",
+        "warehouse_id": 1,
+        "status": "Draft",
+        "notes": "Audit count",
+        "created_by": 1,
+        "completed_by": null,
+        "completed_at": null,
+        "created_at": "2026-10-25 03:40:09",
+        "updated_at": "2026-10-25 03:40:09",
+        "corrected_at": null,
+        "corrected_by": null,
+        "warehouse_code": "WH-001",
+        "warehouse_name": "Main Warehouse",
+        "created_by_name": "Administrator",
+        "completed_by_name": null,
+        "total_items": 1,
+        "counted_items": 0,
+        "variance_items": 0
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/inventory/physical-counts/1/items",
+      "body": {
+        "item_id": 1,
+        "counted_quantity": 8
+      },
+      "status": 200,
+      "response": {
+        "id": 1,
+        "count_id": 1,
+        "item_id": 1,
+        "system_quantity": 10,
+        "counted_quantity": 8,
+        "variance": -2,
+        "unit_cost": 10,
+        "variance_value": -20,
+        "adjustment_posted": 0,
+        "adjustment_movement_id": null,
+        "counted_at": "2026-10-25 03:40:09",
+        "counted_by": 1,
+        "notes": null,
+        "created_at": "2026-10-25 03:40:09",
+        "item_code": "EXT-RAW",
+        "item_name": "EXT-RAW",
+        "unit_of_measure": "Nos",
+        "category": null,
+        "counted_by_name": "Administrator"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/inventory/physical-counts/1/complete",
+      "body": {},
+      "status": 200,
+      "response": {
+        "id": 1,
+        "count_no": "PC-1026-00001",
+        "count_date": "2026-09-05",
+        "warehouse_id": 1,
+        "status": "Completed",
+        "notes": "Audit count",
+        "created_by": 1,
+        "completed_by": 1,
+        "completed_at": "2026-10-25 03:40:09",
+        "created_at": "2026-10-25 03:40:09",
+        "updated_at": "2026-10-25 03:40:09",
+        "corrected_at": null,
+        "corrected_by": null,
+        "warehouse_code": "WH-001",
+        "warehouse_name": "Main Warehouse",
+        "created_by_name": "Administrator",
+        "completed_by_name": "Administrator",
+        "total_items": 1,
+        "counted_items": 1,
+        "variance_items": 1
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/inventory/physical-counts/1/correct",
+      "body": {
+        "corrections": [
+          {
+            "item_id": 1,
+            "counted_quantity": 9
+          }
+        ]
+      },
+      "status": 200,
+      "response": {
+        "id": 1,
+        "count_no": "PC-1026-00001",
+        "count_date": "2026-09-05",
+        "warehouse_id": 1,
+        "status": "Completed",
+        "notes": "Audit count",
+        "created_by": 1,
+        "completed_by": 1,
+        "completed_at": "2026-10-25 03:40:09",
+        "created_at": "2026-10-25 03:40:09",
+        "updated_at": "2026-10-25 03:40:09",
+        "corrected_at": "2026-10-25 03:40:09",
+        "corrected_by": 1,
+        "warehouse_code": "WH-001",
+        "warehouse_name": "Main Warehouse",
+        "created_by_name": "Administrator",
+        "completed_by_name": "Administrator",
+        "total_items": 1,
+        "counted_items": 1,
+        "variance_items": 1
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/inventory/physical-counts/1/correct",
+      "body": {
+        "corrections": [
+          {
+            "item_id": 1,
+            "counted_quantity": 10
+          }
+        ]
+      },
+      "status": 400,
+      "response": {
+        "error": "Count PC-1026-00001 has already been corrected"
+      }
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "BACKEND-EXT-PRODUCTION-OVERHEAD-REVERSE",
+      "status": "PASS",
+      "expected": {
+        "inputCost": 60,
+        "overhead": 30,
+        "allocation": [
+          60,
+          30
+        ],
+        "inventoryAfter": 130,
+        "payableAfter": -30,
+        "clearing": 0,
+        "reversalAccountsEqualInitial": true,
+        "repeatedDelete": 404
+      },
+      "actual": {
+        "outputs": [
+          {
+            "id": 1,
+            "production_id": 1,
+            "item_id": 2,
+            "quantity": 2,
+            "unit_cost": 30,
+            "allocated_cost": 60
+          },
+          {
+            "id": 2,
+            "production_id": 1,
+            "item_id": 3,
+            "quantity": 3,
+            "unit_cost": 10,
+            "allocated_cost": 30
+          }
+        ],
+        "produced": {
+          "1010": 1000,
+          "1200": 130,
+          "2000": -100,
+          "2200": -30,
+          "3200": -1000,
+          "3300": 0,
+          "6000": 0,
+          "6100": 0,
+          "7000": 0,
+          "7100": 0,
+          "7200": 0
+        },
+        "reversed": {
+          "1010": 1000,
+          "1200": 100,
+          "2000": -100,
+          "2200": 0,
+          "3200": -1000,
+          "3300": 0,
+          "6000": 0,
+          "6100": 0,
+          "7000": 0,
+          "7100": 0,
+          "7200": 0
+        }
+      },
+      "artifacts": [
+        "01-before-production.json",
+        "02-production-overhead.json",
+        "03-production-reversed.json"
+      ]
+    },
+    {
+      "id": "BACKEND-EXT-OWNER-DRAWINGS",
+      "status": "PASS",
+      "expected": {
+        "goodsCost": 30,
+        "goodsSellingValueNotUsed": 300,
+        "cashDraw": 50,
+        "combinedDrawings": 80,
+        "reversalAccountsEqualInitial": true
+      },
+      "actual": {
+        "goods": {
+          "1010": 1000,
+          "1200": 70,
+          "2000": -100,
+          "2200": 0,
+          "3200": -1000,
+          "3300": 30,
+          "6000": 0,
+          "6100": 0,
+          "7000": 0,
+          "7100": 0,
+          "7200": 0
+        },
+        "cash": {
+          "1010": 950,
+          "1200": 70,
+          "2000": -100,
+          "2200": 0,
+          "3200": -1000,
+          "3300": 80,
+          "6000": 0,
+          "6100": 0,
+          "7000": 0,
+          "7100": 0,
+          "7200": 0
+        },
+        "reversed": {
+          "1010": 1000,
+          "1200": 100,
+          "2000": -100,
+          "2200": 0,
+          "3200": -1000,
+          "3300": 0,
+          "6000": 0,
+          "6100": 0,
+          "7000": 0,
+          "7100": 0,
+          "7200": 0
+        }
+      },
+      "artifacts": [
+        "04-owner-goods.json",
+        "05-owner-cash.json",
+        "06-owner-reversed.json"
+      ]
+    }
+  ],
+  "error": {
+    "message": "Expected values to be strictly equal:\n\n400 !== 409\n",
+    "stack": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n\n400 !== 409\n\n    at main (/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/tests/backend-extension.cjs:60:156)\n    at processTicksAndRejections (node:internal/process/task_queues:103:5)"
+  }
+}

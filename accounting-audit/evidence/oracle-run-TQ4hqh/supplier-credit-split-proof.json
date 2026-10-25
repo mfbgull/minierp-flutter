@@ -1,0 +1,99 @@
+{
+  "database": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-TQ4hqh/erp.db",
+  "queries": {
+    "notes": "SELECT * FROM credit_notes",
+    "supplier": "SELECT id,current_balance FROM suppliers",
+    "purchases": "SELECT * FROM direct_purchase_payables",
+    "allocations": "SELECT * FROM purchase_allocations",
+    "payments": "SELECT id,payment_no,amount,payment_method,voided_at FROM payments",
+    "gl": "SELECT a.code,SUM(j.debit-j.credit) balance FROM journal_lines j JOIN chart_of_accounts a ON a.id=j.account_id WHERE j.voided=0 GROUP BY a.code"
+  },
+  "results": {
+    "notes": [
+      {
+        "id": 1,
+        "credit_no": "CN-1026-0001",
+        "credit_date": "2026-09-03",
+        "supplier_id": 1,
+        "source_type": "PURCHASE_RETURN",
+        "source_id": 1,
+        "amount": 60,
+        "status": "POSTED",
+        "posted_by": 1,
+        "posted_at": "2026-10-25 03:39:58",
+        "voided_at": null,
+        "voided_by": null,
+        "disposition": "credit_on_account"
+      }
+    ],
+    "supplier": [
+      {
+        "id": 1,
+        "current_balance": 15
+      }
+    ],
+    "purchases": [
+      {
+        "id": 1,
+        "total_payable": 100,
+        "returned_amount": 60,
+        "paid_amount": 100
+      },
+      {
+        "id": 2,
+        "total_payable": 30,
+        "returned_amount": 0,
+        "paid_amount": 0
+      },
+      {
+        "id": 3,
+        "total_payable": 45,
+        "returned_amount": 0,
+        "paid_amount": 0
+      }
+    ],
+    "allocations": [
+      {
+        "id": 1,
+        "payment_id": 1,
+        "purchase_id": 1,
+        "amount": 100,
+        "created_at": "2026-10-25 03:39:58",
+        "voided_at": null
+      }
+    ],
+    "payments": [
+      {
+        "id": 1,
+        "payment_no": "PAY-1026-00001",
+        "amount": 100,
+        "payment_method": "cash",
+        "voided_at": null
+      }
+    ],
+    "gl": [
+      {
+        "code": "1000",
+        "balance": 9900
+      },
+      {
+        "code": "1200",
+        "balance": 115
+      },
+      {
+        "code": "2000",
+        "balance": -15
+      },
+      {
+        "code": "3200",
+        "balance": -10000
+      }
+    ]
+  },
+  "integrity": [
+    {
+      "integrity_check": "ok"
+    }
+  ],
+  "foreignKeys": []
+}

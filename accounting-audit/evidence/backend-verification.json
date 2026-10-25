@@ -1,0 +1,19 @@
+{
+  "verifiedAt": "2026-10-25T03:27:17.254Z",
+  "run": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/backend-run-Lbw3la",
+  "checks": [
+    "F020 exact wages/asset and report misstatement",
+    "F021 pre-disbursement negative loan receivable",
+    "F022 negative batch costs and inventory/clearing mismatch",
+    "F023 both source-period settlement rejections, balances unchanged",
+    "SQLite integrity/FK checks clean",
+    "All journal groups balance despite economic defects"
+  ],
+  "negativeCostBatches": [
+    {
+      "item_id": 5,
+      "unit_cost": -0.01,
+      "quantity_remaining": 1
+    }
+  ]
+}

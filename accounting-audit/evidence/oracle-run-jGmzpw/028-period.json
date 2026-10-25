@@ -1,0 +1,202 @@
+{
+  "label": "period",
+  "accounts": [
+    {
+      "code": "1000",
+      "balance": 10000
+    },
+    {
+      "code": "3200",
+      "balance": -10000
+    }
+  ],
+  "invoices": [],
+  "invoice_items": [],
+  "invoice_returns": [],
+  "invoice_return_items": [],
+  "return_settlements": [],
+  "payments": [],
+  "payment_allocations": [],
+  "customers": [],
+  "customer_ledger": [],
+  "suppliers": [
+    {
+      "id": 1,
+      "supplier_code": "OR-S-1",
+      "supplier_name": "retail",
+      "contact_person": null,
+      "email": null,
+      "phone": null,
+      "address": null,
+      "payment_terms": null,
+      "is_active": 1,
+      "created_at": "2026-10-25 03:13:58",
+      "updated_at": "2026-10-25 03:13:58",
+      "current_balance": 0
+    },
+    {
+      "id": 2,
+      "supplier_code": "OR-S-2",
+      "supplier_name": "credits",
+      "contact_person": null,
+      "email": null,
+      "phone": null,
+      "address": null,
+      "payment_terms": null,
+      "is_active": 1,
+      "created_at": "2026-10-25 03:13:58",
+      "updated_at": "2026-10-25 03:13:58",
+      "current_balance": 0
+    },
+    {
+      "id": 3,
+      "supplier_code": "OR-S-3",
+      "supplier_name": "supplier-return",
+      "contact_person": null,
+      "email": null,
+      "phone": null,
+      "address": null,
+      "payment_terms": null,
+      "is_active": 1,
+      "created_at": "2026-10-25 03:13:58",
+      "updated_at": "2026-10-25 03:13:58",
+      "current_balance": 0
+    },
+    {
+      "id": 4,
+      "supplier_code": "OR-S-4",
+      "supplier_name": "po",
+      "contact_person": null,
+      "email": null,
+      "phone": null,
+      "address": null,
+      "payment_terms": null,
+      "is_active": 1,
+      "created_at": "2026-10-25 03:13:58",
+      "updated_at": "2026-10-25 03:13:58",
+      "current_balance": 0
+    },
+    {
+      "id": 5,
+      "supplier_code": "OR-S-5",
+      "supplier_name": "damage",
+      "contact_person": null,
+      "email": null,
+      "phone": null,
+      "address": null,
+      "payment_terms": null,
+      "is_active": 1,
+      "created_at": "2026-10-25 03:13:59",
+      "updated_at": "2026-10-25 03:13:59",
+      "current_balance": 0
+    },
+    {
+      "id": 6,
+      "supplier_code": "OR-S-6",
+      "supplier_name": "reverse",
+      "contact_person": null,
+      "email": null,
+      "phone": null,
+      "address": null,
+      "payment_terms": null,
+      "is_active": 1,
+      "created_at": "2026-10-25 03:13:59",
+      "updated_at": "2026-10-25 03:13:59",
+      "current_balance": 0
+    },
+    {
+      "id": 7,
+      "supplier_code": "OR-S-7",
+      "supplier_name": "backdate",
+      "contact_person": null,
+      "email": null,
+      "phone": null,
+      "address": null,
+      "payment_terms": null,
+      "is_active": 1,
+      "created_at": "2026-10-25 03:13:59",
+      "updated_at": "2026-10-25 03:13:59",
+      "current_balance": 0
+    },
+    {
+      "id": 8,
+      "supplier_code": "OR-S-8",
+      "supplier_name": "retry",
+      "contact_person": null,
+      "email": null,
+      "phone": null,
+      "address": null,
+      "payment_terms": null,
+      "is_active": 1,
+      "created_at": "2026-10-25 03:14:00",
+      "updated_at": "2026-10-25 03:14:00",
+      "current_balance": 0
+    }
+  ],
+  "supplier_ledger": [],
+  "purchases": [],
+  "purchase_returns": [],
+  "purchase_return_items": [],
+  "purchase_order_items": [],
+  "goods_receipts": [],
+  "stock_batches": [],
+  "stock_balances": [],
+  "journal_lines": [
+    {
+      "id": 1,
+      "journal_entry_id": 1,
+      "account_id": 1,
+      "debit": 10000,
+      "credit": 0,
+      "description": "Capital contributed via CAP-2609-00001",
+      "line_date": "2026-09-01",
+      "reference_type": "OWNER_CAPITAL",
+      "reference_id": 1,
+      "voided": 0,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:13:58",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null
+    },
+    {
+      "id": 2,
+      "journal_entry_id": 1,
+      "account_id": 24,
+      "debit": 0,
+      "credit": 10000,
+      "description": "Owner contribution CAP-2609-00001",
+      "line_date": "2026-09-01",
+      "reference_type": "OWNER_CAPITAL",
+      "reference_id": 1,
+      "voided": 0,
+      "created_by": 1,
+      "created_at": "2026-10-25 03:13:58",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null
+    }
+  ],
+  "accounting_periods": [
+    {
+      "id": 1,
+      "period_name": "2026-09",
+      "start_date": "2026-09-01",
+      "end_date": "2026-09-30",
+      "status": "open",
+      "closed_at": null,
+      "closed_by": null,
+      "created_at": "2026-10-25 03:13:58"
+    },
+    {
+      "id": 2,
+      "period_name": "Audit 2025",
+      "start_date": "2025-01-01",
+      "end_date": "2025-01-31",
+      "status": "closed",
+      "closed_at": "2026-10-25 03:14:00",
+      "closed_by": 1,
+      "created_at": "2026-10-25 03:14:00"
+    }
+  ]
+}

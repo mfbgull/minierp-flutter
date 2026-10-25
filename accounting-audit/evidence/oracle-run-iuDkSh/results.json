@@ -1,0 +1,1705 @@
+{
+  "runDir": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-iuDkSh",
+  "families": [
+    {
+      "id": 1,
+      "name": "retail: 70 @10, sell 15 @15, return 3, resale 2",
+      "status": "PASS",
+      "checks": 22
+    },
+    {
+      "id": 2,
+      "name": "partial payment return, credit and settlement cap",
+      "status": "BLOCKED",
+      "error": "SqliteError: no such column: balance"
+    },
+    {
+      "id": 3,
+      "name": "supplier return credit and refund",
+      "status": "PASS",
+      "checks": 35
+    },
+    {
+      "id": 4,
+      "name": "purchase order partial receipt and partial payment",
+      "status": "PASS",
+      "checks": 20
+    },
+    {
+      "id": 5,
+      "name": "damaged warehouse transfer and write-off",
+      "status": "PASS",
+      "checks": 38
+    },
+    {
+      "id": 6,
+      "name": "payment then invoice reversal, double request",
+      "status": "PASS",
+      "checks": 20
+    },
+    {
+      "id": 7,
+      "name": "backdated sale before inventory acquisition",
+      "status": "PASS",
+      "checks": 19
+    },
+    {
+      "id": 8,
+      "name": "idempotency replay and changed payload",
+      "status": "PASS",
+      "checks": 39
+    },
+    {
+      "id": 9,
+      "name": "closed accounting period rejects posting",
+      "status": "PASS",
+      "checks": 19
+    },
+    {
+      "id": 10,
+      "name": "zero negative and fractional quantities",
+      "status": "PASS",
+      "checks": 23
+    }
+  ],
+  "checks": [
+    {
+      "label": "retail quantity",
+      "actual": 56,
+      "expected": 56,
+      "pass": true
+    },
+    {
+      "label": "retail inventory paise",
+      "actual": 56000,
+      "expected": 56000,
+      "pass": true
+    },
+    {
+      "label": "retail COGS paise",
+      "actual": 14000,
+      "expected": 14000,
+      "pass": true
+    },
+    {
+      "label": "retail balanced journal groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "retail customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "retail supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "retail stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "retail arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "retail apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "retail inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "retail cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "retail orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "retail unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "retail creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "retail creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "retail receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "retail supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "retail expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "retail inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "retail report assets",
+      "actual": 10770,
+      "expected": 10770,
+      "pass": true
+    },
+    {
+      "label": "retail report equity",
+      "actual": 10070,
+      "expected": 10070,
+      "pass": true
+    },
+    {
+      "label": "retail report as-of",
+      "actual": "2026-09-30",
+      "expected": "2026-09-30",
+      "pass": true
+    },
+    {
+      "label": "partial customer cash refund",
+      "actual": -500,
+      "expected": -500,
+      "pass": true
+    },
+    {
+      "label": "partial return balance",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "partial return settled",
+      "actual": 10,
+      "expected": 10,
+      "pass": true
+    },
+    {
+      "label": "credit-settled balanced journal groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-settled customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-settled supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-settled stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-settled arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-settled apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-settled inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-settled cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-settled orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-settled unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-settled creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-settled creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-settled receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-settled supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-settled expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-settled inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "rejected post /api/invoice-returns/2/settle economic atomicity",
+      "actual": "2a21a714b73cc981e9c6e944d47ad38d950ef71f4e4f5bef4299fa4ef1a8a24a",
+      "expected": "2a21a714b73cc981e9c6e944d47ad38d950ef71f4e4f5bef4299fa4ef1a8a24a",
+      "pass": true
+    },
+    {
+      "label": "over-refund rejected",
+      "actual": true,
+      "expected": true,
+      "pass": true
+    },
+    {
+      "label": "over-refund stock unchanged",
+      "actual": 14,
+      "expected": 14,
+      "pass": true
+    },
+    {
+      "label": "credit-over-refund balanced journal groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-over-refund customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-over-refund supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-over-refund stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-over-refund arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-over-refund apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-over-refund inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-over-refund cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-over-refund orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-over-refund unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-over-refund creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-over-refund creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-over-refund receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-over-refund supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-over-refund expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-over-refund inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier returned inventory",
+      "actual": 7,
+      "expected": 7,
+      "pass": true
+    },
+    {
+      "label": "supplier AP movement",
+      "actual": 13000,
+      "expected": 13000,
+      "pass": true
+    },
+    {
+      "label": "supplier-return balanced journal groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-return customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-return supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-return stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-return arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-return apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-return inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-return cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-return orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-return unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-return creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-return creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-return receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-return supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-return expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-return inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier cash net payment less refund",
+      "actual": -8000,
+      "expected": -8000,
+      "pass": true
+    },
+    {
+      "label": "supplier-refund balanced journal groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-refund customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-refund supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-refund stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-refund arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-refund apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-refund inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-refund cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-refund orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-refund unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-refund creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-refund creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-refund receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-refund supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-refund expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-refund inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "PO no inventory before receipt",
+      "actual": 77000,
+      "expected": 77000,
+      "pass": true
+    },
+    {
+      "label": "partial receipt inventory",
+      "actual": 4000,
+      "expected": 4000,
+      "pass": true
+    },
+    {
+      "label": "partial receipt AP",
+      "actual": -4000,
+      "expected": -4000,
+      "pass": true
+    },
+    {
+      "label": "partial receipt remaining AP",
+      "actual": -1500,
+      "expected": -1500,
+      "pass": true
+    },
+    {
+      "label": "po-partial balanced journal groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "po-partial customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "po-partial supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "po-partial stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "po-partial arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "po-partial apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "po-partial inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "po-partial cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "po-partial orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "po-partial unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "po-partial creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "po-partial creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "po-partial receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "po-partial supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "po-partial expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "po-partial inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "damage transfer no loss",
+      "actual": 83000,
+      "expected": 83000,
+      "pass": true
+    },
+    {
+      "label": "damage quantity",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "damage inventory",
+      "actual": -2000,
+      "expected": -2000,
+      "pass": true
+    },
+    {
+      "label": "damage loss",
+      "actual": 2000,
+      "expected": 2000,
+      "pass": true
+    },
+    {
+      "label": "damage balanced journal groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "damage customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "damage supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "damage stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "damage arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "damage apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "damage inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "damage cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "damage orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "damage unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "damage creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "damage creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "damage receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "damage supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "damage expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "damage inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "ordinary expense cash",
+      "actual": -700,
+      "expected": -700,
+      "pass": true
+    },
+    {
+      "label": "ordinary operating expense",
+      "actual": 700,
+      "expected": 700,
+      "pass": true
+    },
+    {
+      "label": "expense balanced journal groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reversal restored quantity",
+      "actual": 10,
+      "expected": 10,
+      "pass": true
+    },
+    {
+      "label": "rejected put /api/invoices/5/cancel economic atomicity",
+      "actual": "ffe3bca4ce6bcfdfce59ea4a0b963b5381ae73e72b8a6ce55bdfb3b4004a242d",
+      "expected": "ffe3bca4ce6bcfdfce59ea4a0b963b5381ae73e72b8a6ce55bdfb3b4004a242d",
+      "pass": true
+    },
+    {
+      "label": "duplicate cancel 4xx",
+      "actual": true,
+      "expected": true,
+      "pass": true
+    },
+    {
+      "label": "duplicate cancel quantity",
+      "actual": 10,
+      "expected": 10,
+      "pass": true
+    },
+    {
+      "label": "reversals balanced journal groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reversals customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reversals supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reversals stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reversals arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reversals apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reversals inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reversals cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reversals orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reversals unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reversals creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reversals creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reversals receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reversals supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reversals expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reversals inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "rejected post /api/invoices economic atomicity",
+      "actual": "fb58382160c41f461342d1a077c2def5a9d437baf3ce2944f02e2f08645c9888",
+      "expected": "fb58382160c41f461342d1a077c2def5a9d437baf3ce2944f02e2f08645c9888",
+      "pass": true
+    },
+    {
+      "label": "sale before receipt rejected",
+      "actual": true,
+      "expected": true,
+      "pass": true
+    },
+    {
+      "label": "sale before receipt quantity unchanged",
+      "actual": 10,
+      "expected": 10,
+      "pass": true
+    },
+    {
+      "label": "backdate balanced journal groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "backdate customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "backdate supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "backdate stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "backdate arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "backdate apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "backdate inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "backdate cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "backdate orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "backdate unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "backdate creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "backdate creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "backdate receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "backdate supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "backdate expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "backdate inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "invoice replay quantity",
+      "actual": 8,
+      "expected": 8,
+      "pass": true
+    },
+    {
+      "label": "invoice replay status",
+      "actual": true,
+      "expected": true,
+      "pass": true
+    },
+    {
+      "label": "rejected post /api/invoices economic atomicity",
+      "actual": "5909e65ead1471900415d69775f9f0171e8931bcc14267ecf5e3ed61dfb80af8",
+      "expected": "5909e65ead1471900415d69775f9f0171e8931bcc14267ecf5e3ed61dfb80af8",
+      "pass": true
+    },
+    {
+      "label": "idempotency payload conflict",
+      "actual": 409,
+      "expected": 409,
+      "pass": true
+    },
+    {
+      "label": "duplicates balanced journal groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "duplicates customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "duplicates supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "duplicates stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "duplicates arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "duplicates apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "duplicates inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "duplicates cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "duplicates orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "duplicates unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "duplicates creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "duplicates creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "duplicates receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "duplicates supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "duplicates expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "duplicates inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "rejected post /api/invoices economic atomicity",
+      "actual": "5909e65ead1471900415d69775f9f0171e8931bcc14267ecf5e3ed61dfb80af8",
+      "expected": "5909e65ead1471900415d69775f9f0171e8931bcc14267ecf5e3ed61dfb80af8",
+      "pass": true
+    },
+    {
+      "label": "forced GL failure not success",
+      "actual": true,
+      "expected": true,
+      "pass": true
+    },
+    {
+      "label": "failed GL write stock unchanged",
+      "actual": 8,
+      "expected": 8,
+      "pass": true
+    },
+    {
+      "label": "atomicity balanced journal groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "atomicity customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "atomicity supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "atomicity stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "atomicity arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "atomicity apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "atomicity inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "atomicity cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "atomicity orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "atomicity unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "atomicity creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "atomicity creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "atomicity receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "atomicity supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "atomicity expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "atomicity inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "rejected post /api/owner-equity/capital economic atomicity",
+      "actual": "5909e65ead1471900415d69775f9f0171e8931bcc14267ecf5e3ed61dfb80af8",
+      "expected": "5909e65ead1471900415d69775f9f0171e8931bcc14267ecf5e3ed61dfb80af8",
+      "pass": true
+    },
+    {
+      "label": "closed period capital rejected",
+      "actual": true,
+      "expected": true,
+      "pass": true
+    },
+    {
+      "label": "closed period cash unchanged",
+      "actual": 1016300,
+      "expected": 1016300,
+      "pass": true
+    },
+    {
+      "label": "period balanced journal groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "period customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "period supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "period stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "period arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "period apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "period inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "period cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "period orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "period unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "period creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "period creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "period receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "period supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "period expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "period inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "rejected post /api/invoices economic atomicity",
+      "actual": "d000dae1f18ef1cdb8f758f8a73de3daa2616322763dd03c8634e487ea28f765",
+      "expected": "d000dae1f18ef1cdb8f758f8a73de3daa2616322763dd03c8634e487ea28f765",
+      "pass": true
+    },
+    {
+      "label": "invalid quantity 0",
+      "actual": true,
+      "expected": true,
+      "pass": true
+    },
+    {
+      "label": "invalid quantity stock 0",
+      "actual": 10,
+      "expected": 10,
+      "pass": true
+    },
+    {
+      "label": "rejected post /api/invoices economic atomicity",
+      "actual": "d000dae1f18ef1cdb8f758f8a73de3daa2616322763dd03c8634e487ea28f765",
+      "expected": "d000dae1f18ef1cdb8f758f8a73de3daa2616322763dd03c8634e487ea28f765",
+      "pass": true
+    },
+    {
+      "label": "invalid quantity -1",
+      "actual": true,
+      "expected": true,
+      "pass": true
+    },
+    {
+      "label": "invalid quantity stock -1",
+      "actual": 10,
+      "expected": 10,
+      "pass": true
+    },
+    {
+      "label": "decimal total exact paise",
+      "actual": 30,
+      "expected": 30,
+      "pass": true
+    },
+    {
+      "label": "boundaries balanced journal groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "boundaries customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "boundaries supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "boundaries stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "boundaries arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "boundaries apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "boundaries inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "boundaries cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "boundaries orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "boundaries unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "boundaries creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "boundaries creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "boundaries receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "boundaries supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "boundaries expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "boundaries inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    }
+  ]
+}

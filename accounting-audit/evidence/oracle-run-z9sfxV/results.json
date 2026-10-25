@@ -1,0 +1,475 @@
+{
+  "runDir": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-z9sfxV",
+  "families": [
+    {
+      "id": "2b",
+      "name": "credit applied across invoices prevents credit reversal",
+      "status": "FAIL",
+      "checks": 73
+    }
+  ],
+  "checks": [
+    {
+      "label": "first target fully credit paid",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "second target partly credit paid",
+      "actual": 15,
+      "expected": 15,
+      "pass": true
+    },
+    {
+      "label": "credit-before-void balanced journal groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-before-void customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-before-void supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-before-void stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-before-void arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-before-void apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-before-void inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-before-void cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-before-void orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-before-void unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-before-void creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-before-void creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-before-void receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-before-void supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-before-void expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-before-void inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-before-void signed AR GL vs customer net",
+      "actual": 1500,
+      "expected": 1500,
+      "pass": true
+    },
+    {
+      "label": "consumed credit settlement cannot reverse",
+      "actual": false,
+      "expected": true,
+      "pass": false
+    },
+    {
+      "label": "credit-two-targets balanced journal groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-two-targets customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-two-targets supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-two-targets stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-two-targets arImbalances",
+      "actual": [
+        {
+          "label": "GL AR vs customer balances",
+          "diff": -30,
+          "account": "1100",
+          "expected": 45,
+          "actual": 15
+        }
+      ],
+      "expected": [],
+      "pass": false
+    },
+    {
+      "label": "credit-two-targets apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-two-targets inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-two-targets cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-two-targets orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-two-targets unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-two-targets creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-two-targets creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-two-targets receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-two-targets supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-two-targets expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-two-targets inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-two-targets signed AR GL vs customer net",
+      "actual": 1500,
+      "expected": -4500,
+      "pass": false
+    },
+    {
+      "label": "spent credit cannot be reissued",
+      "actual": false,
+      "expected": true,
+      "pass": false
+    },
+    {
+      "label": "credit-reissued balanced journal groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-reissued customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-reissued supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-reissued stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-reissued arImbalances",
+      "actual": [
+        {
+          "label": "GL AR vs customer balances",
+          "diff": -30,
+          "account": "1100",
+          "expected": 45,
+          "actual": 15
+        }
+      ],
+      "expected": [],
+      "pass": false
+    },
+    {
+      "label": "credit-reissued apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-reissued inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-reissued cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-reissued orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-reissued unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-reissued creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-reissued creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-reissued receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-reissued supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-reissued expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-reissued inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-reissued signed AR GL vs customer net",
+      "actual": 1500,
+      "expected": -4500,
+      "pass": false
+    },
+    {
+      "label": "third invoice must not get reused return credit",
+      "actual": 60,
+      "expected": 0,
+      "pass": false
+    },
+    {
+      "label": "credit-double-spend balanced journal groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-double-spend customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-double-spend supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-double-spend stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-double-spend arImbalances",
+      "actual": [
+        {
+          "label": "GL AR vs customer balances",
+          "diff": 60,
+          "account": "1100",
+          "expected": 15,
+          "actual": 75
+        }
+      ],
+      "expected": [],
+      "pass": false
+    },
+    {
+      "label": "credit-double-spend apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-double-spend inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-double-spend cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-double-spend orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-double-spend unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-double-spend creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-double-spend creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-double-spend receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-double-spend supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-double-spend expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-double-spend inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "credit-double-spend signed AR GL vs customer net",
+      "actual": 7500,
+      "expected": 1500,
+      "pass": false
+    }
+  ]
+}

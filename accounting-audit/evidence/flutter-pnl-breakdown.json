@@ -1,0 +1,26 @@
+{
+  "source_events": "accounting-audit/evidence/oracle-run-AbsZeT/api-events.json",
+  "api_response": {
+    "startDate": "2026-09-01",
+    "endDate": "2026-10-31",
+    "totalRevenue": 210,
+    "totalCogs": 140,
+    "grossProfit": 70,
+    "expenses": [
+      {
+        "expense_category": "Office Supplies",
+        "total": 10
+      }
+    ],
+    "totalExpenses": 20,
+    "netProfit": 50,
+    "grossProfitMargin": 33.33333333333333,
+    "netProfitMargin": 23.809523809523807
+  },
+  "independent_expected_operating_expense": 10,
+  "independent_expected_damage_loss": 10,
+  "expected_breakdown_total": 20,
+  "actual_breakdown_total": 10,
+  "authoritative_expense_total": 20,
+  "profit_is_correct": true
+}

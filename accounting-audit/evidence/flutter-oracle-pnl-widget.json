@@ -1,0 +1,26 @@
+{
+  "source_events": "accounting-audit/evidence/oracle-run-AbsZeT/api-events.json",
+  "provider_loads_after_refresh_tap": 2,
+  "visible_text": [
+    "Profit & Loss Report",
+    "Oct 1–31, 2026",
+    "This month",
+    "Export to CSV",
+    "Total Revenue",
+    "Rs. 210.00",
+    "Cost of Goods Sold (COGS)",
+    "Rs. 140.00",
+    "Gross Profit",
+    "Rs. 70.00",
+    "Total Expenses",
+    "Rs. 20.00",
+    "Net Profit",
+    "Rs. 50.00",
+    "Gross Profit Margin / Net Profit Margin",
+    "33.333% / 23.81%",
+    "Period: Sep 1, 2026 To Oct 31, 2026",
+    "Expenses by Category",
+    "Office Supplies",
+    "Rs. 10.00"
+  ]
+}

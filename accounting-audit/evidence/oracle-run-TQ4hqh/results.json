@@ -1,0 +1,271 @@
+{
+  "runDir": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-TQ4hqh",
+  "families": [
+    {
+      "id": "3c",
+      "name": "supplier return credit split across two unpaid purchases",
+      "status": "FAIL",
+      "checks": 43
+    }
+  ],
+  "checks": [
+    {
+      "label": "supplier net AP after credit and two invoices",
+      "actual": 15,
+      "expected": 15,
+      "pass": true
+    },
+    {
+      "label": "supplier-credit-before-split balanced journal groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-credit-before-split customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-credit-before-split supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-credit-before-split stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-credit-before-split arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-credit-before-split apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-credit-before-split inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-credit-before-split cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-credit-before-split orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-credit-before-split unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-credit-before-split creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-credit-before-split creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-credit-before-split receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-credit-before-split supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-credit-before-split expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-credit-before-split inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-credit-before-split signed AR GL vs customer net",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "rejected post /api/payments economic atomicity",
+      "actual": "045104b63a4dc16dae51b453888fa1df9d14a10ab187f1334209c4dbbc7d4ea9",
+      "expected": "045104b63a4dc16dae51b453888fa1df9d14a10ab187f1334209c4dbbc7d4ea9",
+      "pass": true
+    },
+    {
+      "label": "requested supplier credit split supported",
+      "actual": false,
+      "expected": true,
+      "pass": false
+    },
+    {
+      "label": "supplier credit split no cash",
+      "actual": 990000,
+      "expected": 990000,
+      "pass": true
+    },
+    {
+      "label": "supplier credit split company net AP unchanged",
+      "actual": -1500,
+      "expected": -1500,
+      "pass": true
+    },
+    {
+      "label": "supplier split allocation target0",
+      "actual": 0,
+      "expected": 30,
+      "pass": false
+    },
+    {
+      "label": "supplier split target balance0",
+      "actual": 30,
+      "expected": 0,
+      "pass": false
+    },
+    {
+      "label": "supplier split allocation target1",
+      "actual": 0,
+      "expected": 30,
+      "pass": false
+    },
+    {
+      "label": "supplier split target balance1",
+      "actual": 45,
+      "expected": 15,
+      "pass": false
+    },
+    {
+      "label": "supplier-credit-after-split-attempt balanced journal groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-credit-after-split-attempt customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-credit-after-split-attempt supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-credit-after-split-attempt stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-credit-after-split-attempt arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-credit-after-split-attempt apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-credit-after-split-attempt inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-credit-after-split-attempt cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-credit-after-split-attempt orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-credit-after-split-attempt unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-credit-after-split-attempt creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-credit-after-split-attempt creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-credit-after-split-attempt receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-credit-after-split-attempt supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-credit-after-split-attempt expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-credit-after-split-attempt inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-credit-after-split-attempt signed AR GL vs customer net",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    }
+  ]
+}

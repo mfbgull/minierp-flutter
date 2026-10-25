@@ -1,0 +1,17 @@
+{
+  "customerArImbalances": [],
+  "supplierApImbalances": [],
+  "stockImbalances": [],
+  "arImbalances": [],
+  "apImbalances": [],
+  "inventoryImbalances": [],
+  "cashImbalances": [],
+  "orphanSourceBatches": [],
+  "unappliedLiabilityImbalances": [],
+  "creditSourceConsumptionImbalances": [],
+  "creditSourceBoundsImbalances": [],
+  "receiptAllocationImbalances": [],
+  "supplierAdvanceImbalances": [],
+  "expensePayableImbalances": [],
+  "inputTaxImbalances": []
+}

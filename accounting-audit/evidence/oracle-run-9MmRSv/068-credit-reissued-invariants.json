@@ -1,0 +1,25 @@
+{
+  "customerArImbalances": [],
+  "supplierApImbalances": [],
+  "stockImbalances": [],
+  "arImbalances": [
+    {
+      "label": "GL AR vs customer balances",
+      "diff": 50,
+      "account": "1100",
+      "expected": 5,
+      "actual": 55
+    }
+  ],
+  "apImbalances": [],
+  "inventoryImbalances": [],
+  "cashImbalances": [],
+  "orphanSourceBatches": [],
+  "unappliedLiabilityImbalances": [],
+  "creditSourceConsumptionImbalances": [],
+  "creditSourceBoundsImbalances": [],
+  "receiptAllocationImbalances": [],
+  "supplierAdvanceImbalances": [],
+  "expensePayableImbalances": [],
+  "inputTaxImbalances": []
+}

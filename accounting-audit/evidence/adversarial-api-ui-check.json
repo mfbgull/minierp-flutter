@@ -1,0 +1,1414 @@
+{
+  "oracle-run-z9sfxV": [
+    {
+      "method": "post",
+      "url": "/api/owner-equity/capital",
+      "status": 201,
+      "body": {
+        "capital_date": "2026-09-01",
+        "amount": 10000
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/inventory/items",
+      "status": 201,
+      "body": {
+        "item_code": "OR-1",
+        "item_name": "credit-two-targets",
+        "unit_of_measure": "pcs"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/suppliers",
+      "status": 201,
+      "body": {
+        "supplier_code": "OR-S-1",
+        "supplier_name": "credit-two-targets"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/customers",
+      "status": 201,
+      "body": {
+        "customer_code": "OR-C-1",
+        "customer_name": "credit-two-targets",
+        "phone": "0300-0000000"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/purchases",
+      "status": 201,
+      "body": {
+        "item_id": 1,
+        "supplier_id": 1,
+        "warehouse_id": 1,
+        "quantity": 20,
+        "unit_cost": 10,
+        "purchase_date": "2026-09-01"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/invoices",
+      "status": 201,
+      "body": {
+        "invoice_no": "OR-I-2",
+        "customer_id": 1,
+        "invoice_date": "2026-09-02",
+        "warehouse_id": 1,
+        "items": [
+          {
+            "item_id": 1,
+            "warehouse_id": 1,
+            "quantity": 10,
+            "unit_price": 15
+          }
+        ]
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/payments",
+      "status": 201,
+      "body": {
+        "customer_id": 1,
+        "payment_date": "2026-09-02",
+        "amount": 150,
+        "payment_method": "cash",
+        "invoice_allocations": [
+          {
+            "invoice_id": 1,
+            "amount": 150
+          }
+        ]
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/invoices/1/return",
+      "status": 200,
+      "body": {
+        "return_date": "2026-09-03",
+        "items": [
+          {
+            "invoice_item_id": 1,
+            "return_quantity": 4
+          }
+        ],
+        "settlements": [
+          {
+            "type": "credit",
+            "amount": 60
+          }
+        ]
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/invoices",
+      "status": 201,
+      "body": {
+        "invoice_no": "OR-I-3",
+        "customer_id": 1,
+        "invoice_date": "2026-09-04",
+        "warehouse_id": 1,
+        "items": [
+          {
+            "item_id": 1,
+            "warehouse_id": 1,
+            "quantity": 2,
+            "unit_price": 15
+          }
+        ],
+        "credit_offset": 30
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/invoices",
+      "status": 201,
+      "body": {
+        "invoice_no": "OR-I-4",
+        "customer_id": 1,
+        "invoice_date": "2026-09-04",
+        "warehouse_id": 1,
+        "items": [
+          {
+            "item_id": 1,
+            "warehouse_id": 1,
+            "quantity": 3,
+            "unit_price": 15
+          }
+        ],
+        "credit_offset": 30
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/return-settlements/1/void",
+      "status": 200,
+      "body": {}
+    },
+    {
+      "method": "post",
+      "url": "/api/invoice-returns/1/settle",
+      "status": 200,
+      "body": {
+        "allocations": [
+          {
+            "type": "credit",
+            "amount": 60
+          }
+        ]
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/invoices",
+      "status": 201,
+      "body": {
+        "invoice_no": "OR-I-5",
+        "customer_id": 1,
+        "invoice_date": "2026-10-25",
+        "warehouse_id": 1,
+        "items": [
+          {
+            "item_id": 1,
+            "warehouse_id": 1,
+            "quantity": 4,
+            "unit_price": 15
+          }
+        ],
+        "credit_offset": 60
+      }
+    }
+  ],
+  "oracle-run-AbsZeT": [
+    {
+      "method": "post",
+      "url": "/api/owner-equity/capital",
+      "status": 201,
+      "body": {
+        "capital_date": "2026-09-01",
+        "amount": 10000
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/inventory/items",
+      "status": 201,
+      "body": {
+        "item_code": "OR-1",
+        "item_name": "retail",
+        "unit_of_measure": "pcs"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/suppliers",
+      "status": 201,
+      "body": {
+        "supplier_code": "OR-S-1",
+        "supplier_name": "retail"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/customers",
+      "status": 201,
+      "body": {
+        "customer_code": "OR-C-1",
+        "customer_name": "retail",
+        "phone": "0300-0000000"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/purchases",
+      "status": 201,
+      "body": {
+        "item_id": 1,
+        "supplier_id": 1,
+        "warehouse_id": 1,
+        "quantity": 70,
+        "unit_cost": 10,
+        "purchase_date": "2026-09-01"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/invoices",
+      "status": 201,
+      "body": {
+        "invoice_no": "OR-I-2",
+        "customer_id": 1,
+        "invoice_date": "2026-09-02",
+        "warehouse_id": 1,
+        "items": [
+          {
+            "item_id": 1,
+            "warehouse_id": 1,
+            "quantity": 15,
+            "unit_price": 15
+          }
+        ]
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/payments",
+      "status": 201,
+      "body": {
+        "customer_id": 1,
+        "payment_date": "2026-09-02",
+        "amount": 225,
+        "payment_method": "cash",
+        "invoice_allocations": [
+          {
+            "invoice_id": 1,
+            "amount": 225
+          }
+        ]
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/invoices/1/return",
+      "status": 200,
+      "body": {
+        "return_date": "2026-09-03",
+        "items": [
+          {
+            "invoice_item_id": 1,
+            "return_quantity": 1
+          }
+        ],
+        "settlements": [
+          {
+            "type": "refund",
+            "amount": 15,
+            "method": "Cash"
+          }
+        ]
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/invoices/1/return",
+      "status": 200,
+      "body": {
+        "return_date": "2026-09-03",
+        "items": [
+          {
+            "invoice_item_id": 1,
+            "return_quantity": 1
+          }
+        ],
+        "settlements": [
+          {
+            "type": "refund",
+            "amount": 15,
+            "method": "Cash"
+          }
+        ]
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/invoices/1/return",
+      "status": 200,
+      "body": {
+        "return_date": "2026-09-03",
+        "items": [
+          {
+            "invoice_item_id": 1,
+            "return_quantity": 1
+          }
+        ],
+        "settlements": [
+          {
+            "type": "refund",
+            "amount": 15,
+            "method": "Cash"
+          }
+        ]
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/invoices",
+      "status": 201,
+      "body": {
+        "invoice_no": "OR-I-3",
+        "customer_id": 1,
+        "invoice_date": "2026-09-04",
+        "warehouse_id": 1,
+        "items": [
+          {
+            "item_id": 1,
+            "warehouse_id": 1,
+            "quantity": 2,
+            "unit_price": 15
+          }
+        ]
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/inventory/stock-transfers",
+      "status": 201,
+      "body": {
+        "item_id": 1,
+        "from_warehouse_id": 1,
+        "to_warehouse_id": 3,
+        "quantity": 1,
+        "remarks": "one returned item broken"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/inventory/damaged/write-off",
+      "status": 200,
+      "body": {
+        "batchIds": [
+          2
+        ],
+        "reason": "one damaged return",
+        "glAccount": "7202"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/expenses",
+      "status": 201,
+      "body": {
+        "expense_category": "Office Supplies",
+        "expense_date": "2026-09-04",
+        "amount": 10,
+        "payment_method": "Cash"
+      }
+    },
+    {
+      "method": "put",
+      "url": "/api/expenses/1",
+      "status": 200,
+      "body": {
+        "status": "Recorded"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/inventory/items",
+      "status": 201,
+      "body": {
+        "item_code": "OR-4",
+        "item_name": "credits",
+        "unit_of_measure": "pcs"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/suppliers",
+      "status": 201,
+      "body": {
+        "supplier_code": "OR-S-4",
+        "supplier_name": "credits"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/customers",
+      "status": 201,
+      "body": {
+        "customer_code": "OR-C-4",
+        "customer_name": "credits",
+        "phone": "0300-0000000"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/purchases",
+      "status": 201,
+      "body": {
+        "item_id": 2,
+        "supplier_id": 2,
+        "warehouse_id": 1,
+        "quantity": 20,
+        "unit_cost": 10,
+        "purchase_date": "2026-09-01"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/invoices",
+      "status": 201,
+      "body": {
+        "invoice_no": "OR-I-5",
+        "customer_id": 2,
+        "invoice_date": "2026-09-02",
+        "warehouse_id": 1,
+        "items": [
+          {
+            "item_id": 2,
+            "warehouse_id": 1,
+            "quantity": 10,
+            "unit_price": 15
+          }
+        ]
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/payments",
+      "status": 201,
+      "body": {
+        "customer_id": 2,
+        "payment_date": "2026-09-02",
+        "amount": 100,
+        "payment_method": "cash",
+        "invoice_allocations": [
+          {
+            "invoice_id": 3,
+            "amount": 100
+          }
+        ]
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/invoices/3/return",
+      "status": 200,
+      "body": {
+        "return_date": "2026-09-03",
+        "items": [
+          {
+            "invoice_item_id": 3,
+            "return_quantity": 4
+          }
+        ],
+        "settlements": [
+          {
+            "type": "refund",
+            "amount": 5,
+            "method": "Cash"
+          },
+          {
+            "type": "credit",
+            "amount": 5
+          }
+        ]
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/invoice-returns/4/settle",
+      "status": 400,
+      "body": {
+        "allocations": [
+          {
+            "type": "refund",
+            "amount": 0.01,
+            "method": "Cash"
+          }
+        ]
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/invoices",
+      "status": 201,
+      "body": {
+        "invoice_no": "OR-I-6",
+        "customer_id": 2,
+        "invoice_date": "2026-09-04",
+        "warehouse_id": 1,
+        "items": [
+          {
+            "item_id": 2,
+            "warehouse_id": 1,
+            "quantity": 1,
+            "unit_price": 15
+          }
+        ],
+        "credit_offset": 5
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/customers/2/unapplied-cash",
+      "status": 201,
+      "body": {
+        "amount": 25,
+        "operation_date": "2026-09-04",
+        "payment_method": "Cash"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/unapplied-cash/apply",
+      "status": 200,
+      "body": {
+        "customer_id": 2,
+        "operation_date": "2026-09-04",
+        "allocations": [
+          {
+            "invoice_id": 4,
+            "amount": 10
+          }
+        ]
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/unapplied-cash/refund",
+      "status": 200,
+      "body": {
+        "customer_id": 2,
+        "amount": 5,
+        "operation_date": "2026-09-04",
+        "payment_method": "Cash"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/inventory/items",
+      "status": 201,
+      "body": {
+        "item_code": "OR-7",
+        "item_name": "supplier-return",
+        "unit_of_measure": "pcs"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/suppliers",
+      "status": 201,
+      "body": {
+        "supplier_code": "OR-S-7",
+        "supplier_name": "supplier-return"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/customers",
+      "status": 201,
+      "body": {
+        "customer_code": "OR-C-7",
+        "customer_name": "supplier-return",
+        "phone": "0300-0000000"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/purchases",
+      "status": 201,
+      "body": {
+        "item_id": 3,
+        "supplier_id": 3,
+        "warehouse_id": 1,
+        "quantity": 10,
+        "unit_cost": 10,
+        "purchase_date": "2026-09-01"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/payments",
+      "status": 201,
+      "body": {
+        "supplier_id": 3,
+        "payment_date": "2026-09-02",
+        "amount": 100,
+        "payment_method": "cash",
+        "purchase_allocations": [
+          {
+            "purchase_id": 3,
+            "amount": 100
+          }
+        ]
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/purchase-returns",
+      "status": 201,
+      "body": {
+        "source_type": "PURCHASE",
+        "source_id": 3,
+        "warehouse_id": 1,
+        "return_date": "2026-09-03",
+        "disposition": "refund_expected",
+        "items": [
+          {
+            "source_item_id": 3,
+            "quantity": 3
+          }
+        ]
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/supplier-refunds",
+      "status": 201,
+      "body": {
+        "credit_note_id": 1,
+        "refund_date": "2026-09-04",
+        "amount": 20,
+        "payment_method": "cash"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/inventory/items",
+      "status": 201,
+      "body": {
+        "item_code": "OR-8",
+        "item_name": "po",
+        "unit_of_measure": "pcs"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/suppliers",
+      "status": 201,
+      "body": {
+        "supplier_code": "OR-S-8",
+        "supplier_name": "po"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/customers",
+      "status": 201,
+      "body": {
+        "customer_code": "OR-C-8",
+        "customer_name": "po",
+        "phone": "0300-0000000"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/purchases",
+      "status": 201,
+      "body": {
+        "item_id": 4,
+        "supplier_id": 4,
+        "warehouse_id": 1,
+        "quantity": 1,
+        "unit_cost": 10,
+        "purchase_date": "2026-09-01"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/purchase-orders",
+      "status": 201,
+      "body": {
+        "supplier_id": 4,
+        "warehouse_id": 1,
+        "po_date": "2026-09-02",
+        "items": [
+          {
+            "item_id": 4,
+            "quantity": 10,
+            "unit_price": 10
+          }
+        ]
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/purchase-orders/1/status",
+      "status": 200,
+      "body": {
+        "status": "Submitted"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/purchase-orders/1/receipts",
+      "status": 201,
+      "body": {
+        "receipt_date": "2026-09-03",
+        "warehouse_id": 1,
+        "items": [
+          {
+            "po_item_id": 1,
+            "received_quantity": 4
+          }
+        ]
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/payments",
+      "status": 201,
+      "body": {
+        "supplier_id": 4,
+        "payment_date": "2026-09-03",
+        "amount": 25,
+        "payment_method": "cash",
+        "po_allocations": [
+          {
+            "po_id": 1,
+            "amount": 25
+          }
+        ]
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/inventory/items",
+      "status": 201,
+      "body": {
+        "item_code": "OR-9",
+        "item_name": "damage",
+        "unit_of_measure": "pcs"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/suppliers",
+      "status": 201,
+      "body": {
+        "supplier_code": "OR-S-9",
+        "supplier_name": "damage"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/customers",
+      "status": 201,
+      "body": {
+        "customer_code": "OR-C-9",
+        "customer_name": "damage",
+        "phone": "0300-0000000"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/purchases",
+      "status": 201,
+      "body": {
+        "item_id": 5,
+        "supplier_id": 5,
+        "warehouse_id": 1,
+        "quantity": 2,
+        "unit_cost": 10,
+        "purchase_date": "2026-09-01"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/inventory/damaged/transfer",
+      "status": 200,
+      "body": {
+        "batchId": 7,
+        "remarks": "audit damage"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/inventory/damaged/write-off",
+      "status": 200,
+      "body": {
+        "batchIds": [
+          8
+        ],
+        "reason": "audit broken",
+        "glAccount": "7202"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/expenses",
+      "status": 201,
+      "body": {
+        "expense_category": "Office Supplies",
+        "expense_date": "2026-09-04",
+        "amount": 7,
+        "payment_method": "Cash"
+      }
+    },
+    {
+      "method": "put",
+      "url": "/api/expenses/2",
+      "status": 200,
+      "body": {
+        "status": "Recorded"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/inventory/items",
+      "status": 201,
+      "body": {
+        "item_code": "OR-10",
+        "item_name": "reverse",
+        "unit_of_measure": "pcs"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/suppliers",
+      "status": 201,
+      "body": {
+        "supplier_code": "OR-S-10",
+        "supplier_name": "reverse"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/customers",
+      "status": 201,
+      "body": {
+        "customer_code": "OR-C-10",
+        "customer_name": "reverse",
+        "phone": "0300-0000000"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/purchases",
+      "status": 201,
+      "body": {
+        "item_id": 6,
+        "supplier_id": 6,
+        "warehouse_id": 1,
+        "quantity": 10,
+        "unit_cost": 10,
+        "purchase_date": "2026-09-01"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/invoices",
+      "status": 201,
+      "body": {
+        "invoice_no": "OR-I-11",
+        "customer_id": 6,
+        "invoice_date": "2026-09-02",
+        "warehouse_id": 1,
+        "items": [
+          {
+            "item_id": 6,
+            "warehouse_id": 1,
+            "quantity": 3,
+            "unit_price": 15
+          }
+        ]
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/payments",
+      "status": 201,
+      "body": {
+        "customer_id": 6,
+        "payment_date": "2026-09-02",
+        "amount": 45,
+        "payment_method": "cash",
+        "invoice_allocations": [
+          {
+            "invoice_id": 5,
+            "amount": 45
+          }
+        ]
+      }
+    },
+    {
+      "method": "delete",
+      "url": "/api/payments/11",
+      "status": 200,
+      "body": null
+    },
+    {
+      "method": "put",
+      "url": "/api/invoices/5/cancel",
+      "status": 200,
+      "body": {
+        "reason": "audit"
+      }
+    },
+    {
+      "method": "put",
+      "url": "/api/invoices/5/cancel",
+      "status": 409,
+      "body": {
+        "reason": "audit duplicate"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/inventory/items",
+      "status": 201,
+      "body": {
+        "item_code": "OR-12",
+        "item_name": "backdate",
+        "unit_of_measure": "pcs"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/suppliers",
+      "status": 201,
+      "body": {
+        "supplier_code": "OR-S-12",
+        "supplier_name": "backdate"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/customers",
+      "status": 201,
+      "body": {
+        "customer_code": "OR-C-12",
+        "customer_name": "backdate",
+        "phone": "0300-0000000"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/purchases",
+      "status": 201,
+      "body": {
+        "item_id": 7,
+        "supplier_id": 7,
+        "warehouse_id": 1,
+        "quantity": 10,
+        "unit_cost": 10,
+        "purchase_date": "2026-09-10"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/invoices",
+      "status": 400,
+      "body": {
+        "customer_id": 7,
+        "invoice_date": "2026-09-09",
+        "warehouse_id": 1,
+        "items": [
+          {
+            "item_id": 7,
+            "warehouse_id": 1,
+            "quantity": 1,
+            "unit_price": 15
+          }
+        ]
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/invoices",
+      "status": 201,
+      "body": {
+        "invoice_no": "OR-I-13",
+        "customer_id": 7,
+        "invoice_date": "2026-09-11",
+        "warehouse_id": 1,
+        "items": [
+          {
+            "item_id": 7,
+            "warehouse_id": 1,
+            "quantity": 1,
+            "unit_price": 15
+          }
+        ]
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/invoices/6/return",
+      "status": 200,
+      "body": {
+        "return_date": "2026-09-09",
+        "items": [
+          {
+            "invoice_item_id": 6,
+            "return_quantity": 1
+          }
+        ]
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/inventory/items",
+      "status": 201,
+      "body": {
+        "item_code": "OR-14",
+        "item_name": "retry",
+        "unit_of_measure": "pcs"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/suppliers",
+      "status": 201,
+      "body": {
+        "supplier_code": "OR-S-14",
+        "supplier_name": "retry"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/customers",
+      "status": 201,
+      "body": {
+        "customer_code": "OR-C-14",
+        "customer_name": "retry",
+        "phone": "0300-0000000"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/purchases",
+      "status": 201,
+      "body": {
+        "item_id": 8,
+        "supplier_id": 8,
+        "warehouse_id": 1,
+        "quantity": 10,
+        "unit_cost": 10,
+        "purchase_date": "2026-09-01"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/invoices",
+      "status": 201,
+      "body": {
+        "customer_id": 8,
+        "invoice_date": "2026-09-02",
+        "warehouse_id": 1,
+        "items": [
+          {
+            "item_id": 8,
+            "warehouse_id": 1,
+            "quantity": 2,
+            "unit_price": 15
+          }
+        ]
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/invoices",
+      "status": 201,
+      "body": {
+        "customer_id": 8,
+        "invoice_date": "2026-09-02",
+        "warehouse_id": 1,
+        "items": [
+          {
+            "item_id": 8,
+            "warehouse_id": 1,
+            "quantity": 2,
+            "unit_price": 15
+          }
+        ]
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/invoices",
+      "status": 409,
+      "body": {
+        "customer_id": 8,
+        "invoice_date": "2026-09-02",
+        "warehouse_id": 1,
+        "items": [
+          {
+            "item_id": 8,
+            "warehouse_id": 1,
+            "quantity": 2,
+            "unit_price": 15
+          }
+        ],
+        "notes": "changed"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/invoices",
+      "status": 500,
+      "body": {
+        "customer_id": 8,
+        "invoice_date": "2026-09-02",
+        "warehouse_id": 1,
+        "items": [
+          {
+            "item_id": 8,
+            "warehouse_id": 1,
+            "quantity": 2,
+            "unit_price": 15
+          }
+        ]
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/accounting/periods",
+      "status": 201,
+      "body": {
+        "period_name": "Audit 2025",
+        "start_date": "2025-01-01",
+        "end_date": "2025-01-31"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/accounting/periods/3/close",
+      "status": 200,
+      "body": {}
+    },
+    {
+      "method": "post",
+      "url": "/api/owner-equity/capital",
+      "status": 400,
+      "body": {
+        "capital_date": "2025-01-15",
+        "amount": 10
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/inventory/items",
+      "status": 201,
+      "body": {
+        "item_code": "OR-15",
+        "item_name": "bounds",
+        "unit_of_measure": "pcs"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/suppliers",
+      "status": 201,
+      "body": {
+        "supplier_code": "OR-S-15",
+        "supplier_name": "bounds"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/customers",
+      "status": 201,
+      "body": {
+        "customer_code": "OR-C-15",
+        "customer_name": "bounds",
+        "phone": "0300-0000000"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/purchases",
+      "status": 201,
+      "body": {
+        "item_id": 9,
+        "supplier_id": 9,
+        "warehouse_id": 1,
+        "quantity": 10,
+        "unit_cost": 0.1,
+        "purchase_date": "2026-09-01"
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/invoices",
+      "status": 400,
+      "body": {
+        "customer_id": 9,
+        "invoice_date": "2026-09-02",
+        "warehouse_id": 1,
+        "items": [
+          {
+            "item_id": 9,
+            "warehouse_id": 1,
+            "quantity": 0,
+            "unit_price": 1
+          }
+        ]
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/invoices",
+      "status": 400,
+      "body": {
+        "customer_id": 9,
+        "invoice_date": "2026-09-02",
+        "warehouse_id": 1,
+        "items": [
+          {
+            "item_id": 9,
+            "warehouse_id": 1,
+            "quantity": -1,
+            "unit_price": 1
+          }
+        ]
+      }
+    },
+    {
+      "method": "post",
+      "url": "/api/invoices",
+      "status": 201,
+      "body": {
+        "invoice_no": "OR-I-16",
+        "customer_id": 9,
+        "invoice_date": "2026-09-02",
+        "warehouse_id": 1,
+        "items": [
+          {
+            "item_id": 9,
+            "warehouse_id": 1,
+            "quantity": 3,
+            "unit_price": 0.1
+          }
+        ]
+      }
+    }
+  ],
+  "flutter-balance-sheet-widget.json": {
+    "input": {
+      "asOfDate": "2026-10-25",
+      "assets": {
+        "inventory": 200,
+        "accounts_receivable": 300,
+        "cash": 1000,
+        "other": 400,
+        "total": 1900
+      },
+      "liabilities": {
+        "accounts_payable": 500,
+        "tax_payable": 60,
+        "other": 70,
+        "total": 630
+      },
+      "equity": {
+        "opening_retained_earnings": 1000,
+        "owner_capital": 300,
+        "owner_drawings": -30,
+        "net_income_ytd": 0,
+        "revenue_ytd": 0,
+        "cogs_ytd": 0,
+        "expenses_ytd": 0,
+        "total": 1270
+      },
+      "totals": {
+        "total_assets": 1900,
+        "total_liabilities": 630,
+        "total_equity": 1270,
+        "total_liab_and_equity": 1900,
+        "balanced": true
+      }
+    },
+    "visible_text": [
+      "Balance Sheet",
+      "Oct 25, 2026",
+      "Today",
+      "Export to CSV",
+      "As of Oct 25, 2026",
+      "Assets",
+      "Inventory",
+      "Rs. 200.00",
+      "Accounts Receivable Reports",
+      "Rs. 300.00",
+      "Cash",
+      "Rs. 1,000.00",
+      "Total",
+      "Rs. 1,900.00",
+      "Liabilities",
+      "Accounts Payable",
+      "Rs. 500.00",
+      "Total",
+      "Rs. 630.00",
+      "Equity",
+      "Opening Retained Earnings",
+      "Rs. 1,000.00",
+      "Owner Capital",
+      "Rs. 300.00",
+      "Owner Drawings",
+      "-Rs. 30.00",
+      "Net Income (YTD)",
+      "Rs. 0.00",
+      "Revenue (YTD)",
+      "Rs. 0.00",
+      "COGS (YTD)",
+      "Rs. 0.00",
+      "Expenses (YTD)",
+      "Rs. 0.00",
+      "Total",
+      "Rs. 1,270.00",
+      "Total Assets",
+      "Rs. 1,900.00",
+      "Total Liabilities & Equity",
+      "Rs. 1,900.00",
+      "Balanced"
+    ],
+    "expected_nonzero_categories": {
+      "other_assets": 400,
+      "tax_payable": 60,
+      "other_liabilities": 70
+    },
+    "displayed_asset_components_sum": 1500,
+    "displayed_asset_total": 1900,
+    "displayed_liability_components_sum": 500,
+    "displayed_liability_total": 630
+  },
+  "flutter-salary-carryover-widget.json": {
+    "fixture": {
+      "salary": 1000,
+      "total_paid_including_advance": 200,
+      "advance_carryover": 200,
+      "remaining": 800,
+      "pay_period": "2026-10"
+    },
+    "source_capture": {
+      "source_artifact": "accounting-audit/evidence/backend-run-fPHem1/results.json",
+      "source_request": "GET /api/employees/1/salary/history",
+      "source_status": 200,
+      "row": {
+        "pay_period": "2026-09",
+        "employee_salary": 1000,
+        "total_paid": 200,
+        "remaining": 800,
+        "status": "advance",
+        "payment_count": 1,
+        "advance_carryover": 200,
+        "advance_source_period": "2026-08",
+        "first_payment_date": "2026-08-20",
+        "last_payment_date": "2026-08-20"
+      }
+    },
+    "fixture_adaptation": "pay_period relabeled to current month for default-date dialog; financial fields unchanged",
+    "visible_text": [
+      "Pay Salary",
+      "AUDIT \u00b7 Audit Fixture",
+      "Amount *",
+      "Payment Date *",
+      "Oct 25, 2026",
+      "Payment Type",
+      "Full",
+      "Already paid this month: Rs. 200.00 + Advance from August 2026: Rs. 200.00 \u2014 Remaining Balance: Rs. 600.00",
+      "Payment Method",
+      "Bank Transfer",
+      "Reference No",
+      "Notes",
+      "Cancel",
+      "Pay Salary"
+    ],
+    "expected_remaining": 800,
+    "actual_remaining_from_client_expression": 600
+  },
+  "csv_cash_row": [
+    "Cash",
+    "",
+    "Rs. 1",
+    "000.00"
+  ]
+}

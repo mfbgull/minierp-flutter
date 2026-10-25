@@ -1,0 +1,48 @@
+{
+  "database": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-z9sfxV/erp.db",
+  "query": "SELECT i.invoice_no,i.total_amount,i.credit_offset,i.paid_amount,i.balance_amount,c.current_balance,c.credit_balance FROM invoices i JOIN customers c ON c.id=i.customer_id ORDER BY i.id",
+  "rows": [
+    {
+      "invoice_no": "INV-1026-00001",
+      "total_amount": 150,
+      "credit_offset": 0,
+      "paid_amount": 150,
+      "balance_amount": 0,
+      "current_balance": 15,
+      "credit_balance": 0
+    },
+    {
+      "invoice_no": "INV-1026-00002",
+      "total_amount": 30,
+      "credit_offset": 30,
+      "paid_amount": 30,
+      "balance_amount": 0,
+      "current_balance": 15,
+      "credit_balance": 0
+    },
+    {
+      "invoice_no": "INV-1026-00003",
+      "total_amount": 45,
+      "credit_offset": 30,
+      "paid_amount": 30,
+      "balance_amount": 15,
+      "current_balance": 15,
+      "credit_balance": 0
+    },
+    {
+      "invoice_no": "INV-1026-00004",
+      "total_amount": 60,
+      "credit_offset": 60,
+      "paid_amount": 60,
+      "balance_amount": 0,
+      "current_balance": 15,
+      "credit_balance": 0
+    }
+  ],
+  "integrity": [
+    {
+      "integrity_check": "ok"
+    }
+  ],
+  "foreignKeys": []
+}

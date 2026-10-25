@@ -1,0 +1,16 @@
+[
+  {
+    "name": "quick",
+    "command": [
+      "bash",
+      "scripts/check.sh",
+      "--quick"
+    ],
+    "cwd": ".",
+    "startedAt": "2026-10-25T03:13:15.276Z",
+    "endedAt": "2026-10-25T03:27:26.711Z",
+    "log": "accounting-audit/evidence/quick.log",
+    "exitCode": 1,
+    "signal": null
+  }
+]

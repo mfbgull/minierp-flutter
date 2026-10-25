@@ -1,0 +1,265 @@
+{
+  "runDir": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-eVTI6t",
+  "families": [
+    {
+      "id": "3b",
+      "name": "unpaid and partial supplier returns",
+      "status": "PASS",
+      "checks": 42
+    }
+  ],
+  "checks": [
+    {
+      "label": "supplier balance paid0",
+      "actual": 70,
+      "expected": 70,
+      "pass": true
+    },
+    {
+      "label": "supplier stock paid0",
+      "actual": 7,
+      "expected": 7,
+      "pass": true
+    },
+    {
+      "label": "rejected post /api/supplier-refunds economic atomicity",
+      "actual": "b655b87db54218db79869263521e9a7eb9d10bf6206e80cec6d5c5a39f2118cf",
+      "expected": "b655b87db54218db79869263521e9a7eb9d10bf6206e80cec6d5c5a39f2118cf",
+      "pass": true
+    },
+    {
+      "label": "supplier collected-cash refund cap paid0",
+      "actual": true,
+      "expected": true,
+      "pass": true
+    },
+    {
+      "label": "supplier-partial-0 balanced journal groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-partial-0 customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-partial-0 supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-partial-0 stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-partial-0 arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-partial-0 apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-partial-0 inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-partial-0 cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-partial-0 orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-partial-0 unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-partial-0 creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-partial-0 creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-partial-0 receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-partial-0 supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-partial-0 expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-partial-0 inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-partial-0 signed AR GL vs customer net",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "supplier balance paid50",
+      "actual": -10,
+      "expected": -10,
+      "pass": true
+    },
+    {
+      "label": "supplier stock paid50",
+      "actual": 4,
+      "expected": 4,
+      "pass": true
+    },
+    {
+      "label": "rejected post /api/supplier-refunds economic atomicity",
+      "actual": "26b4adff18c0d90b5956ed0957b70349a5d0cecafab0b76358d40e551ab39c5d",
+      "expected": "26b4adff18c0d90b5956ed0957b70349a5d0cecafab0b76358d40e551ab39c5d",
+      "pass": true
+    },
+    {
+      "label": "supplier collected-cash refund cap paid50",
+      "actual": true,
+      "expected": true,
+      "pass": true
+    },
+    {
+      "label": "supplier-partial-50 balanced journal groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-partial-50 customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-partial-50 supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-partial-50 stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-partial-50 arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-partial-50 apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-partial-50 inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-partial-50 cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-partial-50 orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-partial-50 unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-partial-50 creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-partial-50 creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-partial-50 receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-partial-50 supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-partial-50 expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-partial-50 inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "supplier-partial-50 signed AR GL vs customer net",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    }
+  ]
+}
