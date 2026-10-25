@@ -268,6 +268,28 @@ describe('repairLegacyBOMItemsSchema legacy shapes', () => {
     mem.close();
   });
 
+  it('allocates a fresh header id and falls back to defaults', () => {
+    const mem = legacyBomDb({ unitCost: true, createdAt: true });
+    mem.prepare(
+      `INSERT INTO boms (id, bom_no, bom_name, finished_item_id, quantity)
+       VALUES (1, 'BOM-TAKEN', 'taken', 1, 1)`
+    ).run();
+    mem.prepare(`INSERT INTO bom (id, bom_no, finished_item_id) VALUES (1, 'BOM-NEW', 1)`).run();
+    mem.prepare(`INSERT INTO bom (id, bom_no) VALUES (2, NULL)`).run();
+
+    repairLegacyBOMItemsSchema(mem);
+
+    const headers = mem
+      .prepare('SELECT id, bom_no, quantity, is_active, created_by FROM boms ORDER BY bom_no')
+      .all() as Array<Record<string, unknown>>;
+    expect(headers).toEqual([
+      { id: 3, bom_no: 'BOM-2', quantity: 1, is_active: 1, created_by: 7 },
+      expect.objectContaining({ id: 2, bom_no: 'BOM-NEW', quantity: 1, is_active: 1, created_by: 7 }),
+      { id: 1, bom_no: 'BOM-TAKEN', quantity: 1, is_active: 1, created_by: null },
+    ]);
+    mem.close();
+  });
+
   it('handles unit_cost-only legacy tables', () => {
     const mem = legacyBomDb({ unitCost: true, createdAt: false });
     mem.prepare(`INSERT INTO bom (id, bom_no) VALUES (1, 'BOM-U')`).run();
