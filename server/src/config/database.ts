@@ -998,11 +998,7 @@ export function repairLegacyBOMItemsSchema(
   );
 }
 
-function migrateLegacyBomHeaders(
-  targetDb: Database.Database,
-  tableExists: (name: string) => boolean,
-  bomIdMap: Map<number, number>,
-): void {
+function migrateLegacyBomHeaders(targetDb: Database.Database, tableExists: (name: string) => boolean, bomIdMap: Map<number, number>): void {
   if (!tableExists('bom')) return;
 
   const legacyBoms = targetDb

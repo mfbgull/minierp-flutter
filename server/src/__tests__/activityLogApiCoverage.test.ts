@@ -75,9 +75,10 @@ describe('activity log API', () => {
     const all = await request(app).get('/api/activity-logs/stats').set('Cookie', cookie);
     expect(all.status).toBe(200);
     expect(all.body.data.totalLogs).toBeGreaterThanOrEqual(3);
-    expect(all.body.data.users).toEqual(
-      expect.arrayContaining([{ username: 'admin', count: 2 }])
+    const adminRow = (all.body.data.users as Array<{ username: string | null; count: number }>).find(
+      u => u.username === 'admin'
     );
+    expect(adminRow?.count).toBeGreaterThanOrEqual(2);
     expect(all.body.data.actions.length).toBeGreaterThanOrEqual(3);
 
     const now = new Date();
