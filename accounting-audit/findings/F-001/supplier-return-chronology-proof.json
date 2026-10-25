@@ -1,0 +1,46 @@
+{
+  "database": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-ZHkdJ8/erp.db",
+  "queries": {
+    "source": "SELECT r.id,r.return_no,r.return_date,p.purchase_no,p.purchase_date FROM purchase_returns r JOIN purchases p ON p.id=r.source_id WHERE r.source_type='PURCHASE'",
+    "gl": "SELECT j.line_date,a.code,j.debit,j.credit FROM journal_lines j JOIN chart_of_accounts a ON a.id=j.account_id WHERE j.reference_type='PURCHASE_RETURN'",
+    "batches": "SELECT id,quantity_remaining,received_date FROM stock_batches"
+  },
+  "results": {
+    "source": [
+      {
+        "id": 1,
+        "return_no": "PR-1026-0001",
+        "return_date": "2026-09-09",
+        "purchase_no": "PURCH-1026-0001",
+        "purchase_date": "2026-09-10"
+      }
+    ],
+    "gl": [
+      {
+        "line_date": "2026-09-09",
+        "code": "2000",
+        "debit": 10,
+        "credit": 0
+      },
+      {
+        "line_date": "2026-09-09",
+        "code": "1200",
+        "debit": 0,
+        "credit": 10
+      }
+    ],
+    "batches": [
+      {
+        "id": 1,
+        "quantity_remaining": 9,
+        "received_date": "2026-09-10"
+      }
+    ]
+  },
+  "integrity": [
+    {
+      "integrity_check": "ok"
+    }
+  ],
+  "foreignKeys": []
+}

@@ -1,0 +1,56 @@
+{
+  "database": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/erp.db",
+  "query": "SELECT r.id,r.return_no,r.return_date,i.invoice_no,i.invoice_date,j.line_date,a.code,j.debit,j.credit FROM invoice_returns r JOIN invoices i ON i.id=r.invoice_id JOIN journal_lines j ON j.reference_type='INVOICE_RETURN' AND j.reference_id=r.id JOIN chart_of_accounts a ON a.id=j.account_id WHERE r.return_date<i.invoice_date",
+  "rows": [
+    {
+      "id": 5,
+      "return_no": "RET-1026-00005",
+      "return_date": "2026-09-09",
+      "invoice_no": "INV-1026-00006",
+      "invoice_date": "2026-09-11",
+      "line_date": "2026-09-09",
+      "code": "1100",
+      "debit": 0,
+      "credit": 15
+    },
+    {
+      "id": 5,
+      "return_no": "RET-1026-00005",
+      "return_date": "2026-09-09",
+      "invoice_no": "INV-1026-00006",
+      "invoice_date": "2026-09-11",
+      "line_date": "2026-09-09",
+      "code": "4100",
+      "debit": 15,
+      "credit": 0
+    },
+    {
+      "id": 5,
+      "return_no": "RET-1026-00005",
+      "return_date": "2026-09-09",
+      "invoice_no": "INV-1026-00006",
+      "invoice_date": "2026-09-11",
+      "line_date": "2026-09-09",
+      "code": "1200",
+      "debit": 10,
+      "credit": 0
+    },
+    {
+      "id": 5,
+      "return_no": "RET-1026-00005",
+      "return_date": "2026-09-09",
+      "invoice_no": "INV-1026-00006",
+      "invoice_date": "2026-09-11",
+      "line_date": "2026-09-09",
+      "code": "5000",
+      "debit": 0,
+      "credit": 10
+    }
+  ],
+  "integrity": [
+    {
+      "integrity_check": "ok"
+    }
+  ],
+  "foreignKeys": []
+}
