@@ -1,0 +1,7136 @@
+{
+  "run": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/payable-cash-run-GIxBh2",
+  "invocation": "node accounting-audit/tests/payable-cash-extension.cjs",
+  "opened": [
+    "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/payable-cash-run-GIxBh2/erp.db"
+  ],
+  "checks": [
+    {
+      "label": "advance-01-liabilities customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-01-liabilities supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-01-liabilities stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-01-liabilities arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-01-liabilities apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-01-liabilities inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-01-liabilities cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-01-liabilities orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-01-liabilities unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-01-liabilities creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-01-liabilities creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-01-liabilities receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-01-liabilities supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-01-liabilities expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-01-liabilities inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-01-liabilities balanced reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-01-liabilities aggregate balance paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "advance-01-liabilities every retained journal balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-01-liabilities canonical and header void status agree",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-01-liabilities voided sources have no active GL",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-01-liabilities active allocations retain active sources",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-01-liabilities signed supplier balance matches AP",
+      "actual": 16465,
+      "expected": 16465,
+      "pass": true
+    },
+    {
+      "label": "bill plus purchase AP paise",
+      "actual": -16465,
+      "expected": -16465,
+      "pass": true
+    },
+    {
+      "label": "bill expense paise",
+      "actual": 10025,
+      "expected": 10025,
+      "pass": true
+    },
+    {
+      "label": "bill input tax paise",
+      "actual": 1504,
+      "expected": 1504,
+      "pass": true
+    },
+    {
+      "label": "purchase stock paise",
+      "actual": 4936,
+      "expected": 4936,
+      "pass": true
+    },
+    {
+      "label": "advance replay retains id",
+      "actual": 1,
+      "expected": 1,
+      "pass": true
+    },
+    {
+      "label": "advance cash debit only once paise",
+      "actual": 79925,
+      "expected": 79925,
+      "pass": true
+    },
+    {
+      "label": "advance asset paise",
+      "actual": 20075,
+      "expected": 20075,
+      "pass": true
+    },
+    {
+      "label": "advance does not net supplier AP",
+      "actual": -16465,
+      "expected": -16465,
+      "pass": true
+    },
+    {
+      "label": "advance-02-created customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-02-created supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-02-created stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-02-created arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-02-created apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-02-created inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-02-created cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-02-created orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-02-created unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-02-created creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-02-created creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-02-created receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-02-created supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-02-created expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-02-created inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-02-created balanced reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-02-created aggregate balance paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "advance-02-created every retained journal balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-02-created canonical and header void status agree",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-02-created voided sources have no active GL",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-02-created active allocations retain active sources",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-02-created signed supplier balance matches AP",
+      "actual": 16465,
+      "expected": 16465,
+      "pass": true
+    },
+    {
+      "label": "application replay retains id",
+      "actual": 1,
+      "expected": 1,
+      "pass": true
+    },
+    {
+      "label": "application cash unchanged",
+      "actual": 79925,
+      "expected": 79925,
+      "pass": true
+    },
+    {
+      "label": "application asset remainder",
+      "actual": 12051,
+      "expected": 12051,
+      "pass": true
+    },
+    {
+      "label": "application AP remainder",
+      "actual": -8441,
+      "expected": -8441,
+      "pass": true
+    },
+    {
+      "label": "advance-03-part-applied customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-03-part-applied supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-03-part-applied stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-03-part-applied arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-03-part-applied apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-03-part-applied inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-03-part-applied cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-03-part-applied orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-03-part-applied unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-03-part-applied creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-03-part-applied creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-03-part-applied receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-03-part-applied supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-03-part-applied expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-03-part-applied inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-03-part-applied balanced reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-03-part-applied aggregate balance paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "advance-03-part-applied every retained journal balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-03-part-applied canonical and header void status agree",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-03-part-applied voided sources have no active GL",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-03-part-applied active allocations retain active sources",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-03-part-applied signed supplier balance matches AP",
+      "actual": 8441,
+      "expected": 8441,
+      "pass": true
+    },
+    {
+      "label": "exact bill has zero payable",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "exact bill paid paise",
+      "actual": 11529,
+      "expected": 11529,
+      "pass": true
+    },
+    {
+      "label": "exact bill leaves purchase AP",
+      "actual": -2925,
+      "expected": -2925,
+      "pass": true
+    },
+    {
+      "label": "advance remaining after exact bill",
+      "actual": 6535,
+      "expected": 6535,
+      "pass": true
+    },
+    {
+      "label": "advance-04-bill-settled customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-04-bill-settled supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-04-bill-settled stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-04-bill-settled arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-04-bill-settled apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-04-bill-settled inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-04-bill-settled cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-04-bill-settled orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-04-bill-settled unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-04-bill-settled creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-04-bill-settled creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-04-bill-settled receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-04-bill-settled supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-04-bill-settled expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-04-bill-settled inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-04-bill-settled balanced reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-04-bill-settled aggregate balance paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "advance-04-bill-settled every retained journal balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-04-bill-settled canonical and header void status agree",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-04-bill-settled voided sources have no active GL",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-04-bill-settled active allocations retain active sources",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-04-bill-settled signed supplier balance matches AP",
+      "actual": 2925,
+      "expected": 2925,
+      "pass": true
+    },
+    {
+      "label": "013 rejection preserves economic and source rows",
+      "actual": "0ee2da2a57e9fd67ad4a7aad8c0da775c68c024fad55e3b8e5be7c8a04a14e29",
+      "expected": "0ee2da2a57e9fd67ad4a7aad8c0da775c68c024fad55e3b8e5be7c8a04a14e29",
+      "pass": true
+    },
+    {
+      "label": "post /api/supplier-prepayments/1/void rejected 4xx",
+      "actual": true,
+      "expected": true,
+      "pass": true
+    },
+    {
+      "label": "014 rejection preserves economic and source rows",
+      "actual": "0ee2da2a57e9fd67ad4a7aad8c0da775c68c024fad55e3b8e5be7c8a04a14e29",
+      "expected": "0ee2da2a57e9fd67ad4a7aad8c0da775c68c024fad55e3b8e5be7c8a04a14e29",
+      "pass": true
+    },
+    {
+      "label": "post /api/supplier-bills/1/void rejected 4xx",
+      "actual": true,
+      "expected": true,
+      "pass": true
+    },
+    {
+      "label": "015 rejection preserves economic and source rows",
+      "actual": "0ee2da2a57e9fd67ad4a7aad8c0da775c68c024fad55e3b8e5be7c8a04a14e29",
+      "expected": "0ee2da2a57e9fd67ad4a7aad8c0da775c68c024fad55e3b8e5be7c8a04a14e29",
+      "pass": true
+    },
+    {
+      "label": "post /api/supplier-prepayments/1/apply rejected 4xx",
+      "actual": true,
+      "expected": true,
+      "pass": true
+    },
+    {
+      "label": "016 rejection preserves economic and source rows",
+      "actual": "0ee2da2a57e9fd67ad4a7aad8c0da775c68c024fad55e3b8e5be7c8a04a14e29",
+      "expected": "0ee2da2a57e9fd67ad4a7aad8c0da775c68c024fad55e3b8e5be7c8a04a14e29",
+      "pass": true
+    },
+    {
+      "label": "post /api/supplier-prepayments/1/apply rejected 4xx",
+      "actual": true,
+      "expected": true,
+      "pass": true
+    },
+    {
+      "label": "advance-05-guards customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-05-guards supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-05-guards stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-05-guards arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-05-guards apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-05-guards inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-05-guards cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-05-guards orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-05-guards unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-05-guards creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-05-guards creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-05-guards receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-05-guards supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-05-guards expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-05-guards inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-05-guards balanced reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-05-guards aggregate balance paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "advance-05-guards every retained journal balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-05-guards canonical and header void status agree",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-05-guards voided sources have no active GL",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-05-guards active allocations retain active sources",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-05-guards signed supplier balance matches AP",
+      "actual": 2925,
+      "expected": 2925,
+      "pass": true
+    },
+    {
+      "label": "application reversals restore advance",
+      "actual": 20075,
+      "expected": 20075,
+      "pass": true
+    },
+    {
+      "label": "application reversals do not move cash",
+      "actual": 79925,
+      "expected": 79925,
+      "pass": true
+    },
+    {
+      "label": "application reversals restore AP",
+      "actual": -16465,
+      "expected": -16465,
+      "pass": true
+    },
+    {
+      "label": "advance-06-applications-reversed customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-06-applications-reversed supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-06-applications-reversed stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-06-applications-reversed arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-06-applications-reversed apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-06-applications-reversed inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-06-applications-reversed cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-06-applications-reversed orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-06-applications-reversed unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-06-applications-reversed creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-06-applications-reversed creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-06-applications-reversed receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-06-applications-reversed supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-06-applications-reversed expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-06-applications-reversed inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-06-applications-reversed balanced reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-06-applications-reversed aggregate balance paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "advance-06-applications-reversed every retained journal balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-06-applications-reversed canonical and header void status agree",
+      "actual": [
+        {
+          "id": 12
+        },
+        {
+          "id": 13
+        },
+        {
+          "id": 14
+        },
+        {
+          "id": 15
+        }
+      ],
+      "expected": [],
+      "pass": false
+    },
+    {
+      "label": "advance-06-applications-reversed voided sources have no active GL",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-06-applications-reversed active allocations retain active sources",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-06-applications-reversed signed supplier balance matches AP",
+      "actual": 16465,
+      "expected": 16465,
+      "pass": true
+    },
+    {
+      "label": "advance void restores baseline GL",
+      "actual": {
+        "1000": 100000,
+        "1010": 100000,
+        "1200": 4936,
+        "1320": 1504,
+        "1330": 0,
+        "2000": -16465,
+        "2115": 0,
+        "3000": 0,
+        "3200": -200000,
+        "6000": 10025
+      },
+      "expected": {
+        "1000": 100000,
+        "1010": 100000,
+        "1200": 4936,
+        "1320": 1504,
+        "1330": 0,
+        "2000": -16465,
+        "2115": 0,
+        "3000": 0,
+        "3200": -200000,
+        "6000": 10025
+      },
+      "pass": true
+    },
+    {
+      "label": "repeat advance void has no economic effect",
+      "actual": "c37917b93a0ab6237540be8183c143213c6555bd23c1e1e4ca652f3c7ac86524",
+      "expected": "c37917b93a0ab6237540be8183c143213c6555bd23c1e1e4ca652f3c7ac86524",
+      "pass": true
+    },
+    {
+      "label": "advance-07-voided customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-07-voided supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-07-voided stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-07-voided arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-07-voided apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-07-voided inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-07-voided cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-07-voided orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-07-voided unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-07-voided creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-07-voided creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-07-voided receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-07-voided supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-07-voided expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-07-voided inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-07-voided balanced reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-07-voided aggregate balance paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "advance-07-voided every retained journal balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-07-voided canonical and header void status agree",
+      "actual": [
+        {
+          "id": 10
+        },
+        {
+          "id": 11
+        },
+        {
+          "id": 12
+        },
+        {
+          "id": 13
+        },
+        {
+          "id": 14
+        },
+        {
+          "id": 15
+        }
+      ],
+      "expected": [],
+      "pass": false
+    },
+    {
+      "label": "advance-07-voided voided sources have no active GL",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-07-voided active allocations retain active sources",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-07-voided signed supplier balance matches AP",
+      "actual": 16465,
+      "expected": 16465,
+      "pass": true
+    },
+    {
+      "label": "unused bank advance bank credit",
+      "actual": 97475,
+      "expected": 97475,
+      "pass": true
+    },
+    {
+      "label": "unused bank advance restored",
+      "actual": 100000,
+      "expected": 100000,
+      "pass": true
+    },
+    {
+      "label": "advance-08-unused-bank-void customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-08-unused-bank-void supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-08-unused-bank-void stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-08-unused-bank-void arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-08-unused-bank-void apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-08-unused-bank-void inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-08-unused-bank-void cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-08-unused-bank-void orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-08-unused-bank-void unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-08-unused-bank-void creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-08-unused-bank-void creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-08-unused-bank-void receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-08-unused-bank-void supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-08-unused-bank-void expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-08-unused-bank-void inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-08-unused-bank-void balanced reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-08-unused-bank-void aggregate balance paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "advance-08-unused-bank-void every retained journal balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-08-unused-bank-void canonical and header void status agree",
+      "actual": [
+        {
+          "id": 10
+        },
+        {
+          "id": 11
+        },
+        {
+          "id": 12
+        },
+        {
+          "id": 13
+        },
+        {
+          "id": 14
+        },
+        {
+          "id": 15
+        },
+        {
+          "id": 16
+        },
+        {
+          "id": 17
+        }
+      ],
+      "expected": [],
+      "pass": false
+    },
+    {
+      "label": "advance-08-unused-bank-void voided sources have no active GL",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-08-unused-bank-void active allocations retain active sources",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-08-unused-bank-void signed supplier balance matches AP",
+      "actual": 16465,
+      "expected": 16465,
+      "pass": true
+    },
+    {
+      "label": "023 rejection preserves economic and source rows",
+      "actual": "0c783475b833ce22646f8809f4d925ec871fd20199968960e4eecb2c17fab6f6",
+      "expected": "0c783475b833ce22646f8809f4d925ec871fd20199968960e4eecb2c17fab6f6",
+      "pass": true
+    },
+    {
+      "label": "injected advance GL failure rejected",
+      "actual": true,
+      "expected": true,
+      "pass": true
+    },
+    {
+      "label": "advance-09-atomic-failure customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-09-atomic-failure supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-09-atomic-failure stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-09-atomic-failure arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-09-atomic-failure apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-09-atomic-failure inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-09-atomic-failure cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-09-atomic-failure orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-09-atomic-failure unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-09-atomic-failure creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-09-atomic-failure creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-09-atomic-failure receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-09-atomic-failure supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-09-atomic-failure expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-09-atomic-failure inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-09-atomic-failure balanced reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-09-atomic-failure aggregate balance paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "advance-09-atomic-failure every retained journal balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-09-atomic-failure canonical and header void status agree",
+      "actual": [
+        {
+          "id": 10
+        },
+        {
+          "id": 11
+        },
+        {
+          "id": 12
+        },
+        {
+          "id": 13
+        },
+        {
+          "id": 14
+        },
+        {
+          "id": 15
+        },
+        {
+          "id": 16
+        },
+        {
+          "id": 17
+        }
+      ],
+      "expected": [],
+      "pass": false
+    },
+    {
+      "label": "advance-09-atomic-failure voided sources have no active GL",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-09-atomic-failure active allocations retain active sources",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "advance-09-atomic-failure signed supplier balance matches AP",
+      "actual": 16465,
+      "expected": 16465,
+      "pass": true
+    },
+    {
+      "label": "expense-01-before customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-01-before supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-01-before stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-01-before arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-01-before apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-01-before inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-01-before cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-01-before orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-01-before unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-01-before creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-01-before creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-01-before receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-01-before supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-01-before expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-01-before inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-01-before balanced reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-01-before aggregate balance paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "expense-01-before every retained journal balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-01-before canonical and header void status agree",
+      "actual": [
+        {
+          "id": 10
+        },
+        {
+          "id": 11
+        },
+        {
+          "id": 12
+        },
+        {
+          "id": 13
+        },
+        {
+          "id": 14
+        },
+        {
+          "id": 15
+        },
+        {
+          "id": 16
+        },
+        {
+          "id": 17
+        }
+      ],
+      "expected": [],
+      "pass": false
+    },
+    {
+      "label": "expense-01-before voided sources have no active GL",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-01-before active allocations retain active sources",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-01-before signed supplier balance matches AP",
+      "actual": 16465,
+      "expected": 16465,
+      "pass": true
+    },
+    {
+      "label": "draft expense creates no GL",
+      "actual": {
+        "1000": 100000,
+        "1010": 100000,
+        "1200": 4936,
+        "1320": 1504,
+        "1330": 0,
+        "2000": -16465,
+        "2115": 0,
+        "3000": 0,
+        "3200": -200000,
+        "6000": 10025
+      },
+      "expected": {
+        "1000": 100000,
+        "1010": 100000,
+        "1200": 4936,
+        "1320": 1504,
+        "1330": 0,
+        "2000": -16465,
+        "2115": 0,
+        "3000": 0,
+        "3200": -200000,
+        "6000": 10025
+      },
+      "pass": true
+    },
+    {
+      "label": "credit expense accrues expense paise",
+      "actual": 12037,
+      "expected": 12037,
+      "pass": true
+    },
+    {
+      "label": "credit expense liability paise",
+      "actual": -12037,
+      "expected": -12037,
+      "pass": true
+    },
+    {
+      "label": "credit expense cash unchanged",
+      "actual": 100000,
+      "expected": 100000,
+      "pass": true
+    },
+    {
+      "label": "expense-02-recorded customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-02-recorded supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-02-recorded stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-02-recorded arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-02-recorded apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-02-recorded inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-02-recorded cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-02-recorded orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-02-recorded unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-02-recorded creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-02-recorded creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-02-recorded receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-02-recorded supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-02-recorded expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-02-recorded inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-02-recorded balanced reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-02-recorded aggregate balance paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "expense-02-recorded every retained journal balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-02-recorded canonical and header void status agree",
+      "actual": [
+        {
+          "id": 10
+        },
+        {
+          "id": 11
+        },
+        {
+          "id": 12
+        },
+        {
+          "id": 13
+        },
+        {
+          "id": 14
+        },
+        {
+          "id": 15
+        },
+        {
+          "id": 16
+        },
+        {
+          "id": 17
+        }
+      ],
+      "expected": [],
+      "pass": false
+    },
+    {
+      "label": "expense-02-recorded voided sources have no active GL",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-02-recorded active allocations retain active sources",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-02-recorded signed supplier balance matches AP",
+      "actual": 16465,
+      "expected": 16465,
+      "pass": true
+    },
+    {
+      "label": "partial expense cash credit",
+      "actual": -4012,
+      "expected": -4012,
+      "pass": true
+    },
+    {
+      "label": "partial expense payable",
+      "actual": -8025,
+      "expected": -8025,
+      "pass": true
+    },
+    {
+      "label": "expense-03-part-paid customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-03-part-paid supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-03-part-paid stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-03-part-paid arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-03-part-paid apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-03-part-paid inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-03-part-paid cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-03-part-paid orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-03-part-paid unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-03-part-paid creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-03-part-paid creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-03-part-paid receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-03-part-paid supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-03-part-paid expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-03-part-paid inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-03-part-paid balanced reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-03-part-paid aggregate balance paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "expense-03-part-paid every retained journal balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-03-part-paid canonical and header void status agree",
+      "actual": [
+        {
+          "id": 10
+        },
+        {
+          "id": 11
+        },
+        {
+          "id": 12
+        },
+        {
+          "id": 13
+        },
+        {
+          "id": 14
+        },
+        {
+          "id": 15
+        },
+        {
+          "id": 16
+        },
+        {
+          "id": 17
+        }
+      ],
+      "expected": [],
+      "pass": false
+    },
+    {
+      "label": "expense-03-part-paid voided sources have no active GL",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-03-part-paid active allocations retain active sources",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-03-part-paid signed supplier balance matches AP",
+      "actual": 16465,
+      "expected": 16465,
+      "pass": true
+    },
+    {
+      "label": "027 rejection preserves economic and source rows",
+      "actual": "6661682b8172487b76af61ec7517311a66ea04d57c8b16f5226b7530c2e42cb0",
+      "expected": "6661682b8172487b76af61ec7517311a66ea04d57c8b16f5226b7530c2e42cb0",
+      "pass": true
+    },
+    {
+      "label": "put /api/expenses/1 rejected 4xx",
+      "actual": true,
+      "expected": true,
+      "pass": true
+    },
+    {
+      "label": "expense payment replay same id",
+      "actual": 2,
+      "expected": 2,
+      "pass": true
+    },
+    {
+      "label": "exact expense bank credit",
+      "actual": -8025,
+      "expected": -8025,
+      "pass": true
+    },
+    {
+      "label": "exact expense payable zero",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "expense-04-settled customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-04-settled supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-04-settled stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-04-settled arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-04-settled apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-04-settled inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-04-settled cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-04-settled orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-04-settled unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-04-settled creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-04-settled creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-04-settled receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-04-settled supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-04-settled expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-04-settled inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-04-settled balanced reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-04-settled aggregate balance paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "expense-04-settled every retained journal balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-04-settled canonical and header void status agree",
+      "actual": [
+        {
+          "id": 10
+        },
+        {
+          "id": 11
+        },
+        {
+          "id": 12
+        },
+        {
+          "id": 13
+        },
+        {
+          "id": 14
+        },
+        {
+          "id": 15
+        },
+        {
+          "id": 16
+        },
+        {
+          "id": 17
+        }
+      ],
+      "expected": [],
+      "pass": false
+    },
+    {
+      "label": "expense-04-settled voided sources have no active GL",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-04-settled active allocations retain active sources",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-04-settled signed supplier balance matches AP",
+      "actual": 16465,
+      "expected": 16465,
+      "pass": true
+    },
+    {
+      "label": "030 rejection preserves economic and source rows",
+      "actual": "31326a61f19475a4251adff062f9026515cd2fd053099c7bd44f0be0aa2763e7",
+      "expected": "31326a61f19475a4251adff062f9026515cd2fd053099c7bd44f0be0aa2763e7",
+      "pass": true
+    },
+    {
+      "label": "post /api/expenses/1/payments rejected 4xx",
+      "actual": true,
+      "expected": true,
+      "pass": true
+    },
+    {
+      "label": "bank settlement reversal restores payable",
+      "actual": -8025,
+      "expected": -8025,
+      "pass": true
+    },
+    {
+      "label": "bank settlement reversal restores bank",
+      "actual": 100000,
+      "expected": 100000,
+      "pass": true
+    },
+    {
+      "label": "expense-05-payment-voided customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-05-payment-voided supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-05-payment-voided stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-05-payment-voided arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-05-payment-voided apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-05-payment-voided inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-05-payment-voided cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-05-payment-voided orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-05-payment-voided unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-05-payment-voided creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-05-payment-voided creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-05-payment-voided receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-05-payment-voided supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-05-payment-voided expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-05-payment-voided inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-05-payment-voided balanced reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-05-payment-voided aggregate balance paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "expense-05-payment-voided every retained journal balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-05-payment-voided canonical and header void status agree",
+      "actual": [
+        {
+          "id": 10
+        },
+        {
+          "id": 11
+        },
+        {
+          "id": 12
+        },
+        {
+          "id": 13
+        },
+        {
+          "id": 14
+        },
+        {
+          "id": 15
+        },
+        {
+          "id": 16
+        },
+        {
+          "id": 17
+        },
+        {
+          "id": 22
+        },
+        {
+          "id": 23
+        }
+      ],
+      "expected": [],
+      "pass": false
+    },
+    {
+      "label": "expense-05-payment-voided voided sources have no active GL",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-05-payment-voided active allocations retain active sources",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-05-payment-voided signed supplier balance matches AP",
+      "actual": 16465,
+      "expected": 16465,
+      "pass": true
+    },
+    {
+      "label": "repeat expense payment void has no effect",
+      "actual": "e7ee619c260c45d10528b673a0c6572c4948ec80ecc35b291d6353eaf233a45a",
+      "expected": "e7ee619c260c45d10528b673a0c6572c4948ec80ecc35b291d6353eaf233a45a",
+      "pass": true
+    },
+    {
+      "label": "033 rejection preserves economic and source rows",
+      "actual": "e7ee619c260c45d10528b673a0c6572c4948ec80ecc35b291d6353eaf233a45a",
+      "expected": "e7ee619c260c45d10528b673a0c6572c4948ec80ecc35b291d6353eaf233a45a",
+      "pass": true
+    },
+    {
+      "label": "injected expense GL failure rejected",
+      "actual": true,
+      "expected": true,
+      "pass": true
+    },
+    {
+      "label": "expense-06-atomic-failure customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-06-atomic-failure supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-06-atomic-failure stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-06-atomic-failure arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-06-atomic-failure apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-06-atomic-failure inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-06-atomic-failure cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-06-atomic-failure orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-06-atomic-failure unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-06-atomic-failure creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-06-atomic-failure creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-06-atomic-failure receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-06-atomic-failure supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-06-atomic-failure expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-06-atomic-failure inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-06-atomic-failure balanced reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-06-atomic-failure aggregate balance paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "expense-06-atomic-failure every retained journal balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-06-atomic-failure canonical and header void status agree",
+      "actual": [
+        {
+          "id": 10
+        },
+        {
+          "id": 11
+        },
+        {
+          "id": 12
+        },
+        {
+          "id": 13
+        },
+        {
+          "id": 14
+        },
+        {
+          "id": 15
+        },
+        {
+          "id": 16
+        },
+        {
+          "id": 17
+        },
+        {
+          "id": 22
+        },
+        {
+          "id": 23
+        }
+      ],
+      "expected": [],
+      "pass": false
+    },
+    {
+      "label": "expense-06-atomic-failure voided sources have no active GL",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-06-atomic-failure active allocations retain active sources",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-06-atomic-failure signed supplier balance matches AP",
+      "actual": 16465,
+      "expected": 16465,
+      "pass": true
+    },
+    {
+      "label": "cancelled expense returns all GL to baseline",
+      "actual": {
+        "1000": 100000,
+        "1010": 100000,
+        "1200": 4936,
+        "1320": 1504,
+        "1330": 0,
+        "2000": -16465,
+        "2115": 0,
+        "3000": 0,
+        "3200": -200000,
+        "6000": 10025
+      },
+      "expected": {
+        "1000": 100000,
+        "1010": 100000,
+        "1200": 4936,
+        "1320": 1504,
+        "1330": 0,
+        "2000": -16465,
+        "2115": 0,
+        "3000": 0,
+        "3200": -200000,
+        "6000": 10025
+      },
+      "pass": true
+    },
+    {
+      "label": "cancelled expense preserved source",
+      "actual": "Cancelled",
+      "expected": "Cancelled",
+      "pass": true
+    },
+    {
+      "label": "expense-07-cancelled customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-07-cancelled supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-07-cancelled stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-07-cancelled arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-07-cancelled apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-07-cancelled inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-07-cancelled cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-07-cancelled orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-07-cancelled unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-07-cancelled creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-07-cancelled creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-07-cancelled receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-07-cancelled supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-07-cancelled expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-07-cancelled inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-07-cancelled balanced reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-07-cancelled aggregate balance paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "expense-07-cancelled every retained journal balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-07-cancelled canonical and header void status agree",
+      "actual": [
+        {
+          "id": 10
+        },
+        {
+          "id": 11
+        },
+        {
+          "id": 12
+        },
+        {
+          "id": 13
+        },
+        {
+          "id": 14
+        },
+        {
+          "id": 15
+        },
+        {
+          "id": 16
+        },
+        {
+          "id": 17
+        },
+        {
+          "id": 18
+        },
+        {
+          "id": 19
+        },
+        {
+          "id": 20
+        },
+        {
+          "id": 21
+        },
+        {
+          "id": 22
+        },
+        {
+          "id": 23
+        }
+      ],
+      "expected": [],
+      "pass": false
+    },
+    {
+      "label": "expense-07-cancelled voided sources have no active GL",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-07-cancelled active allocations retain active sources",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-07-cancelled signed supplier balance matches AP",
+      "actual": 16465,
+      "expected": 16465,
+      "pass": true
+    },
+    {
+      "label": "036 rejection preserves economic and source rows",
+      "actual": "a11bf1c1eee21601d5d08c1d2f1ad548765699e2d6e51c0d8de4d38ffb1e42d9",
+      "expected": "a11bf1c1eee21601d5d08c1d2f1ad548765699e2d6e51c0d8de4d38ffb1e42d9",
+      "pass": true
+    },
+    {
+      "label": "post /api/expenses/1/payments rejected 4xx",
+      "actual": true,
+      "expected": true,
+      "pass": true
+    },
+    {
+      "label": "expense-08-cancelled-payment-guard customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-08-cancelled-payment-guard supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-08-cancelled-payment-guard stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-08-cancelled-payment-guard arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-08-cancelled-payment-guard apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-08-cancelled-payment-guard inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-08-cancelled-payment-guard cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-08-cancelled-payment-guard orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-08-cancelled-payment-guard unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-08-cancelled-payment-guard creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-08-cancelled-payment-guard creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-08-cancelled-payment-guard receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-08-cancelled-payment-guard supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-08-cancelled-payment-guard expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-08-cancelled-payment-guard inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-08-cancelled-payment-guard balanced reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-08-cancelled-payment-guard aggregate balance paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "expense-08-cancelled-payment-guard every retained journal balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-08-cancelled-payment-guard canonical and header void status agree",
+      "actual": [
+        {
+          "id": 10
+        },
+        {
+          "id": 11
+        },
+        {
+          "id": 12
+        },
+        {
+          "id": 13
+        },
+        {
+          "id": 14
+        },
+        {
+          "id": 15
+        },
+        {
+          "id": 16
+        },
+        {
+          "id": 17
+        },
+        {
+          "id": 18
+        },
+        {
+          "id": 19
+        },
+        {
+          "id": 20
+        },
+        {
+          "id": 21
+        },
+        {
+          "id": 22
+        },
+        {
+          "id": 23
+        }
+      ],
+      "expected": [],
+      "pass": false
+    },
+    {
+      "label": "expense-08-cancelled-payment-guard voided sources have no active GL",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-08-cancelled-payment-guard active allocations retain active sources",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "expense-08-cancelled-payment-guard signed supplier balance matches AP",
+      "actual": 16465,
+      "expected": 16465,
+      "pass": true
+    },
+    {
+      "label": "opening adds cash",
+      "actual": 10010,
+      "expected": 10010,
+      "pass": true
+    },
+    {
+      "label": "opening adds bank",
+      "actual": 5020,
+      "expected": 5020,
+      "pass": true
+    },
+    {
+      "label": "opening capital credit",
+      "actual": -15030,
+      "expected": -15030,
+      "pass": true
+    },
+    {
+      "label": "cash-01-opening customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-01-opening supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-01-opening stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-01-opening arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-01-opening apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-01-opening inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-01-opening cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-01-opening orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-01-opening unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-01-opening creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-01-opening creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-01-opening receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-01-opening supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-01-opening expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-01-opening inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-01-opening balanced reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-01-opening aggregate balance paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "cash-01-opening every retained journal balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-01-opening canonical and header void status agree",
+      "actual": [
+        {
+          "id": 10
+        },
+        {
+          "id": 11
+        },
+        {
+          "id": 12
+        },
+        {
+          "id": 13
+        },
+        {
+          "id": 14
+        },
+        {
+          "id": 15
+        },
+        {
+          "id": 16
+        },
+        {
+          "id": 17
+        },
+        {
+          "id": 18
+        },
+        {
+          "id": 19
+        },
+        {
+          "id": 20
+        },
+        {
+          "id": 21
+        },
+        {
+          "id": 22
+        },
+        {
+          "id": 23
+        }
+      ],
+      "expected": [],
+      "pass": false
+    },
+    {
+      "label": "cash-01-opening voided sources have no active GL",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-01-opening active allocations retain active sources",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-01-opening signed supplier balance matches AP",
+      "actual": 16465,
+      "expected": 16465,
+      "pass": true
+    },
+    {
+      "label": "opening rewrite no double cash",
+      "actual": 10010,
+      "expected": 10010,
+      "pass": true
+    },
+    {
+      "label": "opening rewrite no double bank",
+      "actual": 5020,
+      "expected": 5020,
+      "pass": true
+    },
+    {
+      "label": "cash-02-opening-replaced customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-02-opening-replaced supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-02-opening-replaced stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-02-opening-replaced arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-02-opening-replaced apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-02-opening-replaced inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-02-opening-replaced cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-02-opening-replaced orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-02-opening-replaced unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-02-opening-replaced creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-02-opening-replaced creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-02-opening-replaced receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-02-opening-replaced supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-02-opening-replaced expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-02-opening-replaced inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-02-opening-replaced balanced reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-02-opening-replaced aggregate balance paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "cash-02-opening-replaced every retained journal balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-02-opening-replaced canonical and header void status agree",
+      "actual": [
+        {
+          "id": 10
+        },
+        {
+          "id": 11
+        },
+        {
+          "id": 12
+        },
+        {
+          "id": 13
+        },
+        {
+          "id": 14
+        },
+        {
+          "id": 15
+        },
+        {
+          "id": 16
+        },
+        {
+          "id": 17
+        },
+        {
+          "id": 18
+        },
+        {
+          "id": 19
+        },
+        {
+          "id": 20
+        },
+        {
+          "id": 21
+        },
+        {
+          "id": 22
+        },
+        {
+          "id": 23
+        },
+        {
+          "id": 24
+        },
+        {
+          "id": 25
+        },
+        {
+          "id": 26
+        },
+        {
+          "id": 27
+        }
+      ],
+      "expected": [],
+      "pass": false
+    },
+    {
+      "label": "cash-02-opening-replaced voided sources have no active GL",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-02-opening-replaced active allocations retain active sources",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-02-opening-replaced signed supplier balance matches AP",
+      "actual": 16465,
+      "expected": 16465,
+      "pass": true
+    },
+    {
+      "label": "reconciliation independently known shortage",
+      "actual": -15,
+      "expected": -15,
+      "pass": true
+    },
+    {
+      "label": "reconciliation expected cash agrees with GL",
+      "actual": 110010,
+      "expected": 110010,
+      "pass": true
+    },
+    {
+      "label": "reconciliation no automatic journal",
+      "actual": [
+        {
+          "id": 1,
+          "journal_entry_id": 1,
+          "account_id": 1,
+          "debit": 1000,
+          "credit": 0,
+          "description": "Capital contributed via CAP-2609-00001",
+          "line_date": "2026-09-01",
+          "reference_type": "OWNER_CAPITAL",
+          "reference_id": 1,
+          "voided": 0,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:49",
+          "voided_at": null,
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 2,
+          "journal_entry_id": 1,
+          "account_id": 24,
+          "debit": 0,
+          "credit": 1000,
+          "description": "Owner contribution CAP-2609-00001",
+          "line_date": "2026-09-01",
+          "reference_type": "OWNER_CAPITAL",
+          "reference_id": 1,
+          "voided": 0,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:49",
+          "voided_at": null,
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 3,
+          "journal_entry_id": 2,
+          "account_id": 2,
+          "debit": 1000,
+          "credit": 0,
+          "description": "Capital contributed via CAP-2609-00002",
+          "line_date": "2026-09-01",
+          "reference_type": "OWNER_CAPITAL",
+          "reference_id": 2,
+          "voided": 0,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:50",
+          "voided_at": null,
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 4,
+          "journal_entry_id": 2,
+          "account_id": 24,
+          "debit": 0,
+          "credit": 1000,
+          "description": "Owner contribution CAP-2609-00002",
+          "line_date": "2026-09-01",
+          "reference_type": "OWNER_CAPITAL",
+          "reference_id": 2,
+          "voided": 0,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:50",
+          "voided_at": null,
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 5,
+          "journal_entry_id": 3,
+          "account_id": 13,
+          "debit": 100.25,
+          "credit": 0,
+          "description": null,
+          "line_date": "2026-09-03",
+          "reference_type": "SUPPLIER_BILL",
+          "reference_id": 1,
+          "voided": 0,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:50",
+          "voided_at": null,
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 6,
+          "journal_entry_id": 3,
+          "account_id": 34,
+          "debit": 15.04,
+          "credit": 0,
+          "description": null,
+          "line_date": "2026-09-03",
+          "reference_type": "SUPPLIER_BILL",
+          "reference_id": 1,
+          "voided": 0,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:50",
+          "voided_at": null,
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 7,
+          "journal_entry_id": 3,
+          "account_id": 5,
+          "debit": 0,
+          "credit": 115.29,
+          "description": null,
+          "line_date": "2026-09-03",
+          "reference_type": "SUPPLIER_BILL",
+          "reference_id": 1,
+          "voided": 0,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:50",
+          "voided_at": null,
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 8,
+          "journal_entry_id": 4,
+          "account_id": 4,
+          "debit": 49.36,
+          "credit": 0,
+          "description": "Inventory received via PURCH-1026-0001",
+          "line_date": "2026-09-03",
+          "reference_type": "PURCHASE",
+          "reference_id": 1,
+          "voided": 0,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:50",
+          "voided_at": null,
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 9,
+          "journal_entry_id": 4,
+          "account_id": 5,
+          "debit": 0,
+          "credit": 49.36,
+          "description": "Obligation for PURCH-1026-0001",
+          "line_date": "2026-09-03",
+          "reference_type": "PURCHASE",
+          "reference_id": 1,
+          "voided": 0,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:50",
+          "voided_at": null,
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 10,
+          "journal_entry_id": 5,
+          "account_id": 35,
+          "debit": 200.75,
+          "credit": 0,
+          "description": null,
+          "line_date": "2026-09-02",
+          "reference_type": "SUPPLIER_PREPAYMENT",
+          "reference_id": 1,
+          "voided": 1,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:50",
+          "voided_at": "2026-10-25 05:19:52",
+          "voided_by": 1,
+          "void_reason": "Unused after reversal"
+        },
+        {
+          "id": 11,
+          "journal_entry_id": 5,
+          "account_id": 1,
+          "debit": 0,
+          "credit": 200.75,
+          "description": null,
+          "line_date": "2026-09-02",
+          "reference_type": "SUPPLIER_PREPAYMENT",
+          "reference_id": 1,
+          "voided": 1,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:50",
+          "voided_at": "2026-10-25 05:19:52",
+          "voided_by": 1,
+          "void_reason": "Unused after reversal"
+        },
+        {
+          "id": 12,
+          "journal_entry_id": 6,
+          "account_id": 5,
+          "debit": 80.24,
+          "credit": 0,
+          "description": null,
+          "line_date": "2026-09-04",
+          "reference_type": "PAYMENT",
+          "reference_id": 1,
+          "voided": 1,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:51",
+          "voided_at": "2026-10-25 05:19:52",
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 13,
+          "journal_entry_id": 6,
+          "account_id": 35,
+          "debit": 0,
+          "credit": 80.24,
+          "description": null,
+          "line_date": "2026-09-04",
+          "reference_type": "PAYMENT",
+          "reference_id": 1,
+          "voided": 1,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:51",
+          "voided_at": "2026-10-25 05:19:52",
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 14,
+          "journal_entry_id": 7,
+          "account_id": 5,
+          "debit": 55.16,
+          "credit": 0,
+          "description": null,
+          "line_date": "2026-09-04",
+          "reference_type": "PAYMENT",
+          "reference_id": 2,
+          "voided": 1,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:51",
+          "voided_at": "2026-10-25 05:19:51",
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 15,
+          "journal_entry_id": 7,
+          "account_id": 35,
+          "debit": 0,
+          "credit": 55.16,
+          "description": null,
+          "line_date": "2026-09-04",
+          "reference_type": "PAYMENT",
+          "reference_id": 2,
+          "voided": 1,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:51",
+          "voided_at": "2026-10-25 05:19:51",
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 16,
+          "journal_entry_id": 8,
+          "account_id": 35,
+          "debit": 25.25,
+          "credit": 0,
+          "description": null,
+          "line_date": "2026-09-05",
+          "reference_type": "SUPPLIER_PREPAYMENT",
+          "reference_id": 2,
+          "voided": 1,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:52",
+          "voided_at": "2026-10-25 05:19:53",
+          "voided_by": 1,
+          "void_reason": "Unused correction"
+        },
+        {
+          "id": 17,
+          "journal_entry_id": 8,
+          "account_id": 2,
+          "debit": 0,
+          "credit": 25.25,
+          "description": null,
+          "line_date": "2026-09-05",
+          "reference_type": "SUPPLIER_PREPAYMENT",
+          "reference_id": 2,
+          "voided": 1,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:52",
+          "voided_at": "2026-10-25 05:19:53",
+          "voided_by": 1,
+          "void_reason": "Unused correction"
+        },
+        {
+          "id": 18,
+          "journal_entry_id": 9,
+          "account_id": 13,
+          "debit": 120.37,
+          "credit": 0,
+          "description": "Expense incurred via EXP-2609-00001",
+          "line_date": "2026-09-06",
+          "reference_type": "EXPENSE",
+          "reference_id": 1,
+          "voided": 1,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:53",
+          "voided_at": "2026-10-25 05:19:55",
+          "voided_by": 1,
+          "void_reason": "Expense EXP-2609-00001 moved to Cancelled"
+        },
+        {
+          "id": 19,
+          "journal_entry_id": 9,
+          "account_id": 33,
+          "debit": 0,
+          "credit": 120.37,
+          "description": "Payable for EXP-2609-00001",
+          "line_date": "2026-09-06",
+          "reference_type": "EXPENSE",
+          "reference_id": 1,
+          "voided": 1,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:53",
+          "voided_at": "2026-10-25 05:19:55",
+          "voided_by": 1,
+          "void_reason": "Expense EXP-2609-00001 moved to Cancelled"
+        },
+        {
+          "id": 20,
+          "journal_entry_id": 10,
+          "account_id": 33,
+          "debit": 40.12,
+          "credit": 0,
+          "description": null,
+          "line_date": "2026-09-07",
+          "reference_type": "EXPENSE_PAYMENT",
+          "reference_id": 1,
+          "voided": 1,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:53",
+          "voided_at": "2026-10-25 05:19:55",
+          "voided_by": 1,
+          "void_reason": "Reverse cash settlement"
+        },
+        {
+          "id": 21,
+          "journal_entry_id": 10,
+          "account_id": 1,
+          "debit": 0,
+          "credit": 40.12,
+          "description": null,
+          "line_date": "2026-09-07",
+          "reference_type": "EXPENSE_PAYMENT",
+          "reference_id": 1,
+          "voided": 1,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:53",
+          "voided_at": "2026-10-25 05:19:55",
+          "voided_by": 1,
+          "void_reason": "Reverse cash settlement"
+        },
+        {
+          "id": 22,
+          "journal_entry_id": 11,
+          "account_id": 33,
+          "debit": 80.25,
+          "credit": 0,
+          "description": null,
+          "line_date": "2026-09-08",
+          "reference_type": "EXPENSE_PAYMENT",
+          "reference_id": 2,
+          "voided": 1,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:54",
+          "voided_at": "2026-10-25 05:19:54",
+          "voided_by": 1,
+          "void_reason": "Reverse bank settlement"
+        },
+        {
+          "id": 23,
+          "journal_entry_id": 11,
+          "account_id": 2,
+          "debit": 0,
+          "credit": 80.25,
+          "description": null,
+          "line_date": "2026-09-08",
+          "reference_type": "EXPENSE_PAYMENT",
+          "reference_id": 2,
+          "voided": 1,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:54",
+          "voided_at": "2026-10-25 05:19:54",
+          "voided_by": 1,
+          "void_reason": "Reverse bank settlement"
+        },
+        {
+          "id": 24,
+          "journal_entry_id": 12,
+          "account_id": 1,
+          "debit": 100.1,
+          "credit": 0,
+          "description": "Opening balance Cash",
+          "line_date": "2026-08-31",
+          "reference_type": "OPENING_BALANCE",
+          "reference_id": 0,
+          "voided": 1,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:55",
+          "voided_at": "2026-10-25 05:19:55",
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 25,
+          "journal_entry_id": 12,
+          "account_id": 7,
+          "debit": 0,
+          "credit": 100.1,
+          "description": "Opening capital Cash",
+          "line_date": "2026-08-31",
+          "reference_type": "OPENING_BALANCE",
+          "reference_id": 0,
+          "voided": 1,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:55",
+          "voided_at": "2026-10-25 05:19:55",
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 26,
+          "journal_entry_id": 12,
+          "account_id": 2,
+          "debit": 50.2,
+          "credit": 0,
+          "description": "Opening balance Bank",
+          "line_date": "2026-08-31",
+          "reference_type": "OPENING_BALANCE",
+          "reference_id": 0,
+          "voided": 1,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:55",
+          "voided_at": "2026-10-25 05:19:55",
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 27,
+          "journal_entry_id": 12,
+          "account_id": 7,
+          "debit": 0,
+          "credit": 50.2,
+          "description": "Opening capital Bank",
+          "line_date": "2026-08-31",
+          "reference_type": "OPENING_BALANCE",
+          "reference_id": 0,
+          "voided": 1,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:55",
+          "voided_at": "2026-10-25 05:19:55",
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 28,
+          "journal_entry_id": 13,
+          "account_id": 1,
+          "debit": 100.1,
+          "credit": 0,
+          "description": "Opening balance Cash",
+          "line_date": "2026-08-31",
+          "reference_type": "OPENING_BALANCE",
+          "reference_id": 0,
+          "voided": 0,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:55",
+          "voided_at": null,
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 29,
+          "journal_entry_id": 13,
+          "account_id": 7,
+          "debit": 0,
+          "credit": 100.1,
+          "description": "Opening capital Cash",
+          "line_date": "2026-08-31",
+          "reference_type": "OPENING_BALANCE",
+          "reference_id": 0,
+          "voided": 0,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:55",
+          "voided_at": null,
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 30,
+          "journal_entry_id": 13,
+          "account_id": 2,
+          "debit": 50.2,
+          "credit": 0,
+          "description": "Opening balance Bank",
+          "line_date": "2026-08-31",
+          "reference_type": "OPENING_BALANCE",
+          "reference_id": 0,
+          "voided": 0,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:55",
+          "voided_at": null,
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 31,
+          "journal_entry_id": 13,
+          "account_id": 7,
+          "debit": 0,
+          "credit": 50.2,
+          "description": "Opening capital Bank",
+          "line_date": "2026-08-31",
+          "reference_type": "OPENING_BALANCE",
+          "reference_id": 0,
+          "voided": 0,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:55",
+          "voided_at": null,
+          "voided_by": null,
+          "void_reason": null
+        }
+      ],
+      "expected": [
+        {
+          "id": 1,
+          "journal_entry_id": 1,
+          "account_id": 1,
+          "debit": 1000,
+          "credit": 0,
+          "description": "Capital contributed via CAP-2609-00001",
+          "line_date": "2026-09-01",
+          "reference_type": "OWNER_CAPITAL",
+          "reference_id": 1,
+          "voided": 0,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:49",
+          "voided_at": null,
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 2,
+          "journal_entry_id": 1,
+          "account_id": 24,
+          "debit": 0,
+          "credit": 1000,
+          "description": "Owner contribution CAP-2609-00001",
+          "line_date": "2026-09-01",
+          "reference_type": "OWNER_CAPITAL",
+          "reference_id": 1,
+          "voided": 0,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:49",
+          "voided_at": null,
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 3,
+          "journal_entry_id": 2,
+          "account_id": 2,
+          "debit": 1000,
+          "credit": 0,
+          "description": "Capital contributed via CAP-2609-00002",
+          "line_date": "2026-09-01",
+          "reference_type": "OWNER_CAPITAL",
+          "reference_id": 2,
+          "voided": 0,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:50",
+          "voided_at": null,
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 4,
+          "journal_entry_id": 2,
+          "account_id": 24,
+          "debit": 0,
+          "credit": 1000,
+          "description": "Owner contribution CAP-2609-00002",
+          "line_date": "2026-09-01",
+          "reference_type": "OWNER_CAPITAL",
+          "reference_id": 2,
+          "voided": 0,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:50",
+          "voided_at": null,
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 5,
+          "journal_entry_id": 3,
+          "account_id": 13,
+          "debit": 100.25,
+          "credit": 0,
+          "description": null,
+          "line_date": "2026-09-03",
+          "reference_type": "SUPPLIER_BILL",
+          "reference_id": 1,
+          "voided": 0,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:50",
+          "voided_at": null,
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 6,
+          "journal_entry_id": 3,
+          "account_id": 34,
+          "debit": 15.04,
+          "credit": 0,
+          "description": null,
+          "line_date": "2026-09-03",
+          "reference_type": "SUPPLIER_BILL",
+          "reference_id": 1,
+          "voided": 0,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:50",
+          "voided_at": null,
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 7,
+          "journal_entry_id": 3,
+          "account_id": 5,
+          "debit": 0,
+          "credit": 115.29,
+          "description": null,
+          "line_date": "2026-09-03",
+          "reference_type": "SUPPLIER_BILL",
+          "reference_id": 1,
+          "voided": 0,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:50",
+          "voided_at": null,
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 8,
+          "journal_entry_id": 4,
+          "account_id": 4,
+          "debit": 49.36,
+          "credit": 0,
+          "description": "Inventory received via PURCH-1026-0001",
+          "line_date": "2026-09-03",
+          "reference_type": "PURCHASE",
+          "reference_id": 1,
+          "voided": 0,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:50",
+          "voided_at": null,
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 9,
+          "journal_entry_id": 4,
+          "account_id": 5,
+          "debit": 0,
+          "credit": 49.36,
+          "description": "Obligation for PURCH-1026-0001",
+          "line_date": "2026-09-03",
+          "reference_type": "PURCHASE",
+          "reference_id": 1,
+          "voided": 0,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:50",
+          "voided_at": null,
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 10,
+          "journal_entry_id": 5,
+          "account_id": 35,
+          "debit": 200.75,
+          "credit": 0,
+          "description": null,
+          "line_date": "2026-09-02",
+          "reference_type": "SUPPLIER_PREPAYMENT",
+          "reference_id": 1,
+          "voided": 1,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:50",
+          "voided_at": "2026-10-25 05:19:52",
+          "voided_by": 1,
+          "void_reason": "Unused after reversal"
+        },
+        {
+          "id": 11,
+          "journal_entry_id": 5,
+          "account_id": 1,
+          "debit": 0,
+          "credit": 200.75,
+          "description": null,
+          "line_date": "2026-09-02",
+          "reference_type": "SUPPLIER_PREPAYMENT",
+          "reference_id": 1,
+          "voided": 1,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:50",
+          "voided_at": "2026-10-25 05:19:52",
+          "voided_by": 1,
+          "void_reason": "Unused after reversal"
+        },
+        {
+          "id": 12,
+          "journal_entry_id": 6,
+          "account_id": 5,
+          "debit": 80.24,
+          "credit": 0,
+          "description": null,
+          "line_date": "2026-09-04",
+          "reference_type": "PAYMENT",
+          "reference_id": 1,
+          "voided": 1,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:51",
+          "voided_at": "2026-10-25 05:19:52",
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 13,
+          "journal_entry_id": 6,
+          "account_id": 35,
+          "debit": 0,
+          "credit": 80.24,
+          "description": null,
+          "line_date": "2026-09-04",
+          "reference_type": "PAYMENT",
+          "reference_id": 1,
+          "voided": 1,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:51",
+          "voided_at": "2026-10-25 05:19:52",
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 14,
+          "journal_entry_id": 7,
+          "account_id": 5,
+          "debit": 55.16,
+          "credit": 0,
+          "description": null,
+          "line_date": "2026-09-04",
+          "reference_type": "PAYMENT",
+          "reference_id": 2,
+          "voided": 1,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:51",
+          "voided_at": "2026-10-25 05:19:51",
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 15,
+          "journal_entry_id": 7,
+          "account_id": 35,
+          "debit": 0,
+          "credit": 55.16,
+          "description": null,
+          "line_date": "2026-09-04",
+          "reference_type": "PAYMENT",
+          "reference_id": 2,
+          "voided": 1,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:51",
+          "voided_at": "2026-10-25 05:19:51",
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 16,
+          "journal_entry_id": 8,
+          "account_id": 35,
+          "debit": 25.25,
+          "credit": 0,
+          "description": null,
+          "line_date": "2026-09-05",
+          "reference_type": "SUPPLIER_PREPAYMENT",
+          "reference_id": 2,
+          "voided": 1,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:52",
+          "voided_at": "2026-10-25 05:19:53",
+          "voided_by": 1,
+          "void_reason": "Unused correction"
+        },
+        {
+          "id": 17,
+          "journal_entry_id": 8,
+          "account_id": 2,
+          "debit": 0,
+          "credit": 25.25,
+          "description": null,
+          "line_date": "2026-09-05",
+          "reference_type": "SUPPLIER_PREPAYMENT",
+          "reference_id": 2,
+          "voided": 1,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:52",
+          "voided_at": "2026-10-25 05:19:53",
+          "voided_by": 1,
+          "void_reason": "Unused correction"
+        },
+        {
+          "id": 18,
+          "journal_entry_id": 9,
+          "account_id": 13,
+          "debit": 120.37,
+          "credit": 0,
+          "description": "Expense incurred via EXP-2609-00001",
+          "line_date": "2026-09-06",
+          "reference_type": "EXPENSE",
+          "reference_id": 1,
+          "voided": 1,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:53",
+          "voided_at": "2026-10-25 05:19:55",
+          "voided_by": 1,
+          "void_reason": "Expense EXP-2609-00001 moved to Cancelled"
+        },
+        {
+          "id": 19,
+          "journal_entry_id": 9,
+          "account_id": 33,
+          "debit": 0,
+          "credit": 120.37,
+          "description": "Payable for EXP-2609-00001",
+          "line_date": "2026-09-06",
+          "reference_type": "EXPENSE",
+          "reference_id": 1,
+          "voided": 1,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:53",
+          "voided_at": "2026-10-25 05:19:55",
+          "voided_by": 1,
+          "void_reason": "Expense EXP-2609-00001 moved to Cancelled"
+        },
+        {
+          "id": 20,
+          "journal_entry_id": 10,
+          "account_id": 33,
+          "debit": 40.12,
+          "credit": 0,
+          "description": null,
+          "line_date": "2026-09-07",
+          "reference_type": "EXPENSE_PAYMENT",
+          "reference_id": 1,
+          "voided": 1,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:53",
+          "voided_at": "2026-10-25 05:19:55",
+          "voided_by": 1,
+          "void_reason": "Reverse cash settlement"
+        },
+        {
+          "id": 21,
+          "journal_entry_id": 10,
+          "account_id": 1,
+          "debit": 0,
+          "credit": 40.12,
+          "description": null,
+          "line_date": "2026-09-07",
+          "reference_type": "EXPENSE_PAYMENT",
+          "reference_id": 1,
+          "voided": 1,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:53",
+          "voided_at": "2026-10-25 05:19:55",
+          "voided_by": 1,
+          "void_reason": "Reverse cash settlement"
+        },
+        {
+          "id": 22,
+          "journal_entry_id": 11,
+          "account_id": 33,
+          "debit": 80.25,
+          "credit": 0,
+          "description": null,
+          "line_date": "2026-09-08",
+          "reference_type": "EXPENSE_PAYMENT",
+          "reference_id": 2,
+          "voided": 1,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:54",
+          "voided_at": "2026-10-25 05:19:54",
+          "voided_by": 1,
+          "void_reason": "Reverse bank settlement"
+        },
+        {
+          "id": 23,
+          "journal_entry_id": 11,
+          "account_id": 2,
+          "debit": 0,
+          "credit": 80.25,
+          "description": null,
+          "line_date": "2026-09-08",
+          "reference_type": "EXPENSE_PAYMENT",
+          "reference_id": 2,
+          "voided": 1,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:54",
+          "voided_at": "2026-10-25 05:19:54",
+          "voided_by": 1,
+          "void_reason": "Reverse bank settlement"
+        },
+        {
+          "id": 24,
+          "journal_entry_id": 12,
+          "account_id": 1,
+          "debit": 100.1,
+          "credit": 0,
+          "description": "Opening balance Cash",
+          "line_date": "2026-08-31",
+          "reference_type": "OPENING_BALANCE",
+          "reference_id": 0,
+          "voided": 1,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:55",
+          "voided_at": "2026-10-25 05:19:55",
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 25,
+          "journal_entry_id": 12,
+          "account_id": 7,
+          "debit": 0,
+          "credit": 100.1,
+          "description": "Opening capital Cash",
+          "line_date": "2026-08-31",
+          "reference_type": "OPENING_BALANCE",
+          "reference_id": 0,
+          "voided": 1,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:55",
+          "voided_at": "2026-10-25 05:19:55",
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 26,
+          "journal_entry_id": 12,
+          "account_id": 2,
+          "debit": 50.2,
+          "credit": 0,
+          "description": "Opening balance Bank",
+          "line_date": "2026-08-31",
+          "reference_type": "OPENING_BALANCE",
+          "reference_id": 0,
+          "voided": 1,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:55",
+          "voided_at": "2026-10-25 05:19:55",
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 27,
+          "journal_entry_id": 12,
+          "account_id": 7,
+          "debit": 0,
+          "credit": 50.2,
+          "description": "Opening capital Bank",
+          "line_date": "2026-08-31",
+          "reference_type": "OPENING_BALANCE",
+          "reference_id": 0,
+          "voided": 1,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:55",
+          "voided_at": "2026-10-25 05:19:55",
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 28,
+          "journal_entry_id": 13,
+          "account_id": 1,
+          "debit": 100.1,
+          "credit": 0,
+          "description": "Opening balance Cash",
+          "line_date": "2026-08-31",
+          "reference_type": "OPENING_BALANCE",
+          "reference_id": 0,
+          "voided": 0,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:55",
+          "voided_at": null,
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 29,
+          "journal_entry_id": 13,
+          "account_id": 7,
+          "debit": 0,
+          "credit": 100.1,
+          "description": "Opening capital Cash",
+          "line_date": "2026-08-31",
+          "reference_type": "OPENING_BALANCE",
+          "reference_id": 0,
+          "voided": 0,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:55",
+          "voided_at": null,
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 30,
+          "journal_entry_id": 13,
+          "account_id": 2,
+          "debit": 50.2,
+          "credit": 0,
+          "description": "Opening balance Bank",
+          "line_date": "2026-08-31",
+          "reference_type": "OPENING_BALANCE",
+          "reference_id": 0,
+          "voided": 0,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:55",
+          "voided_at": null,
+          "voided_by": null,
+          "void_reason": null
+        },
+        {
+          "id": 31,
+          "journal_entry_id": 13,
+          "account_id": 7,
+          "debit": 0,
+          "credit": 50.2,
+          "description": "Opening capital Bank",
+          "line_date": "2026-08-31",
+          "reference_type": "OPENING_BALANCE",
+          "reference_id": 0,
+          "voided": 0,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:55",
+          "voided_at": null,
+          "voided_by": null,
+          "void_reason": null
+        }
+      ],
+      "pass": true
+    },
+    {
+      "label": "cash-03-counted customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-03-counted supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-03-counted stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-03-counted arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-03-counted apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-03-counted inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-03-counted cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-03-counted orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-03-counted unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-03-counted creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-03-counted creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-03-counted receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-03-counted supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-03-counted expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-03-counted inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-03-counted balanced reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-03-counted aggregate balance paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "cash-03-counted every retained journal balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-03-counted canonical and header void status agree",
+      "actual": [
+        {
+          "id": 10
+        },
+        {
+          "id": 11
+        },
+        {
+          "id": 12
+        },
+        {
+          "id": 13
+        },
+        {
+          "id": 14
+        },
+        {
+          "id": 15
+        },
+        {
+          "id": 16
+        },
+        {
+          "id": 17
+        },
+        {
+          "id": 18
+        },
+        {
+          "id": 19
+        },
+        {
+          "id": 20
+        },
+        {
+          "id": 21
+        },
+        {
+          "id": 22
+        },
+        {
+          "id": 23
+        },
+        {
+          "id": 24
+        },
+        {
+          "id": 25
+        },
+        {
+          "id": 26
+        },
+        {
+          "id": 27
+        }
+      ],
+      "expected": [],
+      "pass": false
+    },
+    {
+      "label": "cash-03-counted voided sources have no active GL",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-03-counted active allocations retain active sources",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-03-counted signed supplier balance matches AP",
+      "actual": 16465,
+      "expected": 16465,
+      "pass": true
+    },
+    {
+      "label": "040 rejection preserves economic and source rows",
+      "actual": "2a8aafeebd8a1c0ab2c0a4487d70176b2e93997d6f382fc5c16580c7ce466cf9",
+      "expected": "2a8aafeebd8a1c0ab2c0a4487d70176b2e93997d6f382fc5c16580c7ce466cf9",
+      "pass": true
+    },
+    {
+      "label": "post /api/reports/cash-reconciliation rejected 4xx",
+      "actual": true,
+      "expected": true,
+      "pass": true
+    },
+    {
+      "label": "cash-04-invalid-count-atomic customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-04-invalid-count-atomic supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-04-invalid-count-atomic stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-04-invalid-count-atomic arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-04-invalid-count-atomic apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-04-invalid-count-atomic inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-04-invalid-count-atomic cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-04-invalid-count-atomic orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-04-invalid-count-atomic unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-04-invalid-count-atomic creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-04-invalid-count-atomic creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-04-invalid-count-atomic receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-04-invalid-count-atomic supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-04-invalid-count-atomic expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-04-invalid-count-atomic inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-04-invalid-count-atomic balanced reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-04-invalid-count-atomic aggregate balance paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "cash-04-invalid-count-atomic every retained journal balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-04-invalid-count-atomic canonical and header void status agree",
+      "actual": [
+        {
+          "id": 10
+        },
+        {
+          "id": 11
+        },
+        {
+          "id": 12
+        },
+        {
+          "id": 13
+        },
+        {
+          "id": 14
+        },
+        {
+          "id": 15
+        },
+        {
+          "id": 16
+        },
+        {
+          "id": 17
+        },
+        {
+          "id": 18
+        },
+        {
+          "id": 19
+        },
+        {
+          "id": 20
+        },
+        {
+          "id": 21
+        },
+        {
+          "id": 22
+        },
+        {
+          "id": 23
+        },
+        {
+          "id": 24
+        },
+        {
+          "id": 25
+        },
+        {
+          "id": 26
+        },
+        {
+          "id": 27
+        }
+      ],
+      "expected": [],
+      "pass": false
+    },
+    {
+      "label": "cash-04-invalid-count-atomic voided sources have no active GL",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-04-invalid-count-atomic active allocations retain active sources",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-04-invalid-count-atomic signed supplier balance matches AP",
+      "actual": 16465,
+      "expected": 16465,
+      "pass": true
+    },
+    {
+      "label": "opening zero restores GL baseline",
+      "actual": {
+        "1000": 100000,
+        "1010": 100000,
+        "1200": 4936,
+        "1320": 1504,
+        "1330": 0,
+        "2000": -16465,
+        "2115": 0,
+        "3000": 0,
+        "3200": -200000,
+        "6000": 10025
+      },
+      "expected": {
+        "1000": 100000,
+        "1010": 100000,
+        "1200": 4936,
+        "1320": 1504,
+        "1330": 0,
+        "2000": -16465,
+        "2115": 0,
+        "3000": 0,
+        "3200": -200000,
+        "6000": 10025
+      },
+      "pass": true
+    },
+    {
+      "label": "cash-05-opening-zeroed customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-05-opening-zeroed supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-05-opening-zeroed stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-05-opening-zeroed arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-05-opening-zeroed apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-05-opening-zeroed inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-05-opening-zeroed cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-05-opening-zeroed orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-05-opening-zeroed unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-05-opening-zeroed creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-05-opening-zeroed creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-05-opening-zeroed receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-05-opening-zeroed supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-05-opening-zeroed expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-05-opening-zeroed inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-05-opening-zeroed balanced reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-05-opening-zeroed aggregate balance paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "cash-05-opening-zeroed every retained journal balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-05-opening-zeroed canonical and header void status agree",
+      "actual": [
+        {
+          "id": 10
+        },
+        {
+          "id": 11
+        },
+        {
+          "id": 12
+        },
+        {
+          "id": 13
+        },
+        {
+          "id": 14
+        },
+        {
+          "id": 15
+        },
+        {
+          "id": 16
+        },
+        {
+          "id": 17
+        },
+        {
+          "id": 18
+        },
+        {
+          "id": 19
+        },
+        {
+          "id": 20
+        },
+        {
+          "id": 21
+        },
+        {
+          "id": 22
+        },
+        {
+          "id": 23
+        },
+        {
+          "id": 24
+        },
+        {
+          "id": 25
+        },
+        {
+          "id": 26
+        },
+        {
+          "id": 27
+        },
+        {
+          "id": 28
+        },
+        {
+          "id": 29
+        },
+        {
+          "id": 30
+        },
+        {
+          "id": 31
+        }
+      ],
+      "expected": [],
+      "pass": false
+    },
+    {
+      "label": "cash-05-opening-zeroed voided sources have no active GL",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-05-opening-zeroed active allocations retain active sources",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "cash-05-opening-zeroed signed supplier balance matches AP",
+      "actual": 16465,
+      "expected": 16465,
+      "pass": true
+    },
+    {
+      "label": "SQLite integrity",
+      "actual": [
+        {
+          "integrity_check": "ok"
+        }
+      ],
+      "expected": [
+        {
+          "integrity_check": "ok"
+        }
+      ],
+      "pass": true
+    },
+    {
+      "label": "foreign key integrity",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    }
+  ],
+  "requests": [
+    {
+      "id": "001",
+      "method": "post",
+      "url": "/api/owner-equity/capital",
+      "body": {
+        "capital_date": "2026-09-01",
+        "amount": 1000,
+        "payment_method": "Cash"
+      },
+      "status": 201,
+      "response": {
+        "success": true,
+        "message": "Owner capital recorded successfully",
+        "data": {
+          "id": 1,
+          "capital_no": "CAP-2609-00001",
+          "amount": 1000
+        }
+      },
+      "before": "001-before.json",
+      "after": "001-after.json",
+      "beforeHash": "4f01e3bd9824d02b7448e577c82ebaf3c7e87b4ec67476008a286a314058a0b6",
+      "afterHash": "a6b962d08be66e1c6e772b0bb9cf904bc95583ee77b8b61dda5a6dbc95674c1d"
+    },
+    {
+      "id": "002",
+      "method": "post",
+      "url": "/api/owner-equity/capital",
+      "body": {
+        "capital_date": "2026-09-01",
+        "amount": 1000,
+        "payment_method": "Bank"
+      },
+      "status": 201,
+      "response": {
+        "success": true,
+        "message": "Owner capital recorded successfully",
+        "data": {
+          "id": 2,
+          "capital_no": "CAP-2609-00002",
+          "amount": 1000
+        }
+      },
+      "before": "002-before.json",
+      "after": "002-after.json",
+      "beforeHash": "a6b962d08be66e1c6e772b0bb9cf904bc95583ee77b8b61dda5a6dbc95674c1d",
+      "afterHash": "a001d2ab7ece3c9a15f7a9e36151761df0f77c396358e90083516edcc604b774"
+    },
+    {
+      "id": "003",
+      "method": "post",
+      "url": "/api/suppliers",
+      "body": {
+        "supplier_code": "PC-SUP",
+        "supplier_name": "Payable cash fixture"
+      },
+      "status": 201,
+      "response": {
+        "success": true,
+        "data": {
+          "id": 1,
+          "supplier_code": "PC-SUP",
+          "supplier_name": "Payable cash fixture"
+        }
+      },
+      "before": "003-before.json",
+      "after": "003-after.json",
+      "beforeHash": "a001d2ab7ece3c9a15f7a9e36151761df0f77c396358e90083516edcc604b774",
+      "afterHash": "3723f9b068fd32e28cc3eda9f6555a3f6d6fd5eb9a5bc332e4844390078d23c4"
+    },
+    {
+      "id": "004",
+      "method": "post",
+      "url": "/api/supplier-bills",
+      "body": {
+        "supplier_id": 1,
+        "bill_no": "PC-BILL",
+        "bill_date": "2026-09-03",
+        "description": "Fixture services",
+        "net_amount": 100.25,
+        "input_tax_amount": 15.04
+      },
+      "status": 201,
+      "response": {
+        "success": true,
+        "data": {
+          "id": 1,
+          "supplier_id": 1,
+          "bill_no": "PC-BILL",
+          "bill_date": "2026-09-03",
+          "due_date": null,
+          "description": "Fixture services",
+          "net_amount": 100.25,
+          "input_tax_amount": 15.04,
+          "total_amount": 115.29,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:50",
+          "voided_at": null,
+          "voided_by": null,
+          "void_reason": null,
+          "supplier_name": "Payable cash fixture",
+          "paid_amount": 0,
+          "balance_amount": 115.29
+        }
+      },
+      "before": "004-before.json",
+      "after": "004-after.json",
+      "beforeHash": "3723f9b068fd32e28cc3eda9f6555a3f6d6fd5eb9a5bc332e4844390078d23c4",
+      "afterHash": "1b16fdab7fd0164b46d236298935726fd1cda8a99aefe25caf278d52cd5241fa"
+    },
+    {
+      "id": "005",
+      "method": "post",
+      "url": "/api/inventory/items",
+      "body": {
+        "item_code": "PC-ITEM",
+        "item_name": "Fixture item",
+        "unit_of_measure": "pcs"
+      },
+      "status": 201,
+      "response": {
+        "id": 1,
+        "item_code": "PC-ITEM",
+        "item_name": "Fixture item",
+        "description": null,
+        "category": null,
+        "unit_of_measure": "pcs",
+        "current_stock": 0,
+        "reorder_level": 0,
+        "standard_cost": 0,
+        "standard_selling_price": 0,
+        "is_raw_material": 0,
+        "is_finished_good": 0,
+        "is_purchased": 1,
+        "is_manufactured": 0,
+        "is_active": 1,
+        "created_by": 1,
+        "created_at": "2026-10-25 05:19:50",
+        "updated_at": "2026-10-25 05:19:50",
+        "has_expiry": 0,
+        "near_expiry_threshold_days": 30,
+        "sale_type": "packed",
+        "qty_decimal_precision": 0,
+        "rounding_step": null,
+        "deleted_at": null,
+        "deleted_by": null
+      },
+      "before": "005-before.json",
+      "after": "005-after.json",
+      "beforeHash": "1b16fdab7fd0164b46d236298935726fd1cda8a99aefe25caf278d52cd5241fa",
+      "afterHash": "29d1f1a8ca13e518788ba4e51fc0e8549f98a7fe2b90de65196244507d2032aa"
+    },
+    {
+      "id": "006",
+      "method": "post",
+      "url": "/api/purchases",
+      "body": {
+        "item_id": 1,
+        "supplier_id": 1,
+        "warehouse_id": 1,
+        "purchase_date": "2026-09-03",
+        "quantity": 4,
+        "unit_cost": 12.34
+      },
+      "status": 201,
+      "response": {
+        "id": 1,
+        "purchase_no": "PURCH-1026-0001",
+        "item_id": 1,
+        "warehouse_id": 1,
+        "quantity": 4,
+        "unit_cost": 12.34,
+        "total_cost": 49.36,
+        "supplier_name": "Payable cash fixture",
+        "purchase_date": "2026-09-03",
+        "invoice_no": null,
+        "remarks": null,
+        "created_by": 1,
+        "created_at": "2026-10-25 05:19:50",
+        "updated_at": "2026-10-25 05:19:50",
+        "supplier_id": 1,
+        "returned_quantity": 0,
+        "batch_id": 1,
+        "batch_no": "BATCH-1026-PUR-00001",
+        "voided_at": null,
+        "voided_by": null,
+        "void_reason": null,
+        "input_tax_amount": 0,
+        "item_code": "PC-ITEM",
+        "item_name": "Fixture item",
+        "unit_of_measure": "pcs",
+        "warehouse_code": "WH-001",
+        "warehouse_name": "Main Warehouse",
+        "created_by_username": "admin",
+        "paid_amount": 0,
+        "total_payable": 49.36,
+        "balance_amount": 49.36
+      },
+      "before": "006-before.json",
+      "after": "006-after.json",
+      "beforeHash": "29d1f1a8ca13e518788ba4e51fc0e8549f98a7fe2b90de65196244507d2032aa",
+      "afterHash": "746337fdb35a4098ac7081ba404be0d5dec8ad24ee3e37e4f2cd887162afee33"
+    },
+    {
+      "id": "007",
+      "method": "post",
+      "url": "/api/supplier-prepayments",
+      "body": {
+        "supplier_id": 1,
+        "prepay_date": "2026-09-02",
+        "amount": 200.75,
+        "payment_method": "Cash"
+      },
+      "key": "pc-create",
+      "status": 201,
+      "response": {
+        "success": true,
+        "data": {
+          "id": 1,
+          "supplier_id": 1,
+          "prepay_date": "2026-09-02",
+          "amount": 200.75,
+          "payment_method": "Cash",
+          "reference_no": null,
+          "notes": null,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:50",
+          "voided_at": null,
+          "voided_by": null,
+          "void_reason": null,
+          "applied_amount": 0,
+          "available_amount": 200.75
+        }
+      },
+      "before": "007-before.json",
+      "after": "007-after.json",
+      "beforeHash": "746337fdb35a4098ac7081ba404be0d5dec8ad24ee3e37e4f2cd887162afee33",
+      "afterHash": "4edda5ff02f88621ab95b63830301178018922d7187993d2f70fe39dc2e848ed"
+    },
+    {
+      "id": "008",
+      "method": "post",
+      "url": "/api/supplier-prepayments",
+      "body": {
+        "supplier_id": 1,
+        "prepay_date": "2026-09-02",
+        "amount": 200.75,
+        "payment_method": "Cash"
+      },
+      "key": "pc-create",
+      "status": 201,
+      "response": {
+        "success": true,
+        "data": {
+          "id": 1,
+          "supplier_id": 1,
+          "prepay_date": "2026-09-02",
+          "amount": 200.75,
+          "payment_method": "Cash",
+          "reference_no": null,
+          "notes": null,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:50",
+          "voided_at": null,
+          "voided_by": null,
+          "void_reason": null,
+          "applied_amount": 0,
+          "available_amount": 200.75
+        }
+      },
+      "before": "008-before.json",
+      "after": "008-after.json",
+      "beforeHash": "4edda5ff02f88621ab95b63830301178018922d7187993d2f70fe39dc2e848ed",
+      "afterHash": "4edda5ff02f88621ab95b63830301178018922d7187993d2f70fe39dc2e848ed"
+    },
+    {
+      "id": "009",
+      "method": "post",
+      "url": "/api/supplier-prepayments/1/apply",
+      "body": {
+        "applied_at": "2026-09-04",
+        "allocations": [
+          {
+            "kind": "supplier_bill",
+            "id": 1,
+            "amount": 60.13
+          },
+          {
+            "kind": "purchase",
+            "id": 1,
+            "amount": 20.11
+          }
+        ]
+      },
+      "key": "pc-apply",
+      "status": 201,
+      "response": {
+        "success": true,
+        "data": {
+          "id": 1
+        }
+      },
+      "before": "009-before.json",
+      "after": "009-after.json",
+      "beforeHash": "4edda5ff02f88621ab95b63830301178018922d7187993d2f70fe39dc2e848ed",
+      "afterHash": "6bd502b30c87393f2fd9b71537f4513d79f3e72c69815e50adb252af3f08c075"
+    },
+    {
+      "id": "010",
+      "method": "post",
+      "url": "/api/supplier-prepayments/1/apply",
+      "body": {
+        "applied_at": "2026-09-04",
+        "allocations": [
+          {
+            "kind": "supplier_bill",
+            "id": 1,
+            "amount": 60.13
+          },
+          {
+            "kind": "purchase",
+            "id": 1,
+            "amount": 20.11
+          }
+        ]
+      },
+      "key": "pc-apply",
+      "status": 201,
+      "response": {
+        "success": true,
+        "data": {
+          "id": 1
+        }
+      },
+      "before": "010-before.json",
+      "after": "010-after.json",
+      "beforeHash": "6bd502b30c87393f2fd9b71537f4513d79f3e72c69815e50adb252af3f08c075",
+      "afterHash": "6bd502b30c87393f2fd9b71537f4513d79f3e72c69815e50adb252af3f08c075"
+    },
+    {
+      "id": "011",
+      "method": "post",
+      "url": "/api/supplier-prepayments/1/apply",
+      "body": {
+        "applied_at": "2026-09-04",
+        "allocations": [
+          {
+            "kind": "supplier_bill",
+            "id": 1,
+            "amount": 55.16
+          }
+        ]
+      },
+      "status": 201,
+      "response": {
+        "success": true,
+        "data": {
+          "id": 2
+        }
+      },
+      "before": "011-before.json",
+      "after": "011-after.json",
+      "beforeHash": "6bd502b30c87393f2fd9b71537f4513d79f3e72c69815e50adb252af3f08c075",
+      "afterHash": "0ee2da2a57e9fd67ad4a7aad8c0da775c68c024fad55e3b8e5be7c8a04a14e29"
+    },
+    {
+      "id": "012",
+      "method": "get",
+      "url": "/api/supplier-bills/1",
+      "status": 200,
+      "response": {
+        "success": true,
+        "data": {
+          "id": 1,
+          "supplier_id": 1,
+          "bill_no": "PC-BILL",
+          "bill_date": "2026-09-03",
+          "due_date": null,
+          "description": "Fixture services",
+          "net_amount": 100.25,
+          "input_tax_amount": 15.04,
+          "total_amount": 115.29,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:50",
+          "voided_at": null,
+          "voided_by": null,
+          "void_reason": null,
+          "supplier_name": "Payable cash fixture",
+          "paid_amount": 115.28999999999999,
+          "balance_amount": 0
+        }
+      },
+      "before": "012-before.json",
+      "after": "012-after.json",
+      "beforeHash": "0ee2da2a57e9fd67ad4a7aad8c0da775c68c024fad55e3b8e5be7c8a04a14e29",
+      "afterHash": "0ee2da2a57e9fd67ad4a7aad8c0da775c68c024fad55e3b8e5be7c8a04a14e29"
+    },
+    {
+      "id": "013",
+      "method": "post",
+      "url": "/api/supplier-prepayments/1/void",
+      "body": {
+        "reason": "Consumed advance guard"
+      },
+      "status": 409,
+      "response": {
+        "error": "Reverse supplier advance applications before voiding"
+      },
+      "before": "013-before.json",
+      "after": "013-after.json",
+      "beforeHash": "0ee2da2a57e9fd67ad4a7aad8c0da775c68c024fad55e3b8e5be7c8a04a14e29",
+      "afterHash": "0ee2da2a57e9fd67ad4a7aad8c0da775c68c024fad55e3b8e5be7c8a04a14e29"
+    },
+    {
+      "id": "014",
+      "method": "post",
+      "url": "/api/supplier-bills/1/void",
+      "body": {
+        "reason": "Paid bill guard"
+      },
+      "status": 409,
+      "response": {
+        "error": "Reverse supplier bill payments before voiding"
+      },
+      "before": "014-before.json",
+      "after": "014-after.json",
+      "beforeHash": "0ee2da2a57e9fd67ad4a7aad8c0da775c68c024fad55e3b8e5be7c8a04a14e29",
+      "afterHash": "0ee2da2a57e9fd67ad4a7aad8c0da775c68c024fad55e3b8e5be7c8a04a14e29"
+    },
+    {
+      "id": "015",
+      "method": "post",
+      "url": "/api/supplier-prepayments/1/apply",
+      "body": {
+        "applied_at": "2026-09-04",
+        "allocations": [
+          {
+            "kind": "purchase",
+            "id": 1,
+            "amount": 65.36
+          }
+        ]
+      },
+      "status": 400,
+      "response": {
+        "error": "Application exceeds the available supplier advance"
+      },
+      "before": "015-before.json",
+      "after": "015-after.json",
+      "beforeHash": "0ee2da2a57e9fd67ad4a7aad8c0da775c68c024fad55e3b8e5be7c8a04a14e29",
+      "afterHash": "0ee2da2a57e9fd67ad4a7aad8c0da775c68c024fad55e3b8e5be7c8a04a14e29"
+    },
+    {
+      "id": "016",
+      "method": "post",
+      "url": "/api/supplier-prepayments/1/apply",
+      "body": {
+        "applied_at": "2026-09-04",
+        "allocations": [
+          {
+            "kind": "supplier_bill",
+            "id": 1,
+            "amount": 0.01
+          }
+        ]
+      },
+      "status": 400,
+      "response": {
+        "error": "Allocation amount (0.01) for supplier bill 1 exceeds the remaining balance (0.00)"
+      },
+      "before": "016-before.json",
+      "after": "016-after.json",
+      "beforeHash": "0ee2da2a57e9fd67ad4a7aad8c0da775c68c024fad55e3b8e5be7c8a04a14e29",
+      "afterHash": "0ee2da2a57e9fd67ad4a7aad8c0da775c68c024fad55e3b8e5be7c8a04a14e29"
+    },
+    {
+      "id": "017",
+      "method": "delete",
+      "url": "/api/payments/2",
+      "status": 200,
+      "response": {
+        "success": true,
+        "message": "Payment voided successfully"
+      },
+      "before": "017-before.json",
+      "after": "017-after.json",
+      "beforeHash": "0ee2da2a57e9fd67ad4a7aad8c0da775c68c024fad55e3b8e5be7c8a04a14e29",
+      "afterHash": "387d7981425f57302a51d31c510d00095946d890532b693b756bf67e829530f5"
+    },
+    {
+      "id": "018",
+      "method": "delete",
+      "url": "/api/payments/1",
+      "status": 200,
+      "response": {
+        "success": true,
+        "message": "Payment voided successfully"
+      },
+      "before": "018-before.json",
+      "after": "018-after.json",
+      "beforeHash": "387d7981425f57302a51d31c510d00095946d890532b693b756bf67e829530f5",
+      "afterHash": "8b2b7d93f131836612a5c75579a9752edbd0fa2ada8867a202e8105c00ac54cb"
+    },
+    {
+      "id": "019",
+      "method": "post",
+      "url": "/api/supplier-prepayments/1/void",
+      "body": {
+        "reason": "Unused after reversal"
+      },
+      "status": 200,
+      "response": {
+        "success": true,
+        "data": {
+          "id": 1,
+          "supplier_id": 1,
+          "prepay_date": "2026-09-02",
+          "amount": 200.75,
+          "payment_method": "Cash",
+          "reference_no": null,
+          "notes": null,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:50",
+          "voided_at": "2026-10-25 05:19:52",
+          "voided_by": 1,
+          "void_reason": "Unused after reversal",
+          "applied_amount": 0,
+          "available_amount": 0
+        }
+      },
+      "before": "019-before.json",
+      "after": "019-after.json",
+      "beforeHash": "8b2b7d93f131836612a5c75579a9752edbd0fa2ada8867a202e8105c00ac54cb",
+      "afterHash": "c37917b93a0ab6237540be8183c143213c6555bd23c1e1e4ca652f3c7ac86524"
+    },
+    {
+      "id": "020",
+      "method": "post",
+      "url": "/api/supplier-prepayments/1/void",
+      "body": {
+        "reason": "Duplicate void"
+      },
+      "status": 200,
+      "response": {
+        "success": true,
+        "data": {
+          "id": 1,
+          "supplier_id": 1,
+          "prepay_date": "2026-09-02",
+          "amount": 200.75,
+          "payment_method": "Cash",
+          "reference_no": null,
+          "notes": null,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:50",
+          "voided_at": "2026-10-25 05:19:52",
+          "voided_by": 1,
+          "void_reason": "Unused after reversal",
+          "applied_amount": 0,
+          "available_amount": 0
+        }
+      },
+      "before": "020-before.json",
+      "after": "020-after.json",
+      "beforeHash": "c37917b93a0ab6237540be8183c143213c6555bd23c1e1e4ca652f3c7ac86524",
+      "afterHash": "c37917b93a0ab6237540be8183c143213c6555bd23c1e1e4ca652f3c7ac86524"
+    },
+    {
+      "id": "021",
+      "method": "post",
+      "url": "/api/supplier-prepayments",
+      "body": {
+        "supplier_id": 1,
+        "prepay_date": "2026-09-05",
+        "amount": 25.25,
+        "payment_method": "Bank"
+      },
+      "status": 201,
+      "response": {
+        "success": true,
+        "data": {
+          "id": 2,
+          "supplier_id": 1,
+          "prepay_date": "2026-09-05",
+          "amount": 25.25,
+          "payment_method": "Bank",
+          "reference_no": null,
+          "notes": null,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:52",
+          "voided_at": null,
+          "voided_by": null,
+          "void_reason": null,
+          "applied_amount": 0,
+          "available_amount": 25.25
+        }
+      },
+      "before": "021-before.json",
+      "after": "021-after.json",
+      "beforeHash": "c37917b93a0ab6237540be8183c143213c6555bd23c1e1e4ca652f3c7ac86524",
+      "afterHash": "3392e5c9b6e22d9bc2d02c7e73a4fb4fdb684a7c6542a94b33fb3bbd4226eeb0"
+    },
+    {
+      "id": "022",
+      "method": "post",
+      "url": "/api/supplier-prepayments/2/void",
+      "body": {
+        "reason": "Unused correction"
+      },
+      "status": 200,
+      "response": {
+        "success": true,
+        "data": {
+          "id": 2,
+          "supplier_id": 1,
+          "prepay_date": "2026-09-05",
+          "amount": 25.25,
+          "payment_method": "Bank",
+          "reference_no": null,
+          "notes": null,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:52",
+          "voided_at": "2026-10-25 05:19:53",
+          "voided_by": 1,
+          "void_reason": "Unused correction",
+          "applied_amount": 0,
+          "available_amount": 0
+        }
+      },
+      "before": "022-before.json",
+      "after": "022-after.json",
+      "beforeHash": "3392e5c9b6e22d9bc2d02c7e73a4fb4fdb684a7c6542a94b33fb3bbd4226eeb0",
+      "afterHash": "0c783475b833ce22646f8809f4d925ec871fd20199968960e4eecb2c17fab6f6"
+    },
+    {
+      "id": "023",
+      "method": "post",
+      "url": "/api/supplier-prepayments",
+      "body": {
+        "supplier_id": 1,
+        "prepay_date": "2026-09-02",
+        "amount": 200.75,
+        "payment_method": "Cash"
+      },
+      "key": "pc-failed-create",
+      "status": 500,
+      "response": {
+        "error": "Failed to record supplier advance"
+      },
+      "before": "023-before.json",
+      "after": "023-after.json",
+      "beforeHash": "0c783475b833ce22646f8809f4d925ec871fd20199968960e4eecb2c17fab6f6",
+      "afterHash": "0c783475b833ce22646f8809f4d925ec871fd20199968960e4eecb2c17fab6f6"
+    },
+    {
+      "id": "024",
+      "method": "post",
+      "url": "/api/expenses",
+      "body": {
+        "expense_category": "Office Supplies",
+        "expense_date": "2026-09-06",
+        "amount": 120.37,
+        "payment_method": "Credit"
+      },
+      "status": 201,
+      "response": {
+        "success": true,
+        "message": "Expense created successfully",
+        "data": {
+          "id": 1,
+          "expense_no": "EXP-2609-00001",
+          "expense_category": "Office Supplies",
+          "amount": 120.37,
+          "expense_date": "2026-09-06",
+          "payment_method": "Credit",
+          "status": "Draft",
+          "created_by": 1
+        }
+      },
+      "before": "024-before.json",
+      "after": "024-after.json",
+      "beforeHash": "0c783475b833ce22646f8809f4d925ec871fd20199968960e4eecb2c17fab6f6",
+      "afterHash": "e134019de92a64bdf4f3727478599e486b6b00d1d6c15451f5118339f89a08eb"
+    },
+    {
+      "id": "025",
+      "method": "put",
+      "url": "/api/expenses/1",
+      "body": {
+        "status": "Recorded"
+      },
+      "status": 200,
+      "response": {
+        "success": true,
+        "message": "Expense updated successfully",
+        "data": {
+          "id": 1,
+          "expense_no": "EXP-2609-00001",
+          "expense_category": "Office Supplies",
+          "description": "",
+          "amount": 120.37,
+          "expense_date": "2026-09-06",
+          "payment_method": "Credit",
+          "reference_no": null,
+          "vendor_name": null,
+          "project": null,
+          "status": "Recorded",
+          "created_at": "2026-10-25 05:19:53",
+          "updated_at": "2026-10-25 05:19:53",
+          "created_by_name": "Administrator"
+        }
+      },
+      "before": "025-before.json",
+      "after": "025-after.json",
+      "beforeHash": "e134019de92a64bdf4f3727478599e486b6b00d1d6c15451f5118339f89a08eb",
+      "afterHash": "774cc6f5b657bc7972968de0e94c71fe1094b49c489078feaba23389df5b3ba2"
+    },
+    {
+      "id": "026",
+      "method": "post",
+      "url": "/api/expenses/1/payments",
+      "body": {
+        "payment_date": "2026-09-07",
+        "amount": 40.12,
+        "payment_method": "Cash"
+      },
+      "key": "pc-expense-part",
+      "status": 201,
+      "response": {
+        "success": true,
+        "data": {
+          "id": 1,
+          "expense_id": 1,
+          "payment_date": "2026-09-07",
+          "amount": 40.12,
+          "payment_method": "Cash",
+          "reference_no": null,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:53",
+          "voided_at": null,
+          "voided_by": null,
+          "void_reason": null
+        }
+      },
+      "before": "026-before.json",
+      "after": "026-after.json",
+      "beforeHash": "774cc6f5b657bc7972968de0e94c71fe1094b49c489078feaba23389df5b3ba2",
+      "afterHash": "6661682b8172487b76af61ec7517311a66ea04d57c8b16f5226b7530c2e42cb0"
+    },
+    {
+      "id": "027",
+      "method": "put",
+      "url": "/api/expenses/1",
+      "body": {
+        "status": "Cancelled"
+      },
+      "status": 409,
+      "response": {
+        "success": false,
+        "error": "Reverse expense payments before cancelling or changing the expense"
+      },
+      "before": "027-before.json",
+      "after": "027-after.json",
+      "beforeHash": "6661682b8172487b76af61ec7517311a66ea04d57c8b16f5226b7530c2e42cb0",
+      "afterHash": "6661682b8172487b76af61ec7517311a66ea04d57c8b16f5226b7530c2e42cb0"
+    },
+    {
+      "id": "028",
+      "method": "post",
+      "url": "/api/expenses/1/payments",
+      "body": {
+        "payment_date": "2026-09-08",
+        "amount": 80.25,
+        "payment_method": "Bank"
+      },
+      "key": "pc-expense-exact",
+      "status": 201,
+      "response": {
+        "success": true,
+        "data": {
+          "id": 2,
+          "expense_id": 1,
+          "payment_date": "2026-09-08",
+          "amount": 80.25,
+          "payment_method": "Bank",
+          "reference_no": null,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:54",
+          "voided_at": null,
+          "voided_by": null,
+          "void_reason": null
+        }
+      },
+      "before": "028-before.json",
+      "after": "028-after.json",
+      "beforeHash": "6661682b8172487b76af61ec7517311a66ea04d57c8b16f5226b7530c2e42cb0",
+      "afterHash": "31326a61f19475a4251adff062f9026515cd2fd053099c7bd44f0be0aa2763e7"
+    },
+    {
+      "id": "029",
+      "method": "post",
+      "url": "/api/expenses/1/payments",
+      "body": {
+        "payment_date": "2026-09-08",
+        "amount": 80.25,
+        "payment_method": "Bank"
+      },
+      "key": "pc-expense-exact",
+      "status": 201,
+      "response": {
+        "success": true,
+        "data": {
+          "id": 2,
+          "expense_id": 1,
+          "payment_date": "2026-09-08",
+          "amount": 80.25,
+          "payment_method": "Bank",
+          "reference_no": null,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:54",
+          "voided_at": null,
+          "voided_by": null,
+          "void_reason": null
+        }
+      },
+      "before": "029-before.json",
+      "after": "029-after.json",
+      "beforeHash": "31326a61f19475a4251adff062f9026515cd2fd053099c7bd44f0be0aa2763e7",
+      "afterHash": "31326a61f19475a4251adff062f9026515cd2fd053099c7bd44f0be0aa2763e7"
+    },
+    {
+      "id": "030",
+      "method": "post",
+      "url": "/api/expenses/1/payments",
+      "body": {
+        "payment_date": "2026-09-08",
+        "amount": 0.01,
+        "payment_method": "Bank"
+      },
+      "status": 400,
+      "response": {
+        "success": false,
+        "error": "Payment exceeds the outstanding expense"
+      },
+      "before": "030-before.json",
+      "after": "030-after.json",
+      "beforeHash": "31326a61f19475a4251adff062f9026515cd2fd053099c7bd44f0be0aa2763e7",
+      "afterHash": "31326a61f19475a4251adff062f9026515cd2fd053099c7bd44f0be0aa2763e7"
+    },
+    {
+      "id": "031",
+      "method": "post",
+      "url": "/api/expenses/1/payments/2/void",
+      "body": {
+        "reason": "Reverse bank settlement"
+      },
+      "status": 200,
+      "response": {
+        "success": true,
+        "data": {
+          "id": 2,
+          "expense_id": 1,
+          "payment_date": "2026-09-08",
+          "amount": 80.25,
+          "payment_method": "Bank",
+          "reference_no": null,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:54",
+          "voided_at": "2026-10-25 05:19:54",
+          "voided_by": 1,
+          "void_reason": "Reverse bank settlement"
+        }
+      },
+      "before": "031-before.json",
+      "after": "031-after.json",
+      "beforeHash": "31326a61f19475a4251adff062f9026515cd2fd053099c7bd44f0be0aa2763e7",
+      "afterHash": "e7ee619c260c45d10528b673a0c6572c4948ec80ecc35b291d6353eaf233a45a"
+    },
+    {
+      "id": "032",
+      "method": "post",
+      "url": "/api/expenses/1/payments/2/void",
+      "body": {
+        "reason": "Duplicate payment void"
+      },
+      "status": 200,
+      "response": {
+        "success": true,
+        "data": {
+          "id": 2,
+          "expense_id": 1,
+          "payment_date": "2026-09-08",
+          "amount": 80.25,
+          "payment_method": "Bank",
+          "reference_no": null,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:54",
+          "voided_at": "2026-10-25 05:19:54",
+          "voided_by": 1,
+          "void_reason": "Reverse bank settlement"
+        }
+      },
+      "before": "032-before.json",
+      "after": "032-after.json",
+      "beforeHash": "e7ee619c260c45d10528b673a0c6572c4948ec80ecc35b291d6353eaf233a45a",
+      "afterHash": "e7ee619c260c45d10528b673a0c6572c4948ec80ecc35b291d6353eaf233a45a"
+    },
+    {
+      "id": "033",
+      "method": "post",
+      "url": "/api/expenses/1/payments",
+      "body": {
+        "payment_date": "2026-09-08",
+        "amount": 80.25,
+        "payment_method": "Bank"
+      },
+      "key": "pc-expense-failed",
+      "status": 500,
+      "response": {
+        "success": false,
+        "error": "Failed to pay expense"
+      },
+      "before": "033-before.json",
+      "after": "033-after.json",
+      "beforeHash": "e7ee619c260c45d10528b673a0c6572c4948ec80ecc35b291d6353eaf233a45a",
+      "afterHash": "e7ee619c260c45d10528b673a0c6572c4948ec80ecc35b291d6353eaf233a45a"
+    },
+    {
+      "id": "034",
+      "method": "post",
+      "url": "/api/expenses/1/payments/1/void",
+      "body": {
+        "reason": "Reverse cash settlement"
+      },
+      "status": 200,
+      "response": {
+        "success": true,
+        "data": {
+          "id": 1,
+          "expense_id": 1,
+          "payment_date": "2026-09-07",
+          "amount": 40.12,
+          "payment_method": "Cash",
+          "reference_no": null,
+          "created_by": 1,
+          "created_at": "2026-10-25 05:19:53",
+          "voided_at": "2026-10-25 05:19:55",
+          "voided_by": 1,
+          "void_reason": "Reverse cash settlement"
+        }
+      },
+      "before": "034-before.json",
+      "after": "034-after.json",
+      "beforeHash": "e7ee619c260c45d10528b673a0c6572c4948ec80ecc35b291d6353eaf233a45a",
+      "afterHash": "35a0ab909ee451b6172830bd961f362d0008ad5dea1efc87f3a6cb94013b7499"
+    },
+    {
+      "id": "035",
+      "method": "put",
+      "url": "/api/expenses/1",
+      "body": {
+        "status": "Cancelled"
+      },
+      "status": 200,
+      "response": {
+        "success": true,
+        "message": "Expense updated successfully",
+        "data": {
+          "id": 1,
+          "expense_no": "EXP-2609-00001",
+          "expense_category": "Office Supplies",
+          "description": "",
+          "amount": 120.37,
+          "expense_date": "2026-09-06",
+          "payment_method": "Credit",
+          "reference_no": null,
+          "vendor_name": null,
+          "project": null,
+          "status": "Cancelled",
+          "created_at": "2026-10-25 05:19:53",
+          "updated_at": "2026-10-25 05:19:55",
+          "created_by_name": "Administrator"
+        }
+      },
+      "before": "035-before.json",
+      "after": "035-after.json",
+      "beforeHash": "35a0ab909ee451b6172830bd961f362d0008ad5dea1efc87f3a6cb94013b7499",
+      "afterHash": "a11bf1c1eee21601d5d08c1d2f1ad548765699e2d6e51c0d8de4d38ffb1e42d9"
+    },
+    {
+      "id": "036",
+      "method": "post",
+      "url": "/api/expenses/1/payments",
+      "body": {
+        "payment_date": "2026-09-08",
+        "amount": 1,
+        "payment_method": "Bank"
+      },
+      "status": 409,
+      "response": {
+        "success": false,
+        "error": "Only recorded credit expenses accept payments"
+      },
+      "before": "036-before.json",
+      "after": "036-after.json",
+      "beforeHash": "a11bf1c1eee21601d5d08c1d2f1ad548765699e2d6e51c0d8de4d38ffb1e42d9",
+      "afterHash": "a11bf1c1eee21601d5d08c1d2f1ad548765699e2d6e51c0d8de4d38ffb1e42d9"
+    },
+    {
+      "id": "037",
+      "method": "put",
+      "url": "/api/dashboard/cash-opening-balances",
+      "body": {
+        "accounts": [
+          {
+            "key": "cash",
+            "amount": 100.1
+          },
+          {
+            "key": "bank",
+            "amount": 50.2
+          }
+        ]
+      },
+      "status": 200,
+      "response": {
+        "success": true,
+        "data": {
+          "accounts": [
+            {
+              "key": "cash",
+              "name": "Cash",
+              "amount": 100.1
+            },
+            {
+              "key": "bank",
+              "name": "Bank",
+              "amount": 50.2
+            },
+            {
+              "key": "easypaisa",
+              "name": "Easypaisa",
+              "amount": 0
+            },
+            {
+              "key": "jazzcash",
+              "name": "JazzCash",
+              "amount": 0
+            },
+            {
+              "key": "upaisa",
+              "name": "UPaisa",
+              "amount": 0
+            }
+          ]
+        }
+      },
+      "before": "037-before.json",
+      "after": "037-after.json",
+      "beforeHash": "a11bf1c1eee21601d5d08c1d2f1ad548765699e2d6e51c0d8de4d38ffb1e42d9",
+      "afterHash": "cafa0ee34fa30edf92541e0a8bcdc43f00f0950d344d132ae2547411a19a1a34"
+    },
+    {
+      "id": "038",
+      "method": "put",
+      "url": "/api/dashboard/cash-opening-balances",
+      "body": {
+        "accounts": [
+          {
+            "key": "cash",
+            "amount": 100.1
+          },
+          {
+            "key": "bank",
+            "amount": 50.2
+          }
+        ]
+      },
+      "status": 200,
+      "response": {
+        "success": true,
+        "data": {
+          "accounts": [
+            {
+              "key": "cash",
+              "name": "Cash",
+              "amount": 100.1
+            },
+            {
+              "key": "bank",
+              "name": "Bank",
+              "amount": 50.2
+            },
+            {
+              "key": "easypaisa",
+              "name": "Easypaisa",
+              "amount": 0
+            },
+            {
+              "key": "jazzcash",
+              "name": "JazzCash",
+              "amount": 0
+            },
+            {
+              "key": "upaisa",
+              "name": "UPaisa",
+              "amount": 0
+            }
+          ]
+        }
+      },
+      "before": "038-before.json",
+      "after": "038-after.json",
+      "beforeHash": "cafa0ee34fa30edf92541e0a8bcdc43f00f0950d344d132ae2547411a19a1a34",
+      "afterHash": "8227658fd20cbc91e2f889c93132173b09a5603655c556a29aeb1f4ac5497f65"
+    },
+    {
+      "id": "039",
+      "method": "post",
+      "url": "/api/reports/cash-reconciliation",
+      "body": {
+        "date": "2026-09-09",
+        "accounts": [
+          {
+            "key": "cash",
+            "counted_balance": 1099.9499999999998,
+            "notes": "Fixture count shortage"
+          },
+          {
+            "key": "bank",
+            "counted_balance": 1050.2
+          }
+        ]
+      },
+      "status": 200,
+      "response": {
+        "success": true,
+        "message": "Cash reconciliation saved",
+        "data": {
+          "date": "2026-09-09",
+          "accounts": [
+            {
+              "key": "cash",
+              "name": "Cash",
+              "opening_balance": 1100.1,
+              "inflow": 0,
+              "outflow": 0,
+              "net": 0,
+              "expected_balance": 1100.1,
+              "counted_balance": 1099.95,
+              "variance": -0.15,
+              "notes": "Fixture count shortage",
+              "reconciled": true,
+              "reconciled_at": "2026-10-25 05:19:56"
+            },
+            {
+              "key": "bank",
+              "name": "Bank",
+              "opening_balance": 1050.2,
+              "inflow": 0,
+              "outflow": 0,
+              "net": 0,
+              "expected_balance": 1050.2,
+              "counted_balance": 1050.2,
+              "variance": 0,
+              "notes": null,
+              "reconciled": true,
+              "reconciled_at": "2026-10-25 05:19:56"
+            },
+            {
+              "key": "easypaisa",
+              "name": "Easypaisa",
+              "opening_balance": 0,
+              "inflow": 0,
+              "outflow": 0,
+              "net": 0,
+              "expected_balance": 0,
+              "counted_balance": null,
+              "variance": null,
+              "notes": null,
+              "reconciled": false,
+              "reconciled_at": null
+            },
+            {
+              "key": "jazzcash",
+              "name": "JazzCash",
+              "opening_balance": 0,
+              "inflow": 0,
+              "outflow": 0,
+              "net": 0,
+              "expected_balance": 0,
+              "counted_balance": null,
+              "variance": null,
+              "notes": null,
+              "reconciled": false,
+              "reconciled_at": null
+            },
+            {
+              "key": "upaisa",
+              "name": "UPaisa",
+              "opening_balance": 0,
+              "inflow": 0,
+              "outflow": 0,
+              "net": 0,
+              "expected_balance": 0,
+              "counted_balance": null,
+              "variance": null,
+              "notes": null,
+              "reconciled": false,
+              "reconciled_at": null
+            }
+          ],
+          "totals": {
+            "total_opening": 2150.3,
+            "total_inflow": 0,
+            "total_outflow": 0,
+            "total_closing": 2150.3
+          }
+        }
+      },
+      "before": "039-before.json",
+      "after": "039-after.json",
+      "beforeHash": "8227658fd20cbc91e2f889c93132173b09a5603655c556a29aeb1f4ac5497f65",
+      "afterHash": "2a8aafeebd8a1c0ab2c0a4487d70176b2e93997d6f382fc5c16580c7ce466cf9"
+    },
+    {
+      "id": "040",
+      "method": "post",
+      "url": "/api/reports/cash-reconciliation",
+      "body": {
+        "date": "2026-09-09",
+        "accounts": [
+          {
+            "key": "cash",
+            "counted_balance": 1
+          },
+          {
+            "key": "unknown",
+            "counted_balance": 2
+          }
+        ]
+      },
+      "status": 400,
+      "response": {
+        "success": false,
+        "error": "Unknown account key: unknown"
+      },
+      "before": "040-before.json",
+      "after": "040-after.json",
+      "beforeHash": "2a8aafeebd8a1c0ab2c0a4487d70176b2e93997d6f382fc5c16580c7ce466cf9",
+      "afterHash": "2a8aafeebd8a1c0ab2c0a4487d70176b2e93997d6f382fc5c16580c7ce466cf9"
+    },
+    {
+      "id": "041",
+      "method": "put",
+      "url": "/api/dashboard/cash-opening-balances",
+      "body": {
+        "accounts": [
+          {
+            "key": "cash",
+            "amount": 0
+          },
+          {
+            "key": "bank",
+            "amount": 0
+          }
+        ]
+      },
+      "status": 200,
+      "response": {
+        "success": true,
+        "data": {
+          "accounts": [
+            {
+              "key": "cash",
+              "name": "Cash",
+              "amount": 0
+            },
+            {
+              "key": "bank",
+              "name": "Bank",
+              "amount": 0
+            },
+            {
+              "key": "easypaisa",
+              "name": "Easypaisa",
+              "amount": 0
+            },
+            {
+              "key": "jazzcash",
+              "name": "JazzCash",
+              "amount": 0
+            },
+            {
+              "key": "upaisa",
+              "name": "UPaisa",
+              "amount": 0
+            }
+          ]
+        }
+      },
+      "before": "041-before.json",
+      "after": "041-after.json",
+      "beforeHash": "2a8aafeebd8a1c0ab2c0a4487d70176b2e93997d6f382fc5c16580c7ce466cf9",
+      "afterHash": "4e81c15af5aff3f6cf5f2bfbb0e92580bf8e6ffc1ea02b94f9bb124f70b7e4ca"
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "advance repeat void HTTP contract",
+      "observedStatus": 200,
+      "note": "200 replay observed; economic neutrality checked, no 4xx claim"
+    },
+    {
+      "name": "advance bill and purchase application, exact bill settlement, guards, reversal",
+      "startRequest": 3,
+      "endRequest": 23,
+      "status": "FAIL"
+    },
+    {
+      "name": "expense payment repeat void HTTP contract",
+      "observedStatus": 200,
+      "note": "200 replay observed; economic neutrality checked, no 4xx claim"
+    },
+    {
+      "name": "credit expense partial and exact settlement, overpay guard, reverse and cancel",
+      "startRequest": 24,
+      "endRequest": 36,
+      "status": "FAIL"
+    },
+    {
+      "name": "opening seed replacement and reconciliation count atomicity",
+      "startRequest": 37,
+      "endRequest": 41,
+      "status": "FAIL"
+    }
+  ],
+  "gaps": [
+    "Dedicated supplier-advance refund endpoint not found in mounted supplierPrepayments router; unused advance void exercised instead.",
+    "Cash-to-bank transfer and reversal not executed: dedicated route not found by bounded graph and source discovery."
+  ],
+  "integrity": [
+    {
+      "integrity_check": "ok"
+    }
+  ],
+  "foreignKeys": [],
+  "completed": false,
+  "failedChecks": [
+    {
+      "label": "advance-06-applications-reversed canonical and header void status agree",
+      "actual": [
+        {
+          "id": 12
+        },
+        {
+          "id": 13
+        },
+        {
+          "id": 14
+        },
+        {
+          "id": 15
+        }
+      ],
+      "expected": [],
+      "pass": false
+    },
+    {
+      "label": "advance-07-voided canonical and header void status agree",
+      "actual": [
+        {
+          "id": 10
+        },
+        {
+          "id": 11
+        },
+        {
+          "id": 12
+        },
+        {
+          "id": 13
+        },
+        {
+          "id": 14
+        },
+        {
+          "id": 15
+        }
+      ],
+      "expected": [],
+      "pass": false
+    },
+    {
+      "label": "advance-08-unused-bank-void canonical and header void status agree",
+      "actual": [
+        {
+          "id": 10
+        },
+        {
+          "id": 11
+        },
+        {
+          "id": 12
+        },
+        {
+          "id": 13
+        },
+        {
+          "id": 14
+        },
+        {
+          "id": 15
+        },
+        {
+          "id": 16
+        },
+        {
+          "id": 17
+        }
+      ],
+      "expected": [],
+      "pass": false
+    },
+    {
+      "label": "advance-09-atomic-failure canonical and header void status agree",
+      "actual": [
+        {
+          "id": 10
+        },
+        {
+          "id": 11
+        },
+        {
+          "id": 12
+        },
+        {
+          "id": 13
+        },
+        {
+          "id": 14
+        },
+        {
+          "id": 15
+        },
+        {
+          "id": 16
+        },
+        {
+          "id": 17
+        }
+      ],
+      "expected": [],
+      "pass": false
+    },
+    {
+      "label": "expense-01-before canonical and header void status agree",
+      "actual": [
+        {
+          "id": 10
+        },
+        {
+          "id": 11
+        },
+        {
+          "id": 12
+        },
+        {
+          "id": 13
+        },
+        {
+          "id": 14
+        },
+        {
+          "id": 15
+        },
+        {
+          "id": 16
+        },
+        {
+          "id": 17
+        }
+      ],
+      "expected": [],
+      "pass": false
+    },
+    {
+      "label": "expense-02-recorded canonical and header void status agree",
+      "actual": [
+        {
+          "id": 10
+        },
+        {
+          "id": 11
+        },
+        {
+          "id": 12
+        },
+        {
+          "id": 13
+        },
+        {
+          "id": 14
+        },
+        {
+          "id": 15
+        },
+        {
+          "id": 16
+        },
+        {
+          "id": 17
+        }
+      ],
+      "expected": [],
+      "pass": false
+    },
+    {
+      "label": "expense-03-part-paid canonical and header void status agree",
+      "actual": [
+        {
+          "id": 10
+        },
+        {
+          "id": 11
+        },
+        {
+          "id": 12
+        },
+        {
+          "id": 13
+        },
+        {
+          "id": 14
+        },
+        {
+          "id": 15
+        },
+        {
+          "id": 16
+        },
+        {
+          "id": 17
+        }
+      ],
+      "expected": [],
+      "pass": false
+    },
+    {
+      "label": "expense-04-settled canonical and header void status agree",
+      "actual": [
+        {
+          "id": 10
+        },
+        {
+          "id": 11
+        },
+        {
+          "id": 12
+        },
+        {
+          "id": 13
+        },
+        {
+          "id": 14
+        },
+        {
+          "id": 15
+        },
+        {
+          "id": 16
+        },
+        {
+          "id": 17
+        }
+      ],
+      "expected": [],
+      "pass": false
+    },
+    {
+      "label": "expense-05-payment-voided canonical and header void status agree",
+      "actual": [
+        {
+          "id": 10
+        },
+        {
+          "id": 11
+        },
+        {
+          "id": 12
+        },
+        {
+          "id": 13
+        },
+        {
+          "id": 14
+        },
+        {
+          "id": 15
+        },
+        {
+          "id": 16
+        },
+        {
+          "id": 17
+        },
+        {
+          "id": 22
+        },
+        {
+          "id": 23
+        }
+      ],
+      "expected": [],
+      "pass": false
+    },
+    {
+      "label": "expense-06-atomic-failure canonical and header void status agree",
+      "actual": [
+        {
+          "id": 10
+        },
+        {
+          "id": 11
+        },
+        {
+          "id": 12
+        },
+        {
+          "id": 13
+        },
+        {
+          "id": 14
+        },
+        {
+          "id": 15
+        },
+        {
+          "id": 16
+        },
+        {
+          "id": 17
+        },
+        {
+          "id": 22
+        },
+        {
+          "id": 23
+        }
+      ],
+      "expected": [],
+      "pass": false
+    },
+    {
+      "label": "expense-07-cancelled canonical and header void status agree",
+      "actual": [
+        {
+          "id": 10
+        },
+        {
+          "id": 11
+        },
+        {
+          "id": 12
+        },
+        {
+          "id": 13
+        },
+        {
+          "id": 14
+        },
+        {
+          "id": 15
+        },
+        {
+          "id": 16
+        },
+        {
+          "id": 17
+        },
+        {
+          "id": 18
+        },
+        {
+          "id": 19
+        },
+        {
+          "id": 20
+        },
+        {
+          "id": 21
+        },
+        {
+          "id": 22
+        },
+        {
+          "id": 23
+        }
+      ],
+      "expected": [],
+      "pass": false
+    },
+    {
+      "label": "expense-08-cancelled-payment-guard canonical and header void status agree",
+      "actual": [
+        {
+          "id": 10
+        },
+        {
+          "id": 11
+        },
+        {
+          "id": 12
+        },
+        {
+          "id": 13
+        },
+        {
+          "id": 14
+        },
+        {
+          "id": 15
+        },
+        {
+          "id": 16
+        },
+        {
+          "id": 17
+        },
+        {
+          "id": 18
+        },
+        {
+          "id": 19
+        },
+        {
+          "id": 20
+        },
+        {
+          "id": 21
+        },
+        {
+          "id": 22
+        },
+        {
+          "id": 23
+        }
+      ],
+      "expected": [],
+      "pass": false
+    },
+    {
+      "label": "cash-01-opening canonical and header void status agree",
+      "actual": [
+        {
+          "id": 10
+        },
+        {
+          "id": 11
+        },
+        {
+          "id": 12
+        },
+        {
+          "id": 13
+        },
+        {
+          "id": 14
+        },
+        {
+          "id": 15
+        },
+        {
+          "id": 16
+        },
+        {
+          "id": 17
+        },
+        {
+          "id": 18
+        },
+        {
+          "id": 19
+        },
+        {
+          "id": 20
+        },
+        {
+          "id": 21
+        },
+        {
+          "id": 22
+        },
+        {
+          "id": 23
+        }
+      ],
+      "expected": [],
+      "pass": false
+    },
+    {
+      "label": "cash-02-opening-replaced canonical and header void status agree",
+      "actual": [
+        {
+          "id": 10
+        },
+        {
+          "id": 11
+        },
+        {
+          "id": 12
+        },
+        {
+          "id": 13
+        },
+        {
+          "id": 14
+        },
+        {
+          "id": 15
+        },
+        {
+          "id": 16
+        },
+        {
+          "id": 17
+        },
+        {
+          "id": 18
+        },
+        {
+          "id": 19
+        },
+        {
+          "id": 20
+        },
+        {
+          "id": 21
+        },
+        {
+          "id": 22
+        },
+        {
+          "id": 23
+        },
+        {
+          "id": 24
+        },
+        {
+          "id": 25
+        },
+        {
+          "id": 26
+        },
+        {
+          "id": 27
+        }
+      ],
+      "expected": [],
+      "pass": false
+    },
+    {
+      "label": "cash-03-counted canonical and header void status agree",
+      "actual": [
+        {
+          "id": 10
+        },
+        {
+          "id": 11
+        },
+        {
+          "id": 12
+        },
+        {
+          "id": 13
+        },
+        {
+          "id": 14
+        },
+        {
+          "id": 15
+        },
+        {
+          "id": 16
+        },
+        {
+          "id": 17
+        },
+        {
+          "id": 18
+        },
+        {
+          "id": 19
+        },
+        {
+          "id": 20
+        },
+        {
+          "id": 21
+        },
+        {
+          "id": 22
+        },
+        {
+          "id": 23
+        },
+        {
+          "id": 24
+        },
+        {
+          "id": 25
+        },
+        {
+          "id": 26
+        },
+        {
+          "id": 27
+        }
+      ],
+      "expected": [],
+      "pass": false
+    },
+    {
+      "label": "cash-04-invalid-count-atomic canonical and header void status agree",
+      "actual": [
+        {
+          "id": 10
+        },
+        {
+          "id": 11
+        },
+        {
+          "id": 12
+        },
+        {
+          "id": 13
+        },
+        {
+          "id": 14
+        },
+        {
+          "id": 15
+        },
+        {
+          "id": 16
+        },
+        {
+          "id": 17
+        },
+        {
+          "id": 18
+        },
+        {
+          "id": 19
+        },
+        {
+          "id": 20
+        },
+        {
+          "id": 21
+        },
+        {
+          "id": 22
+        },
+        {
+          "id": 23
+        },
+        {
+          "id": 24
+        },
+        {
+          "id": 25
+        },
+        {
+          "id": 26
+        },
+        {
+          "id": 27
+        }
+      ],
+      "expected": [],
+      "pass": false
+    },
+    {
+      "label": "cash-05-opening-zeroed canonical and header void status agree",
+      "actual": [
+        {
+          "id": 10
+        },
+        {
+          "id": 11
+        },
+        {
+          "id": 12
+        },
+        {
+          "id": 13
+        },
+        {
+          "id": 14
+        },
+        {
+          "id": 15
+        },
+        {
+          "id": 16
+        },
+        {
+          "id": 17
+        },
+        {
+          "id": 18
+        },
+        {
+          "id": 19
+        },
+        {
+          "id": 20
+        },
+        {
+          "id": 21
+        },
+        {
+          "id": 22
+        },
+        {
+          "id": 23
+        },
+        {
+          "id": 24
+        },
+        {
+          "id": 25
+        },
+        {
+          "id": 26
+        },
+        {
+          "id": 27
+        },
+        {
+          "id": 28
+        },
+        {
+          "id": 29
+        },
+        {
+          "id": 30
+        },
+        {
+          "id": 31
+        }
+      ],
+      "expected": [],
+      "pass": false
+    }
+  ]
+}

@@ -1,0 +1,225 @@
+{
+  "accountsPaise": {
+    "1000": 100000,
+    "1010": 100000,
+    "1200": 0,
+    "1320": 0,
+    "1330": 0,
+    "2000": 0,
+    "2115": 0,
+    "3000": 0,
+    "3200": -200000,
+    "6000": 0
+  },
+  "settings": [
+    {
+      "key": "company_name",
+      "value": "Mini ERP",
+      "description": "Company name for invoices",
+      "updated_at": "2026-10-25 05:17:20"
+    },
+    {
+      "key": "company_email",
+      "value": "support@minierp.com",
+      "description": "Company email for invoices",
+      "updated_at": "2026-10-25 05:17:20"
+    },
+    {
+      "key": "company_phone",
+      "value": "+1 123 456 7890",
+      "description": "Company phone for invoices",
+      "updated_at": "2026-10-25 05:17:20"
+    },
+    {
+      "key": "company_address",
+      "value": "456 Enterprise Ave, BC 12345",
+      "description": "Company address for invoices",
+      "updated_at": "2026-10-25 05:17:20"
+    },
+    {
+      "key": "company_tax_id",
+      "value": "TAX-123456789",
+      "description": "Company tax ID for invoices",
+      "updated_at": "2026-10-25 05:17:20"
+    },
+    {
+      "key": "feature_batch_locations",
+      "value": "0",
+      "description": null,
+      "updated_at": "2026-10-25 05:17:23"
+    },
+    {
+      "key": "CAP_last_no_2609",
+      "value": "2",
+      "description": null,
+      "updated_at": "2026-10-25 05:17:42"
+    }
+  ],
+  "opening_balances": [
+    {
+      "account_key": "cash",
+      "amount": 0,
+      "updated_at": "2026-10-25 05:17:21"
+    },
+    {
+      "account_key": "bank",
+      "amount": 0,
+      "updated_at": "2026-10-25 05:17:21"
+    },
+    {
+      "account_key": "easypaisa",
+      "amount": 0,
+      "updated_at": "2026-10-25 05:17:21"
+    },
+    {
+      "account_key": "jazzcash",
+      "amount": 0,
+      "updated_at": "2026-10-25 05:17:21"
+    },
+    {
+      "account_key": "upaisa",
+      "amount": 0,
+      "updated_at": "2026-10-25 05:17:21"
+    }
+  ],
+  "accounting_periods": [
+    {
+      "id": 1,
+      "period_name": "2026-09",
+      "start_date": "2026-09-01",
+      "end_date": "2026-09-30",
+      "status": "open",
+      "closed_at": null,
+      "closed_by": null,
+      "created_at": "2026-10-25 05:17:41"
+    }
+  ],
+  "journal_entries": [
+    {
+      "id": 1,
+      "reference_type": "OWNER_CAPITAL",
+      "reference_id": 1,
+      "entry_date": "2026-09-01",
+      "description": "Owner capital CAP-2609-00001 — 1000.00 (1000)",
+      "debit_account": "1",
+      "credit_account": "24",
+      "amount": 1000,
+      "created_by": 1,
+      "voided": 0,
+      "created_at": "2026-10-25 05:17:42"
+    },
+    {
+      "id": 2,
+      "reference_type": "OWNER_CAPITAL",
+      "reference_id": 2,
+      "entry_date": "2026-09-01",
+      "description": "Owner capital CAP-2609-00002 — 1000.00 (1010)",
+      "debit_account": "2",
+      "credit_account": "24",
+      "amount": 1000,
+      "created_by": 1,
+      "voided": 0,
+      "created_at": "2026-10-25 05:17:42"
+    }
+  ],
+  "journal_lines": [
+    {
+      "id": 1,
+      "journal_entry_id": 1,
+      "account_id": 1,
+      "debit": 1000,
+      "credit": 0,
+      "description": "Capital contributed via CAP-2609-00001",
+      "line_date": "2026-09-01",
+      "reference_type": "OWNER_CAPITAL",
+      "reference_id": 1,
+      "voided": 0,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:17:42",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null
+    },
+    {
+      "id": 2,
+      "journal_entry_id": 1,
+      "account_id": 24,
+      "debit": 0,
+      "credit": 1000,
+      "description": "Owner contribution CAP-2609-00001",
+      "line_date": "2026-09-01",
+      "reference_type": "OWNER_CAPITAL",
+      "reference_id": 1,
+      "voided": 0,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:17:42",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null
+    },
+    {
+      "id": 3,
+      "journal_entry_id": 2,
+      "account_id": 2,
+      "debit": 1000,
+      "credit": 0,
+      "description": "Capital contributed via CAP-2609-00002",
+      "line_date": "2026-09-01",
+      "reference_type": "OWNER_CAPITAL",
+      "reference_id": 2,
+      "voided": 0,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:17:42",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null
+    },
+    {
+      "id": 4,
+      "journal_entry_id": 2,
+      "account_id": 24,
+      "debit": 0,
+      "credit": 1000,
+      "description": "Owner contribution CAP-2609-00002",
+      "line_date": "2026-09-01",
+      "reference_type": "OWNER_CAPITAL",
+      "reference_id": 2,
+      "voided": 0,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:17:42",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null
+    }
+  ],
+  "suppliers": [
+    {
+      "id": 1,
+      "supplier_code": "PC-SUP",
+      "supplier_name": "Payable cash fixture",
+      "contact_person": null,
+      "email": null,
+      "phone": null,
+      "address": null,
+      "payment_terms": null,
+      "is_active": 1,
+      "created_at": "2026-10-25 05:17:42",
+      "updated_at": "2026-10-25 05:17:42",
+      "current_balance": 0
+    }
+  ],
+  "supplier_ledger": [],
+  "supplier_bills": [],
+  "supplier_bill_allocations": [],
+  "supplier_prepayments": [],
+  "supplier_prepayment_applications": [],
+  "payments": [],
+  "purchase_allocations": [],
+  "po_allocations": [],
+  "purchases": [],
+  "stock_batches": [],
+  "stock_balances": [],
+  "expenses": [],
+  "expense_payments": [],
+  "cash_reconciliations": []
+}

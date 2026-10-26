@@ -1,0 +1,141 @@
+{
+  "project": "media-fawad-26F2EFA7F2EF7987-D-minierp-flutter",
+  "signal": "best_effort",
+  "indexed_at": "2026-10-25T05:09:22Z",
+  "metadata": {
+    "generation": "2026-10-25T05:09:22Z",
+    "index_mode": "full",
+    "recorded_at": "2026-10-25T05:09:27Z",
+    "recording_status": "complete",
+    "ignored_files_stored": 271,
+    "ignored_files_total": 271,
+    "hash_records_complete": true,
+    "coverage_version": 3,
+    "generation_matches": true
+  },
+  "paths": [
+    {
+      "requested_path": "server/src/models/SupplierPrepayment.ts",
+      "path": "server/src/models/SupplierPrepayment.ts",
+      "status": "no_recorded_issue",
+      "freshness": "metadata_match",
+      "recommended_action": "use_graph_with_best_effort_caveat",
+      "coverage": []
+    },
+    {
+      "requested_path": "server/src/routes/supplierPrepayments.ts",
+      "path": "server/src/routes/supplierPrepayments.ts",
+      "status": "no_recorded_issue",
+      "freshness": "metadata_match",
+      "recommended_action": "use_graph_with_best_effort_caveat",
+      "coverage": []
+    },
+    {
+      "requested_path": "server/src/models/SupplierBill.ts",
+      "path": "server/src/models/SupplierBill.ts",
+      "status": "no_recorded_issue",
+      "freshness": "metadata_match",
+      "recommended_action": "use_graph_with_best_effort_caveat",
+      "coverage": []
+    },
+    {
+      "requested_path": "server/src/routes/supplierBills.ts",
+      "path": "server/src/routes/supplierBills.ts",
+      "status": "no_recorded_issue",
+      "freshness": "metadata_match",
+      "recommended_action": "use_graph_with_best_effort_caveat",
+      "coverage": []
+    },
+    {
+      "requested_path": "server/src/models/ExpensePayment.ts",
+      "path": "server/src/models/ExpensePayment.ts",
+      "status": "no_recorded_issue",
+      "freshness": "metadata_match",
+      "recommended_action": "use_graph_with_best_effort_caveat",
+      "coverage": []
+    },
+    {
+      "requested_path": "server/src/controllers/expenseController.ts",
+      "path": "server/src/controllers/expenseController.ts",
+      "status": "no_recorded_issue",
+      "freshness": "metadata_match",
+      "recommended_action": "use_graph_with_best_effort_caveat",
+      "coverage": []
+    },
+    {
+      "requested_path": "server/src/routes/expenses.ts",
+      "path": "server/src/routes/expenses.ts",
+      "status": "no_recorded_issue",
+      "freshness": "metadata_match",
+      "recommended_action": "use_graph_with_best_effort_caveat",
+      "coverage": []
+    },
+    {
+      "requested_path": "server/src/routes/accounting.ts",
+      "path": "server/src/routes/accounting.ts",
+      "status": "no_recorded_issue",
+      "freshness": "metadata_match",
+      "recommended_action": "use_graph_with_best_effort_caveat",
+      "coverage": []
+    },
+    {
+      "requested_path": "server/src/controllers/dashboardController.ts",
+      "path": "server/src/controllers/dashboardController.ts",
+      "status": "no_recorded_issue",
+      "freshness": "metadata_match",
+      "recommended_action": "use_graph_with_best_effort_caveat",
+      "coverage": []
+    },
+    {
+      "requested_path": "server/src/controllers/reportsController.ts",
+      "path": "server/src/controllers/reportsController.ts",
+      "status": "no_recorded_issue",
+      "freshness": "metadata_match",
+      "recommended_action": "use_graph_with_best_effort_caveat",
+      "coverage": []
+    },
+    {
+      "requested_path": "server/src/services/cashService.ts",
+      "path": "server/src/services/cashService.ts",
+      "status": "no_recorded_issue",
+      "freshness": "metadata_match",
+      "recommended_action": "use_graph_with_best_effort_caveat",
+      "coverage": []
+    },
+    {
+      "requested_path": "server/src/models/Reports.ts",
+      "path": "server/src/models/Reports.ts",
+      "status": "no_recorded_issue",
+      "freshness": "metadata_match",
+      "recommended_action": "use_graph_with_best_effort_caveat",
+      "coverage": []
+    },
+    {
+      "requested_path": "server/src/app.ts",
+      "path": "server/src/app.ts",
+      "status": "no_recorded_issue",
+      "freshness": "metadata_match",
+      "recommended_action": "use_graph_with_best_effort_caveat",
+      "coverage": []
+    },
+    {
+      "requested_path": "server/src/__tests__/helpers/accountingInvariants.ts",
+      "path": "server/src/__tests__/helpers/accountingInvariants.ts",
+      "status": "no_recorded_issue",
+      "freshness": "metadata_match",
+      "recommended_action": "use_graph_with_best_effort_caveat",
+      "coverage": []
+    }
+  ],
+  "scopes": [
+    {
+      "requested_scope": "server/src/routes",
+      "scope": "server/src/routes",
+      "total": 0,
+      "has_more": false,
+      "entries": [],
+      "status": "no_recorded_issue"
+    }
+  ],
+  "caveat": "Best-effort signal only. No recorded issue does not prove graph or source completeness; read flagged source and qualify claims when metadata is changed or unavailable."
+}

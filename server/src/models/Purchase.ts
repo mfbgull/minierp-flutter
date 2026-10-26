@@ -711,6 +711,23 @@ class PurchaseModel {
         voidedBy: userId,
         voidReason: reason.trim(),
       });
+      const ownedHeaders = db.prepare<[number, number], { readonly id: number }>(`
+        SELECT je.id FROM journal_entries je
+        WHERE je.voided = 0
+          AND ((je.reference_type = 'PURCHASE' AND je.reference_id = ?)
+            OR EXISTS (
+              SELECT 1 FROM journal_lines owned
+              WHERE owned.journal_entry_id = je.id
+                AND owned.reference_type = 'PURCHASE' AND owned.reference_id = ?
+            ))
+          AND NOT EXISTS (
+            SELECT 1 FROM journal_lines active
+            WHERE active.journal_entry_id = je.id AND active.voided = 0
+          )
+      `).all(id, id);
+      for (const header of ownedHeaders) {
+        StockMovementModel.voidJournalEntry(header.id, db);
+      }
 
       if (batch && batch.quantity_remaining > 0) {
         // ADJUSTMENT movement to remove only the genuinely remaining stock.

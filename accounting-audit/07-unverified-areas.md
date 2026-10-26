@@ -9,19 +9,24 @@ Status: final scope register. A limitation is not a pass. Detailed unexecuted va
 - Passing widget tests does not prove a live Flutter-to-server workflow. Each executed test and each static-only screen will be labeled explicitly.
 - Simulated duplicate requests on a single synchronous SQLite process do not establish crash durability or multi-process contention behavior.
 - Reports with identical values can share a defective formula. Only economic-event-derived expectations count as independent proof.
-- Pre-existing local changes (.qoder/settings.local.json and audit/* artifacts) are preserved. Audit outputs are isolated under accounting-audit/; team coordination state is under .omo/teams/.
+- Pre-existing local changes and later shared-workspace edits are preserved. Audit outputs are under accounting-audit/, with one OPEN-DECISION addition to audit/DECISIONS.md and team state under .omo/teams/. Do not attribute other source/config changes to this audit.
 
 ## Material unexecuted scope
 
-- Complete quotation→SO→fulfillment, POS/walk-in/mobile parity, edit and all financial deletion/cancellation/reversal variants.
-- Physical counts and correction, opening-stock edits, owner goods/cash withdrawals, salary deductions/loan write-off/reversal, positive production overhead/payable settlement and full production cancellation.
-- Supplier advance lifecycle, all input/output tax and discount/rounding permutations, aging bucket boundary dates, all cash wallets/transfers/reconciliation counts, and custom report templates.
+- All edit/deletion/cancellation/channel variants and mobile parity. A bounded quotation→SO→invoice/fulfillment/cancellation and POS cash/credit/split/return/replay extension was subsequently executed; zero POS tender and reservation paths fail F-070–073.
+- Opening-stock edits, salary deductions/loan write-off/reversal and production-overhead payable settlement. Ordinary count correction, owner cash/goods withdrawals/voids, positive overhead and production cancellation were subsequently executed; mixed-cost and omitted-item count corrections fail (F-024/F-025). Other count/location/production variants remain incomplete.
+- All input/output tax and discount/rounding permutations, aging bucket boundaries, all wallet/count variants and custom templates. Supplier advances/application/void and expense payables/settlement were subsequently executed, with canonical economic assertions passing but journal headers failing F-060. A dedicated cash-transfer/reversal and supplier-advance cash-refund endpoint was not established by bounded discovery.
 - Every dashboard KPI/trend/cache invalidation, every PDF/thermal print/export, all filter/group/search/pagination combinations, and full native Flutter→HTTP→database→reload workflows.
 - Hard process interruption, power-loss/WAL recovery, explicitly coordinated multiple SQLite writers, and all conflicting-update interleavings.
 - Historical migrations/replay on consistent business DB copies, including relevant WAL state. Fresh synthetic migrations were exercised; no production copy was necessary or made, and no historical accounting repair occurred.
 - Carton conversion and serial accounting: no implemented conversion/serial workflow was established; these are unsupported/unverified requested cases, not invented fixture features.
+- Supplier return-credit allocation across multiple purchases was attempted through the public payment route, returned500 and left economic state unchanged. Source inspection found supplier-prepayment application, but no return-note-to-target allocation workflow. Correct aggregate AP is not proof of individual invoice settlement. No successful split or consumed-credit reversal is claimed for suppliers.
 
 The per-expression financial inventory is a candidate inventory, not a claim of independent recalculation. The audit provides explicit verification status for discovered areas; it does **not** fulfill exhaustive numerical verification of every displayed figure. Critical current defects independently block a trust or release recommendation regardless of remaining coverage.
+
+## Snapshot and later source drift
+
+The executed audit source is the2026-10-25 snapshot, baseline15a78418 (later artifact commit8d292328). All1,172 protected hashes matched at the saved Oct25 checkpoint. On Oct26,10 previously hashed files differ, and further files/config/dependencies have been added or changed by other work. The new POS/reservation/accounting helper sources used for final proof still match their original hashes. No broad current-tree revalidation or certification is inferred from the earlier full suites. Source drift is recorded in final-extension-verification.json and final-source-state.json; the prior unchanged checkpoint is retained.
 
 ## Outstanding policy disposition
 

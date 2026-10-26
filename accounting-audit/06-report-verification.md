@@ -42,6 +42,16 @@ All amounts are Rs unless a quantity/count is specified. Retail figures use the 
 | Early-return P&L API, 9 September | COGS before purchase/sale | 0 | −10 | −10 | FAIL F-001 |
 | Credit reuse DB vs economic obligation | Receivable after retained goods225 less cash150 | 75 | Customer/invoice receivable15; signed GL75 | −60 in operational receivable | FAIL F-002; GL reflects correct economic obligation |
 | Production cost/GL | Inventory from Rs0.02 inputs | 0.02 | GL0.03 | +0.01 | FAIL F-022 |
+| Physical count correction | Aggregate inventory after correcting only item A | 120 | 140 | +20 | FAIL F-025 |
+| Physical count correction | Aggregate loss after correcting only item A | 130 | 110 | −20 | FAIL F-025 |
+| Positive-overhead production | Inventory incl remaining materials / overhead liability / clearing | 130 / 30 / 0 | 130 / 30 / 0 | 0 | PASS bounded API/GL fixture |
+| Owner goods/cash drawings | Equity drawings at cost | 30 + 50 = 80 | 80 | 0 | PASS API/GL; no new expense |
+| POS zero-tender API/receipt/payment/GL | Real cash collected | 0 | 17.35 | +17.35 fictitious cash | FAIL F-073; live UI not executed |
+| POS split API/GL | Cash/Bank/AR for52.05 sale | 20 / 15 / 17.05 | 20 / 15 / 17.05 | 0 | PASS bounded channel fixture |
+| Reservation location after release | Available quantity from physical10 | 10 | 7 | −3 available | FAIL F-071; physical quantity/value unchanged |
+| Supplier advance application | Advance/AP remaining after80.24 applied | 120.51 / 84.41 | 120.51 / 84.41 | 0 | PASS API/GL; no new cash |
+| Credit expense partial payment | Payable120.37 less40.12 | 80.25 | 80.25 | 0 | PASS API/GL |
+| Journal audit status | Active headers with all child lines voided | 0 | 9 | +9 stale headers | FAIL F-060; canonical money still correct |
 
 Evidence: [Dart model replay](evidence/flutter-oracle-models.json), [mounted P&L](evidence/flutter-oracle-pnl-widget.json), [mounted balance sheet](evidence/flutter-oracle-balance-widget.json), [nonzero-category text](evidence/flutter-balance-sheet-widget.json), [salary dialog](evidence/flutter-salary-carryover-widget.json), [loss breakdown](evidence/flutter-pnl-breakdown.json), and each finding folder.
 

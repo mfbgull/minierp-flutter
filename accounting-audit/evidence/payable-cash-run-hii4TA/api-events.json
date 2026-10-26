@@ -1,0 +1,1308 @@
+[
+  {
+    "id": "001",
+    "method": "post",
+    "url": "/api/owner-equity/capital",
+    "body": {
+      "capital_date": "2026-09-01",
+      "amount": 1000,
+      "payment_method": "Cash"
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "message": "Owner capital recorded successfully",
+      "data": {
+        "id": 1,
+        "capital_no": "CAP-2609-00001",
+        "amount": 1000
+      }
+    },
+    "before": "001-before.json",
+    "after": "001-after.json",
+    "beforeHash": "5fe08b9aa626abfc105ed8649d2de50bcb67b41ca8ec6cc56fde0bca26034f6b",
+    "afterHash": "de06db81cd2108cf27fd19581ea51b78c7795561bdcb27013db4079ff85baea0"
+  },
+  {
+    "id": "002",
+    "method": "post",
+    "url": "/api/owner-equity/capital",
+    "body": {
+      "capital_date": "2026-09-01",
+      "amount": 1000,
+      "payment_method": "Bank"
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "message": "Owner capital recorded successfully",
+      "data": {
+        "id": 2,
+        "capital_no": "CAP-2609-00002",
+        "amount": 1000
+      }
+    },
+    "before": "002-before.json",
+    "after": "002-after.json",
+    "beforeHash": "de06db81cd2108cf27fd19581ea51b78c7795561bdcb27013db4079ff85baea0",
+    "afterHash": "a6de2f6c215e644c3bf99d181e1d55795664139e5cea7be37bca2f66fbe531ee"
+  },
+  {
+    "id": "003",
+    "method": "post",
+    "url": "/api/suppliers",
+    "body": {
+      "supplier_code": "PC-SUP",
+      "supplier_name": "Payable cash fixture"
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 1,
+        "supplier_code": "PC-SUP",
+        "supplier_name": "Payable cash fixture"
+      }
+    },
+    "before": "003-before.json",
+    "after": "003-after.json",
+    "beforeHash": "a6de2f6c215e644c3bf99d181e1d55795664139e5cea7be37bca2f66fbe531ee",
+    "afterHash": "6156ee058b3a7c3571660d0e02e4340536d9ec75401864961210cee2dbfd2b40"
+  },
+  {
+    "id": "004",
+    "method": "post",
+    "url": "/api/supplier-bills",
+    "body": {
+      "supplier_id": 1,
+      "bill_no": "PC-BILL",
+      "bill_date": "2026-09-03",
+      "description": "Fixture services",
+      "net_amount": 100.25,
+      "input_tax_amount": 15.04
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 1,
+        "supplier_id": 1,
+        "bill_no": "PC-BILL",
+        "bill_date": "2026-09-03",
+        "due_date": null,
+        "description": "Fixture services",
+        "net_amount": 100.25,
+        "input_tax_amount": 15.04,
+        "total_amount": 115.29,
+        "created_by": 1,
+        "created_at": "2026-10-25 05:17:42",
+        "voided_at": null,
+        "voided_by": null,
+        "void_reason": null,
+        "supplier_name": "Payable cash fixture",
+        "paid_amount": 0,
+        "balance_amount": 115.29
+      }
+    },
+    "before": "004-before.json",
+    "after": "004-after.json",
+    "beforeHash": "6156ee058b3a7c3571660d0e02e4340536d9ec75401864961210cee2dbfd2b40",
+    "afterHash": "5312cfdbf706c37a56a11d9f52d22a37020514ea8b017ee6130d72b73bb2905e"
+  },
+  {
+    "id": "005",
+    "method": "post",
+    "url": "/api/inventory/items",
+    "body": {
+      "item_code": "PC-ITEM",
+      "item_name": "Fixture item",
+      "unit_of_measure": "pcs"
+    },
+    "status": 201,
+    "response": {
+      "id": 1,
+      "item_code": "PC-ITEM",
+      "item_name": "Fixture item",
+      "description": null,
+      "category": null,
+      "unit_of_measure": "pcs",
+      "current_stock": 0,
+      "reorder_level": 0,
+      "standard_cost": 0,
+      "standard_selling_price": 0,
+      "is_raw_material": 0,
+      "is_finished_good": 0,
+      "is_purchased": 1,
+      "is_manufactured": 0,
+      "is_active": 1,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:17:42",
+      "updated_at": "2026-10-25 05:17:42",
+      "has_expiry": 0,
+      "near_expiry_threshold_days": 30,
+      "sale_type": "packed",
+      "qty_decimal_precision": 0,
+      "rounding_step": null,
+      "deleted_at": null,
+      "deleted_by": null
+    },
+    "before": "005-before.json",
+    "after": "005-after.json",
+    "beforeHash": "5312cfdbf706c37a56a11d9f52d22a37020514ea8b017ee6130d72b73bb2905e",
+    "afterHash": "5312cfdbf706c37a56a11d9f52d22a37020514ea8b017ee6130d72b73bb2905e"
+  },
+  {
+    "id": "006",
+    "method": "post",
+    "url": "/api/purchases",
+    "body": {
+      "item_id": 1,
+      "supplier_id": 1,
+      "warehouse_id": 1,
+      "purchase_date": "2026-09-03",
+      "quantity": 4,
+      "unit_cost": 12.34
+    },
+    "status": 201,
+    "response": {
+      "id": 1,
+      "purchase_no": "PURCH-1026-0001",
+      "item_id": 1,
+      "warehouse_id": 1,
+      "quantity": 4,
+      "unit_cost": 12.34,
+      "total_cost": 49.36,
+      "supplier_name": "Payable cash fixture",
+      "purchase_date": "2026-09-03",
+      "invoice_no": null,
+      "remarks": null,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:17:42",
+      "updated_at": "2026-10-25 05:17:42",
+      "supplier_id": 1,
+      "returned_quantity": 0,
+      "batch_id": 1,
+      "batch_no": "BATCH-1026-PUR-00001",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "input_tax_amount": 0,
+      "item_code": "PC-ITEM",
+      "item_name": "Fixture item",
+      "unit_of_measure": "pcs",
+      "warehouse_code": "WH-001",
+      "warehouse_name": "Main Warehouse",
+      "created_by_username": "admin",
+      "paid_amount": 0,
+      "total_payable": 49.36,
+      "balance_amount": 49.36
+    },
+    "before": "006-before.json",
+    "after": "006-after.json",
+    "beforeHash": "5312cfdbf706c37a56a11d9f52d22a37020514ea8b017ee6130d72b73bb2905e",
+    "afterHash": "775621d63d52a4303f1a5cd27f9b90d145ec2783b4baad5f86a4aede5650d9b2"
+  },
+  {
+    "id": "007",
+    "method": "post",
+    "url": "/api/supplier-prepayments",
+    "body": {
+      "supplier_id": 1,
+      "prepay_date": "2026-09-02",
+      "amount": 200.75,
+      "payment_method": "Cash"
+    },
+    "key": "pc-create",
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 1,
+        "supplier_id": 1,
+        "prepay_date": "2026-09-02",
+        "amount": 200.75,
+        "payment_method": "Cash",
+        "reference_no": null,
+        "notes": null,
+        "created_by": 1,
+        "created_at": "2026-10-25 05:17:42",
+        "voided_at": null,
+        "voided_by": null,
+        "void_reason": null,
+        "applied_amount": 0,
+        "available_amount": 200.75
+      }
+    },
+    "before": "007-before.json",
+    "after": "007-after.json",
+    "beforeHash": "775621d63d52a4303f1a5cd27f9b90d145ec2783b4baad5f86a4aede5650d9b2",
+    "afterHash": "1224f3e9642fc7a30f3b5dcfa2424746df07201fc14abf377fedf6c5bf036f7e"
+  },
+  {
+    "id": "008",
+    "method": "post",
+    "url": "/api/supplier-prepayments",
+    "body": {
+      "supplier_id": 1,
+      "prepay_date": "2026-09-02",
+      "amount": 200.75,
+      "payment_method": "Cash"
+    },
+    "key": "pc-create",
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 1,
+        "supplier_id": 1,
+        "prepay_date": "2026-09-02",
+        "amount": 200.75,
+        "payment_method": "Cash",
+        "reference_no": null,
+        "notes": null,
+        "created_by": 1,
+        "created_at": "2026-10-25 05:17:42",
+        "voided_at": null,
+        "voided_by": null,
+        "void_reason": null,
+        "applied_amount": 0,
+        "available_amount": 200.75
+      }
+    },
+    "before": "008-before.json",
+    "after": "008-after.json",
+    "beforeHash": "1224f3e9642fc7a30f3b5dcfa2424746df07201fc14abf377fedf6c5bf036f7e",
+    "afterHash": "1224f3e9642fc7a30f3b5dcfa2424746df07201fc14abf377fedf6c5bf036f7e"
+  },
+  {
+    "id": "009",
+    "method": "post",
+    "url": "/api/supplier-prepayments/1/apply",
+    "body": {
+      "applied_at": "2026-09-04",
+      "allocations": [
+        {
+          "kind": "supplier_bill",
+          "id": 1,
+          "amount": 60.13
+        },
+        {
+          "kind": "purchase",
+          "id": 1,
+          "amount": 20.11
+        }
+      ]
+    },
+    "key": "pc-apply",
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 1
+      }
+    },
+    "before": "009-before.json",
+    "after": "009-after.json",
+    "beforeHash": "1224f3e9642fc7a30f3b5dcfa2424746df07201fc14abf377fedf6c5bf036f7e",
+    "afterHash": "8837e392671d84d8c1b58544e55d0f245635fca1fa00cc3e124af71b96de9610"
+  },
+  {
+    "id": "010",
+    "method": "post",
+    "url": "/api/supplier-prepayments/1/apply",
+    "body": {
+      "applied_at": "2026-09-04",
+      "allocations": [
+        {
+          "kind": "supplier_bill",
+          "id": 1,
+          "amount": 60.13
+        },
+        {
+          "kind": "purchase",
+          "id": 1,
+          "amount": 20.11
+        }
+      ]
+    },
+    "key": "pc-apply",
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 1
+      }
+    },
+    "before": "010-before.json",
+    "after": "010-after.json",
+    "beforeHash": "8837e392671d84d8c1b58544e55d0f245635fca1fa00cc3e124af71b96de9610",
+    "afterHash": "8837e392671d84d8c1b58544e55d0f245635fca1fa00cc3e124af71b96de9610"
+  },
+  {
+    "id": "011",
+    "method": "post",
+    "url": "/api/supplier-prepayments/1/apply",
+    "body": {
+      "applied_at": "2026-09-04",
+      "allocations": [
+        {
+          "kind": "supplier_bill",
+          "id": 1,
+          "amount": 55.16
+        }
+      ]
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 2
+      }
+    },
+    "before": "011-before.json",
+    "after": "011-after.json",
+    "beforeHash": "8837e392671d84d8c1b58544e55d0f245635fca1fa00cc3e124af71b96de9610",
+    "afterHash": "86ba80a12bbcf2af019d03b8ee94c9c1642b6eb6ab9adeff151ee44f871aecf5"
+  },
+  {
+    "id": "012",
+    "method": "get",
+    "url": "/api/supplier-bills/1",
+    "status": 200,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 1,
+        "supplier_id": 1,
+        "bill_no": "PC-BILL",
+        "bill_date": "2026-09-03",
+        "due_date": null,
+        "description": "Fixture services",
+        "net_amount": 100.25,
+        "input_tax_amount": 15.04,
+        "total_amount": 115.29,
+        "created_by": 1,
+        "created_at": "2026-10-25 05:17:42",
+        "voided_at": null,
+        "voided_by": null,
+        "void_reason": null,
+        "supplier_name": "Payable cash fixture",
+        "paid_amount": 115.28999999999999,
+        "balance_amount": 0
+      }
+    },
+    "before": "012-before.json",
+    "after": "012-after.json",
+    "beforeHash": "86ba80a12bbcf2af019d03b8ee94c9c1642b6eb6ab9adeff151ee44f871aecf5",
+    "afterHash": "86ba80a12bbcf2af019d03b8ee94c9c1642b6eb6ab9adeff151ee44f871aecf5"
+  },
+  {
+    "id": "013",
+    "method": "post",
+    "url": "/api/supplier-prepayments/1/void",
+    "body": {
+      "reason": "Consumed advance guard"
+    },
+    "status": 409,
+    "response": {
+      "error": "Reverse supplier advance applications before voiding"
+    },
+    "before": "013-before.json",
+    "after": "013-after.json",
+    "beforeHash": "86ba80a12bbcf2af019d03b8ee94c9c1642b6eb6ab9adeff151ee44f871aecf5",
+    "afterHash": "86ba80a12bbcf2af019d03b8ee94c9c1642b6eb6ab9adeff151ee44f871aecf5"
+  },
+  {
+    "id": "014",
+    "method": "post",
+    "url": "/api/supplier-bills/1/void",
+    "body": {
+      "reason": "Paid bill guard"
+    },
+    "status": 409,
+    "response": {
+      "error": "Reverse supplier bill payments before voiding"
+    },
+    "before": "014-before.json",
+    "after": "014-after.json",
+    "beforeHash": "86ba80a12bbcf2af019d03b8ee94c9c1642b6eb6ab9adeff151ee44f871aecf5",
+    "afterHash": "86ba80a12bbcf2af019d03b8ee94c9c1642b6eb6ab9adeff151ee44f871aecf5"
+  },
+  {
+    "id": "015",
+    "method": "post",
+    "url": "/api/supplier-prepayments/1/apply",
+    "body": {
+      "applied_at": "2026-09-04",
+      "allocations": [
+        {
+          "kind": "purchase",
+          "id": 1,
+          "amount": 65.36
+        }
+      ]
+    },
+    "status": 400,
+    "response": {
+      "error": "Application exceeds the available supplier advance"
+    },
+    "before": "015-before.json",
+    "after": "015-after.json",
+    "beforeHash": "86ba80a12bbcf2af019d03b8ee94c9c1642b6eb6ab9adeff151ee44f871aecf5",
+    "afterHash": "86ba80a12bbcf2af019d03b8ee94c9c1642b6eb6ab9adeff151ee44f871aecf5"
+  },
+  {
+    "id": "016",
+    "method": "post",
+    "url": "/api/supplier-prepayments/1/apply",
+    "body": {
+      "applied_at": "2026-09-04",
+      "allocations": [
+        {
+          "kind": "supplier_bill",
+          "id": 1,
+          "amount": 0.01
+        }
+      ]
+    },
+    "status": 400,
+    "response": {
+      "error": "Allocation amount (0.01) for supplier bill 1 exceeds the remaining balance (0.00)"
+    },
+    "before": "016-before.json",
+    "after": "016-after.json",
+    "beforeHash": "86ba80a12bbcf2af019d03b8ee94c9c1642b6eb6ab9adeff151ee44f871aecf5",
+    "afterHash": "86ba80a12bbcf2af019d03b8ee94c9c1642b6eb6ab9adeff151ee44f871aecf5"
+  },
+  {
+    "id": "017",
+    "method": "delete",
+    "url": "/api/payments/2",
+    "status": 200,
+    "response": {
+      "success": true,
+      "message": "Payment voided successfully"
+    },
+    "before": "017-before.json",
+    "after": "017-after.json",
+    "beforeHash": "86ba80a12bbcf2af019d03b8ee94c9c1642b6eb6ab9adeff151ee44f871aecf5",
+    "afterHash": "e287a91b3fbc95c4714fc9e426625bb62e0ea3d9af875a99674e5d6e0efb9190"
+  },
+  {
+    "id": "018",
+    "method": "delete",
+    "url": "/api/payments/1",
+    "status": 200,
+    "response": {
+      "success": true,
+      "message": "Payment voided successfully"
+    },
+    "before": "018-before.json",
+    "after": "018-after.json",
+    "beforeHash": "e287a91b3fbc95c4714fc9e426625bb62e0ea3d9af875a99674e5d6e0efb9190",
+    "afterHash": "97d20e237b3189d81a3610a29b81ba76e90d42b400cfe3cf83f29fc5e4b08086"
+  },
+  {
+    "id": "019",
+    "method": "post",
+    "url": "/api/supplier-prepayments/1/void",
+    "body": {
+      "reason": "Unused after reversal"
+    },
+    "status": 200,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 1,
+        "supplier_id": 1,
+        "prepay_date": "2026-09-02",
+        "amount": 200.75,
+        "payment_method": "Cash",
+        "reference_no": null,
+        "notes": null,
+        "created_by": 1,
+        "created_at": "2026-10-25 05:17:42",
+        "voided_at": "2026-10-25 05:17:43",
+        "voided_by": 1,
+        "void_reason": "Unused after reversal",
+        "applied_amount": 0,
+        "available_amount": 0
+      }
+    },
+    "before": "019-before.json",
+    "after": "019-after.json",
+    "beforeHash": "97d20e237b3189d81a3610a29b81ba76e90d42b400cfe3cf83f29fc5e4b08086",
+    "afterHash": "c2bdd3b056ff58f1765896cb5af6b463a7042c280166cda22b647b4df09f81cd"
+  },
+  {
+    "id": "020",
+    "method": "post",
+    "url": "/api/supplier-prepayments/1/void",
+    "body": {
+      "reason": "Duplicate void"
+    },
+    "status": 200,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 1,
+        "supplier_id": 1,
+        "prepay_date": "2026-09-02",
+        "amount": 200.75,
+        "payment_method": "Cash",
+        "reference_no": null,
+        "notes": null,
+        "created_by": 1,
+        "created_at": "2026-10-25 05:17:42",
+        "voided_at": "2026-10-25 05:17:43",
+        "voided_by": 1,
+        "void_reason": "Unused after reversal",
+        "applied_amount": 0,
+        "available_amount": 0
+      }
+    },
+    "before": "020-before.json",
+    "after": "020-after.json",
+    "beforeHash": "c2bdd3b056ff58f1765896cb5af6b463a7042c280166cda22b647b4df09f81cd",
+    "afterHash": "c2bdd3b056ff58f1765896cb5af6b463a7042c280166cda22b647b4df09f81cd"
+  },
+  {
+    "id": "021",
+    "method": "post",
+    "url": "/api/supplier-prepayments",
+    "body": {
+      "supplier_id": 1,
+      "prepay_date": "2026-09-05",
+      "amount": 25.25,
+      "payment_method": "Bank"
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 2,
+        "supplier_id": 1,
+        "prepay_date": "2026-09-05",
+        "amount": 25.25,
+        "payment_method": "Bank",
+        "reference_no": null,
+        "notes": null,
+        "created_by": 1,
+        "created_at": "2026-10-25 05:17:43",
+        "voided_at": null,
+        "voided_by": null,
+        "void_reason": null,
+        "applied_amount": 0,
+        "available_amount": 25.25
+      }
+    },
+    "before": "021-before.json",
+    "after": "021-after.json",
+    "beforeHash": "c2bdd3b056ff58f1765896cb5af6b463a7042c280166cda22b647b4df09f81cd",
+    "afterHash": "c218d548ab4996d3fc4be596ac4df600c915412f7deb3b932faa5fa8b3226f38"
+  },
+  {
+    "id": "022",
+    "method": "post",
+    "url": "/api/supplier-prepayments/2/void",
+    "body": {
+      "reason": "Unused correction"
+    },
+    "status": 200,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 2,
+        "supplier_id": 1,
+        "prepay_date": "2026-09-05",
+        "amount": 25.25,
+        "payment_method": "Bank",
+        "reference_no": null,
+        "notes": null,
+        "created_by": 1,
+        "created_at": "2026-10-25 05:17:43",
+        "voided_at": "2026-10-25 05:17:43",
+        "voided_by": 1,
+        "void_reason": "Unused correction",
+        "applied_amount": 0,
+        "available_amount": 0
+      }
+    },
+    "before": "022-before.json",
+    "after": "022-after.json",
+    "beforeHash": "c218d548ab4996d3fc4be596ac4df600c915412f7deb3b932faa5fa8b3226f38",
+    "afterHash": "5db9e041a7297624f72d0e5de41114c12cba0fe0d0c89cbd73e4185fd517e09e"
+  },
+  {
+    "id": "023",
+    "method": "post",
+    "url": "/api/supplier-prepayments",
+    "body": {
+      "supplier_id": 1,
+      "prepay_date": "2026-09-02",
+      "amount": 200.75,
+      "payment_method": "Cash"
+    },
+    "key": "pc-failed-create",
+    "status": 500,
+    "response": {
+      "error": "Failed to record supplier advance"
+    },
+    "before": "023-before.json",
+    "after": "023-after.json",
+    "beforeHash": "5db9e041a7297624f72d0e5de41114c12cba0fe0d0c89cbd73e4185fd517e09e",
+    "afterHash": "5db9e041a7297624f72d0e5de41114c12cba0fe0d0c89cbd73e4185fd517e09e"
+  },
+  {
+    "id": "024",
+    "method": "post",
+    "url": "/api/expenses",
+    "body": {
+      "expense_category": "Office Supplies",
+      "expense_date": "2026-09-06",
+      "amount": 120.37,
+      "payment_method": "Credit"
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "message": "Expense created successfully",
+      "data": {
+        "id": 1,
+        "expense_no": "EXP-2609-00001",
+        "expense_category": "Office Supplies",
+        "amount": 120.37,
+        "expense_date": "2026-09-06",
+        "payment_method": "Credit",
+        "status": "Draft",
+        "created_by": 1
+      }
+    },
+    "before": "024-before.json",
+    "after": "024-after.json",
+    "beforeHash": "5db9e041a7297624f72d0e5de41114c12cba0fe0d0c89cbd73e4185fd517e09e",
+    "afterHash": "ab1bc1847193b7713ed7e7e0586e1c73bcd766aa4276f9fd4bdcd9e46c66c6b3"
+  },
+  {
+    "id": "025",
+    "method": "put",
+    "url": "/api/expenses/1",
+    "body": {
+      "status": "Recorded"
+    },
+    "status": 200,
+    "response": {
+      "success": true,
+      "message": "Expense updated successfully",
+      "data": {
+        "id": 1,
+        "expense_no": "EXP-2609-00001",
+        "expense_category": "Office Supplies",
+        "description": "",
+        "amount": 120.37,
+        "expense_date": "2026-09-06",
+        "payment_method": "Credit",
+        "reference_no": null,
+        "vendor_name": null,
+        "project": null,
+        "status": "Recorded",
+        "created_at": "2026-10-25 05:17:43",
+        "updated_at": "2026-10-25 05:17:43",
+        "created_by_name": "Administrator"
+      }
+    },
+    "before": "025-before.json",
+    "after": "025-after.json",
+    "beforeHash": "ab1bc1847193b7713ed7e7e0586e1c73bcd766aa4276f9fd4bdcd9e46c66c6b3",
+    "afterHash": "3683f2270bdbbed81d4a6d877f604f5665e7865321646ab6068003f855fc72e2"
+  },
+  {
+    "id": "026",
+    "method": "post",
+    "url": "/api/expenses/1/payments",
+    "body": {
+      "payment_date": "2026-09-07",
+      "amount": 40.12,
+      "payment_method": "Cash"
+    },
+    "key": "pc-expense-part",
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 1,
+        "expense_id": 1,
+        "payment_date": "2026-09-07",
+        "amount": 40.12,
+        "payment_method": "Cash",
+        "reference_no": null,
+        "created_by": 1,
+        "created_at": "2026-10-25 05:17:43",
+        "voided_at": null,
+        "voided_by": null,
+        "void_reason": null
+      }
+    },
+    "before": "026-before.json",
+    "after": "026-after.json",
+    "beforeHash": "3683f2270bdbbed81d4a6d877f604f5665e7865321646ab6068003f855fc72e2",
+    "afterHash": "35e62e1923ef042e25305646bab24226c2422f5d4cb420789e865c8297786f62"
+  },
+  {
+    "id": "027",
+    "method": "put",
+    "url": "/api/expenses/1",
+    "body": {
+      "status": "Cancelled"
+    },
+    "status": 409,
+    "response": {
+      "success": false,
+      "error": "Reverse expense payments before cancelling or changing the expense"
+    },
+    "before": "027-before.json",
+    "after": "027-after.json",
+    "beforeHash": "35e62e1923ef042e25305646bab24226c2422f5d4cb420789e865c8297786f62",
+    "afterHash": "35e62e1923ef042e25305646bab24226c2422f5d4cb420789e865c8297786f62"
+  },
+  {
+    "id": "028",
+    "method": "post",
+    "url": "/api/expenses/1/payments",
+    "body": {
+      "payment_date": "2026-09-08",
+      "amount": 80.25,
+      "payment_method": "Bank"
+    },
+    "key": "pc-expense-exact",
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 2,
+        "expense_id": 1,
+        "payment_date": "2026-09-08",
+        "amount": 80.25,
+        "payment_method": "Bank",
+        "reference_no": null,
+        "created_by": 1,
+        "created_at": "2026-10-25 05:17:43",
+        "voided_at": null,
+        "voided_by": null,
+        "void_reason": null
+      }
+    },
+    "before": "028-before.json",
+    "after": "028-after.json",
+    "beforeHash": "35e62e1923ef042e25305646bab24226c2422f5d4cb420789e865c8297786f62",
+    "afterHash": "78d995c39f57030a04cbf63f93b61bb662db58dffdd928fcb039f3d7ba95994a"
+  },
+  {
+    "id": "029",
+    "method": "post",
+    "url": "/api/expenses/1/payments",
+    "body": {
+      "payment_date": "2026-09-08",
+      "amount": 80.25,
+      "payment_method": "Bank"
+    },
+    "key": "pc-expense-exact",
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 2,
+        "expense_id": 1,
+        "payment_date": "2026-09-08",
+        "amount": 80.25,
+        "payment_method": "Bank",
+        "reference_no": null,
+        "created_by": 1,
+        "created_at": "2026-10-25 05:17:43",
+        "voided_at": null,
+        "voided_by": null,
+        "void_reason": null
+      }
+    },
+    "before": "029-before.json",
+    "after": "029-after.json",
+    "beforeHash": "78d995c39f57030a04cbf63f93b61bb662db58dffdd928fcb039f3d7ba95994a",
+    "afterHash": "78d995c39f57030a04cbf63f93b61bb662db58dffdd928fcb039f3d7ba95994a"
+  },
+  {
+    "id": "030",
+    "method": "post",
+    "url": "/api/expenses/1/payments",
+    "body": {
+      "payment_date": "2026-09-08",
+      "amount": 0.01,
+      "payment_method": "Bank"
+    },
+    "status": 400,
+    "response": {
+      "success": false,
+      "error": "Payment exceeds the outstanding expense"
+    },
+    "before": "030-before.json",
+    "after": "030-after.json",
+    "beforeHash": "78d995c39f57030a04cbf63f93b61bb662db58dffdd928fcb039f3d7ba95994a",
+    "afterHash": "78d995c39f57030a04cbf63f93b61bb662db58dffdd928fcb039f3d7ba95994a"
+  },
+  {
+    "id": "031",
+    "method": "post",
+    "url": "/api/expenses/1/payments/2/void",
+    "body": {
+      "reason": "Reverse bank settlement"
+    },
+    "status": 200,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 2,
+        "expense_id": 1,
+        "payment_date": "2026-09-08",
+        "amount": 80.25,
+        "payment_method": "Bank",
+        "reference_no": null,
+        "created_by": 1,
+        "created_at": "2026-10-25 05:17:43",
+        "voided_at": "2026-10-25 05:17:43",
+        "voided_by": 1,
+        "void_reason": "Reverse bank settlement"
+      }
+    },
+    "before": "031-before.json",
+    "after": "031-after.json",
+    "beforeHash": "78d995c39f57030a04cbf63f93b61bb662db58dffdd928fcb039f3d7ba95994a",
+    "afterHash": "9edbb1cc43ef6b391c5b4de473c922645a21f48b82d71343a00cac2cb9e7e56e"
+  },
+  {
+    "id": "032",
+    "method": "post",
+    "url": "/api/expenses/1/payments/2/void",
+    "body": {
+      "reason": "Duplicate payment void"
+    },
+    "status": 200,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 2,
+        "expense_id": 1,
+        "payment_date": "2026-09-08",
+        "amount": 80.25,
+        "payment_method": "Bank",
+        "reference_no": null,
+        "created_by": 1,
+        "created_at": "2026-10-25 05:17:43",
+        "voided_at": "2026-10-25 05:17:43",
+        "voided_by": 1,
+        "void_reason": "Reverse bank settlement"
+      }
+    },
+    "before": "032-before.json",
+    "after": "032-after.json",
+    "beforeHash": "9edbb1cc43ef6b391c5b4de473c922645a21f48b82d71343a00cac2cb9e7e56e",
+    "afterHash": "9edbb1cc43ef6b391c5b4de473c922645a21f48b82d71343a00cac2cb9e7e56e"
+  },
+  {
+    "id": "033",
+    "method": "post",
+    "url": "/api/expenses/1/payments",
+    "body": {
+      "payment_date": "2026-09-08",
+      "amount": 80.25,
+      "payment_method": "Bank"
+    },
+    "key": "pc-expense-failed",
+    "status": 500,
+    "response": {
+      "success": false,
+      "error": "Failed to pay expense"
+    },
+    "before": "033-before.json",
+    "after": "033-after.json",
+    "beforeHash": "9edbb1cc43ef6b391c5b4de473c922645a21f48b82d71343a00cac2cb9e7e56e",
+    "afterHash": "9edbb1cc43ef6b391c5b4de473c922645a21f48b82d71343a00cac2cb9e7e56e"
+  },
+  {
+    "id": "034",
+    "method": "post",
+    "url": "/api/expenses/1/payments/1/void",
+    "body": {
+      "reason": "Reverse cash settlement"
+    },
+    "status": 200,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 1,
+        "expense_id": 1,
+        "payment_date": "2026-09-07",
+        "amount": 40.12,
+        "payment_method": "Cash",
+        "reference_no": null,
+        "created_by": 1,
+        "created_at": "2026-10-25 05:17:43",
+        "voided_at": "2026-10-25 05:17:43",
+        "voided_by": 1,
+        "void_reason": "Reverse cash settlement"
+      }
+    },
+    "before": "034-before.json",
+    "after": "034-after.json",
+    "beforeHash": "9edbb1cc43ef6b391c5b4de473c922645a21f48b82d71343a00cac2cb9e7e56e",
+    "afterHash": "4e443b7b6dec509488b14a236c8f3ca280df45887814abdf76f37c27b7c3553e"
+  },
+  {
+    "id": "035",
+    "method": "put",
+    "url": "/api/expenses/1",
+    "body": {
+      "status": "Cancelled"
+    },
+    "status": 200,
+    "response": {
+      "success": true,
+      "message": "Expense updated successfully",
+      "data": {
+        "id": 1,
+        "expense_no": "EXP-2609-00001",
+        "expense_category": "Office Supplies",
+        "description": "",
+        "amount": 120.37,
+        "expense_date": "2026-09-06",
+        "payment_method": "Credit",
+        "reference_no": null,
+        "vendor_name": null,
+        "project": null,
+        "status": "Cancelled",
+        "created_at": "2026-10-25 05:17:43",
+        "updated_at": "2026-10-25 05:17:43",
+        "created_by_name": "Administrator"
+      }
+    },
+    "before": "035-before.json",
+    "after": "035-after.json",
+    "beforeHash": "4e443b7b6dec509488b14a236c8f3ca280df45887814abdf76f37c27b7c3553e",
+    "afterHash": "edee0266d38dcae6c9b8f8793215bd143bfdf58fd345549f094445213a1e231f"
+  },
+  {
+    "id": "036",
+    "method": "post",
+    "url": "/api/expenses/1/payments",
+    "body": {
+      "payment_date": "2026-09-08",
+      "amount": 1,
+      "payment_method": "Bank"
+    },
+    "status": 409,
+    "response": {
+      "success": false,
+      "error": "Only recorded credit expenses accept payments"
+    },
+    "before": "036-before.json",
+    "after": "036-after.json",
+    "beforeHash": "edee0266d38dcae6c9b8f8793215bd143bfdf58fd345549f094445213a1e231f",
+    "afterHash": "edee0266d38dcae6c9b8f8793215bd143bfdf58fd345549f094445213a1e231f"
+  },
+  {
+    "id": "037",
+    "method": "put",
+    "url": "/api/dashboard/cash-opening-balances",
+    "body": {
+      "accounts": [
+        {
+          "key": "cash",
+          "amount": 100.1
+        },
+        {
+          "key": "bank",
+          "amount": 50.2
+        }
+      ]
+    },
+    "status": 200,
+    "response": {
+      "success": true,
+      "data": {
+        "accounts": [
+          {
+            "key": "cash",
+            "name": "Cash",
+            "amount": 100.1
+          },
+          {
+            "key": "bank",
+            "name": "Bank",
+            "amount": 50.2
+          },
+          {
+            "key": "easypaisa",
+            "name": "Easypaisa",
+            "amount": 0
+          },
+          {
+            "key": "jazzcash",
+            "name": "JazzCash",
+            "amount": 0
+          },
+          {
+            "key": "upaisa",
+            "name": "UPaisa",
+            "amount": 0
+          }
+        ]
+      }
+    },
+    "before": "037-before.json",
+    "after": "037-after.json",
+    "beforeHash": "edee0266d38dcae6c9b8f8793215bd143bfdf58fd345549f094445213a1e231f",
+    "afterHash": "e2b2c2e202ec919a0564c2ce186407e4589596f75b4fb71ebe5d6f980c9ebf06"
+  },
+  {
+    "id": "038",
+    "method": "put",
+    "url": "/api/dashboard/cash-opening-balances",
+    "body": {
+      "accounts": [
+        {
+          "key": "cash",
+          "amount": 100.1
+        },
+        {
+          "key": "bank",
+          "amount": 50.2
+        }
+      ]
+    },
+    "status": 200,
+    "response": {
+      "success": true,
+      "data": {
+        "accounts": [
+          {
+            "key": "cash",
+            "name": "Cash",
+            "amount": 100.1
+          },
+          {
+            "key": "bank",
+            "name": "Bank",
+            "amount": 50.2
+          },
+          {
+            "key": "easypaisa",
+            "name": "Easypaisa",
+            "amount": 0
+          },
+          {
+            "key": "jazzcash",
+            "name": "JazzCash",
+            "amount": 0
+          },
+          {
+            "key": "upaisa",
+            "name": "UPaisa",
+            "amount": 0
+          }
+        ]
+      }
+    },
+    "before": "038-before.json",
+    "after": "038-after.json",
+    "beforeHash": "e2b2c2e202ec919a0564c2ce186407e4589596f75b4fb71ebe5d6f980c9ebf06",
+    "afterHash": "8868c9728e2a69edeef077faffb3f399996834bb277dc93adf798c3042938caa"
+  },
+  {
+    "id": "039",
+    "method": "post",
+    "url": "/api/reports/cash-reconciliation",
+    "body": {
+      "date": "2026-09-09",
+      "accounts": [
+        {
+          "key": "cash",
+          "counted_balance": 1099.9499999999998,
+          "notes": "Fixture count shortage"
+        },
+        {
+          "key": "bank",
+          "counted_balance": 1050.2
+        }
+      ]
+    },
+    "status": 200,
+    "response": {
+      "success": true,
+      "message": "Cash reconciliation saved",
+      "data": {
+        "date": "2026-09-09",
+        "accounts": [
+          {
+            "key": "cash",
+            "name": "Cash",
+            "opening_balance": 1100.1,
+            "inflow": 0,
+            "outflow": 0,
+            "net": 0,
+            "expected_balance": 1100.1,
+            "counted_balance": 1099.95,
+            "variance": -0.15,
+            "notes": "Fixture count shortage",
+            "reconciled": true,
+            "reconciled_at": "2026-10-25 05:17:44"
+          },
+          {
+            "key": "bank",
+            "name": "Bank",
+            "opening_balance": 1050.2,
+            "inflow": 0,
+            "outflow": 0,
+            "net": 0,
+            "expected_balance": 1050.2,
+            "counted_balance": 1050.2,
+            "variance": 0,
+            "notes": null,
+            "reconciled": true,
+            "reconciled_at": "2026-10-25 05:17:44"
+          },
+          {
+            "key": "easypaisa",
+            "name": "Easypaisa",
+            "opening_balance": 0,
+            "inflow": 0,
+            "outflow": 0,
+            "net": 0,
+            "expected_balance": 0,
+            "counted_balance": null,
+            "variance": null,
+            "notes": null,
+            "reconciled": false,
+            "reconciled_at": null
+          },
+          {
+            "key": "jazzcash",
+            "name": "JazzCash",
+            "opening_balance": 0,
+            "inflow": 0,
+            "outflow": 0,
+            "net": 0,
+            "expected_balance": 0,
+            "counted_balance": null,
+            "variance": null,
+            "notes": null,
+            "reconciled": false,
+            "reconciled_at": null
+          },
+          {
+            "key": "upaisa",
+            "name": "UPaisa",
+            "opening_balance": 0,
+            "inflow": 0,
+            "outflow": 0,
+            "net": 0,
+            "expected_balance": 0,
+            "counted_balance": null,
+            "variance": null,
+            "notes": null,
+            "reconciled": false,
+            "reconciled_at": null
+          }
+        ],
+        "totals": {
+          "total_opening": 2150.3,
+          "total_inflow": 0,
+          "total_outflow": 0,
+          "total_closing": 2150.3
+        }
+      }
+    },
+    "before": "039-before.json",
+    "after": "039-after.json",
+    "beforeHash": "8868c9728e2a69edeef077faffb3f399996834bb277dc93adf798c3042938caa",
+    "afterHash": "770b6217a8906f29cbd03ade03dd198e3748fc2cd6e9af35121d332b8c2f6768"
+  },
+  {
+    "id": "040",
+    "method": "post",
+    "url": "/api/reports/cash-reconciliation",
+    "body": {
+      "date": "2026-09-09",
+      "accounts": [
+        {
+          "key": "cash",
+          "counted_balance": 1
+        },
+        {
+          "key": "unknown",
+          "counted_balance": 2
+        }
+      ]
+    },
+    "status": 400,
+    "response": {
+      "success": false,
+      "error": "Unknown account key: unknown"
+    },
+    "before": "040-before.json",
+    "after": "040-after.json",
+    "beforeHash": "770b6217a8906f29cbd03ade03dd198e3748fc2cd6e9af35121d332b8c2f6768",
+    "afterHash": "770b6217a8906f29cbd03ade03dd198e3748fc2cd6e9af35121d332b8c2f6768"
+  },
+  {
+    "id": "041",
+    "method": "put",
+    "url": "/api/dashboard/cash-opening-balances",
+    "body": {
+      "accounts": [
+        {
+          "key": "cash",
+          "amount": 0
+        },
+        {
+          "key": "bank",
+          "amount": 0
+        }
+      ]
+    },
+    "status": 200,
+    "response": {
+      "success": true,
+      "data": {
+        "accounts": [
+          {
+            "key": "cash",
+            "name": "Cash",
+            "amount": 0
+          },
+          {
+            "key": "bank",
+            "name": "Bank",
+            "amount": 0
+          },
+          {
+            "key": "easypaisa",
+            "name": "Easypaisa",
+            "amount": 0
+          },
+          {
+            "key": "jazzcash",
+            "name": "JazzCash",
+            "amount": 0
+          },
+          {
+            "key": "upaisa",
+            "name": "UPaisa",
+            "amount": 0
+          }
+        ]
+      }
+    },
+    "before": "041-before.json",
+    "after": "041-after.json",
+    "beforeHash": "770b6217a8906f29cbd03ade03dd198e3748fc2cd6e9af35121d332b8c2f6768",
+    "afterHash": "2c10f2327a0b8f2df3b008c28e6c5299b9c1c92462f253c6c4af8b84464828db"
+  }
+]

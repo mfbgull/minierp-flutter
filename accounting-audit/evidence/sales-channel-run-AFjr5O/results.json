@@ -1,0 +1,4473 @@
+{
+  "run": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/sales-channel-run-AFjr5O",
+  "today": "2026-10-25",
+  "invocation": "node accounting-audit/tests/sales-channel-extension.cjs",
+  "guard": {
+    "nodeEnv": "test",
+    "databasePath": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/sales-channel-run-AFjr5O",
+    "openedDatabases": [
+      "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/sales-channel-run-AFjr5O/erp.db"
+    ]
+  },
+  "fixtureWrites": [
+    {
+      "sql": "UPDATE settings SET value='1' WHERE key='feature_batch_locations'",
+      "purpose": "Enable optional batch-location feature in fresh disposable fixture only"
+    },
+    {
+      "sql": "INSERT INTO batch_stock_by_location (batch_id,location_id,quantity_physical,quantity_reserved,quantity_available) VALUES (?,?,?,0,?)",
+      "params": [
+        7,
+        1,
+        10,
+        10
+      ],
+      "purpose": "Fresh feature-enabled fixture: mirror purchased batch quantity at its default location before reservation operations"
+    },
+    {
+      "sql": "INSERT INTO batch_stock_by_location (batch_id,location_id,quantity_physical,quantity_reserved,quantity_available) VALUES (?,?,?,0,?)",
+      "params": [
+        8,
+        1,
+        10,
+        10
+      ],
+      "purpose": "Fresh feature-enabled fixture: mirror purchased batch quantity at its default location before reservation operations"
+    },
+    {
+      "sql": "INSERT INTO batch_stock_by_location (batch_id,location_id,quantity_physical,quantity_reserved,quantity_available) VALUES (?,?,?,0,?)",
+      "params": [
+        9,
+        1,
+        10,
+        10
+      ],
+      "purpose": "Fresh feature-enabled fixture: mirror purchased batch quantity at its default location before reservation operations"
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "quotation-confirmed-order-invoice-cancel",
+      "status": "FAIL",
+      "checks": [
+        0,
+        133
+      ],
+      "events": [
+        1,
+        14
+      ],
+      "artifacts": [
+        "01-quotation-before.json",
+        "02-quotation-converted-no-financial-effect.json",
+        "03-sales-order-invoiced.json",
+        "04-sales-order-cancelled.json",
+        "05-sales-order-repeat-cancel.json"
+      ]
+    },
+    {
+      "id": "direct-order-confirm-deliver-paid-guard",
+      "status": "PASS",
+      "checks": [
+        133,
+        240
+      ],
+      "events": [
+        14,
+        26
+      ],
+      "artifacts": [
+        "06-direct-order-before.json",
+        "07-direct-order-delivered.json",
+        "08-direct-order-paid.json",
+        "09-direct-order-reversed.json"
+      ]
+    },
+    {
+      "id": "pos-cash-walkin-replay-partial-return",
+      "status": "PASS",
+      "checks": [
+        240,
+        343
+      ],
+      "events": [
+        26,
+        34
+      ],
+      "artifacts": [
+        "10-pos-cash-before.json",
+        "11-pos-cash-sale.json",
+        "12-pos-cash-replay.json",
+        "13-pos-cash-return.json"
+      ]
+    },
+    {
+      "id": "pos-named-credit-partial-return",
+      "status": "PASS",
+      "checks": [
+        343,
+        421
+      ],
+      "events": [
+        34,
+        41
+      ],
+      "artifacts": [
+        "14-pos-credit-before.json",
+        "15-pos-credit-sale.json",
+        "16-pos-credit-return.json"
+      ]
+    },
+    {
+      "id": "pos-split-cash-bank-credit",
+      "status": "PASS",
+      "checks": [
+        421,
+        469
+      ],
+      "events": [
+        41,
+        46
+      ],
+      "artifacts": [
+        "17-pos-split-before.json",
+        "18-pos-split-sale.json"
+      ]
+    },
+    {
+      "id": "pos-explicit-zero-cash",
+      "status": "FAIL",
+      "checks": [
+        469,
+        509
+      ],
+      "events": [
+        46,
+        51
+      ],
+      "artifacts": [
+        "19-pos-zero-before.json",
+        "20-pos-zero-after.json"
+      ]
+    },
+    {
+      "id": "reservation-line-replay-release",
+      "status": "FAIL",
+      "checks": [
+        509,
+        579
+      ],
+      "events": [
+        51,
+        58
+      ],
+      "artifacts": [
+        "21-reservation-before.json",
+        "22-reservation-replayed.json",
+        "23-reservation-released.json"
+      ]
+    },
+    {
+      "id": "reservation-single-line-release-control",
+      "status": "PASS",
+      "checks": [
+        579,
+        649
+      ],
+      "events": [
+        58,
+        65
+      ],
+      "artifacts": [
+        "24-reservation-control-before.json",
+        "25-reservation-control-active.json",
+        "26-reservation-control-released.json"
+      ]
+    },
+    {
+      "id": "reservation-without-optional-line-release",
+      "status": "FAIL",
+      "checks": [
+        649,
+        690
+      ],
+      "events": [
+        65,
+        71
+      ],
+      "artifacts": [
+        "27-reservation-noline-before.json",
+        "28-reservation-noline-after.json"
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "label": "quotation-before customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "quotation-before supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "quotation-before stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "quotation-before arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "quotation-before apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "quotation-before inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "quotation-before cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "quotation-before orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "quotation-before unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "quotation-before creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "quotation-before creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "quotation-before receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "quotation-before supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "quotation-before expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "quotation-before inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "quotation-before invariant A reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "quotation-before invariant A overall paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "quotation-before individual journal groups balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "quotation-before signed AR",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "quotation total exact paise",
+      "actual": 5205,
+      "expected": 5205,
+      "pass": true
+    },
+    {
+      "label": "converted order confirmed",
+      "actual": "Confirmed",
+      "expected": "Confirmed",
+      "pass": true
+    },
+    {
+      "label": "pre-invoice stock",
+      "actual": 40,
+      "expected": 40,
+      "pass": true
+    },
+    {
+      "label": "quotation and confirmed order GL 1000 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "quotation and confirmed order GL 1010 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "quotation and confirmed order GL 1100 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "quotation and confirmed order GL 1110 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "quotation and confirmed order GL 1200 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "quotation and confirmed order GL 2000 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "quotation and confirmed order GL 4000 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "quotation and confirmed order GL 4100 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "quotation and confirmed order GL 5000 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "quotation-converted-no-financial-effect customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "quotation-converted-no-financial-effect supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "quotation-converted-no-financial-effect stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "quotation-converted-no-financial-effect arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "quotation-converted-no-financial-effect apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "quotation-converted-no-financial-effect inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "quotation-converted-no-financial-effect cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "quotation-converted-no-financial-effect orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "quotation-converted-no-financial-effect unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "quotation-converted-no-financial-effect creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "quotation-converted-no-financial-effect creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "quotation-converted-no-financial-effect receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "quotation-converted-no-financial-effect supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "quotation-converted-no-financial-effect expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "quotation-converted-no-financial-effect inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "quotation-converted-no-financial-effect invariant A reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "quotation-converted-no-financial-effect invariant A overall paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "quotation-converted-no-financial-effect individual journal groups balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "quotation-converted-no-financial-effect signed AR",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "rejection atomic post /api/quotations/1/convert",
+      "actual": "b3aa3ffd5b7447459c59009dcb15ecd27c665ed0083aac2595e026bbf226972e",
+      "expected": "b3aa3ffd5b7447459c59009dcb15ecd27c665ed0083aac2595e026bbf226972e",
+      "pass": true
+    },
+    {
+      "label": "quotation repeat conversion 400",
+      "actual": 400,
+      "expected": 400,
+      "pass": true
+    },
+    {
+      "label": "SO invoice GL 1000 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "SO invoice GL 1010 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "SO invoice GL 1100 paise",
+      "actual": 5205,
+      "expected": 5205,
+      "pass": true
+    },
+    {
+      "label": "SO invoice GL 1110 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "SO invoice GL 1200 paise",
+      "actual": -2775,
+      "expected": -2775,
+      "pass": true
+    },
+    {
+      "label": "SO invoice GL 2000 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "SO invoice GL 4000 paise",
+      "actual": -5205,
+      "expected": -5205,
+      "pass": true
+    },
+    {
+      "label": "SO invoice GL 4100 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "SO invoice GL 5000 paise",
+      "actual": 2775,
+      "expected": 2775,
+      "pass": true
+    },
+    {
+      "label": "SO stock after invoice",
+      "actual": 37,
+      "expected": 37,
+      "pass": true
+    },
+    {
+      "label": "SO line delivered",
+      "actual": 3,
+      "expected": 3,
+      "pass": true
+    },
+    {
+      "label": "sales-order-invoiced customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-invoiced supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-invoiced stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-invoiced arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-invoiced apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-invoiced inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-invoiced cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-invoiced orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-invoiced unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-invoiced creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-invoiced creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-invoiced receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-invoiced supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-invoiced expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-invoiced inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-invoiced invariant A reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-invoiced invariant A overall paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "sales-order-invoiced individual journal groups balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-invoiced signed AR",
+      "actual": 5205,
+      "expected": 5205,
+      "pass": true
+    },
+    {
+      "label": "SO cancel neutrality GL 1000 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "SO cancel neutrality GL 1010 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "SO cancel neutrality GL 1100 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "SO cancel neutrality GL 1110 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "SO cancel neutrality GL 1200 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "SO cancel neutrality GL 2000 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "SO cancel neutrality GL 4000 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "SO cancel neutrality GL 4100 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "SO cancel neutrality GL 5000 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "SO cancel stock",
+      "actual": 40,
+      "expected": 40,
+      "pass": true
+    },
+    {
+      "label": "linked invoice cancelled",
+      "actual": "Cancelled",
+      "expected": "Cancelled",
+      "pass": true
+    },
+    {
+      "label": "sales-order-cancelled customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-cancelled supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-cancelled stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-cancelled arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-cancelled apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-cancelled inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-cancelled cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-cancelled orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-cancelled unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-cancelled creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-cancelled creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-cancelled receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-cancelled supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-cancelled expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-cancelled inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-cancelled invariant A reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-cancelled invariant A overall paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "sales-order-cancelled individual journal groups balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-cancelled signed AR",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "rejection atomic post /api/sales-orders/1/cancel",
+      "actual": "5a4976e88c27bffbce17d09a82445616f1d2888f9fd58e6ba0f6b989aa52e8a0",
+      "expected": "5a4976e88c27bffbce17d09a82445616f1d2888f9fd58e6ba0f6b989aa52e8a0",
+      "pass": true
+    },
+    {
+      "label": "F070 repeated SO cancellation is 4xx",
+      "actual": false,
+      "expected": true,
+      "pass": false
+    },
+    {
+      "label": "sales-order-repeat-cancel customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-repeat-cancel supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-repeat-cancel stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-repeat-cancel arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-repeat-cancel apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-repeat-cancel inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-repeat-cancel cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-repeat-cancel orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-repeat-cancel unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-repeat-cancel creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-repeat-cancel creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-repeat-cancel receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-repeat-cancel supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-repeat-cancel expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-repeat-cancel inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-repeat-cancel invariant A reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-repeat-cancel invariant A overall paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "sales-order-repeat-cancel individual journal groups balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "sales-order-repeat-cancel signed AR",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "direct-order-before customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-before supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-before stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-before arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-before apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-before inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-before cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-before orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-before unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-before creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-before creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-before receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-before supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-before expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-before inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-before invariant A reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-before invariant A overall paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "direct-order-before individual journal groups balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-before signed AR",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "delivered status before invoice GL 1000 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "delivered status before invoice GL 1010 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "delivered status before invoice GL 1100 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "delivered status before invoice GL 1110 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "delivered status before invoice GL 1200 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "delivered status before invoice GL 2000 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "delivered status before invoice GL 4000 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "delivered status before invoice GL 4100 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "delivered status before invoice GL 5000 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "delivered status physical stock",
+      "actual": 40,
+      "expected": 40,
+      "pass": true
+    },
+    {
+      "label": "direct-order-delivered customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-delivered supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-delivered stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-delivered arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-delivered apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-delivered inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-delivered cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-delivered orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-delivered unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-delivered creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-delivered creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-delivered receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-delivered supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-delivered expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-delivered inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-delivered invariant A reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-delivered invariant A overall paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "direct-order-delivered individual journal groups balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-delivered signed AR",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "paid SO GL 1000 paise",
+      "actual": 3470,
+      "expected": 3470,
+      "pass": true
+    },
+    {
+      "label": "paid SO GL 1010 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "paid SO GL 1100 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "paid SO GL 1110 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "paid SO GL 1200 paise",
+      "actual": -1850,
+      "expected": -1850,
+      "pass": true
+    },
+    {
+      "label": "paid SO GL 2000 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "paid SO GL 4000 paise",
+      "actual": -3470,
+      "expected": -3470,
+      "pass": true
+    },
+    {
+      "label": "paid SO GL 4100 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "paid SO GL 5000 paise",
+      "actual": 1850,
+      "expected": 1850,
+      "pass": true
+    },
+    {
+      "label": "direct-order-paid customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-paid supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-paid stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-paid arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-paid apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-paid inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-paid cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-paid orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-paid unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-paid creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-paid creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-paid receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-paid supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-paid expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-paid inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-paid invariant A reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-paid invariant A overall paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "direct-order-paid individual journal groups balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-paid signed AR",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "rejection atomic post /api/sales-orders/2/cancel",
+      "actual": "7e3823d8eab0cf7ccdcd8fd9734af2af95f733838728488320029a0525f420a8",
+      "expected": "7e3823d8eab0cf7ccdcd8fd9734af2af95f733838728488320029a0525f420a8",
+      "pass": true
+    },
+    {
+      "label": "paid SO cancellation protected",
+      "actual": 409,
+      "expected": 409,
+      "pass": true
+    },
+    {
+      "label": "paid SO reverse neutrality GL 1000 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "paid SO reverse neutrality GL 1010 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "paid SO reverse neutrality GL 1100 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "paid SO reverse neutrality GL 1110 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "paid SO reverse neutrality GL 1200 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "paid SO reverse neutrality GL 2000 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "paid SO reverse neutrality GL 4000 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "paid SO reverse neutrality GL 4100 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "paid SO reverse neutrality GL 5000 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "paid SO stock restore",
+      "actual": 40,
+      "expected": 40,
+      "pass": true
+    },
+    {
+      "label": "direct-order-reversed customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-reversed supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-reversed stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-reversed arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-reversed apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-reversed inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-reversed cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-reversed orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-reversed unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-reversed creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-reversed creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-reversed receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-reversed supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-reversed expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-reversed inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-reversed invariant A reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-reversed invariant A overall paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "direct-order-reversed individual journal groups balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "direct-order-reversed signed AR",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "pos-cash-before customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-before supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-before stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-before arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-before apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-before inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-before cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-before orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-before unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-before creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-before creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-before receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-before supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-before expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-before inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-before invariant A reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-before invariant A overall paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "pos-cash-before individual journal groups balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-before signed AR",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "POS cash change paise",
+      "actual": 3060,
+      "expected": 3060,
+      "pass": true
+    },
+    {
+      "label": "POS cash GL 1000 paise",
+      "actual": 6940,
+      "expected": 6940,
+      "pass": true
+    },
+    {
+      "label": "POS cash GL 1010 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "POS cash GL 1100 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "POS cash GL 1110 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "POS cash GL 1200 paise",
+      "actual": -3700,
+      "expected": -3700,
+      "pass": true
+    },
+    {
+      "label": "POS cash GL 2000 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "POS cash GL 4000 paise",
+      "actual": -6940,
+      "expected": -6940,
+      "pass": true
+    },
+    {
+      "label": "POS cash GL 4100 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "POS cash GL 5000 paise",
+      "actual": 3700,
+      "expected": 3700,
+      "pass": true
+    },
+    {
+      "label": "POS cash quantity",
+      "actual": 36,
+      "expected": 36,
+      "pass": true
+    },
+    {
+      "label": "pos-cash-sale customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-sale supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-sale stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-sale arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-sale apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-sale inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-sale cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-sale orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-sale unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-sale creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-sale creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-sale receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-sale supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-sale expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-sale inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-sale invariant A reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-sale invariant A overall paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "pos-cash-sale individual journal groups balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-sale signed AR",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "POS replay status",
+      "actual": 201,
+      "expected": 201,
+      "pass": true
+    },
+    {
+      "label": "POS replay header",
+      "actual": "true",
+      "expected": "true",
+      "pass": true
+    },
+    {
+      "label": "POS replay body",
+      "actual": {
+        "transaction_no": "INV-1026-00003",
+        "sale_date": "2026-10-25",
+        "warehouse_id": 1,
+        "warehouse_name": "Main Warehouse",
+        "customer_name": "Walk-in Customer",
+        "items": [
+          {
+            "sale_id": 3,
+            "sale_no": "INV-1026-00003",
+            "item_id": 3,
+            "item_code": "SC-3",
+            "item_name": "POS walkin",
+            "unit_of_measure": "pcs",
+            "quantity": 4,
+            "unit_price": 17.35,
+            "line_total": 69.4
+          }
+        ],
+        "discount_scope": "invoice",
+        "discount_type": "percentage",
+        "discount_value": 0,
+        "payments": [
+          {
+            "payment_method": "Cash",
+            "amount": 69.4
+          }
+        ],
+        "subtotal": 69.4,
+        "total": 69.4,
+        "cash_received": 100,
+        "change": 30.599999999999994,
+        "items_count": 1,
+        "sale_ids": [
+          3
+        ]
+      },
+      "expected": {
+        "transaction_no": "INV-1026-00003",
+        "sale_date": "2026-10-25",
+        "warehouse_id": 1,
+        "warehouse_name": "Main Warehouse",
+        "customer_name": "Walk-in Customer",
+        "items": [
+          {
+            "sale_id": 3,
+            "sale_no": "INV-1026-00003",
+            "item_id": 3,
+            "item_code": "SC-3",
+            "item_name": "POS walkin",
+            "unit_of_measure": "pcs",
+            "quantity": 4,
+            "unit_price": 17.35,
+            "line_total": 69.4
+          }
+        ],
+        "discount_scope": "invoice",
+        "discount_type": "percentage",
+        "discount_value": 0,
+        "payments": [
+          {
+            "payment_method": "Cash",
+            "amount": 69.4
+          }
+        ],
+        "subtotal": 69.4,
+        "total": 69.4,
+        "cash_received": 100,
+        "change": 30.599999999999994,
+        "items_count": 1,
+        "sale_ids": [
+          3
+        ]
+      },
+      "pass": true
+    },
+    {
+      "label": "POS replay economic state",
+      "actual": "d5a5b3201349dbca84d852e9fc6e95c5b5a9b3941d398467230cf59f89108129",
+      "expected": "d5a5b3201349dbca84d852e9fc6e95c5b5a9b3941d398467230cf59f89108129",
+      "pass": true
+    },
+    {
+      "label": "rejection atomic post /api/pos/sale",
+      "actual": "d5a5b3201349dbca84d852e9fc6e95c5b5a9b3941d398467230cf59f89108129",
+      "expected": "d5a5b3201349dbca84d852e9fc6e95c5b5a9b3941d398467230cf59f89108129",
+      "pass": true
+    },
+    {
+      "label": "POS changed replay rejected",
+      "actual": 409,
+      "expected": 409,
+      "pass": true
+    },
+    {
+      "label": "pos-cash-replay customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-replay supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-replay stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-replay arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-replay apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-replay inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-replay cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-replay orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-replay unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-replay creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-replay creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-replay receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-replay supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-replay expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-replay inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-replay invariant A reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-replay invariant A overall paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "pos-cash-replay individual journal groups balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-replay signed AR",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "POS cash partial return GL 1000 paise",
+      "actual": 5205,
+      "expected": 5205,
+      "pass": true
+    },
+    {
+      "label": "POS cash partial return GL 1010 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "POS cash partial return GL 1100 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "POS cash partial return GL 1110 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "POS cash partial return GL 1200 paise",
+      "actual": -2775,
+      "expected": -2775,
+      "pass": true
+    },
+    {
+      "label": "POS cash partial return GL 2000 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "POS cash partial return GL 4000 paise",
+      "actual": -6940,
+      "expected": -6940,
+      "pass": true
+    },
+    {
+      "label": "POS cash partial return GL 4100 paise",
+      "actual": 1735,
+      "expected": 1735,
+      "pass": true
+    },
+    {
+      "label": "POS cash partial return GL 5000 paise",
+      "actual": 2775,
+      "expected": 2775,
+      "pass": true
+    },
+    {
+      "label": "POS cash return quantity",
+      "actual": 37,
+      "expected": 37,
+      "pass": true
+    },
+    {
+      "label": "pos-cash-return customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-return supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-return stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-return arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-return apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-return inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-return cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-return orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-return unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-return creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-return creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-return receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-return supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-return expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-return inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-return invariant A reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-return invariant A overall paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "pos-cash-return individual journal groups balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-cash-return signed AR",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "pos-credit-before customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-before supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-before stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-before arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-before apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-before inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-before cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-before orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-before unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-before creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-before creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-before receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-before supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-before expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-before inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-before invariant A reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-before invariant A overall paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "pos-credit-before individual journal groups balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-before signed AR",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "POS credit GL 1000 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "POS credit GL 1010 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "POS credit GL 1100 paise",
+      "actual": 8675,
+      "expected": 8675,
+      "pass": true
+    },
+    {
+      "label": "POS credit GL 1110 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "POS credit GL 1200 paise",
+      "actual": -4625,
+      "expected": -4625,
+      "pass": true
+    },
+    {
+      "label": "POS credit GL 2000 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "POS credit GL 4000 paise",
+      "actual": -8675,
+      "expected": -8675,
+      "pass": true
+    },
+    {
+      "label": "POS credit GL 4100 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "POS credit GL 5000 paise",
+      "actual": 4625,
+      "expected": 4625,
+      "pass": true
+    },
+    {
+      "label": "POS credit quantity",
+      "actual": 35,
+      "expected": 35,
+      "pass": true
+    },
+    {
+      "label": "pos-credit-sale customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-sale supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-sale stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-sale arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-sale apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-sale inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-sale cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-sale orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-sale unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-sale creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-sale creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-sale receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-sale supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-sale expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-sale inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-sale invariant A reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-sale invariant A overall paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "pos-credit-sale individual journal groups balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-sale signed AR",
+      "actual": 8675,
+      "expected": 8675,
+      "pass": true
+    },
+    {
+      "label": "POS credit replay no writes",
+      "actual": "10f86ba6f60ea41d9d46795b10675ddf90661b6f49be89d445e0ef60e430768b",
+      "expected": "10f86ba6f60ea41d9d46795b10675ddf90661b6f49be89d445e0ef60e430768b",
+      "pass": true
+    },
+    {
+      "label": "POS unpaid partial return GL 1000 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "POS unpaid partial return GL 1010 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "POS unpaid partial return GL 1100 paise",
+      "actual": 5205,
+      "expected": 5205,
+      "pass": true
+    },
+    {
+      "label": "POS unpaid partial return GL 1110 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "POS unpaid partial return GL 1200 paise",
+      "actual": -2775,
+      "expected": -2775,
+      "pass": true
+    },
+    {
+      "label": "POS unpaid partial return GL 2000 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "POS unpaid partial return GL 4000 paise",
+      "actual": -8675,
+      "expected": -8675,
+      "pass": true
+    },
+    {
+      "label": "POS unpaid partial return GL 4100 paise",
+      "actual": 3470,
+      "expected": 3470,
+      "pass": true
+    },
+    {
+      "label": "POS unpaid partial return GL 5000 paise",
+      "actual": 2775,
+      "expected": 2775,
+      "pass": true
+    },
+    {
+      "label": "POS unpaid return quantity",
+      "actual": 37,
+      "expected": 37,
+      "pass": true
+    },
+    {
+      "label": "pos-credit-return customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-return supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-return stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-return arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-return apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-return inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-return cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-return orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-return unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-return creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-return creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-return receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-return supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-return expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-return inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-return invariant A reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-return invariant A overall paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "pos-credit-return individual journal groups balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-credit-return signed AR",
+      "actual": 5205,
+      "expected": 5205,
+      "pass": true
+    },
+    {
+      "label": "pos-split-before customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-split-before supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-split-before stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-split-before arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-split-before apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-split-before inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-split-before cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-split-before orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-split-before unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-split-before creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-split-before creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-split-before receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-split-before supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-split-before expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-split-before inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-split-before invariant A reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-split-before invariant A overall paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "pos-split-before individual journal groups balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-split-before signed AR",
+      "actual": 5205,
+      "expected": 5205,
+      "pass": true
+    },
+    {
+      "label": "POS split GL 1000 paise",
+      "actual": 2000,
+      "expected": 2000,
+      "pass": true
+    },
+    {
+      "label": "POS split GL 1010 paise",
+      "actual": 1500,
+      "expected": 1500,
+      "pass": true
+    },
+    {
+      "label": "POS split GL 1100 paise",
+      "actual": 1705,
+      "expected": 1705,
+      "pass": true
+    },
+    {
+      "label": "POS split GL 1110 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "POS split GL 1200 paise",
+      "actual": -2775,
+      "expected": -2775,
+      "pass": true
+    },
+    {
+      "label": "POS split GL 2000 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "POS split GL 4000 paise",
+      "actual": -5205,
+      "expected": -5205,
+      "pass": true
+    },
+    {
+      "label": "POS split GL 4100 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "POS split GL 5000 paise",
+      "actual": 2775,
+      "expected": 2775,
+      "pass": true
+    },
+    {
+      "label": "POS split quantity",
+      "actual": 37,
+      "expected": 37,
+      "pass": true
+    },
+    {
+      "label": "pos-split-sale customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-split-sale supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-split-sale stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-split-sale arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-split-sale apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-split-sale inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-split-sale cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-split-sale orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-split-sale unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-split-sale creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-split-sale creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-split-sale receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-split-sale supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-split-sale expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-split-sale inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-split-sale invariant A reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-split-sale invariant A overall paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "pos-split-sale individual journal groups balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-split-sale signed AR",
+      "actual": 6910,
+      "expected": 6910,
+      "pass": true
+    },
+    {
+      "label": "pos-zero-before customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-zero-before supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-zero-before stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-zero-before arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-zero-before apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-zero-before inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-zero-before cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-zero-before orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-zero-before unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-zero-before creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-zero-before creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-zero-before receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-zero-before supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-zero-before expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-zero-before inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-zero-before invariant A reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-zero-before invariant A overall paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "pos-zero-before individual journal groups balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-zero-before signed AR",
+      "actual": 6910,
+      "expected": 6910,
+      "pass": true
+    },
+    {
+      "label": "F073 explicit zero cash rejected",
+      "actual": false,
+      "expected": true,
+      "pass": false
+    },
+    {
+      "label": "F073 zero tender no financial mutation",
+      "actual": "ad656754d7cb0b15ca6a6cbf8a5ea467d5fb683181e2060ba2081d77a1fc1bd8",
+      "expected": "7b40d75cc7d7cb6997501fd31ad67e9ddbc6d4ba087ac5170caecf1d22057853",
+      "pass": false
+    },
+    {
+      "label": "pos-zero-after customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-zero-after supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-zero-after stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-zero-after arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-zero-after apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-zero-after inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-zero-after cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-zero-after orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-zero-after unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-zero-after creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-zero-after creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-zero-after receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-zero-after supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-zero-after expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-zero-after inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-zero-after invariant A reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-zero-after invariant A overall paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "pos-zero-after individual journal groups balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "pos-zero-after signed AR",
+      "actual": 6910,
+      "expected": 6910,
+      "pass": true
+    },
+    {
+      "label": "reservation-before customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-before supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-before stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-before arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-before apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-before inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-before cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-before orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-before unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-before creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-before creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-before receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-before supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-before expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-before inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-before invariant A reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-before invariant A overall paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "reservation-before individual journal groups balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-before signed AR",
+      "actual": 6910,
+      "expected": 6910,
+      "pass": true
+    },
+    {
+      "label": "reservation replay same record",
+      "actual": 1,
+      "expected": 1,
+      "pass": true
+    },
+    {
+      "label": "F071 reservation replay reserves once",
+      "actual": 6,
+      "expected": 3,
+      "pass": false
+    },
+    {
+      "label": "reservation-replayed customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-replayed supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-replayed stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-replayed arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-replayed apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-replayed inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-replayed cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-replayed orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-replayed unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-replayed creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-replayed creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-replayed receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-replayed supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-replayed expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-replayed inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-replayed invariant A reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-replayed invariant A overall paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "reservation-replayed individual journal groups balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-replayed signed AR",
+      "actual": 6910,
+      "expected": 6910,
+      "pass": true
+    },
+    {
+      "label": "F071 release restores all availability",
+      "actual": 7,
+      "expected": 10,
+      "pass": false
+    },
+    {
+      "label": "reservation no GL GL 1000 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "reservation no GL GL 1010 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "reservation no GL GL 1100 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "reservation no GL GL 1110 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "reservation no GL GL 1200 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "reservation no GL GL 2000 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "reservation no GL GL 4000 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "reservation no GL GL 4100 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "reservation no GL GL 5000 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "reservation physical unchanged",
+      "actual": 10,
+      "expected": 10,
+      "pass": true
+    },
+    {
+      "label": "reservation-released customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-released supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-released stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-released arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-released apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-released inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-released cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-released orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-released unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-released creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-released creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-released receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-released supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-released expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-released inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-released invariant A reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-released invariant A overall paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "reservation-released individual journal groups balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-released signed AR",
+      "actual": 6910,
+      "expected": 6910,
+      "pass": true
+    },
+    {
+      "label": "reservation-control-before customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-before supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-before stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-before arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-before apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-before inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-before cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-before orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-before unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-before creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-before creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-before receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-before supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-before expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-before inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-before invariant A reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-before invariant A overall paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "reservation-control-before individual journal groups balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-before signed AR",
+      "actual": 6910,
+      "expected": 6910,
+      "pass": true
+    },
+    {
+      "label": "single reservation available quantity",
+      "actual": 7,
+      "expected": 7,
+      "pass": true
+    },
+    {
+      "label": "reservation-control-active customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-active supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-active stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-active arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-active apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-active inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-active cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-active orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-active unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-active creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-active creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-active receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-active supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-active expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-active inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-active invariant A reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-active invariant A overall paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "reservation-control-active individual journal groups balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-active signed AR",
+      "actual": 6910,
+      "expected": 6910,
+      "pass": true
+    },
+    {
+      "label": "single release restores availability",
+      "actual": 10,
+      "expected": 10,
+      "pass": true
+    },
+    {
+      "label": "rejection atomic delete /api/inventory/reservations/2/release",
+      "actual": "aea5b0c07ec1c9fa9ca62e17e11ca910e3f970228542c5e2bb48393f11644df6",
+      "expected": "aea5b0c07ec1c9fa9ca62e17e11ca910e3f970228542c5e2bb48393f11644df6",
+      "pass": true
+    },
+    {
+      "label": "single release repeat rejected",
+      "actual": 400,
+      "expected": 400,
+      "pass": true
+    },
+    {
+      "label": "single reservation GL neutral GL 1000 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "single reservation GL neutral GL 1010 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "single reservation GL neutral GL 1100 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "single reservation GL neutral GL 1110 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "single reservation GL neutral GL 1200 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "single reservation GL neutral GL 2000 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "single reservation GL neutral GL 4000 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "single reservation GL neutral GL 4100 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "single reservation GL neutral GL 5000 paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "reservation-control-released customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-released supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-released stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-released arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-released apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-released inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-released cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-released orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-released unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-released creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-released creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-released receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-released supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-released expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-released inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-released invariant A reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-released invariant A overall paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "reservation-control-released individual journal groups balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-control-released signed AR",
+      "actual": 6910,
+      "expected": 6910,
+      "pass": true
+    },
+    {
+      "label": "reservation-noline-before customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-noline-before supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-noline-before stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-noline-before arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-noline-before apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-noline-before inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-noline-before cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-noline-before orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-noline-before unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-noline-before creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-noline-before creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-noline-before receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-noline-before supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-noline-before expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-noline-before inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-noline-before invariant A reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-noline-before invariant A overall paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "reservation-noline-before individual journal groups balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-noline-before signed AR",
+      "actual": 6910,
+      "expected": 6910,
+      "pass": true
+    },
+    {
+      "label": "rejection atomic delete /api/inventory/reservations/3/release",
+      "actual": "5ca10e9031add6f30d92381c0681567e8ae877c08dee4116c6c8f5e87a49879c",
+      "expected": "5ca10e9031add6f30d92381c0681567e8ae877c08dee4116c6c8f5e87a49879c",
+      "pass": true
+    },
+    {
+      "label": "F072 release optional-line reservation succeeds",
+      "actual": 400,
+      "expected": 200,
+      "pass": false
+    },
+    {
+      "label": "F072 reservation no longer active",
+      "actual": "ACTIVE",
+      "expected": "RELEASED",
+      "pass": false
+    },
+    {
+      "label": "reservation-noline-after customerArImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-noline-after supplierApImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-noline-after stockImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-noline-after arImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-noline-after apImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-noline-after inventoryImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-noline-after cashImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-noline-after orphanSourceBatches",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-noline-after unappliedLiabilityImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-noline-after creditSourceConsumptionImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-noline-after creditSourceBoundsImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-noline-after receiptAllocationImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-noline-after supplierAdvanceImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-noline-after expensePayableImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-noline-after inputTaxImbalances",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-noline-after invariant A reference groups",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-noline-after invariant A overall paise",
+      "actual": 0,
+      "expected": 0,
+      "pass": true
+    },
+    {
+      "label": "reservation-noline-after individual journal groups balanced",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    },
+    {
+      "label": "reservation-noline-after signed AR",
+      "actual": 6910,
+      "expected": 6910,
+      "pass": true
+    },
+    {
+      "label": "SQLite integrity",
+      "actual": [
+        {
+          "integrity_check": "ok"
+        }
+      ],
+      "expected": [
+        {
+          "integrity_check": "ok"
+        }
+      ],
+      "pass": true
+    },
+    {
+      "label": "SQLite foreign keys",
+      "actual": [],
+      "expected": [],
+      "pass": true
+    }
+  ],
+  "summary": {
+    "total": 692,
+    "pass": 685,
+    "fail": 7
+  },
+  "snapshots": [
+    "01-quotation-before.json",
+    "02-quotation-converted-no-financial-effect.json",
+    "03-sales-order-invoiced.json",
+    "04-sales-order-cancelled.json",
+    "05-sales-order-repeat-cancel.json",
+    "06-direct-order-before.json",
+    "07-direct-order-delivered.json",
+    "08-direct-order-paid.json",
+    "09-direct-order-reversed.json",
+    "10-pos-cash-before.json",
+    "11-pos-cash-sale.json",
+    "12-pos-cash-replay.json",
+    "13-pos-cash-return.json",
+    "14-pos-credit-before.json",
+    "15-pos-credit-sale.json",
+    "16-pos-credit-return.json",
+    "17-pos-split-before.json",
+    "18-pos-split-sale.json",
+    "19-pos-zero-before.json",
+    "20-pos-zero-after.json",
+    "21-reservation-before.json",
+    "22-reservation-replayed.json",
+    "23-reservation-released.json",
+    "24-reservation-control-before.json",
+    "25-reservation-control-active.json",
+    "26-reservation-control-released.json",
+    "27-reservation-noline-before.json",
+    "28-reservation-noline-after.json"
+  ]
+}

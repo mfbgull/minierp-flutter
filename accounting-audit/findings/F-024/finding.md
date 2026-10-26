@@ -2,7 +2,7 @@
 
 **Status:** CONFIRMED current mounted API, fresh fixture. **Severity:** High workflow/inventory-correction failure. **Category:** batch provenance/reversal. **Owner:** backend-controls. No fix applied.
 
-## Scenario and independent oracle
+## Scenario and independent expected accounting
 
 Purchase5 units@10 on1Sep and5 units@20 on2Sep: quantity10, value150. Complete a3Sep physical count of2. FIFO shortage8 correctly consumes5@10+3@20, leaving2@20=value40 and loss110. Recount to8 should reverse original layers, then consume2@10: remaining3@10+5@20=value130, quantity8, loss20.
 
@@ -20,6 +20,6 @@ Graph symbols completeCount/correctCount and exact source paths were inspected a
 
 `accounting-audit/evidence/backend-count-risk-run-ZBybHv/results.json`, scenario `BACKEND-COUNT-MIXED-COST-CORRECTION`, defectReproduced=true. Exact requests/responses are in api[]. `01-mixed-count-completed.json` and `02-mixed-count-corrected.json` capture full batches, stock, journal, movements and count rows before/after. Retained erp.db and `backend-count-risk-verified.log`. Full run exit0 means reproducer completed and captured the defect, not that production behavior passed.
 
-## Impact and regression
+## Impact, recommended correction and regression
 
 Any shortage spanning batches can become uncorrectable when total shortage exceeds first-batch capacity. Never relax the batch constraint to make correction succeed; that would move stock into the wrong cost layer and can corrupt valuation. Persist consumed batch allocations at completion and restore exact layers on correction, then reconsume as required. Regression must use different batch prices and assert quantity, layer values, GL inventory, loss and original-count rollback on failure. Also exercise location-enabled batches separately; that branch was not dynamically covered here.

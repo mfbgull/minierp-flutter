@@ -17,8 +17,17 @@
     }
   ],
   "entry": [
+    "accounting-audit/run-verification.cjs",
+    "accounting-audit/tests/backend-controls.cjs",
+    "accounting-audit/tests/backend-count-risk.cjs",
+    "accounting-audit/tests/backend-extension.cjs",
+    "accounting-audit/tests/backend-verify-evidence.cjs",
+    "accounting-audit/tests/oracle-lifecycle.cjs",
+    "accounting-audit/tests/payable-cash-extension.cjs",
+    "accounting-audit/tests/sales-channel-extension.cjs",
     "scripts/openspec-archive-guard.js",
     "scripts/openspec-archive-guard.test.js",
+    "server/scripts/lib/merge-fallow-coverage.cjs",
     "scripts/unapplied-cash-fixture.test.cjs",
     "docs/test-migration-order.ts",
     "docs/superpowers/verification/*.cjs",

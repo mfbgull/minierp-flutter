@@ -13,6 +13,19 @@ interface LegacyBomRow {
   updated_at: string | null;
 }
 
+function legacyBomValues(legacy: LegacyBomRow, bomNo: string, fallbackUser: number) {
+  return [
+    bomNo,
+    bomNo,
+    Number(legacy.finished_item_id) || 0,
+    Number(legacy.quantity) || 1,
+    legacy.notes ?? null,
+    legacy.is_active ?? 1,
+    Number(legacy.created_by) || fallbackUser,
+    legacy.created_at ?? null,
+    legacy.updated_at ?? null,
+  ] as const;
+}
 
 export function migrateLegacyBomHeaders(targetDb: Database.Database, tableExists: (name: string) => boolean, bomIdMap: Map<number, number>): void {
   if (!tableExists('bom')) return;
@@ -61,21 +74,7 @@ export function migrateLegacyBomHeaders(targetDb: Database.Database, tableExists
       continue;
     }
 
-    const createdBy = Number(legacy.created_by) || fallbackUser;
-    const finishedItemId = Number(legacy.finished_item_id) || 0;
-    const quantity = Number(legacy.quantity) || 1;
-    const isActive = legacy.is_active ?? 1;
-    const values = [
-      bomNo,
-      bomNo,
-      finishedItemId,
-      quantity,
-      legacy.notes ?? null,
-      isActive,
-      createdBy,
-      legacy.created_at ?? null,
-      legacy.updated_at ?? null,
-    ] as const;
+    const values = legacyBomValues(legacy, bomNo, fallbackUser);
 
     if (!idTaken.get(legacyId)) {
       insertWithId.run(legacyId, ...values);

@@ -12,5 +12,37 @@
     "log": "accounting-audit/evidence/quick.log",
     "exitCode": 1,
     "signal": null
+  },
+  {
+    "name": "flutter-analyze-final",
+    "command": [
+      "flutter",
+      "analyze"
+    ],
+    "cwd": ".",
+    "startedAt": "2026-10-25T05:04:12.580Z",
+    "log": "accounting-audit/evidence/flutter-analyze-final.log",
+    "status": "COMPLETED",
+    "pid": 1112010,
+    "endedAt": "2026-10-25T05:05:37.208Z",
+    "exitCode": 0,
+    "signal": null
+  },
+  {
+    "name": "flutter-full-resumed",
+    "command": [
+      "flutter",
+      "test",
+      "--reporter",
+      "json"
+    ],
+    "cwd": ".",
+    "startedAt": "2026-10-25T05:06:04.133Z",
+    "log": "accounting-audit/evidence/flutter-full-resumed.log",
+    "status": "COMPLETED",
+    "pid": 1114478,
+    "endedAt": "2026-10-25T05:27:57.934Z",
+    "exitCode": 0,
+    "signal": null
   }
 ]

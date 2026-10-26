@@ -1,0 +1,2596 @@
+[
+  {
+    "method": "post",
+    "url": "/api/owner-equity/capital",
+    "body": {
+      "capital_date": "2026-09-01",
+      "amount": 10000
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "success": true,
+      "message": "Owner capital recorded successfully",
+      "data": {
+        "id": 1,
+        "capital_no": "CAP-2609-00001",
+        "amount": 10000
+      }
+    },
+    "before": "504975397e92fb7b6d99c2e3b7e061a7b158a7ba3be49f38fae25ddaa548c9e4",
+    "after": "cebaf2f18c560fd425f38637d0a44c79d1f22783478ea7db246aac1569efa062"
+  },
+  {
+    "method": "post",
+    "url": "/api/inventory/items",
+    "body": {
+      "item_code": "SC-1",
+      "item_name": "Quotation lifecycle",
+      "unit_of_measure": "pcs"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "id": 1,
+      "item_code": "SC-1",
+      "item_name": "Quotation lifecycle",
+      "description": null,
+      "category": null,
+      "unit_of_measure": "pcs",
+      "current_stock": 0,
+      "reorder_level": 0,
+      "standard_cost": 0,
+      "standard_selling_price": 0,
+      "is_raw_material": 0,
+      "is_finished_good": 0,
+      "is_purchased": 1,
+      "is_manufactured": 0,
+      "is_active": 1,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:21:44",
+      "updated_at": "2026-10-25 05:21:44",
+      "has_expiry": 0,
+      "near_expiry_threshold_days": 30,
+      "sale_type": "packed",
+      "qty_decimal_precision": 0,
+      "rounding_step": null,
+      "deleted_at": null,
+      "deleted_by": null
+    },
+    "before": "cebaf2f18c560fd425f38637d0a44c79d1f22783478ea7db246aac1569efa062",
+    "after": "cebaf2f18c560fd425f38637d0a44c79d1f22783478ea7db246aac1569efa062"
+  },
+  {
+    "method": "post",
+    "url": "/api/customers",
+    "body": {
+      "customer_code": "SC-C-1",
+      "customer_name": "Quotation lifecycle",
+      "phone": "03000000000"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 1,
+        "customer_code": "CUST-1026-00001",
+        "customer_name": "Quotation lifecycle",
+        "contact_person": "",
+        "email": "",
+        "phone": "03000000000",
+        "billing_address": "",
+        "shipping_address": "",
+        "payment_terms": "",
+        "payment_terms_days": 14,
+        "credit_limit": 0,
+        "current_balance": 0,
+        "opening_balance": 0,
+        "credit_balance": 0,
+        "credit_utilization_percent": 0,
+        "is_active": 1,
+        "created_at": "2026-10-25 05:21:44",
+        "updated_at": "2026-10-25 05:21:44"
+      },
+      "message": "Customer created successfully"
+    },
+    "before": "cebaf2f18c560fd425f38637d0a44c79d1f22783478ea7db246aac1569efa062",
+    "after": "9c592b43701046ba1c848a290fca351a66e3e0b025155eea64dadd2b86edeec5"
+  },
+  {
+    "method": "post",
+    "url": "/api/suppliers",
+    "body": {
+      "supplier_code": "SC-S-1",
+      "supplier_name": "Quotation lifecycle"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 1,
+        "supplier_code": "SC-S-1",
+        "supplier_name": "Quotation lifecycle"
+      }
+    },
+    "before": "9c592b43701046ba1c848a290fca351a66e3e0b025155eea64dadd2b86edeec5",
+    "after": "a4e33ae03c5bad336933993be67094e22c7319765ab46fb79cbe2425f4570e90"
+  },
+  {
+    "method": "post",
+    "url": "/api/purchases",
+    "body": {
+      "item_id": 1,
+      "supplier_id": 1,
+      "warehouse_id": 1,
+      "quantity": 40,
+      "unit_cost": 9.25,
+      "purchase_date": "2026-09-01"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "id": 1,
+      "purchase_no": "PURCH-1026-0001",
+      "item_id": 1,
+      "warehouse_id": 1,
+      "quantity": 40,
+      "unit_cost": 9.25,
+      "total_cost": 370,
+      "supplier_name": "Quotation lifecycle",
+      "purchase_date": "2026-09-01",
+      "invoice_no": null,
+      "remarks": null,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:21:44",
+      "updated_at": "2026-10-25 05:21:44",
+      "supplier_id": 1,
+      "returned_quantity": 0,
+      "batch_id": 1,
+      "batch_no": "BATCH-1026-PUR-00001",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "input_tax_amount": 0,
+      "item_code": "SC-1",
+      "item_name": "Quotation lifecycle",
+      "unit_of_measure": "pcs",
+      "warehouse_code": "WH-001",
+      "warehouse_name": "Main Warehouse",
+      "created_by_username": "admin",
+      "paid_amount": 0,
+      "total_payable": 370,
+      "balance_amount": 370
+    },
+    "before": "a4e33ae03c5bad336933993be67094e22c7319765ab46fb79cbe2425f4570e90",
+    "after": "fb517386c1ca010bbe6f6e9d932853cfc8c9f266d56f5bc9de564a759d4873e0"
+  },
+  {
+    "method": "post",
+    "url": "/api/quotations",
+    "body": {
+      "customer_id": 1,
+      "quotation_date": "2026-10-25",
+      "warehouse_id": 1,
+      "items": [
+        {
+          "item_id": 1,
+          "quantity": 3,
+          "unit_price": 17.35
+        }
+      ]
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "id": 1,
+      "quotation_no": "QUO-1026-0001",
+      "customer_id": 1,
+      "customer_name": "Quotation lifecycle",
+      "quotation_date": "2026-10-25",
+      "expiry_date": null,
+      "status": "Draft",
+      "source_type": null,
+      "total_amount": 52.05,
+      "notes": null,
+      "terms": null,
+      "warehouse_id": 1,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:21:44",
+      "updated_at": "2026-10-25 05:21:44",
+      "warehouse_code": "WH-001",
+      "warehouse_name": "Main Warehouse",
+      "created_by_username": "admin",
+      "items": [
+        {
+          "id": 1,
+          "quotation_id": 1,
+          "item_id": 1,
+          "item_code": "SC-1",
+          "item_name": "Quotation lifecycle",
+          "quantity": 3,
+          "unit_price": 17.35,
+          "discount_type": "none",
+          "discount_value": 0,
+          "tax_rate": 0,
+          "amount": 52.05
+        }
+      ]
+    },
+    "before": "fb517386c1ca010bbe6f6e9d932853cfc8c9f266d56f5bc9de564a759d4873e0",
+    "after": "b33db44e452d4e5ff7576bcab94d28579783b960a49795b85d3c5995c53011e2"
+  },
+  {
+    "method": "put",
+    "url": "/api/quotations/1",
+    "body": {
+      "status": "Sent"
+    },
+    "headers": {},
+    "status": 200,
+    "response": {
+      "id": 1,
+      "quotation_no": "QUO-1026-0001",
+      "customer_id": 1,
+      "customer_name": "Quotation lifecycle",
+      "quotation_date": "2026-10-25",
+      "expiry_date": null,
+      "status": "Sent",
+      "source_type": null,
+      "total_amount": 52.05,
+      "notes": null,
+      "terms": null,
+      "warehouse_id": 1,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:21:44",
+      "updated_at": "2026-10-25 05:21:44",
+      "warehouse_code": "WH-001",
+      "warehouse_name": "Main Warehouse",
+      "created_by_username": "admin",
+      "items": [
+        {
+          "id": 1,
+          "quotation_id": 1,
+          "item_id": 1,
+          "item_code": "SC-1",
+          "item_name": "Quotation lifecycle",
+          "quantity": 3,
+          "unit_price": 17.35,
+          "discount_type": "none",
+          "discount_value": 0,
+          "tax_rate": 0,
+          "amount": 52.05
+        }
+      ]
+    },
+    "before": "b33db44e452d4e5ff7576bcab94d28579783b960a49795b85d3c5995c53011e2",
+    "after": "6cd7921780aa83fbb854cab04ba6250cedf897917bc8b1bcdc221dd7b1c136d4"
+  },
+  {
+    "method": "put",
+    "url": "/api/quotations/1",
+    "body": {
+      "status": "Accepted"
+    },
+    "headers": {},
+    "status": 200,
+    "response": {
+      "id": 1,
+      "quotation_no": "QUO-1026-0001",
+      "customer_id": 1,
+      "customer_name": "Quotation lifecycle",
+      "quotation_date": "2026-10-25",
+      "expiry_date": null,
+      "status": "Accepted",
+      "source_type": null,
+      "total_amount": 52.05,
+      "notes": null,
+      "terms": null,
+      "warehouse_id": 1,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:21:44",
+      "updated_at": "2026-10-25 05:21:44",
+      "warehouse_code": "WH-001",
+      "warehouse_name": "Main Warehouse",
+      "created_by_username": "admin",
+      "items": [
+        {
+          "id": 1,
+          "quotation_id": 1,
+          "item_id": 1,
+          "item_code": "SC-1",
+          "item_name": "Quotation lifecycle",
+          "quantity": 3,
+          "unit_price": 17.35,
+          "discount_type": "none",
+          "discount_value": 0,
+          "tax_rate": 0,
+          "amount": 52.05
+        }
+      ]
+    },
+    "before": "6cd7921780aa83fbb854cab04ba6250cedf897917bc8b1bcdc221dd7b1c136d4",
+    "after": "d555850373684142a417091b261ffa1bf37ef6b604dd69710bcbab76f6524907"
+  },
+  {
+    "method": "post",
+    "url": "/api/quotations/1/convert",
+    "body": {},
+    "headers": {},
+    "status": 201,
+    "response": {
+      "success": true,
+      "message": "Quotation converted to sales order",
+      "salesOrderId": 1,
+      "salesOrderNo": "SO-1026-0001"
+    },
+    "before": "d555850373684142a417091b261ffa1bf37ef6b604dd69710bcbab76f6524907",
+    "after": "b3aa3ffd5b7447459c59009dcb15ecd27c665ed0083aac2595e026bbf226972e"
+  },
+  {
+    "method": "get",
+    "url": "/api/sales-orders/1",
+    "headers": {},
+    "status": 200,
+    "response": {
+      "id": 1,
+      "so_no": "SO-1026-0001",
+      "customer_id": 1,
+      "so_date": "2026-10-25",
+      "delivery_date": null,
+      "status": "Confirmed",
+      "total_amount": 52.05,
+      "notes": null,
+      "warehouse_id": 1,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:21:44",
+      "updated_at": "2026-10-25 05:21:44",
+      "source_type": "QUOTATION",
+      "source_id": 1,
+      "customer_name": "Quotation lifecycle",
+      "warehouse_code": "WH-001",
+      "warehouse_name": "Main Warehouse",
+      "created_by_username": "admin",
+      "quotation_no": "QUO-1026-0001",
+      "items": [
+        {
+          "id": 1,
+          "so_id": 1,
+          "item_id": 1,
+          "item_code": "SC-1",
+          "item_name": "Quotation lifecycle",
+          "quantity": 3,
+          "delivered_quantity": 0,
+          "unit_price": 17.35,
+          "amount": 52.05
+        }
+      ]
+    },
+    "before": "b3aa3ffd5b7447459c59009dcb15ecd27c665ed0083aac2595e026bbf226972e",
+    "after": "b3aa3ffd5b7447459c59009dcb15ecd27c665ed0083aac2595e026bbf226972e"
+  },
+  {
+    "method": "post",
+    "url": "/api/quotations/1/convert",
+    "body": {},
+    "headers": {},
+    "status": 400,
+    "response": {
+      "error": "Quotation already converted to sales order"
+    },
+    "before": "b3aa3ffd5b7447459c59009dcb15ecd27c665ed0083aac2595e026bbf226972e",
+    "after": "b3aa3ffd5b7447459c59009dcb15ecd27c665ed0083aac2595e026bbf226972e"
+  },
+  {
+    "method": "post",
+    "url": "/api/sales-orders/1/convert",
+    "body": {
+      "invoice_date": "2026-10-25"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "success": true,
+      "message": "Sales order converted to invoice",
+      "invoiceId": 1,
+      "invoiceNo": "INV-1026-00001"
+    },
+    "before": "b3aa3ffd5b7447459c59009dcb15ecd27c665ed0083aac2595e026bbf226972e",
+    "after": "0f897065ba8bdae4330b2143a8541c5caa3f94bda4492ef800f9302c10989665"
+  },
+  {
+    "method": "post",
+    "url": "/api/sales-orders/1/cancel",
+    "body": {},
+    "headers": {},
+    "status": 200,
+    "response": {
+      "success": true,
+      "message": "Sales order cancelled successfully",
+      "invoiceId": 1,
+      "invoiceNo": "INV-1026-00001"
+    },
+    "before": "0f897065ba8bdae4330b2143a8541c5caa3f94bda4492ef800f9302c10989665",
+    "after": "5a4976e88c27bffbce17d09a82445616f1d2888f9fd58e6ba0f6b989aa52e8a0"
+  },
+  {
+    "method": "post",
+    "url": "/api/sales-orders/1/cancel",
+    "body": {},
+    "headers": {},
+    "status": 500,
+    "response": {
+      "error": "Sales order is already cancelled"
+    },
+    "before": "5a4976e88c27bffbce17d09a82445616f1d2888f9fd58e6ba0f6b989aa52e8a0",
+    "after": "5a4976e88c27bffbce17d09a82445616f1d2888f9fd58e6ba0f6b989aa52e8a0"
+  },
+  {
+    "method": "post",
+    "url": "/api/inventory/items",
+    "body": {
+      "item_code": "SC-2",
+      "item_name": "Direct order",
+      "unit_of_measure": "pcs"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "id": 2,
+      "item_code": "SC-2",
+      "item_name": "Direct order",
+      "description": null,
+      "category": null,
+      "unit_of_measure": "pcs",
+      "current_stock": 0,
+      "reorder_level": 0,
+      "standard_cost": 0,
+      "standard_selling_price": 0,
+      "is_raw_material": 0,
+      "is_finished_good": 0,
+      "is_purchased": 1,
+      "is_manufactured": 0,
+      "is_active": 1,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:21:44",
+      "updated_at": "2026-10-25 05:21:44",
+      "has_expiry": 0,
+      "near_expiry_threshold_days": 30,
+      "sale_type": "packed",
+      "qty_decimal_precision": 0,
+      "rounding_step": null,
+      "deleted_at": null,
+      "deleted_by": null
+    },
+    "before": "5a4976e88c27bffbce17d09a82445616f1d2888f9fd58e6ba0f6b989aa52e8a0",
+    "after": "5a4976e88c27bffbce17d09a82445616f1d2888f9fd58e6ba0f6b989aa52e8a0"
+  },
+  {
+    "method": "post",
+    "url": "/api/customers",
+    "body": {
+      "customer_code": "SC-C-2",
+      "customer_name": "Direct order",
+      "phone": "03000000000"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 2,
+        "customer_code": "CUST-1026-00002",
+        "customer_name": "Direct order",
+        "contact_person": "",
+        "email": "",
+        "phone": "03000000000",
+        "billing_address": "",
+        "shipping_address": "",
+        "payment_terms": "",
+        "payment_terms_days": 14,
+        "credit_limit": 0,
+        "current_balance": 0,
+        "opening_balance": 0,
+        "credit_balance": 0,
+        "credit_utilization_percent": 0,
+        "is_active": 1,
+        "created_at": "2026-10-25 05:21:44",
+        "updated_at": "2026-10-25 05:21:44"
+      },
+      "message": "Customer created successfully"
+    },
+    "before": "5a4976e88c27bffbce17d09a82445616f1d2888f9fd58e6ba0f6b989aa52e8a0",
+    "after": "522b10f28a5e754393258282b6b21f8238b6cffac13dfc380198e91799c0d2cc"
+  },
+  {
+    "method": "post",
+    "url": "/api/suppliers",
+    "body": {
+      "supplier_code": "SC-S-2",
+      "supplier_name": "Direct order"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 2,
+        "supplier_code": "SC-S-2",
+        "supplier_name": "Direct order"
+      }
+    },
+    "before": "522b10f28a5e754393258282b6b21f8238b6cffac13dfc380198e91799c0d2cc",
+    "after": "3742e214f0db0ee76cf766e345d916065e00e2832596094ddd2f37b189af5a21"
+  },
+  {
+    "method": "post",
+    "url": "/api/purchases",
+    "body": {
+      "item_id": 2,
+      "supplier_id": 2,
+      "warehouse_id": 1,
+      "quantity": 40,
+      "unit_cost": 9.25,
+      "purchase_date": "2026-09-01"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "id": 2,
+      "purchase_no": "PURCH-1026-0002",
+      "item_id": 2,
+      "warehouse_id": 1,
+      "quantity": 40,
+      "unit_cost": 9.25,
+      "total_cost": 370,
+      "supplier_name": "Direct order",
+      "purchase_date": "2026-09-01",
+      "invoice_no": null,
+      "remarks": null,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:21:44",
+      "updated_at": "2026-10-25 05:21:44",
+      "supplier_id": 2,
+      "returned_quantity": 0,
+      "batch_id": 2,
+      "batch_no": "BATCH-1026-PUR-00002",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "input_tax_amount": 0,
+      "item_code": "SC-2",
+      "item_name": "Direct order",
+      "unit_of_measure": "pcs",
+      "warehouse_code": "WH-001",
+      "warehouse_name": "Main Warehouse",
+      "created_by_username": "admin",
+      "paid_amount": 0,
+      "total_payable": 370,
+      "balance_amount": 370
+    },
+    "before": "3742e214f0db0ee76cf766e345d916065e00e2832596094ddd2f37b189af5a21",
+    "after": "725ad4bf2c6672ac2d9fc8c75edae04b12ba4e8073ce65796239a41c0e17b94b"
+  },
+  {
+    "method": "post",
+    "url": "/api/sales-orders",
+    "body": {
+      "customer_id": 2,
+      "so_date": "2026-10-25",
+      "warehouse_id": 1,
+      "items": [
+        {
+          "item_id": 2,
+          "quantity": 2,
+          "unit_price": 17.35
+        }
+      ]
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "id": 2,
+      "so_no": "SO-1026-0002",
+      "customer_id": 2,
+      "so_date": "2026-10-25",
+      "delivery_date": null,
+      "status": "Draft",
+      "total_amount": 34.7,
+      "notes": null,
+      "warehouse_id": 1,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:21:44",
+      "updated_at": "2026-10-25 05:21:44",
+      "source_type": "DIRECT",
+      "source_id": null,
+      "customer_name": "Direct order",
+      "warehouse_code": "WH-001",
+      "warehouse_name": "Main Warehouse",
+      "created_by_username": "admin",
+      "quotation_no": null,
+      "items": [
+        {
+          "id": 2,
+          "so_id": 2,
+          "item_id": 2,
+          "item_code": "SC-2",
+          "item_name": "Direct order",
+          "quantity": 2,
+          "delivered_quantity": 0,
+          "unit_price": 17.35,
+          "amount": 34.7
+        }
+      ]
+    },
+    "before": "725ad4bf2c6672ac2d9fc8c75edae04b12ba4e8073ce65796239a41c0e17b94b",
+    "after": "e8a59f406e0449f267776a27cde3ac6ade3a68e6b8cf6ac5da72e5ce70184e46"
+  },
+  {
+    "method": "put",
+    "url": "/api/sales-orders/2",
+    "body": {
+      "status": "Confirmed"
+    },
+    "headers": {},
+    "status": 200,
+    "response": {
+      "id": 2,
+      "so_no": "SO-1026-0002",
+      "customer_id": 2,
+      "so_date": "2026-10-25",
+      "delivery_date": null,
+      "status": "Confirmed",
+      "total_amount": 34.7,
+      "notes": null,
+      "warehouse_id": 1,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:21:44",
+      "updated_at": "2026-10-25 05:21:44",
+      "source_type": "DIRECT",
+      "source_id": null,
+      "customer_name": "Direct order",
+      "warehouse_code": "WH-001",
+      "warehouse_name": "Main Warehouse",
+      "created_by_username": "admin",
+      "quotation_no": null,
+      "items": [
+        {
+          "id": 2,
+          "so_id": 2,
+          "item_id": 2,
+          "item_code": "SC-2",
+          "item_name": "Direct order",
+          "quantity": 2,
+          "delivered_quantity": 0,
+          "unit_price": 17.35,
+          "amount": 34.7
+        }
+      ]
+    },
+    "before": "e8a59f406e0449f267776a27cde3ac6ade3a68e6b8cf6ac5da72e5ce70184e46",
+    "after": "47c1e3125f22cf83cdff319b72e072bbabaec7f8722695b838593e79836c0afa"
+  },
+  {
+    "method": "put",
+    "url": "/api/sales-orders/2",
+    "body": {
+      "status": "Delivered"
+    },
+    "headers": {},
+    "status": 200,
+    "response": {
+      "id": 2,
+      "so_no": "SO-1026-0002",
+      "customer_id": 2,
+      "so_date": "2026-10-25",
+      "delivery_date": null,
+      "status": "Delivered",
+      "total_amount": 34.7,
+      "notes": null,
+      "warehouse_id": 1,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:21:44",
+      "updated_at": "2026-10-25 05:21:44",
+      "source_type": "DIRECT",
+      "source_id": null,
+      "customer_name": "Direct order",
+      "warehouse_code": "WH-001",
+      "warehouse_name": "Main Warehouse",
+      "created_by_username": "admin",
+      "quotation_no": null,
+      "items": [
+        {
+          "id": 2,
+          "so_id": 2,
+          "item_id": 2,
+          "item_code": "SC-2",
+          "item_name": "Direct order",
+          "quantity": 2,
+          "delivered_quantity": 0,
+          "unit_price": 17.35,
+          "amount": 34.7
+        }
+      ]
+    },
+    "before": "47c1e3125f22cf83cdff319b72e072bbabaec7f8722695b838593e79836c0afa",
+    "after": "370f432005136500e81574ece8d16cfc40bf408f8874e9f9a3ca88b9409229f0"
+  },
+  {
+    "method": "post",
+    "url": "/api/sales-orders/2/convert",
+    "body": {
+      "invoice_date": "2026-10-25"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "success": true,
+      "message": "Sales order converted to invoice",
+      "invoiceId": 2,
+      "invoiceNo": "INV-1026-00002"
+    },
+    "before": "370f432005136500e81574ece8d16cfc40bf408f8874e9f9a3ca88b9409229f0",
+    "after": "47e3c05e65093f433eed1ffd38cae09767f96bd3aac5f8973f98277e6cb6adad"
+  },
+  {
+    "method": "post",
+    "url": "/api/payments",
+    "body": {
+      "customer_id": 2,
+      "payment_date": "2026-10-25",
+      "amount": 34.7,
+      "payment_method": "cash",
+      "invoice_allocations": [
+        {
+          "invoice_id": 2,
+          "amount": 34.7
+        }
+      ]
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 1,
+        "payment_no": "PAY-1026-00001",
+        "customer_id": 2,
+        "customer_name": "Direct order",
+        "supplier_id": null,
+        "invoice_id": null,
+        "invoice_no": null,
+        "payment_date": "2026-10-25",
+        "amount": 34.7,
+        "payment_method": "cash",
+        "reference_no": "",
+        "notes": "",
+        "created_at": "2026-10-25 05:21:44",
+        "voided_at": null,
+        "payment_kind": "RECEIPT",
+        "allocated_invoices": "2",
+        "allocation_amounts": "34.7",
+        "allocation_ids": "1",
+        "allocations": [
+          {
+            "id": 1,
+            "payment_id": 1,
+            "invoice_id": 2,
+            "invoice_no": "INV-1026-00002",
+            "amount": 34.7
+          }
+        ]
+      }
+    },
+    "before": "47e3c05e65093f433eed1ffd38cae09767f96bd3aac5f8973f98277e6cb6adad",
+    "after": "7e3823d8eab0cf7ccdcd8fd9734af2af95f733838728488320029a0525f420a8"
+  },
+  {
+    "method": "post",
+    "url": "/api/sales-orders/2/cancel",
+    "body": {},
+    "headers": {},
+    "status": 409,
+    "response": {
+      "error": "Cannot cancel invoice INV-1026-00002 with recorded payments (34.70). Reverse or delete the payments first."
+    },
+    "before": "7e3823d8eab0cf7ccdcd8fd9734af2af95f733838728488320029a0525f420a8",
+    "after": "7e3823d8eab0cf7ccdcd8fd9734af2af95f733838728488320029a0525f420a8"
+  },
+  {
+    "method": "delete",
+    "url": "/api/payments/1",
+    "headers": {},
+    "status": 200,
+    "response": {
+      "success": true,
+      "message": "Payment voided successfully"
+    },
+    "before": "7e3823d8eab0cf7ccdcd8fd9734af2af95f733838728488320029a0525f420a8",
+    "after": "a79eaddace0643eede68b89842c13d47a4ba791d4969bdae524c01521ac9a12a"
+  },
+  {
+    "method": "post",
+    "url": "/api/sales-orders/2/cancel",
+    "body": {},
+    "headers": {},
+    "status": 200,
+    "response": {
+      "success": true,
+      "message": "Sales order cancelled successfully",
+      "invoiceId": 2,
+      "invoiceNo": "INV-1026-00002"
+    },
+    "before": "a79eaddace0643eede68b89842c13d47a4ba791d4969bdae524c01521ac9a12a",
+    "after": "fdef92c9bcb47efad85f1de9927a4e3f595c83e5c139fb06c64a3eea9a105fba"
+  },
+  {
+    "method": "post",
+    "url": "/api/inventory/items",
+    "body": {
+      "item_code": "SC-3",
+      "item_name": "POS walkin",
+      "unit_of_measure": "pcs"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "id": 3,
+      "item_code": "SC-3",
+      "item_name": "POS walkin",
+      "description": null,
+      "category": null,
+      "unit_of_measure": "pcs",
+      "current_stock": 0,
+      "reorder_level": 0,
+      "standard_cost": 0,
+      "standard_selling_price": 0,
+      "is_raw_material": 0,
+      "is_finished_good": 0,
+      "is_purchased": 1,
+      "is_manufactured": 0,
+      "is_active": 1,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:21:44",
+      "updated_at": "2026-10-25 05:21:44",
+      "has_expiry": 0,
+      "near_expiry_threshold_days": 30,
+      "sale_type": "packed",
+      "qty_decimal_precision": 0,
+      "rounding_step": null,
+      "deleted_at": null,
+      "deleted_by": null
+    },
+    "before": "fdef92c9bcb47efad85f1de9927a4e3f595c83e5c139fb06c64a3eea9a105fba",
+    "after": "fdef92c9bcb47efad85f1de9927a4e3f595c83e5c139fb06c64a3eea9a105fba"
+  },
+  {
+    "method": "post",
+    "url": "/api/customers",
+    "body": {
+      "customer_code": "SC-C-3",
+      "customer_name": "POS walkin",
+      "phone": "03000000000"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 3,
+        "customer_code": "CUST-1026-00003",
+        "customer_name": "POS walkin",
+        "contact_person": "",
+        "email": "",
+        "phone": "03000000000",
+        "billing_address": "",
+        "shipping_address": "",
+        "payment_terms": "",
+        "payment_terms_days": 14,
+        "credit_limit": 0,
+        "current_balance": 0,
+        "opening_balance": 0,
+        "credit_balance": 0,
+        "credit_utilization_percent": 0,
+        "is_active": 1,
+        "created_at": "2026-10-25 05:21:44",
+        "updated_at": "2026-10-25 05:21:44"
+      },
+      "message": "Customer created successfully"
+    },
+    "before": "fdef92c9bcb47efad85f1de9927a4e3f595c83e5c139fb06c64a3eea9a105fba",
+    "after": "3571293a2d149215009496fe5a0451f9735c26067103bdc88cbf8e134caa1fe2"
+  },
+  {
+    "method": "post",
+    "url": "/api/suppliers",
+    "body": {
+      "supplier_code": "SC-S-3",
+      "supplier_name": "POS walkin"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 3,
+        "supplier_code": "SC-S-3",
+        "supplier_name": "POS walkin"
+      }
+    },
+    "before": "3571293a2d149215009496fe5a0451f9735c26067103bdc88cbf8e134caa1fe2",
+    "after": "864556cf7e3bb8ab5e681d208e87d726e3dde7cf6901c122fb9b03ad080a5e45"
+  },
+  {
+    "method": "post",
+    "url": "/api/purchases",
+    "body": {
+      "item_id": 3,
+      "supplier_id": 3,
+      "warehouse_id": 1,
+      "quantity": 40,
+      "unit_cost": 9.25,
+      "purchase_date": "2026-09-01"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "id": 3,
+      "purchase_no": "PURCH-1026-0003",
+      "item_id": 3,
+      "warehouse_id": 1,
+      "quantity": 40,
+      "unit_cost": 9.25,
+      "total_cost": 370,
+      "supplier_name": "POS walkin",
+      "purchase_date": "2026-09-01",
+      "invoice_no": null,
+      "remarks": null,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:21:44",
+      "updated_at": "2026-10-25 05:21:44",
+      "supplier_id": 3,
+      "returned_quantity": 0,
+      "batch_id": 3,
+      "batch_no": "BATCH-1026-PUR-00003",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "input_tax_amount": 0,
+      "item_code": "SC-3",
+      "item_name": "POS walkin",
+      "unit_of_measure": "pcs",
+      "warehouse_code": "WH-001",
+      "warehouse_name": "Main Warehouse",
+      "created_by_username": "admin",
+      "paid_amount": 0,
+      "total_payable": 370,
+      "balance_amount": 370
+    },
+    "before": "864556cf7e3bb8ab5e681d208e87d726e3dde7cf6901c122fb9b03ad080a5e45",
+    "after": "10a721c951db424268036d6469a2c3ecfeae8e61bd819b904d38a666ac4ed36b"
+  },
+  {
+    "method": "post",
+    "url": "/api/pos/sale",
+    "body": {
+      "warehouse_id": 1,
+      "sale_date": "2026-10-25",
+      "items": [
+        {
+          "item_id": 3,
+          "quantity": 4,
+          "unit_price": 17.35
+        }
+      ],
+      "cash_received": 100
+    },
+    "headers": {
+      "Idempotency-Key": "SC-walkin-cash"
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "message": "POS sale completed successfully",
+      "data": {
+        "transaction_no": "INV-1026-00003",
+        "sale_date": "2026-10-25",
+        "warehouse_id": 1,
+        "warehouse_name": "Main Warehouse",
+        "customer_name": "Walk-in Customer",
+        "items": [
+          {
+            "sale_id": 3,
+            "sale_no": "INV-1026-00003",
+            "item_id": 3,
+            "item_code": "SC-3",
+            "item_name": "POS walkin",
+            "unit_of_measure": "pcs",
+            "quantity": 4,
+            "unit_price": 17.35,
+            "line_total": 69.4
+          }
+        ],
+        "discount_scope": "invoice",
+        "discount_type": "percentage",
+        "discount_value": 0,
+        "payments": [
+          {
+            "payment_method": "Cash",
+            "amount": 69.4
+          }
+        ],
+        "subtotal": 69.4,
+        "total": 69.4,
+        "cash_received": 100,
+        "change": 30.599999999999994,
+        "items_count": 1,
+        "sale_ids": [
+          3
+        ]
+      }
+    },
+    "before": "10a721c951db424268036d6469a2c3ecfeae8e61bd819b904d38a666ac4ed36b",
+    "after": "d5a5b3201349dbca84d852e9fc6e95c5b5a9b3941d398467230cf59f89108129"
+  },
+  {
+    "method": "post",
+    "url": "/api/pos/sale",
+    "body": {
+      "warehouse_id": 1,
+      "sale_date": "2026-10-25",
+      "items": [
+        {
+          "item_id": 3,
+          "quantity": 4,
+          "unit_price": 17.35
+        }
+      ],
+      "cash_received": 100
+    },
+    "headers": {
+      "Idempotency-Key": "SC-walkin-cash"
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "message": "POS sale completed successfully",
+      "data": {
+        "transaction_no": "INV-1026-00003",
+        "sale_date": "2026-10-25",
+        "warehouse_id": 1,
+        "warehouse_name": "Main Warehouse",
+        "customer_name": "Walk-in Customer",
+        "items": [
+          {
+            "sale_id": 3,
+            "sale_no": "INV-1026-00003",
+            "item_id": 3,
+            "item_code": "SC-3",
+            "item_name": "POS walkin",
+            "unit_of_measure": "pcs",
+            "quantity": 4,
+            "unit_price": 17.35,
+            "line_total": 69.4
+          }
+        ],
+        "discount_scope": "invoice",
+        "discount_type": "percentage",
+        "discount_value": 0,
+        "payments": [
+          {
+            "payment_method": "Cash",
+            "amount": 69.4
+          }
+        ],
+        "subtotal": 69.4,
+        "total": 69.4,
+        "cash_received": 100,
+        "change": 30.599999999999994,
+        "items_count": 1,
+        "sale_ids": [
+          3
+        ]
+      }
+    },
+    "replayed": "true",
+    "before": "d5a5b3201349dbca84d852e9fc6e95c5b5a9b3941d398467230cf59f89108129",
+    "after": "d5a5b3201349dbca84d852e9fc6e95c5b5a9b3941d398467230cf59f89108129"
+  },
+  {
+    "method": "post",
+    "url": "/api/pos/sale",
+    "body": {
+      "warehouse_id": 1,
+      "sale_date": "2026-10-25",
+      "items": [
+        {
+          "item_id": 3,
+          "quantity": 4,
+          "unit_price": 17.35
+        }
+      ],
+      "cash_received": 101
+    },
+    "headers": {
+      "Idempotency-Key": "SC-walkin-cash"
+    },
+    "status": 409,
+    "response": {
+      "error": "Idempotency-Key was already used with a different request payload"
+    },
+    "before": "d5a5b3201349dbca84d852e9fc6e95c5b5a9b3941d398467230cf59f89108129",
+    "after": "d5a5b3201349dbca84d852e9fc6e95c5b5a9b3941d398467230cf59f89108129"
+  },
+  {
+    "method": "post",
+    "url": "/api/invoices/3/return",
+    "body": {
+      "return_date": "2026-10-25",
+      "items": [
+        {
+          "invoice_item_id": 3,
+          "return_quantity": 1
+        }
+      ],
+      "settlements": [
+        {
+          "type": "refund",
+          "amount": 17.35,
+          "method": "Cash"
+        }
+      ]
+    },
+    "headers": {
+      "Idempotency-Key": "SC-return-3"
+    },
+    "status": 200,
+    "response": {
+      "success": true,
+      "message": "Return processed successfully",
+      "data": {
+        "returnId": 1,
+        "returnNo": "RET-1026-00001",
+        "status": "Settled",
+        "returnedAmount": 17.35,
+        "feeAmount": 0,
+        "netAmount": 17.35,
+        "settledAmount": 17.35,
+        "settlements": [
+          {
+            "id": 1,
+            "return_id": 1,
+            "settlement_no": "PAY-1026-00003",
+            "type": "refund",
+            "amount": 17.35,
+            "method": "Cash",
+            "reference": "PAY-1026-00003",
+            "target_invoice_id": null,
+            "payment_id": 3,
+            "settled_date": "2026-10-25",
+            "created_by": 1,
+            "created_at": "2026-10-25 05:21:45",
+            "voided_at": null,
+            "voided_by": null
+          }
+        ],
+        "position": {
+          "originalTotal": 69.4,
+          "totalReturned": 17.35,
+          "currentInvoiceValue": 52.05,
+          "totalPaid": 69.4,
+          "totalFees": 0,
+          "netPosition": 17.35,
+          "refundCreditDue": 17.35,
+          "totalSettled": 17.35,
+          "remainingRefundDue": 0,
+          "balanceDue": 0,
+          "remainingSettlementCapacity": 0,
+          "settledAmount": 17.35
+        },
+        "returnAmount": 17.35,
+        "deduction": 0,
+        "netReturn": 17.35,
+        "refundAmount": 17.35,
+        "retainedCredit": 0,
+        "totalItems": 1,
+        "returnedItems": [
+          {
+            "invoice_item_id": 3,
+            "item_id": 3,
+            "quantity": 1
+          }
+        ]
+      }
+    },
+    "before": "d5a5b3201349dbca84d852e9fc6e95c5b5a9b3941d398467230cf59f89108129",
+    "after": "400e95885dcdbb7ffb69e5e2f33036c490d97bbb72a02ff634da97b9c8a212fc"
+  },
+  {
+    "method": "post",
+    "url": "/api/inventory/items",
+    "body": {
+      "item_code": "SC-4",
+      "item_name": "POS credit",
+      "unit_of_measure": "pcs"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "id": 4,
+      "item_code": "SC-4",
+      "item_name": "POS credit",
+      "description": null,
+      "category": null,
+      "unit_of_measure": "pcs",
+      "current_stock": 0,
+      "reorder_level": 0,
+      "standard_cost": 0,
+      "standard_selling_price": 0,
+      "is_raw_material": 0,
+      "is_finished_good": 0,
+      "is_purchased": 1,
+      "is_manufactured": 0,
+      "is_active": 1,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:21:45",
+      "updated_at": "2026-10-25 05:21:45",
+      "has_expiry": 0,
+      "near_expiry_threshold_days": 30,
+      "sale_type": "packed",
+      "qty_decimal_precision": 0,
+      "rounding_step": null,
+      "deleted_at": null,
+      "deleted_by": null
+    },
+    "before": "400e95885dcdbb7ffb69e5e2f33036c490d97bbb72a02ff634da97b9c8a212fc",
+    "after": "400e95885dcdbb7ffb69e5e2f33036c490d97bbb72a02ff634da97b9c8a212fc"
+  },
+  {
+    "method": "post",
+    "url": "/api/customers",
+    "body": {
+      "customer_code": "SC-C-4",
+      "customer_name": "POS credit",
+      "phone": "03000000000"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 5,
+        "customer_code": "CUST-1026-00004",
+        "customer_name": "POS credit",
+        "contact_person": "",
+        "email": "",
+        "phone": "03000000000",
+        "billing_address": "",
+        "shipping_address": "",
+        "payment_terms": "",
+        "payment_terms_days": 14,
+        "credit_limit": 0,
+        "current_balance": 0,
+        "opening_balance": 0,
+        "credit_balance": 0,
+        "credit_utilization_percent": 0,
+        "is_active": 1,
+        "created_at": "2026-10-25 05:21:45",
+        "updated_at": "2026-10-25 05:21:45"
+      },
+      "message": "Customer created successfully"
+    },
+    "before": "400e95885dcdbb7ffb69e5e2f33036c490d97bbb72a02ff634da97b9c8a212fc",
+    "after": "f3056feeb8d3d3ceb3a282e39348eca848a54d4523006af7792b250d00756948"
+  },
+  {
+    "method": "post",
+    "url": "/api/suppliers",
+    "body": {
+      "supplier_code": "SC-S-4",
+      "supplier_name": "POS credit"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 4,
+        "supplier_code": "SC-S-4",
+        "supplier_name": "POS credit"
+      }
+    },
+    "before": "f3056feeb8d3d3ceb3a282e39348eca848a54d4523006af7792b250d00756948",
+    "after": "17a56f85941c9407bbe8ad338bf7f02abfcf4eec11475090c6f931ac2252361e"
+  },
+  {
+    "method": "post",
+    "url": "/api/purchases",
+    "body": {
+      "item_id": 4,
+      "supplier_id": 4,
+      "warehouse_id": 1,
+      "quantity": 40,
+      "unit_cost": 9.25,
+      "purchase_date": "2026-09-01"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "id": 4,
+      "purchase_no": "PURCH-1026-0004",
+      "item_id": 4,
+      "warehouse_id": 1,
+      "quantity": 40,
+      "unit_cost": 9.25,
+      "total_cost": 370,
+      "supplier_name": "POS credit",
+      "purchase_date": "2026-09-01",
+      "invoice_no": null,
+      "remarks": null,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:21:45",
+      "updated_at": "2026-10-25 05:21:45",
+      "supplier_id": 4,
+      "returned_quantity": 0,
+      "batch_id": 4,
+      "batch_no": "BATCH-1026-PUR-00004",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "input_tax_amount": 0,
+      "item_code": "SC-4",
+      "item_name": "POS credit",
+      "unit_of_measure": "pcs",
+      "warehouse_code": "WH-001",
+      "warehouse_name": "Main Warehouse",
+      "created_by_username": "admin",
+      "paid_amount": 0,
+      "total_payable": 370,
+      "balance_amount": 370
+    },
+    "before": "17a56f85941c9407bbe8ad338bf7f02abfcf4eec11475090c6f931ac2252361e",
+    "after": "839e916108bddb501a612de83f676e7495974fddd7325d55e3b7ee874e9767f5"
+  },
+  {
+    "method": "post",
+    "url": "/api/pos/sale",
+    "body": {
+      "customer_id": 5,
+      "warehouse_id": 1,
+      "sale_date": "2026-10-25",
+      "items": [
+        {
+          "item_id": 4,
+          "quantity": 5,
+          "unit_price": 17.35
+        }
+      ],
+      "payments": []
+    },
+    "headers": {
+      "Idempotency-Key": "SC-credit"
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "message": "POS sale completed successfully",
+      "data": {
+        "transaction_no": "INV-1026-00004",
+        "sale_date": "2026-10-25",
+        "warehouse_id": 1,
+        "warehouse_name": "Main Warehouse",
+        "customer_id": 5,
+        "customer_name": "Walk-in Customer",
+        "items": [
+          {
+            "sale_id": 4,
+            "sale_no": "INV-1026-00004",
+            "item_id": 4,
+            "item_code": "SC-4",
+            "item_name": "POS credit",
+            "unit_of_measure": "pcs",
+            "quantity": 5,
+            "unit_price": 17.35,
+            "line_total": 86.75
+          }
+        ],
+        "discount_scope": "invoice",
+        "discount_type": "percentage",
+        "discount_value": 0,
+        "payments": [],
+        "subtotal": 86.75,
+        "total": 86.75,
+        "cash_received": 0,
+        "change": 0,
+        "items_count": 1,
+        "sale_ids": [
+          4
+        ]
+      }
+    },
+    "before": "839e916108bddb501a612de83f676e7495974fddd7325d55e3b7ee874e9767f5",
+    "after": "10f86ba6f60ea41d9d46795b10675ddf90661b6f49be89d445e0ef60e430768b"
+  },
+  {
+    "method": "post",
+    "url": "/api/pos/sale",
+    "body": {
+      "customer_id": 5,
+      "warehouse_id": 1,
+      "sale_date": "2026-10-25",
+      "items": [
+        {
+          "item_id": 4,
+          "quantity": 5,
+          "unit_price": 17.35
+        }
+      ],
+      "payments": []
+    },
+    "headers": {
+      "Idempotency-Key": "SC-credit"
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "message": "POS sale completed successfully",
+      "data": {
+        "transaction_no": "INV-1026-00004",
+        "sale_date": "2026-10-25",
+        "warehouse_id": 1,
+        "warehouse_name": "Main Warehouse",
+        "customer_id": 5,
+        "customer_name": "Walk-in Customer",
+        "items": [
+          {
+            "sale_id": 4,
+            "sale_no": "INV-1026-00004",
+            "item_id": 4,
+            "item_code": "SC-4",
+            "item_name": "POS credit",
+            "unit_of_measure": "pcs",
+            "quantity": 5,
+            "unit_price": 17.35,
+            "line_total": 86.75
+          }
+        ],
+        "discount_scope": "invoice",
+        "discount_type": "percentage",
+        "discount_value": 0,
+        "payments": [],
+        "subtotal": 86.75,
+        "total": 86.75,
+        "cash_received": 0,
+        "change": 0,
+        "items_count": 1,
+        "sale_ids": [
+          4
+        ]
+      }
+    },
+    "replayed": "true",
+    "before": "10f86ba6f60ea41d9d46795b10675ddf90661b6f49be89d445e0ef60e430768b",
+    "after": "10f86ba6f60ea41d9d46795b10675ddf90661b6f49be89d445e0ef60e430768b"
+  },
+  {
+    "method": "post",
+    "url": "/api/invoices/4/return",
+    "body": {
+      "return_date": "2026-10-25",
+      "items": [
+        {
+          "invoice_item_id": 4,
+          "return_quantity": 2
+        }
+      ]
+    },
+    "headers": {
+      "Idempotency-Key": "SC-return-4"
+    },
+    "status": 200,
+    "response": {
+      "success": true,
+      "message": "Return processed successfully",
+      "data": {
+        "returnId": 2,
+        "returnNo": "RET-1026-00002",
+        "status": "Unsettled",
+        "returnedAmount": 34.7,
+        "feeAmount": 0,
+        "netAmount": 34.7,
+        "settledAmount": 0,
+        "settlements": [],
+        "position": {
+          "originalTotal": 86.75,
+          "totalReturned": 34.7,
+          "currentInvoiceValue": 52.05,
+          "totalPaid": 0,
+          "totalFees": 0,
+          "netPosition": -52.05,
+          "refundCreditDue": 0,
+          "totalSettled": 0,
+          "remainingRefundDue": 0,
+          "balanceDue": 52.05,
+          "remainingSettlementCapacity": 0,
+          "settledAmount": 0
+        },
+        "returnAmount": 34.7,
+        "deduction": 0,
+        "netReturn": 34.7,
+        "refundAmount": 0,
+        "retainedCredit": 34.7,
+        "totalItems": 1,
+        "returnedItems": [
+          {
+            "invoice_item_id": 4,
+            "item_id": 4,
+            "quantity": 2
+          }
+        ]
+      }
+    },
+    "before": "10f86ba6f60ea41d9d46795b10675ddf90661b6f49be89d445e0ef60e430768b",
+    "after": "2da1a83a0453bd291a0d2041b9880dcae74ec988f725afc686d3f8c04ea77588"
+  },
+  {
+    "method": "post",
+    "url": "/api/inventory/items",
+    "body": {
+      "item_code": "SC-5",
+      "item_name": "POS split",
+      "unit_of_measure": "pcs"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "id": 5,
+      "item_code": "SC-5",
+      "item_name": "POS split",
+      "description": null,
+      "category": null,
+      "unit_of_measure": "pcs",
+      "current_stock": 0,
+      "reorder_level": 0,
+      "standard_cost": 0,
+      "standard_selling_price": 0,
+      "is_raw_material": 0,
+      "is_finished_good": 0,
+      "is_purchased": 1,
+      "is_manufactured": 0,
+      "is_active": 1,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:21:45",
+      "updated_at": "2026-10-25 05:21:45",
+      "has_expiry": 0,
+      "near_expiry_threshold_days": 30,
+      "sale_type": "packed",
+      "qty_decimal_precision": 0,
+      "rounding_step": null,
+      "deleted_at": null,
+      "deleted_by": null
+    },
+    "before": "2da1a83a0453bd291a0d2041b9880dcae74ec988f725afc686d3f8c04ea77588",
+    "after": "2da1a83a0453bd291a0d2041b9880dcae74ec988f725afc686d3f8c04ea77588"
+  },
+  {
+    "method": "post",
+    "url": "/api/customers",
+    "body": {
+      "customer_code": "SC-C-5",
+      "customer_name": "POS split",
+      "phone": "03000000000"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 6,
+        "customer_code": "CUST-1026-00005",
+        "customer_name": "POS split",
+        "contact_person": "",
+        "email": "",
+        "phone": "03000000000",
+        "billing_address": "",
+        "shipping_address": "",
+        "payment_terms": "",
+        "payment_terms_days": 14,
+        "credit_limit": 0,
+        "current_balance": 0,
+        "opening_balance": 0,
+        "credit_balance": 0,
+        "credit_utilization_percent": 0,
+        "is_active": 1,
+        "created_at": "2026-10-25 05:21:45",
+        "updated_at": "2026-10-25 05:21:45"
+      },
+      "message": "Customer created successfully"
+    },
+    "before": "2da1a83a0453bd291a0d2041b9880dcae74ec988f725afc686d3f8c04ea77588",
+    "after": "3413c448cfaa5322fad51a5a9c036b4b348e3a2bb970c28b93f8de7b12567874"
+  },
+  {
+    "method": "post",
+    "url": "/api/suppliers",
+    "body": {
+      "supplier_code": "SC-S-5",
+      "supplier_name": "POS split"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 5,
+        "supplier_code": "SC-S-5",
+        "supplier_name": "POS split"
+      }
+    },
+    "before": "3413c448cfaa5322fad51a5a9c036b4b348e3a2bb970c28b93f8de7b12567874",
+    "after": "a3d4dc6df126ddbdb99092052b78debb303b84977ed94a09dc14b82f6e148efa"
+  },
+  {
+    "method": "post",
+    "url": "/api/purchases",
+    "body": {
+      "item_id": 5,
+      "supplier_id": 5,
+      "warehouse_id": 1,
+      "quantity": 40,
+      "unit_cost": 9.25,
+      "purchase_date": "2026-09-01"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "id": 5,
+      "purchase_no": "PURCH-1026-0005",
+      "item_id": 5,
+      "warehouse_id": 1,
+      "quantity": 40,
+      "unit_cost": 9.25,
+      "total_cost": 370,
+      "supplier_name": "POS split",
+      "purchase_date": "2026-09-01",
+      "invoice_no": null,
+      "remarks": null,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:21:45",
+      "updated_at": "2026-10-25 05:21:45",
+      "supplier_id": 5,
+      "returned_quantity": 0,
+      "batch_id": 5,
+      "batch_no": "BATCH-1026-PUR-00005",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "input_tax_amount": 0,
+      "item_code": "SC-5",
+      "item_name": "POS split",
+      "unit_of_measure": "pcs",
+      "warehouse_code": "WH-001",
+      "warehouse_name": "Main Warehouse",
+      "created_by_username": "admin",
+      "paid_amount": 0,
+      "total_payable": 370,
+      "balance_amount": 370
+    },
+    "before": "a3d4dc6df126ddbdb99092052b78debb303b84977ed94a09dc14b82f6e148efa",
+    "after": "d4c6e2757fecce515fb1256c7678b217f8d1afbc78e418416be4dd2a05eb04d9"
+  },
+  {
+    "method": "post",
+    "url": "/api/pos/sale",
+    "body": {
+      "customer_id": 6,
+      "warehouse_id": 1,
+      "sale_date": "2026-10-25",
+      "items": [
+        {
+          "item_id": 5,
+          "quantity": 3,
+          "unit_price": 17.35
+        }
+      ],
+      "payments": [
+        {
+          "amount": 20,
+          "payment_method": "Cash"
+        },
+        {
+          "amount": 15,
+          "payment_method": "Bank"
+        }
+      ]
+    },
+    "headers": {
+      "Idempotency-Key": "SC-split"
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "message": "POS sale completed successfully",
+      "data": {
+        "transaction_no": "INV-1026-00005",
+        "sale_date": "2026-10-25",
+        "warehouse_id": 1,
+        "warehouse_name": "Main Warehouse",
+        "customer_id": 6,
+        "customer_name": "Walk-in Customer",
+        "items": [
+          {
+            "sale_id": 5,
+            "sale_no": "INV-1026-00005",
+            "item_id": 5,
+            "item_code": "SC-5",
+            "item_name": "POS split",
+            "unit_of_measure": "pcs",
+            "quantity": 3,
+            "unit_price": 17.35,
+            "line_total": 52.05
+          }
+        ],
+        "discount_scope": "invoice",
+        "discount_type": "percentage",
+        "discount_value": 0,
+        "payments": [
+          {
+            "payment_method": "Cash",
+            "amount": 20
+          },
+          {
+            "payment_method": "Bank",
+            "amount": 15
+          }
+        ],
+        "subtotal": 52.05,
+        "total": 52.05,
+        "cash_received": 20,
+        "change": 0,
+        "items_count": 1,
+        "sale_ids": [
+          5
+        ]
+      }
+    },
+    "before": "d4c6e2757fecce515fb1256c7678b217f8d1afbc78e418416be4dd2a05eb04d9",
+    "after": "cc6fbd9e7ceb55ec877940adc5fc1594c728b1e3f063407471c61baff8896a98"
+  },
+  {
+    "method": "post",
+    "url": "/api/inventory/items",
+    "body": {
+      "item_code": "SC-6",
+      "item_name": "POS zero tender",
+      "unit_of_measure": "pcs"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "id": 6,
+      "item_code": "SC-6",
+      "item_name": "POS zero tender",
+      "description": null,
+      "category": null,
+      "unit_of_measure": "pcs",
+      "current_stock": 0,
+      "reorder_level": 0,
+      "standard_cost": 0,
+      "standard_selling_price": 0,
+      "is_raw_material": 0,
+      "is_finished_good": 0,
+      "is_purchased": 1,
+      "is_manufactured": 0,
+      "is_active": 1,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:21:45",
+      "updated_at": "2026-10-25 05:21:45",
+      "has_expiry": 0,
+      "near_expiry_threshold_days": 30,
+      "sale_type": "packed",
+      "qty_decimal_precision": 0,
+      "rounding_step": null,
+      "deleted_at": null,
+      "deleted_by": null
+    },
+    "before": "cc6fbd9e7ceb55ec877940adc5fc1594c728b1e3f063407471c61baff8896a98",
+    "after": "cc6fbd9e7ceb55ec877940adc5fc1594c728b1e3f063407471c61baff8896a98"
+  },
+  {
+    "method": "post",
+    "url": "/api/customers",
+    "body": {
+      "customer_code": "SC-C-6",
+      "customer_name": "POS zero tender",
+      "phone": "03000000000"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 7,
+        "customer_code": "CUST-1026-00006",
+        "customer_name": "POS zero tender",
+        "contact_person": "",
+        "email": "",
+        "phone": "03000000000",
+        "billing_address": "",
+        "shipping_address": "",
+        "payment_terms": "",
+        "payment_terms_days": 14,
+        "credit_limit": 0,
+        "current_balance": 0,
+        "opening_balance": 0,
+        "credit_balance": 0,
+        "credit_utilization_percent": 0,
+        "is_active": 1,
+        "created_at": "2026-10-25 05:21:45",
+        "updated_at": "2026-10-25 05:21:45"
+      },
+      "message": "Customer created successfully"
+    },
+    "before": "cc6fbd9e7ceb55ec877940adc5fc1594c728b1e3f063407471c61baff8896a98",
+    "after": "36f29426a3cc03f899f8e912198ceb4e57fb08a5e21ba94370c616d20bd0f2ed"
+  },
+  {
+    "method": "post",
+    "url": "/api/suppliers",
+    "body": {
+      "supplier_code": "SC-S-6",
+      "supplier_name": "POS zero tender"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 6,
+        "supplier_code": "SC-S-6",
+        "supplier_name": "POS zero tender"
+      }
+    },
+    "before": "36f29426a3cc03f899f8e912198ceb4e57fb08a5e21ba94370c616d20bd0f2ed",
+    "after": "32b7cca7980fcf1caa23f09085a6841a7e3a6790317bbafd404456700fb9909a"
+  },
+  {
+    "method": "post",
+    "url": "/api/purchases",
+    "body": {
+      "item_id": 6,
+      "supplier_id": 6,
+      "warehouse_id": 1,
+      "quantity": 40,
+      "unit_cost": 9.25,
+      "purchase_date": "2026-09-01"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "id": 6,
+      "purchase_no": "PURCH-1026-0006",
+      "item_id": 6,
+      "warehouse_id": 1,
+      "quantity": 40,
+      "unit_cost": 9.25,
+      "total_cost": 370,
+      "supplier_name": "POS zero tender",
+      "purchase_date": "2026-09-01",
+      "invoice_no": null,
+      "remarks": null,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:21:45",
+      "updated_at": "2026-10-25 05:21:45",
+      "supplier_id": 6,
+      "returned_quantity": 0,
+      "batch_id": 6,
+      "batch_no": "BATCH-1026-PUR-00006",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "input_tax_amount": 0,
+      "item_code": "SC-6",
+      "item_name": "POS zero tender",
+      "unit_of_measure": "pcs",
+      "warehouse_code": "WH-001",
+      "warehouse_name": "Main Warehouse",
+      "created_by_username": "admin",
+      "paid_amount": 0,
+      "total_payable": 370,
+      "balance_amount": 370
+    },
+    "before": "32b7cca7980fcf1caa23f09085a6841a7e3a6790317bbafd404456700fb9909a",
+    "after": "7b40d75cc7d7cb6997501fd31ad67e9ddbc6d4ba087ac5170caecf1d22057853"
+  },
+  {
+    "method": "post",
+    "url": "/api/pos/sale",
+    "body": {
+      "warehouse_id": 1,
+      "sale_date": "2026-10-25",
+      "items": [
+        {
+          "item_id": 6,
+          "quantity": 1,
+          "unit_price": 17.35
+        }
+      ],
+      "cash_received": 0
+    },
+    "headers": {
+      "Idempotency-Key": "SC-zero-cash-valid"
+    },
+    "status": 201,
+    "response": {
+      "success": true,
+      "message": "POS sale completed successfully",
+      "data": {
+        "transaction_no": "INV-1026-00006",
+        "sale_date": "2026-10-25",
+        "warehouse_id": 1,
+        "warehouse_name": "Main Warehouse",
+        "customer_name": "Walk-in Customer",
+        "items": [
+          {
+            "sale_id": 6,
+            "sale_no": "INV-1026-00006",
+            "item_id": 6,
+            "item_code": "SC-6",
+            "item_name": "POS zero tender",
+            "unit_of_measure": "pcs",
+            "quantity": 1,
+            "unit_price": 17.35,
+            "line_total": 17.35
+          }
+        ],
+        "discount_scope": "invoice",
+        "discount_type": "percentage",
+        "discount_value": 0,
+        "payments": [
+          {
+            "payment_method": "Cash",
+            "amount": 17.35
+          }
+        ],
+        "subtotal": 17.35,
+        "total": 17.35,
+        "cash_received": 17.35,
+        "change": 0,
+        "items_count": 1,
+        "sale_ids": [
+          6
+        ]
+      }
+    },
+    "before": "7b40d75cc7d7cb6997501fd31ad67e9ddbc6d4ba087ac5170caecf1d22057853",
+    "after": "ad656754d7cb0b15ca6a6cbf8a5ea467d5fb683181e2060ba2081d77a1fc1bd8"
+  },
+  {
+    "method": "post",
+    "url": "/api/inventory/items",
+    "body": {
+      "item_code": "SC-7",
+      "item_name": "Reservation replay",
+      "unit_of_measure": "pcs"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "id": 7,
+      "item_code": "SC-7",
+      "item_name": "Reservation replay",
+      "description": null,
+      "category": null,
+      "unit_of_measure": "pcs",
+      "current_stock": 0,
+      "reorder_level": 0,
+      "standard_cost": 0,
+      "standard_selling_price": 0,
+      "is_raw_material": 0,
+      "is_finished_good": 0,
+      "is_purchased": 1,
+      "is_manufactured": 0,
+      "is_active": 1,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:21:45",
+      "updated_at": "2026-10-25 05:21:45",
+      "has_expiry": 0,
+      "near_expiry_threshold_days": 30,
+      "sale_type": "packed",
+      "qty_decimal_precision": 0,
+      "rounding_step": null,
+      "deleted_at": null,
+      "deleted_by": null
+    },
+    "before": "ad656754d7cb0b15ca6a6cbf8a5ea467d5fb683181e2060ba2081d77a1fc1bd8",
+    "after": "ad656754d7cb0b15ca6a6cbf8a5ea467d5fb683181e2060ba2081d77a1fc1bd8"
+  },
+  {
+    "method": "post",
+    "url": "/api/customers",
+    "body": {
+      "customer_code": "SC-C-7",
+      "customer_name": "Reservation replay",
+      "phone": "03000000000"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 8,
+        "customer_code": "CUST-1026-00007",
+        "customer_name": "Reservation replay",
+        "contact_person": "",
+        "email": "",
+        "phone": "03000000000",
+        "billing_address": "",
+        "shipping_address": "",
+        "payment_terms": "",
+        "payment_terms_days": 14,
+        "credit_limit": 0,
+        "current_balance": 0,
+        "opening_balance": 0,
+        "credit_balance": 0,
+        "credit_utilization_percent": 0,
+        "is_active": 1,
+        "created_at": "2026-10-25 05:21:45",
+        "updated_at": "2026-10-25 05:21:45"
+      },
+      "message": "Customer created successfully"
+    },
+    "before": "ad656754d7cb0b15ca6a6cbf8a5ea467d5fb683181e2060ba2081d77a1fc1bd8",
+    "after": "b18d696f67565e1a3512565f4cb966d9f5fcde97ce37fa8389cafb67000d646c"
+  },
+  {
+    "method": "post",
+    "url": "/api/suppliers",
+    "body": {
+      "supplier_code": "SC-S-7",
+      "supplier_name": "Reservation replay"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 7,
+        "supplier_code": "SC-S-7",
+        "supplier_name": "Reservation replay"
+      }
+    },
+    "before": "b18d696f67565e1a3512565f4cb966d9f5fcde97ce37fa8389cafb67000d646c",
+    "after": "447ba07eb794894a549180bc69052f73d7ba4e4fc964119c6471b578e82fa589"
+  },
+  {
+    "method": "post",
+    "url": "/api/purchases",
+    "body": {
+      "item_id": 7,
+      "supplier_id": 7,
+      "warehouse_id": 1,
+      "quantity": 10,
+      "unit_cost": 9.25,
+      "purchase_date": "2026-09-01"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "id": 7,
+      "purchase_no": "PURCH-1026-0007",
+      "item_id": 7,
+      "warehouse_id": 1,
+      "quantity": 10,
+      "unit_cost": 9.25,
+      "total_cost": 92.5,
+      "supplier_name": "Reservation replay",
+      "purchase_date": "2026-09-01",
+      "invoice_no": null,
+      "remarks": null,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:21:45",
+      "updated_at": "2026-10-25 05:21:45",
+      "supplier_id": 7,
+      "returned_quantity": 0,
+      "batch_id": 7,
+      "batch_no": "BATCH-1026-PUR-00007",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "input_tax_amount": 0,
+      "item_code": "SC-7",
+      "item_name": "Reservation replay",
+      "unit_of_measure": "pcs",
+      "warehouse_code": "WH-001",
+      "warehouse_name": "Main Warehouse",
+      "created_by_username": "admin",
+      "paid_amount": 0,
+      "total_payable": 92.5,
+      "balance_amount": 92.5
+    },
+    "before": "447ba07eb794894a549180bc69052f73d7ba4e4fc964119c6471b578e82fa589",
+    "after": "3792fa073e9bb4dce9ca8cb8842b4711273d620e8c5e2246824772df870db561"
+  },
+  {
+    "method": "post",
+    "url": "/api/inventory/reservations",
+    "body": {
+      "item_id": 7,
+      "warehouse_id": 1,
+      "batch_id": 7,
+      "location_id": 1,
+      "quantity_reserved": 3,
+      "reference_doctype": "SALES_ORDER",
+      "reference_docno": "SC-RES-REPLAY",
+      "reference_line_id": 1
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "id": 1,
+      "item_id": 7,
+      "warehouse_id": 1,
+      "location_id": 1,
+      "batch_id": 7,
+      "quantity_reserved": 3,
+      "reference_doctype": "SALES_ORDER",
+      "reference_docno": "SC-RES-REPLAY",
+      "reference_line_id": 1,
+      "status": "ACTIVE",
+      "created_at": "2026-10-25 05:21:45",
+      "released_at": null,
+      "consumed_at": null
+    },
+    "before": "98ef2c56cb0999f3363c1efb9ebca5581433c099e318f857b91734e204219bd1",
+    "after": "efcb7dd9b51bbc9af4a124982fc819eb2ab7641cbacb2330443d96768bbfc8d5"
+  },
+  {
+    "method": "post",
+    "url": "/api/inventory/reservations",
+    "body": {
+      "item_id": 7,
+      "warehouse_id": 1,
+      "batch_id": 7,
+      "location_id": 1,
+      "quantity_reserved": 3,
+      "reference_doctype": "SALES_ORDER",
+      "reference_docno": "SC-RES-REPLAY",
+      "reference_line_id": 1
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "id": 1,
+      "quantity_reserved": 3,
+      "status": "ACTIVE"
+    },
+    "before": "efcb7dd9b51bbc9af4a124982fc819eb2ab7641cbacb2330443d96768bbfc8d5",
+    "after": "8b92d14d2a9b1c3b59f0e8adb69af66982f68fa1eb515d46f7cf2ed651ecee57"
+  },
+  {
+    "method": "delete",
+    "url": "/api/inventory/reservations/1/release",
+    "headers": {},
+    "status": 200,
+    "response": {
+      "id": 1,
+      "item_id": 7,
+      "warehouse_id": 1,
+      "location_id": 1,
+      "batch_id": 7,
+      "quantity_reserved": 3,
+      "reference_doctype": "SALES_ORDER",
+      "reference_docno": "SC-RES-REPLAY",
+      "reference_line_id": 1,
+      "status": "RELEASED",
+      "created_at": "2026-10-25 05:21:45",
+      "released_at": "2026-10-25 05:21:45",
+      "consumed_at": null
+    },
+    "before": "8b92d14d2a9b1c3b59f0e8adb69af66982f68fa1eb515d46f7cf2ed651ecee57",
+    "after": "ce312fdf4e84f7c88fba8d5c9418c632975ee41331bbf961d5530101a403af06"
+  },
+  {
+    "method": "post",
+    "url": "/api/inventory/items",
+    "body": {
+      "item_code": "SC-8",
+      "item_name": "Reservation single control",
+      "unit_of_measure": "pcs"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "id": 8,
+      "item_code": "SC-8",
+      "item_name": "Reservation single control",
+      "description": null,
+      "category": null,
+      "unit_of_measure": "pcs",
+      "current_stock": 0,
+      "reorder_level": 0,
+      "standard_cost": 0,
+      "standard_selling_price": 0,
+      "is_raw_material": 0,
+      "is_finished_good": 0,
+      "is_purchased": 1,
+      "is_manufactured": 0,
+      "is_active": 1,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:21:45",
+      "updated_at": "2026-10-25 05:21:45",
+      "has_expiry": 0,
+      "near_expiry_threshold_days": 30,
+      "sale_type": "packed",
+      "qty_decimal_precision": 0,
+      "rounding_step": null,
+      "deleted_at": null,
+      "deleted_by": null
+    },
+    "before": "ce312fdf4e84f7c88fba8d5c9418c632975ee41331bbf961d5530101a403af06",
+    "after": "ce312fdf4e84f7c88fba8d5c9418c632975ee41331bbf961d5530101a403af06"
+  },
+  {
+    "method": "post",
+    "url": "/api/customers",
+    "body": {
+      "customer_code": "SC-C-8",
+      "customer_name": "Reservation single control",
+      "phone": "03000000000"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 9,
+        "customer_code": "CUST-1026-00008",
+        "customer_name": "Reservation single control",
+        "contact_person": "",
+        "email": "",
+        "phone": "03000000000",
+        "billing_address": "",
+        "shipping_address": "",
+        "payment_terms": "",
+        "payment_terms_days": 14,
+        "credit_limit": 0,
+        "current_balance": 0,
+        "opening_balance": 0,
+        "credit_balance": 0,
+        "credit_utilization_percent": 0,
+        "is_active": 1,
+        "created_at": "2026-10-25 05:21:45",
+        "updated_at": "2026-10-25 05:21:45"
+      },
+      "message": "Customer created successfully"
+    },
+    "before": "ce312fdf4e84f7c88fba8d5c9418c632975ee41331bbf961d5530101a403af06",
+    "after": "0a2320522618759a07f083b0a595d8438fee8275757e2fe6a0ae71073e220347"
+  },
+  {
+    "method": "post",
+    "url": "/api/suppliers",
+    "body": {
+      "supplier_code": "SC-S-8",
+      "supplier_name": "Reservation single control"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 8,
+        "supplier_code": "SC-S-8",
+        "supplier_name": "Reservation single control"
+      }
+    },
+    "before": "0a2320522618759a07f083b0a595d8438fee8275757e2fe6a0ae71073e220347",
+    "after": "b4f4df614a0a2bc20c00292d5ea5d5416909ebf948dd355024f847a87486919a"
+  },
+  {
+    "method": "post",
+    "url": "/api/purchases",
+    "body": {
+      "item_id": 8,
+      "supplier_id": 8,
+      "warehouse_id": 1,
+      "quantity": 10,
+      "unit_cost": 9.25,
+      "purchase_date": "2026-09-01"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "id": 8,
+      "purchase_no": "PURCH-1026-0008",
+      "item_id": 8,
+      "warehouse_id": 1,
+      "quantity": 10,
+      "unit_cost": 9.25,
+      "total_cost": 92.5,
+      "supplier_name": "Reservation single control",
+      "purchase_date": "2026-09-01",
+      "invoice_no": null,
+      "remarks": null,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:21:46",
+      "updated_at": "2026-10-25 05:21:46",
+      "supplier_id": 8,
+      "returned_quantity": 0,
+      "batch_id": 8,
+      "batch_no": "BATCH-1026-PUR-00008",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "input_tax_amount": 0,
+      "item_code": "SC-8",
+      "item_name": "Reservation single control",
+      "unit_of_measure": "pcs",
+      "warehouse_code": "WH-001",
+      "warehouse_name": "Main Warehouse",
+      "created_by_username": "admin",
+      "paid_amount": 0,
+      "total_payable": 92.5,
+      "balance_amount": 92.5
+    },
+    "before": "b4f4df614a0a2bc20c00292d5ea5d5416909ebf948dd355024f847a87486919a",
+    "after": "d98b1e74fe1047544b80b0f156af9403ce8ec52b2849d3b727d4d183fe6ea4f1"
+  },
+  {
+    "method": "post",
+    "url": "/api/inventory/reservations",
+    "body": {
+      "item_id": 8,
+      "warehouse_id": 1,
+      "batch_id": 8,
+      "location_id": 1,
+      "quantity_reserved": 3,
+      "reference_doctype": "SALES_ORDER",
+      "reference_docno": "SC-RES-CONTROL",
+      "reference_line_id": 2
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "id": 2,
+      "item_id": 8,
+      "warehouse_id": 1,
+      "location_id": 1,
+      "batch_id": 8,
+      "quantity_reserved": 3,
+      "reference_doctype": "SALES_ORDER",
+      "reference_docno": "SC-RES-CONTROL",
+      "reference_line_id": 2,
+      "status": "ACTIVE",
+      "created_at": "2026-10-25 05:21:46",
+      "released_at": null,
+      "consumed_at": null
+    },
+    "before": "4e1c10d4a883c1ec525d4b48c45339f975681ae07d2fae9ec0ef015106ee46ba",
+    "after": "6ae7c627d21772a6b6c5e5f22c622f808af48758afd56a96dcd62b2b73cb4416"
+  },
+  {
+    "method": "delete",
+    "url": "/api/inventory/reservations/2/release",
+    "headers": {},
+    "status": 200,
+    "response": {
+      "id": 2,
+      "item_id": 8,
+      "warehouse_id": 1,
+      "location_id": 1,
+      "batch_id": 8,
+      "quantity_reserved": 3,
+      "reference_doctype": "SALES_ORDER",
+      "reference_docno": "SC-RES-CONTROL",
+      "reference_line_id": 2,
+      "status": "RELEASED",
+      "created_at": "2026-10-25 05:21:46",
+      "released_at": "2026-10-25 05:21:46",
+      "consumed_at": null
+    },
+    "before": "6ae7c627d21772a6b6c5e5f22c622f808af48758afd56a96dcd62b2b73cb4416",
+    "after": "aea5b0c07ec1c9fa9ca62e17e11ca910e3f970228542c5e2bb48393f11644df6"
+  },
+  {
+    "method": "delete",
+    "url": "/api/inventory/reservations/2/release",
+    "headers": {},
+    "status": 400,
+    "response": {
+      "error": "Reservation is not active"
+    },
+    "before": "aea5b0c07ec1c9fa9ca62e17e11ca910e3f970228542c5e2bb48393f11644df6",
+    "after": "aea5b0c07ec1c9fa9ca62e17e11ca910e3f970228542c5e2bb48393f11644df6"
+  },
+  {
+    "method": "post",
+    "url": "/api/inventory/items",
+    "body": {
+      "item_code": "SC-9",
+      "item_name": "Reservation no line",
+      "unit_of_measure": "pcs"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "id": 9,
+      "item_code": "SC-9",
+      "item_name": "Reservation no line",
+      "description": null,
+      "category": null,
+      "unit_of_measure": "pcs",
+      "current_stock": 0,
+      "reorder_level": 0,
+      "standard_cost": 0,
+      "standard_selling_price": 0,
+      "is_raw_material": 0,
+      "is_finished_good": 0,
+      "is_purchased": 1,
+      "is_manufactured": 0,
+      "is_active": 1,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:21:46",
+      "updated_at": "2026-10-25 05:21:46",
+      "has_expiry": 0,
+      "near_expiry_threshold_days": 30,
+      "sale_type": "packed",
+      "qty_decimal_precision": 0,
+      "rounding_step": null,
+      "deleted_at": null,
+      "deleted_by": null
+    },
+    "before": "aea5b0c07ec1c9fa9ca62e17e11ca910e3f970228542c5e2bb48393f11644df6",
+    "after": "aea5b0c07ec1c9fa9ca62e17e11ca910e3f970228542c5e2bb48393f11644df6"
+  },
+  {
+    "method": "post",
+    "url": "/api/customers",
+    "body": {
+      "customer_code": "SC-C-9",
+      "customer_name": "Reservation no line",
+      "phone": "03000000000"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 10,
+        "customer_code": "CUST-1026-00009",
+        "customer_name": "Reservation no line",
+        "contact_person": "",
+        "email": "",
+        "phone": "03000000000",
+        "billing_address": "",
+        "shipping_address": "",
+        "payment_terms": "",
+        "payment_terms_days": 14,
+        "credit_limit": 0,
+        "current_balance": 0,
+        "opening_balance": 0,
+        "credit_balance": 0,
+        "credit_utilization_percent": 0,
+        "is_active": 1,
+        "created_at": "2026-10-25 05:21:46",
+        "updated_at": "2026-10-25 05:21:46"
+      },
+      "message": "Customer created successfully"
+    },
+    "before": "aea5b0c07ec1c9fa9ca62e17e11ca910e3f970228542c5e2bb48393f11644df6",
+    "after": "6d907b7c8a865a183d768a93242371b9a29f2d8d6712d3958edf8e9f72c2a100"
+  },
+  {
+    "method": "post",
+    "url": "/api/suppliers",
+    "body": {
+      "supplier_code": "SC-S-9",
+      "supplier_name": "Reservation no line"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "success": true,
+      "data": {
+        "id": 9,
+        "supplier_code": "SC-S-9",
+        "supplier_name": "Reservation no line"
+      }
+    },
+    "before": "6d907b7c8a865a183d768a93242371b9a29f2d8d6712d3958edf8e9f72c2a100",
+    "after": "f304578ceaad09973c8bacc17a12ab0ad698d6c4d963d8ef8f10d8146ce553aa"
+  },
+  {
+    "method": "post",
+    "url": "/api/purchases",
+    "body": {
+      "item_id": 9,
+      "supplier_id": 9,
+      "warehouse_id": 1,
+      "quantity": 10,
+      "unit_cost": 9.25,
+      "purchase_date": "2026-09-01"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "id": 9,
+      "purchase_no": "PURCH-1026-0009",
+      "item_id": 9,
+      "warehouse_id": 1,
+      "quantity": 10,
+      "unit_cost": 9.25,
+      "total_cost": 92.5,
+      "supplier_name": "Reservation no line",
+      "purchase_date": "2026-09-01",
+      "invoice_no": null,
+      "remarks": null,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:21:46",
+      "updated_at": "2026-10-25 05:21:46",
+      "supplier_id": 9,
+      "returned_quantity": 0,
+      "batch_id": 9,
+      "batch_no": "BATCH-1026-PUR-00009",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "input_tax_amount": 0,
+      "item_code": "SC-9",
+      "item_name": "Reservation no line",
+      "unit_of_measure": "pcs",
+      "warehouse_code": "WH-001",
+      "warehouse_name": "Main Warehouse",
+      "created_by_username": "admin",
+      "paid_amount": 0,
+      "total_payable": 92.5,
+      "balance_amount": 92.5
+    },
+    "before": "f304578ceaad09973c8bacc17a12ab0ad698d6c4d963d8ef8f10d8146ce553aa",
+    "after": "c1ca74c2f3d17eca3da291947bd7525f9abbb6b0c692ede29c1c4944ac2427a0"
+  },
+  {
+    "method": "post",
+    "url": "/api/inventory/reservations",
+    "body": {
+      "item_id": 9,
+      "warehouse_id": 1,
+      "batch_id": 9,
+      "location_id": 1,
+      "quantity_reserved": 2,
+      "reference_doctype": "SALES_ORDER",
+      "reference_docno": "SC-RES-NOLINE"
+    },
+    "headers": {},
+    "status": 201,
+    "response": {
+      "id": 3,
+      "item_id": 9,
+      "warehouse_id": 1,
+      "location_id": 1,
+      "batch_id": 9,
+      "quantity_reserved": 2,
+      "reference_doctype": "SALES_ORDER",
+      "reference_docno": "SC-RES-NOLINE",
+      "reference_line_id": null,
+      "status": "ACTIVE",
+      "created_at": "2026-10-25 05:21:46",
+      "released_at": null,
+      "consumed_at": null
+    },
+    "before": "1bfe8a3b011a5ed50f5ac20a5079cb7319c1b91a5d394f74977f2516cdcc0fb4",
+    "after": "5ca10e9031add6f30d92381c0681567e8ae877c08dee4116c6c8f5e87a49879c"
+  },
+  {
+    "method": "delete",
+    "url": "/api/inventory/reservations/3/release",
+    "headers": {},
+    "status": 400,
+    "response": {
+      "error": "Reservation is not active"
+    },
+    "before": "5ca10e9031add6f30d92381c0681567e8ae877c08dee4116c6c8f5e87a49879c",
+    "after": "5ca10e9031add6f30d92381c0681567e8ae877c08dee4116c6c8f5e87a49879c"
+  }
+]

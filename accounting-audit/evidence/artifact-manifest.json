@@ -1,0 +1,3991 @@
+{
+  "generatedAt": "2026-10-26T01:40:38.226Z",
+  "files": [
+    {
+      "path": "accounting-audit/00-executive-summary.md",
+      "bytes": 8242,
+      "sha256": "d63ee9c4ae36d99b0986c3b82ad611243346373993a2c2cb09daa1a3bb401fa7"
+    },
+    {
+      "path": "accounting-audit/01-accounting-architecture.md",
+      "bytes": 7891,
+      "sha256": "ac2c4d2490ae1247921e9d50b81579a35700ecfa7a729fdce8aca3e98f023060"
+    },
+    {
+      "path": "accounting-audit/02-module-inventory.md",
+      "bytes": 7105,
+      "sha256": "c2a81b62a88d7c7688e629c45513dec9b0972519aa1bb03bd6f79b3b1de677b3"
+    },
+    {
+      "path": "accounting-audit/03-coverage-matrix.md",
+      "bytes": 9236,
+      "sha256": "1f8edcaed5099801bb4d9656faf9944d69fd59b1d5c1c0c3d793105234bee42c"
+    },
+    {
+      "path": "accounting-audit/04-reconciliation-results.md",
+      "bytes": 9702,
+      "sha256": "e99046ffcd996b7784b191888fb98be47de0522bbd8c688664200f8762cc9761"
+    },
+    {
+      "path": "accounting-audit/05-test-scenarios.md",
+      "bytes": 7494,
+      "sha256": "67600c86d8e75b91b9c287aa9e30e81db36c62b9b859888ad76a5eb332a24a09"
+    },
+    {
+      "path": "accounting-audit/06-report-verification.md",
+      "bytes": 9519,
+      "sha256": "af379bf64a05530bd900b4b28c7d6dc4e1e88cb7ffea69397594a7b620925e02"
+    },
+    {
+      "path": "accounting-audit/07-unverified-areas.md",
+      "bytes": 5464,
+      "sha256": "eafbf014f74c8a651a6f76b3b6a0a60f5d5190ff47b301df3942aa8e83dd71b9"
+    },
+    {
+      "path": "accounting-audit/08-findings-register.md",
+      "bytes": 5767,
+      "sha256": "e36864c2103bcecf1b6d4129f7e71a4965eb8bf501c5645ac98eaed76a234747"
+    },
+    {
+      "path": "accounting-audit/09-remediation-roadmap.md",
+      "bytes": 5165,
+      "sha256": "6f8ca9f44dc9764564928ecdc360dc1b6c8a96a90e5795bb14a32e609029629a"
+    },
+    {
+      "path": "accounting-audit/10-verification-results.md",
+      "bytes": 9299,
+      "sha256": "0d66b901f5869272f98cdb1b06c926b147bd2cb08b305d2d9b48fd8087e1d56e"
+    },
+    {
+      "path": "accounting-audit/accounting-flow.mmd",
+      "bytes": 850,
+      "sha256": "7e35d79664fcc7aff926bb0d06349afbeecb3f9f8f5705372d5675e516d01875"
+    },
+    {
+      "path": "accounting-audit/audit-log.md",
+      "bytes": 6895,
+      "sha256": "82d2833f99410f56d899c2bb02fdcf535758d8cc6a8d15cf8ddabcca7d62abc9"
+    },
+    {
+      "path": "accounting-audit/evidence/adversarial-api-ui-check.json",
+      "bytes": 30110,
+      "sha256": "8df4a1cea6a53951ffa5bff8c1d6af21cde1aff38c2c3e6e62490f0a1f6b9fe7"
+    },
+    {
+      "path": "accounting-audit/evidence/adversarial-db-check.json",
+      "bytes": 5545,
+      "sha256": "c401f7b5d9d2f5d75a7cd706b3c860bafa587cd55aebf7329a7609242435b130"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-count-risk-latest-run.txt",
+      "bytes": 104,
+      "sha256": "c1e79fe4bfb6e999162507693ddbaa39dabd7b689fda9fd9a5adda5cb9b13c7b"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-count-risk-run-ZBybHv/01-mixed-count-completed.json",
+      "bytes": 6055,
+      "sha256": "f8143759d08101a5e5943b8c46a6daa5894bac34ccd3d57f0442063bf4f5cdb8"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-count-risk-run-ZBybHv/02-mixed-count-corrected.json",
+      "bytes": 6055,
+      "sha256": "d1e35a73991a70b8c2ed4e8f4bcd279258cf07173c440f7328ecf9b8c7a40ce3"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-count-risk-run-ZBybHv/03-two-item-count-completed.json",
+      "bytes": 12227,
+      "sha256": "7ae11717f4f8f7d39583cad1cb924d095ea6f07c6e84a2ebc8fb97d18b17b08e"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-count-risk-run-ZBybHv/04-partial-item-correction.json",
+      "bytes": 14232,
+      "sha256": "379969c7ff02adbd225ebfcc9862816ab5ccdc9c78ff18b0e0eceb878d018e6e"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-count-risk-run-ZBybHv/erp.db",
+      "bytes": 1630208,
+      "sha256": "fa8c62b571695858e7db5b8d53c37d0ba1ca8fb5200a1c35e0ea55a8ee3189b7"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-count-risk-run-ZBybHv/erp.db-shm",
+      "bytes": 32768,
+      "sha256": "fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-count-risk-run-ZBybHv/erp.db-wal",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-count-risk-run-ZBybHv/results.json",
+      "bytes": 16227,
+      "sha256": "288b74fea0422102ef90af27990eda5d0194a0bfb39f00abd629776eb236dd3c"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-count-risk-verified.log",
+      "bytes": 2281,
+      "sha256": "876a31665ff5426d985510cf5512fad37d52c55dbc15001e86b53b9e2eaec97d"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-count-risk.log",
+      "bytes": 768,
+      "sha256": "760298488c3a237fff6cb78e837ba621ba635ea4ede84c2f396592ba89f15601"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-latest-run.txt",
+      "bytes": 103,
+      "sha256": "219a39c26a87d730b859d4c75e9f5457d9367f1d9f6984e88b2638542834e1ce"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-run-IUWdcO/01-before-production.json",
+      "bytes": 3748,
+      "sha256": "ce69b3e7c4bf15fb89d197a5a1ddc5dc004a28a2d8e5bc7108bba3acfe1af7af"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-run-IUWdcO/02-production-overhead.json",
+      "bytes": 11465,
+      "sha256": "c416ac40a4d47762c05c67ccd23e2751f9bfa4baa6cb6aedc4314c1da8b14bb6"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-run-IUWdcO/03-production-reversed.json",
+      "bytes": 13436,
+      "sha256": "04b37a38b15b6656f77147fe3d0026793d30634b133c4a49e3f563c81a5a9de1"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-run-IUWdcO/04-owner-goods.json",
+      "bytes": 15318,
+      "sha256": "3c5ca0f8e2a0060804202c323a0528cc6c0776c0a4acef28d9159f8ec72aa599"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-run-IUWdcO/05-owner-cash.json",
+      "bytes": 16616,
+      "sha256": "86e0c31287a816ae848c04ce5a286197b030cb6b78eafe880b397d474f5fce5b"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-run-IUWdcO/06-owner-reversed.json",
+      "bytes": 17351,
+      "sha256": "8545dc6e5f2404a107d9acbf57e71ac4f0cb49ddde868a84fd20ce8a57a3fa50"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-run-IUWdcO/07-count-completed.json",
+      "bytes": 19298,
+      "sha256": "144325db5412f9105f9614ee96c8b65ab020afb800137d67eaedbb7e5e910e22"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-run-IUWdcO/08-count-corrected.json",
+      "bytes": 21991,
+      "sha256": "58ce12217a5ae8fac58b49b23d2326b66edd64f7472838a4ff8330f4431f2cf1"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-run-IUWdcO/erp.db",
+      "bytes": 1630208,
+      "sha256": "3d08345965c4bbd96cad181e61463b838a127ca6824093de24555ec34f1c38f0"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-run-IUWdcO/results.json",
+      "bytes": 17613,
+      "sha256": "1e26c5d75e5da33eb7b590aa9e04493c5b944e190a8d00cd11c85fae51e053f7"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-run-OF2b8i/01-before-production.json",
+      "bytes": 3748,
+      "sha256": "e2fb6491889e9d64be68f1b5c86e890b6887a22ecdf01eab733daeaa77b6fae4"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-run-OF2b8i/02-production-overhead.json",
+      "bytes": 11465,
+      "sha256": "dee9a3a54a42eb68ca6fb5e2df7cc1ca599c4548bc4096259b5a1e3a74c36fc2"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-run-OF2b8i/03-production-reversed.json",
+      "bytes": 13436,
+      "sha256": "50d8d52a475f47b584d9bb6021937f908e3a4fba5f580b4bd987b88a8956d31c"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-run-OF2b8i/04-owner-goods.json",
+      "bytes": 15318,
+      "sha256": "1efd5b7b7a6974b3c438f8e3ac849e76896dc909189dbd607fd3b14c3dc30965"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-run-OF2b8i/05-owner-cash.json",
+      "bytes": 16616,
+      "sha256": "3314d06b0a0e4135488b85b7039cea1d9530953ae8f75231200a2db0f6b8142d"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-run-OF2b8i/06-owner-reversed.json",
+      "bytes": 17351,
+      "sha256": "1252948162f14b1628eb57d2e8d32102e5c71de19e0e44beebf6685e1d814120"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-run-OF2b8i/07-count-completed.json",
+      "bytes": 19298,
+      "sha256": "09557b2454ef0c4756400e7140790e7e8817c976e952f0680b563e7a79d003d3"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-run-OF2b8i/08-count-corrected.json",
+      "bytes": 21991,
+      "sha256": "47340b09df03392eda4a94c011a961f365e90c47c7b7fc75e2dad24a521f7e91"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-run-OF2b8i/09-count-repeat-rejected.json",
+      "bytes": 21997,
+      "sha256": "50e17d5ec92e4f3f3aa648febd554c7840fa9c72d815501605834f317ecd342a"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-run-OF2b8i/erp.db",
+      "bytes": 1630208,
+      "sha256": "6ab9a35c9d896e64604f456ee0f7e50d05ccaa96573e0eb25afcb99dd83b3f73"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-run-OF2b8i/erp.db-shm",
+      "bytes": 32768,
+      "sha256": "fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-run-OF2b8i/erp.db-wal",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-run-OF2b8i/results.json",
+      "bytes": 19270,
+      "sha256": "86e63b7e46cbb94bf64d02abb812bb5e4d09a089677b5da54f60c0fa5d02ffad"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-run-Wi7tJX/01-mixed-count-completed.json",
+      "bytes": 6055,
+      "sha256": "27940e239a13e8ae742591351382297f475f8aff5596ae4f65b4db9cc559b8ae"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-run-Wi7tJX/erp.db",
+      "bytes": 1630208,
+      "sha256": "a55620de9118728b47534782a7c7d8af599dc702107b9036a6add0dcbb38c4fb"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-run-Wi7tJX/results.json",
+      "bytes": 7663,
+      "sha256": "e208c0bb30be60b9606ad8a09418cae45c505c81e46a5a4f58899f95667b21d3"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-verification.json",
+      "bytes": 313,
+      "sha256": "827ee197298b1aef71277b31b30629149a7c7ee96bda8095dd3b7fed9b972f9e"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-verification.log",
+      "bytes": 314,
+      "sha256": "c407865621fbcaddf689d1ca0287461a6f53f7446ca7adda952353a728b9d385"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-verified.log",
+      "bytes": 3980,
+      "sha256": "ed0013469c697da6e7dd40ba3023e0973e1443fce5d71b562f63e4e7ba289617"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension.log",
+      "bytes": 3539,
+      "sha256": "2dddb7869ab7a646656a109eca1c6715376c26e6510cb0c5fef3839f1c17315b"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-graph-coverage.json",
+      "bytes": 3902,
+      "sha256": "d9e6b3bd00b4c276dc62e0ce06c1de8bfd7a6a9d49bc395f951df93db558f33d"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-inventory.log",
+      "bytes": 219,
+      "sha256": "ed0fc6bed71323f260ec73245355fc712f88325b3124759327027a9dce8eaf03"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-latest-run.txt",
+      "bytes": 93,
+      "sha256": "c8c5d7f31636ea2f3b507d314f199f0611dbd340767aaf6caeb86dc46848a67a"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-probes-expanded.log",
+      "bytes": 2533,
+      "sha256": "b442a5488fab6f6b0bfa2118549bdbeca3dd5198b8c07d9f17330ee512e1e029"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-probes-final.log",
+      "bytes": 4633,
+      "sha256": "25adb76d69ac00edacc80de3efe4892c728ac406aa36c4b7b2fc69959f48c593"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-probes-verified.log",
+      "bytes": 5434,
+      "sha256": "aad33ea37e44c561d13f66683f228fb1816de082fdb442deba0fefbfb5e1718a"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-probes.log",
+      "bytes": 2016,
+      "sha256": "cd6c88890ed096524a67ea6c755b4ddcf1d282724a8f11bf23187328f5ccc7b7"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-run-4HRMlP/erp.db",
+      "bytes": 1630208,
+      "sha256": "b0c3a2dc996a83b3afd0754e6a4058e2c26594e4fff1079bd91cb1d7048a52b5"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-run-4HRMlP/results.json",
+      "bytes": 99300,
+      "sha256": "6bca1b9a69ba8a80e1b6b7308ca210b3478c78651e293634c00e28b44582f1bb"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-run-Lbw3la/erp.db",
+      "bytes": 1630208,
+      "sha256": "341cdeafb89f915e52747b9635752149c65259f0bac4955dc442cbaaf4ae07af"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-run-Lbw3la/erp.db-shm",
+      "bytes": 32768,
+      "sha256": "fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-run-Lbw3la/erp.db-wal",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-run-Lbw3la/results.json",
+      "bytes": 126485,
+      "sha256": "00795e5cbc20c662c0e6c0a98f4980cb4370bce135baff3a270202525888ea9d"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-run-Mw9Rnx/erp.db",
+      "bytes": 1511424,
+      "sha256": "0c1f233353bf5f0a8bc6330e2d91a4007a8f9d0deafab8d55004802e36ea5089"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-run-Mw9Rnx/erp.db-shm",
+      "bytes": 32768,
+      "sha256": "22178b3da0a6568ff43c3b9ba4fcee2daa136da6348a00b90dae36efadff88af"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-run-Mw9Rnx/erp.db-wal",
+      "bytes": 1730432,
+      "sha256": "64819497cb1ba67ecc7b394cf99cf1798c691a19ada505c46d03979466049b0a"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-run-fPHem1/erp.db",
+      "bytes": 1630208,
+      "sha256": "abd26f13c2c56e472bd87ed83dd81da322da754f4e3cf07aef6f7f6dc19c4fb8"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-run-fPHem1/results.json",
+      "bytes": 119200,
+      "sha256": "994d8c4f01c7d9b194d4bea55f04cd5cd212b5bfcc198834bb28d3465ea6561c"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-run-uSDrDf/erp.db",
+      "bytes": 1630208,
+      "sha256": "a374a7c9f09a073f4697568747923220380cd0e7f18b31d9661914a6622382e3"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-run-uSDrDf/results.json",
+      "bytes": 108912,
+      "sha256": "11ffe5107fdf3c485b76e76bfb6da1750b653196820685692311dfc1a89004c1"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-source-inventory.json",
+      "bytes": 327951,
+      "sha256": "374bafcca20dce6401bed10cb5fb417320c0f8c7f7826b866d5fae18000be579"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-validation.json",
+      "bytes": 14313,
+      "sha256": "8f136dda2cee3e7a9a563ff8c318f3ff8f25c6d77b131da88665f363a45e2adc"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-verification.json",
+      "bytes": 634,
+      "sha256": "27c81e698bc858302e37c552d2aa7288a0ded20ee4c573aba0bb237e1bd4cf6e"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-verification.log",
+      "bytes": 635,
+      "sha256": "57861c3b375b44aa06487e8d3ad03391f1a6f00e6f68108b58aab5a2a00447de"
+    },
+    {
+      "path": "accounting-audit/evidence/final-extension-verification.json",
+      "bytes": 10211,
+      "sha256": "5551c470017e6ea35aac40349054d4d3de81005183f74283d0449fa41401feea"
+    },
+    {
+      "path": "accounting-audit/evidence/final-review-independent.json",
+      "bytes": 9855,
+      "sha256": "24f29529c48921ecae53f4866538702258203603c297a2c33f33402eac6468e6"
+    },
+    {
+      "path": "accounting-audit/evidence/final-source-state.json",
+      "bytes": 10544,
+      "sha256": "f54a62862eb99f7130869d2d52173960ddb917d6a0f5f406679539202fa9f051"
+    },
+    {
+      "path": "accounting-audit/evidence/final-test-summary.json",
+      "bytes": 2391,
+      "sha256": "e997702943f5fe6df7645727c6240b4754712bb4b1c08de94655ebf3cffc6334"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-analyze-final.log",
+      "bytes": 1667,
+      "sha256": "24b4dd6a36adb69b90d4b2fc6e2c1ef747dd3d8ad7e8767491ffc01d053e73e9"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-balance-sheet-widget.json",
+      "bytes": 1815,
+      "sha256": "349d433a3576ee1b8179de80201227e36db13aba8f54fc1e05e501a04aab8433"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-balance-sheet.csv",
+      "bytes": 496,
+      "sha256": "9eac348365f4390887571126fdfc8623ea4974690fdb3c030f048d64acac0c95"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-balance-sheet.png",
+      "bytes": 117519,
+      "sha256": "b840aaf89a34ffa0ea9c456f8077608204522bfa24f9b0dec0abf2e2daa1af83"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-csv-observation.json",
+      "bytes": 164,
+      "sha256": "9aa9caee23f7c890739ea665230fc81d68c4838b47312489888bdaf6ce4a46d5"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-csv-regression.exit",
+      "bytes": 1,
+      "sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-csv-regression.log",
+      "bytes": 1626,
+      "sha256": "9d42431249c7708f02f4438d7cdcbd115cf685c2fd7b442ccb84338d5672a123"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-figures.csv",
+      "bytes": 5039468,
+      "sha256": "2de934152588d96f44a2e7eac12d9d5edcdacdd3be42a569c95deecd70b8a95a"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-full-resumed.log",
+      "bytes": 589476,
+      "sha256": "1afe90bd2ff8de0266e9a8472b8ba5a24d810bba8f551d8741e9a13f04e954dd"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-graph-coverage.json",
+      "bytes": 4181,
+      "sha256": "03d5f38581391b6eda567733b39f9da2f455f6e169d4ef56bb07e45871dd0f7f"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-graph-discovery.json",
+      "bytes": 87018,
+      "sha256": "ce8cfbb7d43540b7a9104fb061f6608748b5adcfc00a6ae54b585917f582675a"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-harness-analyze.exit",
+      "bytes": 1,
+      "sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-harness-analyze.log",
+      "bytes": 97,
+      "sha256": "bd36e58e6ba2ff28847fc66281360e0709ba765af736eab4dc780fa8085b693c"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-inventory-run.exit",
+      "bytes": 1,
+      "sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-inventory-run.log",
+      "bytes": 808,
+      "sha256": "340a12bed98599890b14209d97c7ab94a9e4ff9353fe38f2a6450a7b6c9dfd30"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-inventory-summary.json",
+      "bytes": 807,
+      "sha256": "2d2121a505d85968affdc7138b1591407a8c7dc8b437cda2e6d3b0e636e6da87"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-oracle-balance-widget.json",
+      "bytes": 913,
+      "sha256": "5d373c405f0ad42e234675bd16250e53a1294ba764c6d2f0f5bede3d6a1efb71"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-oracle-models.json",
+      "bytes": 957,
+      "sha256": "469c76dc2dd3afa031a42c6db908f48770647345d0c92a9eb6cc7a1006581491"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-oracle-pnl-widget.json",
+      "bytes": 623,
+      "sha256": "2cfcb064689a1a42df4b65482408bf754b94f43fb316fc32dc253e2ef87b8a5f"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-oracle-replay.exit",
+      "bytes": 1,
+      "sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-oracle-replay.log",
+      "bytes": 369,
+      "sha256": "4892354bd7893752ec383bbb35299adb69f845398874dbe5d1eb418f298ebefd"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-payroll-api-fixture.json",
+      "bytes": 484,
+      "sha256": "c4ee92397ff100a01ed2c837471288a434af4cf179e69430d52ab28372bcf48f"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-pnl-breakdown.exit",
+      "bytes": 1,
+      "sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-pnl-breakdown.json",
+      "bytes": 701,
+      "sha256": "09ba7ec687e036e442946423850df051fef586b8491590fd2dd680f67b514b8d"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-pnl-breakdown.log",
+      "bytes": 894,
+      "sha256": "8e4384aee5f47457829f2bbd2c7aa8b805a308d976a7565bbb4aef02860a422f"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-report-regressions.exit",
+      "bytes": 1,
+      "sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-report-regressions.log",
+      "bytes": 5746,
+      "sha256": "d71688eae3201745a6de55ba9d569956c9a7165f1d836337d6d27f9cc9e64e75"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-salary-carryover-widget.json",
+      "bytes": 1282,
+      "sha256": "b33fd31f004b3ee7da2748ab9397705e6dadf3582134e4b8326f745533dd253b"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-support.csv",
+      "bytes": 234816,
+      "sha256": "e81801d44a638a355f92a1bfca874c85c8f8b9d32d9b76185fe886b07799fa5d"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-surfaces.csv",
+      "bytes": 93947,
+      "sha256": "da0f1d768c431963ae94238e9e1c31539d698a0f9c9e062d2c893fbd39457074"
+    },
+    {
+      "path": "accounting-audit/evidence/graph-coverage.json",
+      "bytes": 28148,
+      "sha256": "e40cb93caceeb839c16c511782eaf77eb2310e768419f4a0697c1918ca17841f"
+    },
+    {
+      "path": "accounting-audit/evidence/graph-repository-tree.json",
+      "bytes": 57143,
+      "sha256": "882c33fc13b955b3a0d750f1fee0706cb136f1e0693fffd3329593f1f32845f6"
+    },
+    {
+      "path": "accounting-audit/evidence/invariant-granularity.md",
+      "bytes": 1872,
+      "sha256": "74957462bf54e26ddfedf40172606e43b60b09d51719b7c459c40fc11bd289c2"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-console-2.log",
+      "bytes": 1817,
+      "sha256": "5b6ccf2f5345f0fdf29bb475d99948645ba1a06599fc33f84151cd163855d02e"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-console-3.log",
+      "bytes": 1557,
+      "sha256": "f07e18162bc243606ebb3f14c49bc5a11a298d926c1af725aa583e9928163596"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-console-4.log",
+      "bytes": 2015,
+      "sha256": "4e76006b2e1fe27ccbcfbce74b59da34ac2e00a7e44dcdc2c853b3cdec77104a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-console-5.log",
+      "bytes": 2438,
+      "sha256": "f16ad250f666dfdb871de95ebe6d2849fab956b0e225da913b16d4eb1eca77f4"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-console.log",
+      "bytes": 5799,
+      "sha256": "cd8b2ff52d93d2586c98fdbb05f0391a319885ff301f4529cedbd8c852d38f77"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-credit-repro.log",
+      "bytes": 3002,
+      "sha256": "98e2aed5629200e7a13884e42ae36d5ee3357739a44797ce609fc7f452a1987d"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-latest.txt",
+      "bytes": 92,
+      "sha256": "b4fb8b8a07bae14fcc1d9ae61578b11515970281bed66379924b684cf32f19aa"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-9MmRSv/007-supplier-partial-0-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-9MmRSv/007-supplier-partial-0.json",
+      "bytes": 7475,
+      "sha256": "15291cb2e1c3abd38e625b2da4f00f0d384e35ab69db2a57cf75c848f3d7c5b3"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-9MmRSv/015-supplier-partial-50-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-9MmRSv/015-supplier-partial-50.json",
+      "bytes": 17373,
+      "sha256": "ca6a5e69444ccfe312c0bb1db1a3423a60761c64690d15f3c7cec321f8eec1fd"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-9MmRSv/021-warehouse-transfer-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-9MmRSv/021-warehouse-transfer.json",
+      "bytes": 21443,
+      "sha256": "2d30b8593a82e89b205dd0eaf1f72e0f38064b418e8c52d5af49a39ac2313153"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-9MmRSv/022-warehouse-transfer-void-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-9MmRSv/022-warehouse-transfer-void.json",
+      "bytes": 23322,
+      "sha256": "1ae005448bc2187c3f5dbed4e939d9f8156f0236596bf51990968704467918ae"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-9MmRSv/028-fefo-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-9MmRSv/028-fefo.json",
+      "bytes": 32874,
+      "sha256": "f0a832e959b774bf2c657cf0f2e3b5ebeaadc50123f618a93d0b58ec10c3183b"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-9MmRSv/033-nonexpiry-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-9MmRSv/033-nonexpiry.json",
+      "bytes": 38584,
+      "sha256": "453018e6c32250e7c3361db910f90147a9b74ea465bcd6bd335df2240c0f9fe2"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-9MmRSv/039-stock-funds-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-9MmRSv/039-stock-funds.json",
+      "bytes": 42002,
+      "sha256": "fe7266ab6c26bee09d045fd9a0678ad7cf88f18bea33825fe8b19bca80025afb"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-9MmRSv/048-year-boundary-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-9MmRSv/048-year-boundary.json",
+      "bytes": 51223,
+      "sha256": "64b1c0e08dace77e38af9d3c40c5ca32048441762231088c8eefed276315e296"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-9MmRSv/055-tax-first-receipt-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-9MmRSv/055-tax-first-receipt.json",
+      "bytes": 57433,
+      "sha256": "e5fa5d35848a0f7f523d1decd2e452ce17eb93d018e4bd9cf6b81c267200a6bd"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-9MmRSv/056-tax-complete-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-9MmRSv/056-tax-complete.json",
+      "bytes": 59874,
+      "sha256": "78b1f6971b265b3805addf038224fd1a061b0b6c1dc37cc88f55bad92b94711c"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-9MmRSv/057-tax-reversed-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-9MmRSv/057-tax-reversed.json",
+      "bytes": 59942,
+      "sha256": "e038c4c2690cc54dcf21303b11a49eae4304b7960d88906c037d1d0c095e0bc8"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-9MmRSv/066-credit-before-void-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-9MmRSv/066-credit-before-void.json",
+      "bytes": 82004,
+      "sha256": "c0429b338e1643a569a7365e79a25e247b302400c5f95fb424deec18f11edea7"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-9MmRSv/067-credit-two-targets-invariants.json",
+      "bytes": 609,
+      "sha256": "2454aac9d82b605932c9a3756b27b0440d4f39d5a6c10e3b1ab4d06ff997b00e"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-9MmRSv/067-credit-two-targets.json",
+      "bytes": 82411,
+      "sha256": "5b0e37e52fcefa69b133d8f5d802fbe229a91e9f2e3a63677dfd0af9dc72cf12"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-9MmRSv/068-credit-reissued-invariants.json",
+      "bytes": 609,
+      "sha256": "2454aac9d82b605932c9a3756b27b0440d4f39d5a6c10e3b1ab4d06ff997b00e"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-9MmRSv/068-credit-reissued.json",
+      "bytes": 83227,
+      "sha256": "d971c4878436c312c57822e43f58e04cc2cc2a3b7894324e153f89da264167c4"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-9MmRSv/069-credit-double-spend-invariants.json",
+      "bytes": 611,
+      "sha256": "d3cfca0eb7df5ca2f8ef83b7db7d8cfc620d7702d9871d11b3031bfc04c2e804"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-9MmRSv/069-credit-double-spend.json",
+      "bytes": 87932,
+      "sha256": "cc576596f3568af06ae12a34597218b0dfe85fe49dcb2bb3044ed152839185a8"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-9MmRSv/api-events.json",
+      "bytes": 76167,
+      "sha256": "fef2bef3fe8d35163f28f97f8c6d52e6a289cf97658007df849cf2653aec2fb8"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-9MmRSv/erp.db",
+      "bytes": 1667072,
+      "sha256": "dcaf6e539f5af6368de814a71abbfd431c4439c0ca9335ec274fe2628fafcb1a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-9MmRSv/results.json",
+      "bytes": 40034,
+      "sha256": "7cea5be3e13bcf5e2daaa98d0c28e152f74120f5bcc75e42b2a5c96859bd5c6d"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-9MmRSv/schema.json",
+      "bytes": 64749,
+      "sha256": "be492c6bdd4d769d597bad1b26f692e0e14645ad88b3ed7ce50bad507eaa5c91"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/008-retail-return-1-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/008-retail-return-1.json",
+      "bytes": 16389,
+      "sha256": "8a168fbd6ccf395784869cbf6c814fdb51c31b33a3b2bef1407bb5e4264d85a6"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/009-retail-return-2-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/009-retail-return-2.json",
+      "bytes": 21651,
+      "sha256": "546c730d72712e4625668b47df6789e32f9a3db4169aeeb06e85096b02fc39bf"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/010-retail-return-3-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/010-retail-return-3.json",
+      "bytes": 26915,
+      "sha256": "7c7f1d74b4e3b81ae418f3fffc6a7e7927d56b0867c35687d36aa2a8cde1e29a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/015-retail-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/015-retail.json",
+      "bytes": 32862,
+      "sha256": "4853d9dd3c26c3555361c0b0d0a6a791e5ef6443c140fb9c01a8e9b4644379e1"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/031-credit-settled-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/031-credit-settled.json",
+      "bytes": 47713,
+      "sha256": "9cc35885b1e7f0d8445a44545ded9d3213b835e26a6c32b35d7a1d7e430b0d0b"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/032-credit-over-refund-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/032-credit-over-refund.json",
+      "bytes": 47717,
+      "sha256": "0b72d998f3ea7f44f4d98a0fa795e33900a7aae7dbb495dd97857a7a7d4368cd"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/033-credit-applied-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/033-credit-applied.json",
+      "bytes": 52483,
+      "sha256": "eeabd9d2b18487944d814aa1ade7ea07f04d4da0843424c5965146e92ea5e862"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/036-unapplied-cash-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/036-unapplied-cash.json",
+      "bytes": 56522,
+      "sha256": "5317649bf1b8045a36bd94e1deebcdc3af16ce981eed940f683343166af578cc"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/042-supplier-return-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/042-supplier-return.json",
+      "bytes": 63810,
+      "sha256": "697ca01e2669b3d9ded9491d9480ecf62e7f2fe4bde7c3f21cd7f46d38f6c92d"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/043-supplier-refund-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/043-supplier-refund.json",
+      "bytes": 65103,
+      "sha256": "e69926aec9475efc8600db05f2f54a35b0a9bf9e840540e61f6d8375d02ffe70"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/051-po-partial-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/051-po-partial.json",
+      "bytes": 72453,
+      "sha256": "b8ab5c51ae899eec636157caae1c6872e48e07f1b389a961008f70002bf42205"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/057-damage-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/057-damage.json",
+      "bytes": 77429,
+      "sha256": "04df5e35fd28770834c519bc7632b6569b7e19dfaa2ef89020ff938744dc3ec8"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/059-expense-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/059-expense.json",
+      "bytes": 78290,
+      "sha256": "181fe424cd8b3076d244bd27e3406064f8b381ebf468b8a39c4a647ec18ecaf1"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/068-reversals-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/068-reversals.json",
+      "bytes": 88070,
+      "sha256": "d08a92825c7bae62e747d073193942259f2e885aa9c4d687fa8be60eae1e92fa"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/073-backdate-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/073-backdate.json",
+      "bytes": 91490,
+      "sha256": "57a9cf1a752aaafd8660b6ba3cfb98e595feb8dea6fc2f3787eb13298e011191"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/076-early-return-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/076-early-return.json",
+      "bytes": 97835,
+      "sha256": "cdef0218e34d6b26f85e062ac4d8a8f12e0bcee99ce450cbf6813fb77094d08a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/085-duplicates-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/085-duplicates.json",
+      "bytes": 104678,
+      "sha256": "49c22d12466368058ecee4ad967ea682f5b9578f02e22e7bd50e9c2e63b2302f"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/086-atomicity-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/086-atomicity.json",
+      "bytes": 104677,
+      "sha256": "a12fc3ae7c75e4c78417f77a01029626de4a3c5080ab40d9207848fd5924d6e3"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/089-period-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/089-period.json",
+      "bytes": 104935,
+      "sha256": "36775446b5a17c37408a5b994918886a470403787cefbdd968b5cd381310c0f1"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/096-boundaries-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/096-boundaries.json",
+      "bytes": 111797,
+      "sha256": "057c03b8451349d28a30d7f4bffcaec706e5ca401c3e21fd48fcb09983138336"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/api-events.json",
+      "bytes": 111914,
+      "sha256": "3c8976dbd51e6e23ed44ea19cd6bc09f64cf47e76534a8312773ee7712564a68"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/erp.db",
+      "bytes": 1683456,
+      "sha256": "ea1332edda9ef95c55958ba4229ecbb0b6028999c13dd02f53ef67d66d48e313"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/erp.db-shm",
+      "bytes": 32768,
+      "sha256": "fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/erp.db-wal",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/results.json",
+      "bytes": 52422,
+      "sha256": "263225418c11fdcb599c0cb09789505ed84aeca413393b9a0825e397818ad962"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-AbsZeT/schema.json",
+      "bytes": 64749,
+      "sha256": "be492c6bdd4d769d597bad1b26f692e0e14645ad88b3ed7ce50bad507eaa5c91"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/008-retail-return-1-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/008-retail-return-1.json",
+      "bytes": 16389,
+      "sha256": "d282a8d35275b58d3a1bb6e343ffe4910e5921554bf81ace62e08b64797e5459"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/009-retail-return-2-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/009-retail-return-2.json",
+      "bytes": 21651,
+      "sha256": "a8de42c9fe5dbefe37899c5fec0843161170d01b6ee5baa83a693363d0964400"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/010-retail-return-3-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/010-retail-return-3.json",
+      "bytes": 26915,
+      "sha256": "8bf5c4958af33bbe1026c67be819b83760ffb04f85ab3f9867b7533df163227c"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/019-credit-settled-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/019-credit-settled.json",
+      "bytes": 45169,
+      "sha256": "e42b24008baf03cf40fb569b23d8e0c5795f0fb0c092598357f2345da04591bc"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/020-credit-over-refund-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/020-credit-over-refund.json",
+      "bytes": 45173,
+      "sha256": "c29c087289f73b6965875351d10848586ef30a10381e0004c307657a60cb551f"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/021-credit-applied-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/021-credit-applied.json",
+      "bytes": 49939,
+      "sha256": "b97abe6f02abe1e6e37946e90d8fbc6e007c4e3ac2c8f163ad6ac535fa7f5722"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/024-unapplied-cash-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/024-unapplied-cash.json",
+      "bytes": 53978,
+      "sha256": "06dd57b74f7fb3c475ca9fb3bf41626118b4003824855e9a9c4ebabf7db8be10"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/030-supplier-return-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/030-supplier-return.json",
+      "bytes": 61266,
+      "sha256": "518a230e52f2cda3e8d50a3c2327177012e30c3689e71c34d7435cebafe263f0"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/031-supplier-refund-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/031-supplier-refund.json",
+      "bytes": 62559,
+      "sha256": "ba113eb22b35df2ade51a53b42090053270b0e00c5e92701da990df7b2205db3"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/039-po-partial-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/039-po-partial.json",
+      "bytes": 69909,
+      "sha256": "83ba99c57aa2491b4d27f5aadb8f07c2b524fa84d11e2831c4db03ab0d14f801"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/045-damage-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/045-damage.json",
+      "bytes": 74940,
+      "sha256": "4d0e6bd279a8ed2e629387490cd56965ff99b454a25b9042459e403d7e104ace"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/047-expense-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/047-expense.json",
+      "bytes": 75855,
+      "sha256": "b1cfb779fbdb2b164a9d90813f8672aa80bfaacccc708897dd527e83f2b3cba4"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/056-reversals-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/056-reversals.json",
+      "bytes": 85635,
+      "sha256": "28866256b769c7b82d4e5c6a3be55e0e572c7898f4673a8156d7d04d90aaa386"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/061-backdate-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/061-backdate.json",
+      "bytes": 89053,
+      "sha256": "9e0ff946cb04dca6b631db38ecac78582bd05e0896f8c9e75049c7de592d39dd"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/063-early-return-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/063-early-return.json",
+      "bytes": 95397,
+      "sha256": "2a715d3e8fe2b20a694426fe66a4ec644bd2a4b4f913f66e9815be0707eb72e2"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/071-duplicates-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/071-duplicates.json",
+      "bytes": 102237,
+      "sha256": "cf5e3a0234b2a4526357809cf041221aa0fc6cabb264cc61615ebda4229f0448"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/072-atomicity-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/072-atomicity.json",
+      "bytes": 102236,
+      "sha256": "dc04bebe63ef29df2bee668a073f472060b8f750bae05993e42a5f29394b5ef4"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/075-period-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/075-period.json",
+      "bytes": 102494,
+      "sha256": "14eb962924f4d82965ef356c87f35f1689fe12e234070b1a84cc856378e485bd"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/082-boundaries-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/082-boundaries.json",
+      "bytes": 109356,
+      "sha256": "672434ac86eb26aeb04ee6584f6cd7f5c45f03ce2dcddc2b43fabf5782433f18"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/api-events.json",
+      "bytes": 89916,
+      "sha256": "38286d5dff1b5e4656bfe542ef7e986ed3e59cff3ffa05c21701beb091eb04f6"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/erp.db",
+      "bytes": 1679360,
+      "sha256": "9e3718f50b6df62a4a125dc3bd9b61e51b0e29e3c44cd96027c6c1d2550ea1a6"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/results.json",
+      "bytes": 47805,
+      "sha256": "78c11688875b8bce5de50d6310912c488e7d3775ac69d23935066160796eb282"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-GJ8a8h/schema.json",
+      "bytes": 64749,
+      "sha256": "be492c6bdd4d769d597bad1b26f692e0e14645ad88b3ed7ce50bad507eaa5c91"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-TQ4hqh/009-supplier-credit-before-split-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-TQ4hqh/009-supplier-credit-before-split.json",
+      "bytes": 13798,
+      "sha256": "a6cb8bb37fc89fd6ab9ab5d797db30e550d10c465feea2b11f4f2028d4612545"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-TQ4hqh/012-supplier-credit-after-split-attempt-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-TQ4hqh/012-supplier-credit-after-split-attempt.json",
+      "bytes": 13805,
+      "sha256": "0db9c3075f2806e2944be207ed0b6a32b9dcedeb7573d94e199342e27e1ca1bb"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-TQ4hqh/api-events.json",
+      "bytes": 13492,
+      "sha256": "90feeb0ee99ea37b21d9217d7cc6676cde1b51db34f0b1e748b44b0950b237d8"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-TQ4hqh/erp.db",
+      "bytes": 1630208,
+      "sha256": "bece048c2ea7aa944bd86b2f57a629874c6c62f4ae20af0a151a40bf86e09515"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-TQ4hqh/erp.db-shm",
+      "bytes": 32768,
+      "sha256": "fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-TQ4hqh/erp.db-wal",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-TQ4hqh/results.json",
+      "bytes": 6607,
+      "sha256": "6aafecadbbf30495f9ddf8874f84d065787491a508742c3da40a389d3e07ae77"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-TQ4hqh/schema.json",
+      "bytes": 64749,
+      "sha256": "be492c6bdd4d769d597bad1b26f692e0e14645ad88b3ed7ce50bad507eaa5c91"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-TQ4hqh/supplier-credit-split-proof.json",
+      "bytes": 2275,
+      "sha256": "67941618e4b5930d3fc06cf42815dc4916cdccb42e3f10b312fa1fcb713a7ec1"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-ZHkdJ8/008-supplier-early-return-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-ZHkdJ8/008-supplier-early-return.json",
+      "bytes": 7502,
+      "sha256": "aaa7923bdca75147bea2383d5dfb7631fe75fb8c3f808e28484ed46e8ac92e1e"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-ZHkdJ8/api-events.json",
+      "bytes": 8781,
+      "sha256": "2922a4406036576e76b9632ad68750d994e173c55992784e0fa055af5749ce6e"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-ZHkdJ8/erp.db",
+      "bytes": 1630208,
+      "sha256": "834c3c35a1cf09f025896acbbdf4ec57bd4e87e302efe872101b3f379cc455b9"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-ZHkdJ8/erp.db-shm",
+      "bytes": 32768,
+      "sha256": "fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-ZHkdJ8/erp.db-wal",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-ZHkdJ8/results.json",
+      "bytes": 3150,
+      "sha256": "018deea36d9ed01e98c73a35335111beedf6bc9704ba36d2e8867aba425bae90"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-ZHkdJ8/schema.json",
+      "bytes": 64749,
+      "sha256": "be492c6bdd4d769d597bad1b26f692e0e14645ad88b3ed7ce50bad507eaa5c91"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-bFQ2pm/009-retail-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-bFQ2pm/009-retail.json",
+      "bytes": 19792,
+      "sha256": "6ffa9dc1fcd155fab95bf24f7bfa3efbe782a3af64476e724194ea0c5e8054f8"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-bFQ2pm/024-credit-settled-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-bFQ2pm/024-credit-settled.json",
+      "bytes": 34638,
+      "sha256": "1fc38b36d4913d59358d375d10fe2522e6ef2e2842fd5aeffb96b75cf6948970"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-bFQ2pm/025-credit-over-refund-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-bFQ2pm/025-credit-over-refund.json",
+      "bytes": 34642,
+      "sha256": "86c534cecc0eee61a334746b4a7e92f5821ea286a5938bdcb74294f008f9e7b9"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-bFQ2pm/031-supplier-return-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-bFQ2pm/031-supplier-return.json",
+      "bytes": 41926,
+      "sha256": "1ed3f18b27f7e2b1d20eec27cc79448fec6bd107bf8fc357cca24dbf0bda33be"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-bFQ2pm/032-supplier-refund-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-bFQ2pm/032-supplier-refund.json",
+      "bytes": 43219,
+      "sha256": "2474cb1af13ffa28bf5438d3036368a5bc2c7140ac11c804216c8be0e4f7f31d"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-bFQ2pm/040-po-partial-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-bFQ2pm/040-po-partial.json",
+      "bytes": 50566,
+      "sha256": "ec6e73705a30d757c2504e258d690dcf4992e29a6c343c7cbde4622fe227a6ec"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-bFQ2pm/059-backdate-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-bFQ2pm/059-backdate.json",
+      "bytes": 67230,
+      "sha256": "776fc4342c3186344422ac530ffc9c02883584dc93638f1c959b55bf5c5ed20c"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-bFQ2pm/066-duplicates-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-bFQ2pm/066-duplicates.json",
+      "bytes": 74072,
+      "sha256": "fb9e4ad56811d89cd9ac9b63853531316de45089ab82ff5e3d789c48c653af72"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-bFQ2pm/069-period-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-bFQ2pm/069-period.json",
+      "bytes": 74329,
+      "sha256": "f026152c004aca16fb05bdbe37980ecca6703cef2a9176166a76712362a8deaf"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-bFQ2pm/076-boundaries-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-bFQ2pm/076-boundaries.json",
+      "bytes": 81185,
+      "sha256": "06074c75c392816fd53c492f32529c1ae04ecc305f67ed6eb6dd532337bd150c"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-bFQ2pm/api-events.json",
+      "bytes": 75094,
+      "sha256": "9d77e2c2bdcd0fbcc2e112ec79eafb0ad10e952802ddcaa05b9dd9006405b5b2"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-bFQ2pm/erp.db",
+      "bytes": 1654784,
+      "sha256": "780082debd2de0b44b8fd9fc8f0d75351803005236a586493a8d913bf06fa8c7"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-bFQ2pm/results.json",
+      "bytes": 25205,
+      "sha256": "9c85178fd179f03cde2ff7d39eccf658ab5c32501339ffa0233f59ee6bb87cad"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-bFQ2pm/schema.json",
+      "bytes": 64749,
+      "sha256": "be492c6bdd4d769d597bad1b26f692e0e14645ad88b3ed7ce50bad507eaa5c91"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-eVTI6t/007-supplier-partial-0-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-eVTI6t/007-supplier-partial-0.json",
+      "bytes": 7475,
+      "sha256": "6baa2b2953bae13c929057d341011131ea1c8c331743ba70c90d09d942689941"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-eVTI6t/015-supplier-partial-50-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-eVTI6t/015-supplier-partial-50.json",
+      "bytes": 16042,
+      "sha256": "640ed8319223d4f2012bad7df9fa769b1a34428cf218cf51a4111af60d9b49d5"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-eVTI6t/api-events.json",
+      "bytes": 15932,
+      "sha256": "ba92e7553b1c330d58134351128a1d168d6346686eba136b83f29cd5d8274367"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-eVTI6t/erp.db",
+      "bytes": 1630208,
+      "sha256": "da92790ddd7c320b82226019697adf025afa6188a9540ce26763e46c93f610e1"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-eVTI6t/results.json",
+      "bytes": 6106,
+      "sha256": "b7f1721ccd072c762ad05a83e3193b59a7bfd676a87953e1c94c32c39b6f9874"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-eVTI6t/schema.json",
+      "bytes": 64749,
+      "sha256": "be492c6bdd4d769d597bad1b26f692e0e14645ad88b3ed7ce50bad507eaa5c91"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-iuDkSh/009-retail-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-iuDkSh/009-retail.json",
+      "bytes": 19792,
+      "sha256": "b25e14cd5f27561bd06a1f8bb93a5055fc300b1950582d598a3dc4a040ddeb11"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-iuDkSh/024-credit-settled-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-iuDkSh/024-credit-settled.json",
+      "bytes": 34638,
+      "sha256": "48ebba6ad40c6380ffc4c295acde1e1c082954785073d1f9da79be0191afa0c8"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-iuDkSh/025-credit-over-refund-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-iuDkSh/025-credit-over-refund.json",
+      "bytes": 34642,
+      "sha256": "e55767eaec5a3418e3588e16458f1e5467b4e6d78a0175d8b7b17dd4583a3c31"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-iuDkSh/032-supplier-return-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-iuDkSh/032-supplier-return.json",
+      "bytes": 45338,
+      "sha256": "ef160b7e76ceddc35a10b5f357cb7b93df688ba394fdd84c190c33a1ec81146f"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-iuDkSh/033-supplier-refund-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-iuDkSh/033-supplier-refund.json",
+      "bytes": 46631,
+      "sha256": "dde44bbc1a5632d5c85ab828e8e784348f884a9348cd425b498789c0ecfe7205"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-iuDkSh/041-po-partial-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-iuDkSh/041-po-partial.json",
+      "bytes": 53978,
+      "sha256": "4c0adf93a4f0711a297db9662b30835b9862f252d385b73faa26564bd5ed6535"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-iuDkSh/047-damage-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-iuDkSh/047-damage.json",
+      "bytes": 59009,
+      "sha256": "107cbfc82ecad9f4a517b59d33a48796e45994636e8e01eeaca74425782ef495"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-iuDkSh/049-expense-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-iuDkSh/049-expense.json",
+      "bytes": 59924,
+      "sha256": "529693f0a11f58bbb981bf20cce9d5b395c8dd0be72593b47c8810925bf8c8e6"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-iuDkSh/058-reversals-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-iuDkSh/058-reversals.json",
+      "bytes": 69700,
+      "sha256": "7d542368e3fc08519ab97803d4903c7b975c0caec96005d0b49401186ed71935"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-iuDkSh/063-backdate-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-iuDkSh/063-backdate.json",
+      "bytes": 73118,
+      "sha256": "567a115bf6cb77f83b3ce4fab6b7fcdfb8c0d11fa4573b0957e0706c84a8e997"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-iuDkSh/070-duplicates-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-iuDkSh/070-duplicates.json",
+      "bytes": 79959,
+      "sha256": "172ce9fb60bf177f0e65ecb6541ae08c9c6ce8aa94280ae7f00eaed11d725f81"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-iuDkSh/071-atomicity-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-iuDkSh/071-atomicity.json",
+      "bytes": 79958,
+      "sha256": "fa6848f3935c4fdc75952d89646fea71a035261a1424258582f06037f6f7035e"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-iuDkSh/074-period-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-iuDkSh/074-period.json",
+      "bytes": 80216,
+      "sha256": "b14e233776e2ff0e8c87a7722060d3e890b5fb4a461577831b1e0fc1e5262632"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-iuDkSh/081-boundaries-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-iuDkSh/081-boundaries.json",
+      "bytes": 87072,
+      "sha256": "d51690624b07a2145e556dfde317c7dd40994e34cde60bb86c6fcb3043901179"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-iuDkSh/api-events.json",
+      "bytes": 94812,
+      "sha256": "c934a47a65ba03f6908b103c88ebccd3156f9a6e02f7c6a2124312da3ba6c7bb"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-iuDkSh/erp.db",
+      "bytes": 1667072,
+      "sha256": "4a30899509f65188278b81790d130e40917b8b4923b7d20feb7f1f234f765898"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-iuDkSh/results.json",
+      "bytes": 36652,
+      "sha256": "801f3ccddf6037769b3f9adc41cfc5e16b5ad32fca3f27ee1f0f5e2f2ba33918"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-iuDkSh/schema.json",
+      "bytes": 64749,
+      "sha256": "be492c6bdd4d769d597bad1b26f692e0e14645ad88b3ed7ce50bad507eaa5c91"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-jGmzpw/028-period.json",
+      "bytes": 4872,
+      "sha256": "f47d725578347a55752d91b5199c9c481c218cc4b0c97c606eb8007061696420"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-jGmzpw/api-events.json",
+      "bytes": 17390,
+      "sha256": "fcb1a6285089a5a080172ab1dc748327d2dc1f37e374f85d373baa851b8cebb6"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-jGmzpw/erp.db",
+      "bytes": 1630208,
+      "sha256": "3a0f7a58738ca96c8399c63ff29f1d8e8b8f94cd4f5016669da5e8e01e6a28ab"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-jGmzpw/results.json",
+      "bytes": 3921,
+      "sha256": "5621eda3ed347b4dd337312d298440b6afb0bfef1b47a369328d085239af269d"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-jGmzpw/schema.json",
+      "bytes": 64749,
+      "sha256": "be492c6bdd4d769d597bad1b26f692e0e14645ad88b3ed7ce50bad507eaa5c91"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-s4LmH5/012-warehouse-transfer-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-s4LmH5/012-warehouse-transfer.json",
+      "bytes": 9415,
+      "sha256": "999d19f1d59e3631c4c65ed2ec1a21f9683207719e4ccff7dd88ab6ab8c40a05"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-s4LmH5/019-fefo-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-s4LmH5/019-fefo.json",
+      "bytes": 18960,
+      "sha256": "89d85dd07d1935d9f44818556bcf6cbe103696e45fe51652b38865375730c587"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-s4LmH5/024-nonexpiry-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-s4LmH5/024-nonexpiry.json",
+      "bytes": 24664,
+      "sha256": "4c1eb3117f182c2bec6ca328e3732fe1caf6fbfd84422a707e5191afa48a8fd6"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-s4LmH5/030-stock-funds-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-s4LmH5/030-stock-funds.json",
+      "bytes": 28081,
+      "sha256": "b2d5b16e2dbe7ae74dd99e58ed936e4b19b5d128205828f4bda26b03c80c8e18"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-s4LmH5/039-year-boundary-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-s4LmH5/039-year-boundary.json",
+      "bytes": 37300,
+      "sha256": "c50d5277496d8322e5ca9537ebc0d8fff3cc98982a36716a353d87f49121c047"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-s4LmH5/046-tax-first-receipt-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-s4LmH5/046-tax-first-receipt.json",
+      "bytes": 43508,
+      "sha256": "576fba15645d3625b93c6e3338a1ae7a29adcd464afac74b8403b09a2663f0e1"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-s4LmH5/047-tax-complete-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-s4LmH5/047-tax-complete.json",
+      "bytes": 45949,
+      "sha256": "402c8b0d35e8e3cc125f1e45710e33cd75305ba736037c5b49fea1b32c78d19f"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-s4LmH5/048-tax-reversed-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-s4LmH5/048-tax-reversed.json",
+      "bytes": 46017,
+      "sha256": "0e276fe6f1580645db7140cf56b9cb59f7dfc814931ce0e91725bdd06ee8838d"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-s4LmH5/058-credit-two-targets-invariants.json",
+      "bytes": 609,
+      "sha256": "2454aac9d82b605932c9a3756b27b0440d4f39d5a6c10e3b1ab4d06ff997b00e"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-s4LmH5/058-credit-two-targets.json",
+      "bytes": 68485,
+      "sha256": "df60821fa1f76f26792e3b2b460b44180e8a509a368af2c51b2b3bbb7b5e63f5"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-s4LmH5/api-events.json",
+      "bytes": 61165,
+      "sha256": "79545891cb9ed022bed39b7204812cce26525a379f259caf25f225e79584359b"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-s4LmH5/erp.db",
+      "bytes": 1654784,
+      "sha256": "e62e77283a38d6b106f768214a2a2fbb6119324bae5be4e08ec6b1cda8fca6ba"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-s4LmH5/results.json",
+      "bytes": 24110,
+      "sha256": "4b6b3226c27b12c9aa720f80a2d2bf4ae478d8450aacf0a2092c9bb0cf424902"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-s4LmH5/schema.json",
+      "bytes": 64749,
+      "sha256": "be492c6bdd4d769d597bad1b26f692e0e14645ad88b3ed7ce50bad507eaa5c91"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-z9sfxV/010-credit-before-void-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-z9sfxV/010-credit-before-void.json",
+      "bytes": 24112,
+      "sha256": "2832b71fec084aa731345f611243ae562963b6d05f52f4e343b61cba81054803"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-z9sfxV/011-credit-two-targets-invariants.json",
+      "bytes": 611,
+      "sha256": "29c520d8f0ee6cf2952b603ec8e70eb2025d96a76c802833e509ea8a689befbb"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-z9sfxV/011-credit-two-targets.json",
+      "bytes": 24518,
+      "sha256": "06fbb762d33fc648be9c960c3ba45cedacb4c93d60c3d5fe9c90de597a312850"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-z9sfxV/012-credit-reissued-invariants.json",
+      "bytes": 611,
+      "sha256": "29c520d8f0ee6cf2952b603ec8e70eb2025d96a76c802833e509ea8a689befbb"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-z9sfxV/012-credit-reissued.json",
+      "bytes": 25334,
+      "sha256": "63f0441b9f89c82ba5edda6ab7582012999d202fb024198eb9f9624d3b8239b2"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-z9sfxV/013-credit-double-spend-invariants.json",
+      "bytes": 610,
+      "sha256": "fd425ff8329bbd76811ef48ce2b690c2ba4095659bd0d6beb6d125a111465b62"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-z9sfxV/013-credit-double-spend.json",
+      "bytes": 30281,
+      "sha256": "fb0e6f9a27a7612c5c50e628dc98e78585d621ef5ba80ab12303804893006385"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-z9sfxV/api-events.json",
+      "bytes": 17326,
+      "sha256": "c3079c0985661886d07614ab4023100dd989ff23e2ff64e710bfc353b3f37021"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-z9sfxV/erp.db",
+      "bytes": 1638400,
+      "sha256": "ed5d1abed43bf044a30dc6836bec6d22a8c580720561a8b16c2b9ac0df1438e3"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-z9sfxV/erp.db-shm",
+      "bytes": 32768,
+      "sha256": "fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-z9sfxV/erp.db-wal",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-z9sfxV/results.json",
+      "bytes": 10546,
+      "sha256": "5f92896dc706cedcef16b8a05611ab25a272bbc6e46c33fb4bd50a94d1cc9ba5"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-run-z9sfxV/schema.json",
+      "bytes": 64749,
+      "sha256": "be492c6bdd4d769d597bad1b26f692e0e14645ad88b3ed7ce50bad507eaa5c91"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-supplement-console-2.log",
+      "bytes": 3967,
+      "sha256": "1c989bd26e5c2aa11f1264fde55421eb5b2a76c514cf64171fab257d403c6c21"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-supplement-console.log",
+      "bytes": 2355,
+      "sha256": "8973b1b9914389e787a31d67ad2fcc93e6145da067892437a02bc9d2c5687ab4"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-supplier-chronology.log",
+      "bytes": 1117,
+      "sha256": "a91a80872dc68dc3de5137b673baf316cddf81e56b5706aea3a3bbabe98de634"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-supplier-repro.log",
+      "bytes": 279,
+      "sha256": "56a5a878dd0565a6249f14f12b8e52f39b0f26b22833eed4166efb1b19442229"
+    },
+    {
+      "path": "accounting-audit/evidence/oracle-supplier-split.log",
+      "bytes": 1235,
+      "sha256": "845944aa2221bcc5ecace79d71d347d84af462a2350bee8d49eedbf5bd4d7177"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-execution.log",
+      "bytes": 14940,
+      "sha256": "ed1a61be0af2dd210afac68ac3b618e5dd216a0b5f8c417ca445c6f232333791"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-graph-coverage.json",
+      "bytes": 4944,
+      "sha256": "a0e277bcca5956a0b2dfd6c047091e5bf5c2d027cf783434bbbe696fc1cacbce"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-latest-run.txt",
+      "bytes": 98,
+      "sha256": "0b21fdee1c5212513f976b0a3b9aff4630d57357b17ecde12c8d9d2d300529a2"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/001-after.json",
+      "bytes": 3924,
+      "sha256": "8e87638664b4e98c513458599adf538d4372c82dda065128a1b46d85d888c4c9"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/001-before.json",
+      "bytes": 2284,
+      "sha256": "a7e5fcc0ad32f25d794b8c63788d9902b8986464bf8661916decaeacb2508e65"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/002-after.json",
+      "bytes": 5175,
+      "sha256": "8cf0947bdea2d679821fd65c92f927b6b502d14db324d3f462208b97d96c000b"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/002-before.json",
+      "bytes": 3924,
+      "sha256": "8e87638664b4e98c513458599adf538d4372c82dda065128a1b46d85d888c4c9"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/003-after.json",
+      "bytes": 5544,
+      "sha256": "416b4cdeae82fede70d2f7192fcf745dd31abb07e1d939083273eabd235c8d00"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/003-before.json",
+      "bytes": 5175,
+      "sha256": "8cf0947bdea2d679821fd65c92f927b6b502d14db324d3f462208b97d96c000b"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/004-after.json",
+      "bytes": 7898,
+      "sha256": "ade286f33adcb8c6a2f47e5b67b6df6f1a76f0134a9fd421c878d0230ad778cb"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/004-before.json",
+      "bytes": 5544,
+      "sha256": "416b4cdeae82fede70d2f7192fcf745dd31abb07e1d939083273eabd235c8d00"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/005-after.json",
+      "bytes": 8636,
+      "sha256": "a5726521919d5feab6afc8cc72a7031ea0cfab428c5bda755aac0484ad59c16a"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/005-before.json",
+      "bytes": 7898,
+      "sha256": "ade286f33adcb8c6a2f47e5b67b6df6f1a76f0134a9fd421c878d0230ad778cb"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/006-after.json",
+      "bytes": 12524,
+      "sha256": "5d3433a1c6fd1583da91974f128a2c7805dd31245ba3104356a2147084592f68"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/006-before.json",
+      "bytes": 8636,
+      "sha256": "a5726521919d5feab6afc8cc72a7031ea0cfab428c5bda755aac0484ad59c16a"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/007-after.json",
+      "bytes": 14342,
+      "sha256": "0dae3529a6967428a4ba9d8f1eec6527f29b3994e1ecfd2a1e6b6aec2dd10343"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/007-before.json",
+      "bytes": 12524,
+      "sha256": "5d3433a1c6fd1583da91974f128a2c7805dd31245ba3104356a2147084592f68"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/008-after.json",
+      "bytes": 14342,
+      "sha256": "0dae3529a6967428a4ba9d8f1eec6527f29b3994e1ecfd2a1e6b6aec2dd10343"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/008-before.json",
+      "bytes": 14342,
+      "sha256": "0dae3529a6967428a4ba9d8f1eec6527f29b3994e1ecfd2a1e6b6aec2dd10343"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/009-after.json",
+      "bytes": 17292,
+      "sha256": "86f6a8bdebcd171077896e31923413b5f384c824162b68b5ef5317bf96f58f00"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/009-before.json",
+      "bytes": 14342,
+      "sha256": "0dae3529a6967428a4ba9d8f1eec6527f29b3994e1ecfd2a1e6b6aec2dd10343"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/010-after.json",
+      "bytes": 17292,
+      "sha256": "86f6a8bdebcd171077896e31923413b5f384c824162b68b5ef5317bf96f58f00"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/010-before.json",
+      "bytes": 17292,
+      "sha256": "86f6a8bdebcd171077896e31923413b5f384c824162b68b5ef5317bf96f58f00"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/011-after.json",
+      "bytes": 19614,
+      "sha256": "f11cb835793986340604bff980add3419533e05a44dcd705cbb508be4b40b2af"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/011-before.json",
+      "bytes": 17292,
+      "sha256": "86f6a8bdebcd171077896e31923413b5f384c824162b68b5ef5317bf96f58f00"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/012-after.json",
+      "bytes": 19614,
+      "sha256": "f11cb835793986340604bff980add3419533e05a44dcd705cbb508be4b40b2af"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/012-before.json",
+      "bytes": 19614,
+      "sha256": "f11cb835793986340604bff980add3419533e05a44dcd705cbb508be4b40b2af"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/013-after.json",
+      "bytes": 19614,
+      "sha256": "f11cb835793986340604bff980add3419533e05a44dcd705cbb508be4b40b2af"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/013-before.json",
+      "bytes": 19614,
+      "sha256": "f11cb835793986340604bff980add3419533e05a44dcd705cbb508be4b40b2af"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/014-after.json",
+      "bytes": 19614,
+      "sha256": "f11cb835793986340604bff980add3419533e05a44dcd705cbb508be4b40b2af"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/014-before.json",
+      "bytes": 19614,
+      "sha256": "f11cb835793986340604bff980add3419533e05a44dcd705cbb508be4b40b2af"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/015-after.json",
+      "bytes": 19614,
+      "sha256": "f11cb835793986340604bff980add3419533e05a44dcd705cbb508be4b40b2af"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/015-before.json",
+      "bytes": 19614,
+      "sha256": "f11cb835793986340604bff980add3419533e05a44dcd705cbb508be4b40b2af"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/016-after.json",
+      "bytes": 19614,
+      "sha256": "f11cb835793986340604bff980add3419533e05a44dcd705cbb508be4b40b2af"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/016-before.json",
+      "bytes": 19614,
+      "sha256": "f11cb835793986340604bff980add3419533e05a44dcd705cbb508be4b40b2af"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/017-after.json",
+      "bytes": 20112,
+      "sha256": "8384960bfed51c824a82802771cbc84200fa0c83e4772214c6c8850e06f7ea03"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/017-before.json",
+      "bytes": 19614,
+      "sha256": "f11cb835793986340604bff980add3419533e05a44dcd705cbb508be4b40b2af"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/018-after.json",
+      "bytes": 20618,
+      "sha256": "020896b87bde4a307b9cdfe93b4e25358377dbf6f4ac0c110cc075e0bc82be0a"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/018-before.json",
+      "bytes": 20112,
+      "sha256": "8384960bfed51c824a82802771cbc84200fa0c83e4772214c6c8850e06f7ea03"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/019-after.json",
+      "bytes": 20714,
+      "sha256": "dc8cda1793da4c97ce8b2949de2a6d738488552673e20c53778f792a94a47b3a"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/019-before.json",
+      "bytes": 20618,
+      "sha256": "020896b87bde4a307b9cdfe93b4e25358377dbf6f4ac0c110cc075e0bc82be0a"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/020-after.json",
+      "bytes": 20714,
+      "sha256": "dc8cda1793da4c97ce8b2949de2a6d738488552673e20c53778f792a94a47b3a"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/020-before.json",
+      "bytes": 20714,
+      "sha256": "dc8cda1793da4c97ce8b2949de2a6d738488552673e20c53778f792a94a47b3a"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/021-after.json",
+      "bytes": 22222,
+      "sha256": "1d753a3df9fbdd302f1e40a24a9cf683f463b7c8f165e596a4d9e408af3864e1"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/021-before.json",
+      "bytes": 20714,
+      "sha256": "dc8cda1793da4c97ce8b2949de2a6d738488552673e20c53778f792a94a47b3a"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/022-after.json",
+      "bytes": 22307,
+      "sha256": "b8c78f4ad79ceec4b25897d3725eb893978d1b0e32b77540577444905aba113c"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/022-before.json",
+      "bytes": 22222,
+      "sha256": "1d753a3df9fbdd302f1e40a24a9cf683f463b7c8f165e596a4d9e408af3864e1"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/023-after.json",
+      "bytes": 22307,
+      "sha256": "b8c78f4ad79ceec4b25897d3725eb893978d1b0e32b77540577444905aba113c"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/023-before.json",
+      "bytes": 22307,
+      "sha256": "b8c78f4ad79ceec4b25897d3725eb893978d1b0e32b77540577444905aba113c"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/024-after.json",
+      "bytes": 22885,
+      "sha256": "774ff640de8e18413ca9817d780b0fc2bf0f3808324eb0946cdb9f9d981f7a3d"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/024-before.json",
+      "bytes": 22307,
+      "sha256": "b8c78f4ad79ceec4b25897d3725eb893978d1b0e32b77540577444905aba113c"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/025-after.json",
+      "bytes": 24114,
+      "sha256": "5d1da87b9deca5f489a60f80640564829ddd26aa2ad2c6b0d454dba96db46650"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/025-before.json",
+      "bytes": 22885,
+      "sha256": "774ff640de8e18413ca9817d780b0fc2bf0f3808324eb0946cdb9f9d981f7a3d"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/026-after.json",
+      "bytes": 25896,
+      "sha256": "d9836910105390de0b726871d53e57837f7dcc778ee5c0afb8754d312e85c31f"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/026-before.json",
+      "bytes": 24114,
+      "sha256": "5d1da87b9deca5f489a60f80640564829ddd26aa2ad2c6b0d454dba96db46650"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/027-after.json",
+      "bytes": 25896,
+      "sha256": "d9836910105390de0b726871d53e57837f7dcc778ee5c0afb8754d312e85c31f"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/027-before.json",
+      "bytes": 25896,
+      "sha256": "d9836910105390de0b726871d53e57837f7dcc778ee5c0afb8754d312e85c31f"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/028-after.json",
+      "bytes": 27674,
+      "sha256": "e944b7f6ede7cb656b576c7651715918554bc97b82f8fa5084aeff86bc86c9f5"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/028-before.json",
+      "bytes": 25896,
+      "sha256": "d9836910105390de0b726871d53e57837f7dcc778ee5c0afb8754d312e85c31f"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/029-after.json",
+      "bytes": 27674,
+      "sha256": "e944b7f6ede7cb656b576c7651715918554bc97b82f8fa5084aeff86bc86c9f5"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/029-before.json",
+      "bytes": 27674,
+      "sha256": "e944b7f6ede7cb656b576c7651715918554bc97b82f8fa5084aeff86bc86c9f5"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/030-after.json",
+      "bytes": 27674,
+      "sha256": "e944b7f6ede7cb656b576c7651715918554bc97b82f8fa5084aeff86bc86c9f5"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/030-before.json",
+      "bytes": 27674,
+      "sha256": "e944b7f6ede7cb656b576c7651715918554bc97b82f8fa5084aeff86bc86c9f5"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/031-after.json",
+      "bytes": 27784,
+      "sha256": "ee0ff5916e58e6b8565e0e7cbd2d2d0479e3f549e79abdf8bf0cff712fa71a01"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/031-before.json",
+      "bytes": 27674,
+      "sha256": "e944b7f6ede7cb656b576c7651715918554bc97b82f8fa5084aeff86bc86c9f5"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/032-after.json",
+      "bytes": 27784,
+      "sha256": "ee0ff5916e58e6b8565e0e7cbd2d2d0479e3f549e79abdf8bf0cff712fa71a01"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/032-before.json",
+      "bytes": 27784,
+      "sha256": "ee0ff5916e58e6b8565e0e7cbd2d2d0479e3f549e79abdf8bf0cff712fa71a01"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/033-after.json",
+      "bytes": 27784,
+      "sha256": "ee0ff5916e58e6b8565e0e7cbd2d2d0479e3f549e79abdf8bf0cff712fa71a01"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/033-before.json",
+      "bytes": 27784,
+      "sha256": "ee0ff5916e58e6b8565e0e7cbd2d2d0479e3f549e79abdf8bf0cff712fa71a01"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/034-after.json",
+      "bytes": 27891,
+      "sha256": "cc8a6d44f5f6611f3c86150fc64577fac7f34c72d83971e1fd201333181ba0f0"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/034-before.json",
+      "bytes": 27784,
+      "sha256": "ee0ff5916e58e6b8565e0e7cbd2d2d0479e3f549e79abdf8bf0cff712fa71a01"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/035-after.json",
+      "bytes": 27993,
+      "sha256": "1cb90bfceb496fcb3b09a24b1c7c7e8a3b89e60122ceb89b4cf0d94eaeb7da57"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/035-before.json",
+      "bytes": 27891,
+      "sha256": "cc8a6d44f5f6611f3c86150fc64577fac7f34c72d83971e1fd201333181ba0f0"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/036-after.json",
+      "bytes": 27993,
+      "sha256": "1cb90bfceb496fcb3b09a24b1c7c7e8a3b89e60122ceb89b4cf0d94eaeb7da57"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/036-before.json",
+      "bytes": 27993,
+      "sha256": "1cb90bfceb496fcb3b09a24b1c7c7e8a3b89e60122ceb89b4cf0d94eaeb7da57"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/037-after.json",
+      "bytes": 30326,
+      "sha256": "231032c4a7713a1b25634cd4d5ab235cb1b9c7c3d6a5d845e24db4c1be26e5a2"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/037-before.json",
+      "bytes": 27993,
+      "sha256": "1cb90bfceb496fcb3b09a24b1c7c7e8a3b89e60122ceb89b4cf0d94eaeb7da57"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/038-after.json",
+      "bytes": 32473,
+      "sha256": "9ca5d7ddd716e288790b633fb44eb7c3cf41a387651e9d979c5bb0b767cc2c22"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/038-before.json",
+      "bytes": 30326,
+      "sha256": "231032c4a7713a1b25634cd4d5ab235cb1b9c7c3d6a5d845e24db4c1be26e5a2"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/039-after.json",
+      "bytes": 33200,
+      "sha256": "be3337b8733cd825102555c23c5f1f0c3cbbc056957a397c0f4af952a410708c"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/039-before.json",
+      "bytes": 32473,
+      "sha256": "9ca5d7ddd716e288790b633fb44eb7c3cf41a387651e9d979c5bb0b767cc2c22"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/040-after.json",
+      "bytes": 33200,
+      "sha256": "be3337b8733cd825102555c23c5f1f0c3cbbc056957a397c0f4af952a410708c"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/040-before.json",
+      "bytes": 33200,
+      "sha256": "be3337b8733cd825102555c23c5f1f0c3cbbc056957a397c0f4af952a410708c"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/041-after.json",
+      "bytes": 33256,
+      "sha256": "26c0bea0a8acc0faf558dee5704db6afc111da78b301d479e0d84bc405eb0d2e"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/041-before.json",
+      "bytes": 33200,
+      "sha256": "be3337b8733cd825102555c23c5f1f0c3cbbc056957a397c0f4af952a410708c"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/advance-01-liabilities-invariants.json",
+      "bytes": 634,
+      "sha256": "701ee73c1c17be086b76b3fe9bf2c591d2fb07f21de1026804bbf310ebf8c94f"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/advance-01-liabilities.json",
+      "bytes": 12524,
+      "sha256": "5d3433a1c6fd1583da91974f128a2c7805dd31245ba3104356a2147084592f68"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/advance-02-created-invariants.json",
+      "bytes": 634,
+      "sha256": "701ee73c1c17be086b76b3fe9bf2c591d2fb07f21de1026804bbf310ebf8c94f"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/advance-02-created.json",
+      "bytes": 14342,
+      "sha256": "0dae3529a6967428a4ba9d8f1eec6527f29b3994e1ecfd2a1e6b6aec2dd10343"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/advance-03-part-applied-invariants.json",
+      "bytes": 634,
+      "sha256": "701ee73c1c17be086b76b3fe9bf2c591d2fb07f21de1026804bbf310ebf8c94f"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/advance-03-part-applied.json",
+      "bytes": 17292,
+      "sha256": "86f6a8bdebcd171077896e31923413b5f384c824162b68b5ef5317bf96f58f00"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/advance-04-bill-settled-invariants.json",
+      "bytes": 634,
+      "sha256": "701ee73c1c17be086b76b3fe9bf2c591d2fb07f21de1026804bbf310ebf8c94f"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/advance-04-bill-settled.json",
+      "bytes": 19614,
+      "sha256": "f11cb835793986340604bff980add3419533e05a44dcd705cbb508be4b40b2af"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/advance-05-guards-invariants.json",
+      "bytes": 634,
+      "sha256": "701ee73c1c17be086b76b3fe9bf2c591d2fb07f21de1026804bbf310ebf8c94f"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/advance-05-guards.json",
+      "bytes": 19614,
+      "sha256": "f11cb835793986340604bff980add3419533e05a44dcd705cbb508be4b40b2af"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/advance-06-applications-reversed-invariants.json",
+      "bytes": 748,
+      "sha256": "4423385de30fc413b14d22eb05c8081aa3e55493410d2cd19105aaaf148c97a0"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/advance-06-applications-reversed.json",
+      "bytes": 20618,
+      "sha256": "020896b87bde4a307b9cdfe93b4e25358377dbf6f4ac0c110cc075e0bc82be0a"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/advance-07-voided-invariants.json",
+      "bytes": 804,
+      "sha256": "267b7afaa6fd44dbec9a0fcfdd234860518ae2ce2146255500292701b18cecdb"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/advance-07-voided.json",
+      "bytes": 20714,
+      "sha256": "dc8cda1793da4c97ce8b2949de2a6d738488552673e20c53778f792a94a47b3a"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/advance-08-unused-bank-void-invariants.json",
+      "bytes": 860,
+      "sha256": "9c850621156ee6edc528dc5fbe10d51fc5381f81fe3b7601558f0ab798c2398c"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/advance-08-unused-bank-void.json",
+      "bytes": 22307,
+      "sha256": "b8c78f4ad79ceec4b25897d3725eb893978d1b0e32b77540577444905aba113c"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/advance-09-atomic-failure-invariants.json",
+      "bytes": 860,
+      "sha256": "9c850621156ee6edc528dc5fbe10d51fc5381f81fe3b7601558f0ab798c2398c"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/advance-09-atomic-failure.json",
+      "bytes": 22307,
+      "sha256": "b8c78f4ad79ceec4b25897d3725eb893978d1b0e32b77540577444905aba113c"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/api-events.json",
+      "bytes": 35560,
+      "sha256": "760d1a108b7b37578c335a9bfa90f9931671f7c76df7049005fc6a96823f9586"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/cash-01-opening-invariants.json",
+      "bytes": 1028,
+      "sha256": "58ac0018b80070cdd74ea027b57ecbdef80068a4fcdee56f6bca95cf9ed8941d"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/cash-01-opening.json",
+      "bytes": 30326,
+      "sha256": "231032c4a7713a1b25634cd4d5ab235cb1b9c7c3d6a5d845e24db4c1be26e5a2"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/cash-02-opening-replaced-invariants.json",
+      "bytes": 1140,
+      "sha256": "5a35630be3f04e359d8a80f0c6e5bbc58af2dcb73f9e05216eadfba9075f86be"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/cash-02-opening-replaced.json",
+      "bytes": 32473,
+      "sha256": "9ca5d7ddd716e288790b633fb44eb7c3cf41a387651e9d979c5bb0b767cc2c22"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/cash-03-counted-invariants.json",
+      "bytes": 1140,
+      "sha256": "5a35630be3f04e359d8a80f0c6e5bbc58af2dcb73f9e05216eadfba9075f86be"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/cash-03-counted.json",
+      "bytes": 33200,
+      "sha256": "be3337b8733cd825102555c23c5f1f0c3cbbc056957a397c0f4af952a410708c"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/cash-04-invalid-count-atomic-invariants.json",
+      "bytes": 1140,
+      "sha256": "5a35630be3f04e359d8a80f0c6e5bbc58af2dcb73f9e05216eadfba9075f86be"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/cash-04-invalid-count-atomic.json",
+      "bytes": 33200,
+      "sha256": "be3337b8733cd825102555c23c5f1f0c3cbbc056957a397c0f4af952a410708c"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/cash-05-opening-zeroed-invariants.json",
+      "bytes": 1252,
+      "sha256": "bede354096666b70d2f408c9d5328640a76a27d282213f3937a48481e021216e"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/cash-05-opening-zeroed.json",
+      "bytes": 33256,
+      "sha256": "26c0bea0a8acc0faf558dee5704db6afc111da78b301d479e0d84bc405eb0d2e"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/erp.db",
+      "bytes": 1630208,
+      "sha256": "774e28c7e6e2d1c9f2f9b82bc12a195c57fdefa09615a9179e736ac975ca0e32"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/erp.db-shm",
+      "bytes": 32768,
+      "sha256": "fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/erp.db-wal",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/expense-01-before-invariants.json",
+      "bytes": 860,
+      "sha256": "9c850621156ee6edc528dc5fbe10d51fc5381f81fe3b7601558f0ab798c2398c"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/expense-01-before.json",
+      "bytes": 22307,
+      "sha256": "b8c78f4ad79ceec4b25897d3725eb893978d1b0e32b77540577444905aba113c"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/expense-02-recorded-invariants.json",
+      "bytes": 860,
+      "sha256": "9c850621156ee6edc528dc5fbe10d51fc5381f81fe3b7601558f0ab798c2398c"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/expense-02-recorded.json",
+      "bytes": 24114,
+      "sha256": "5d1da87b9deca5f489a60f80640564829ddd26aa2ad2c6b0d454dba96db46650"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/expense-03-part-paid-invariants.json",
+      "bytes": 860,
+      "sha256": "9c850621156ee6edc528dc5fbe10d51fc5381f81fe3b7601558f0ab798c2398c"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/expense-03-part-paid.json",
+      "bytes": 25896,
+      "sha256": "d9836910105390de0b726871d53e57837f7dcc778ee5c0afb8754d312e85c31f"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/expense-04-settled-invariants.json",
+      "bytes": 860,
+      "sha256": "9c850621156ee6edc528dc5fbe10d51fc5381f81fe3b7601558f0ab798c2398c"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/expense-04-settled.json",
+      "bytes": 27674,
+      "sha256": "e944b7f6ede7cb656b576c7651715918554bc97b82f8fa5084aeff86bc86c9f5"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/expense-05-payment-voided-invariants.json",
+      "bytes": 916,
+      "sha256": "272e0ed58d11c8b230a9288cb0df87d3da8bededff33ae19f5b50cf655234d1d"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/expense-05-payment-voided.json",
+      "bytes": 27784,
+      "sha256": "ee0ff5916e58e6b8565e0e7cbd2d2d0479e3f549e79abdf8bf0cff712fa71a01"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/expense-06-atomic-failure-invariants.json",
+      "bytes": 916,
+      "sha256": "272e0ed58d11c8b230a9288cb0df87d3da8bededff33ae19f5b50cf655234d1d"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/expense-06-atomic-failure.json",
+      "bytes": 27784,
+      "sha256": "ee0ff5916e58e6b8565e0e7cbd2d2d0479e3f549e79abdf8bf0cff712fa71a01"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/expense-07-cancelled-invariants.json",
+      "bytes": 1028,
+      "sha256": "58ac0018b80070cdd74ea027b57ecbdef80068a4fcdee56f6bca95cf9ed8941d"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/expense-07-cancelled.json",
+      "bytes": 27993,
+      "sha256": "1cb90bfceb496fcb3b09a24b1c7c7e8a3b89e60122ceb89b4cf0d94eaeb7da57"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/expense-08-cancelled-payment-guard-invariants.json",
+      "bytes": 1028,
+      "sha256": "58ac0018b80070cdd74ea027b57ecbdef80068a4fcdee56f6bca95cf9ed8941d"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/expense-08-cancelled-payment-guard.json",
+      "bytes": 27993,
+      "sha256": "1cb90bfceb496fcb3b09a24b1c7c7e8a3b89e60122ceb89b4cf0d94eaeb7da57"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/results.json",
+      "bytes": 170257,
+      "sha256": "101f1d6ee8e6fb89afe2c4a8607c07953e46ecca9b5ecb62f92707250a645fe7"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-GIxBh2/schema.json",
+      "bytes": 64749,
+      "sha256": "be492c6bdd4d769d597bad1b26f692e0e14645ad88b3ed7ce50bad507eaa5c91"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/001-after.json",
+      "bytes": 3858,
+      "sha256": "227735a24f20a03426e138f3c693a502ee7d3d2aeb0aa3460dbfb138d5a9e1df"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/001-before.json",
+      "bytes": 2218,
+      "sha256": "d9db9f40d421c4f4711e60f2cb5750e3b1af7b835d840a3d91a8ed65002d465b"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/002-after.json",
+      "bytes": 5109,
+      "sha256": "50a3983e950062a95907b9ed1843c1da68af4f37cf0639c98af71e60f6ccd865"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/002-before.json",
+      "bytes": 3858,
+      "sha256": "227735a24f20a03426e138f3c693a502ee7d3d2aeb0aa3460dbfb138d5a9e1df"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/003-after.json",
+      "bytes": 5478,
+      "sha256": "c1ad6af68d89d17821648c326bf3411076d8d0d555fb920172fd5fd4566a5a4d"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/003-before.json",
+      "bytes": 5109,
+      "sha256": "50a3983e950062a95907b9ed1843c1da68af4f37cf0639c98af71e60f6ccd865"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/004-after.json",
+      "bytes": 7832,
+      "sha256": "5ef306231a5a73377d8b7a370f6b1d35f2697ca203979323f7966a07c7ece049"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/004-before.json",
+      "bytes": 5478,
+      "sha256": "c1ad6af68d89d17821648c326bf3411076d8d0d555fb920172fd5fd4566a5a4d"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/005-after.json",
+      "bytes": 7832,
+      "sha256": "5ef306231a5a73377d8b7a370f6b1d35f2697ca203979323f7966a07c7ece049"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/005-before.json",
+      "bytes": 7832,
+      "sha256": "5ef306231a5a73377d8b7a370f6b1d35f2697ca203979323f7966a07c7ece049"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/006-after.json",
+      "bytes": 11114,
+      "sha256": "a4a56575c5e0e077578923297490715e7a2e8f52ec0a2995359ae446e29f2349"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/006-before.json",
+      "bytes": 7832,
+      "sha256": "5ef306231a5a73377d8b7a370f6b1d35f2697ca203979323f7966a07c7ece049"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/007-after.json",
+      "bytes": 12629,
+      "sha256": "8a4989b61ea588b8129d5d41f81c551dd0d9b5edc74a80fb5496546e467dd53a"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/007-before.json",
+      "bytes": 11114,
+      "sha256": "a4a56575c5e0e077578923297490715e7a2e8f52ec0a2995359ae446e29f2349"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/008-after.json",
+      "bytes": 12629,
+      "sha256": "8a4989b61ea588b8129d5d41f81c551dd0d9b5edc74a80fb5496546e467dd53a"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/008-before.json",
+      "bytes": 12629,
+      "sha256": "8a4989b61ea588b8129d5d41f81c551dd0d9b5edc74a80fb5496546e467dd53a"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/009-after.json",
+      "bytes": 15280,
+      "sha256": "09d79c36137950b6f418de83ceb6360c4a5a4289f64a639b38ed2f287cb9c511"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/009-before.json",
+      "bytes": 12629,
+      "sha256": "8a4989b61ea588b8129d5d41f81c551dd0d9b5edc74a80fb5496546e467dd53a"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/010-after.json",
+      "bytes": 15280,
+      "sha256": "09d79c36137950b6f418de83ceb6360c4a5a4289f64a639b38ed2f287cb9c511"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/010-before.json",
+      "bytes": 15280,
+      "sha256": "09d79c36137950b6f418de83ceb6360c4a5a4289f64a639b38ed2f287cb9c511"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/011-after.json",
+      "bytes": 17602,
+      "sha256": "f07e0d6226733036125a4aff4d7ac720430a11f2d3c9e24f2bb791366e92c335"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/011-before.json",
+      "bytes": 15280,
+      "sha256": "09d79c36137950b6f418de83ceb6360c4a5a4289f64a639b38ed2f287cb9c511"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/012-after.json",
+      "bytes": 17602,
+      "sha256": "f07e0d6226733036125a4aff4d7ac720430a11f2d3c9e24f2bb791366e92c335"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/012-before.json",
+      "bytes": 17602,
+      "sha256": "f07e0d6226733036125a4aff4d7ac720430a11f2d3c9e24f2bb791366e92c335"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/013-after.json",
+      "bytes": 17602,
+      "sha256": "f07e0d6226733036125a4aff4d7ac720430a11f2d3c9e24f2bb791366e92c335"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/013-before.json",
+      "bytes": 17602,
+      "sha256": "f07e0d6226733036125a4aff4d7ac720430a11f2d3c9e24f2bb791366e92c335"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/014-after.json",
+      "bytes": 17602,
+      "sha256": "f07e0d6226733036125a4aff4d7ac720430a11f2d3c9e24f2bb791366e92c335"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/014-before.json",
+      "bytes": 17602,
+      "sha256": "f07e0d6226733036125a4aff4d7ac720430a11f2d3c9e24f2bb791366e92c335"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/015-after.json",
+      "bytes": 17602,
+      "sha256": "f07e0d6226733036125a4aff4d7ac720430a11f2d3c9e24f2bb791366e92c335"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/015-before.json",
+      "bytes": 17602,
+      "sha256": "f07e0d6226733036125a4aff4d7ac720430a11f2d3c9e24f2bb791366e92c335"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/016-after.json",
+      "bytes": 17602,
+      "sha256": "f07e0d6226733036125a4aff4d7ac720430a11f2d3c9e24f2bb791366e92c335"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/016-before.json",
+      "bytes": 17602,
+      "sha256": "f07e0d6226733036125a4aff4d7ac720430a11f2d3c9e24f2bb791366e92c335"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/017-after.json",
+      "bytes": 18100,
+      "sha256": "4461d8c69a3657b7e6ee16beba43716574ea7037f58b74571594acdb93ace858"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/017-before.json",
+      "bytes": 17602,
+      "sha256": "f07e0d6226733036125a4aff4d7ac720430a11f2d3c9e24f2bb791366e92c335"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/018-after.json",
+      "bytes": 18606,
+      "sha256": "64a849eca72a75278a3f058b29e12516f9e4cd99033c73d513e2e96a16e09dea"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/018-before.json",
+      "bytes": 18100,
+      "sha256": "4461d8c69a3657b7e6ee16beba43716574ea7037f58b74571594acdb93ace858"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/019-after.json",
+      "bytes": 18702,
+      "sha256": "db660156dd78812202bdc1100b7f3951b8829ed2d7ff0f6aa88f0025f055f33c"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/019-before.json",
+      "bytes": 18606,
+      "sha256": "64a849eca72a75278a3f058b29e12516f9e4cd99033c73d513e2e96a16e09dea"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/020-after.json",
+      "bytes": 18702,
+      "sha256": "db660156dd78812202bdc1100b7f3951b8829ed2d7ff0f6aa88f0025f055f33c"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/020-before.json",
+      "bytes": 18702,
+      "sha256": "db660156dd78812202bdc1100b7f3951b8829ed2d7ff0f6aa88f0025f055f33c"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/021-after.json",
+      "bytes": 20210,
+      "sha256": "ab29b46a962fcaee74cec64c146579f3185b2ed693f63b5a8f6cc87da6537388"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/021-before.json",
+      "bytes": 18702,
+      "sha256": "db660156dd78812202bdc1100b7f3951b8829ed2d7ff0f6aa88f0025f055f33c"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/022-after.json",
+      "bytes": 20295,
+      "sha256": "d68e44c2d1728718f79dc112ceee005a50852f0d09f61de5f83135659ae30dd8"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/022-before.json",
+      "bytes": 20210,
+      "sha256": "ab29b46a962fcaee74cec64c146579f3185b2ed693f63b5a8f6cc87da6537388"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/023-after.json",
+      "bytes": 20295,
+      "sha256": "d68e44c2d1728718f79dc112ceee005a50852f0d09f61de5f83135659ae30dd8"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/023-before.json",
+      "bytes": 20295,
+      "sha256": "d68e44c2d1728718f79dc112ceee005a50852f0d09f61de5f83135659ae30dd8"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/024-after.json",
+      "bytes": 20873,
+      "sha256": "f3075bd6a3cb865791d0a37610a74e9ee9feb58c37da0d5b580f2b9f9038a3b1"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/024-before.json",
+      "bytes": 20295,
+      "sha256": "d68e44c2d1728718f79dc112ceee005a50852f0d09f61de5f83135659ae30dd8"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/025-after.json",
+      "bytes": 22102,
+      "sha256": "e14566c36b5f012fe9b5134fc06cca5e624d10fc6a6da6e85a9555a3e94e8861"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/025-before.json",
+      "bytes": 20873,
+      "sha256": "f3075bd6a3cb865791d0a37610a74e9ee9feb58c37da0d5b580f2b9f9038a3b1"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/026-after.json",
+      "bytes": 23588,
+      "sha256": "b9b286d9a1ff14b17bb57225306ec818568c27cda683bbeb213291349b4a1892"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/026-before.json",
+      "bytes": 22102,
+      "sha256": "e14566c36b5f012fe9b5134fc06cca5e624d10fc6a6da6e85a9555a3e94e8861"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/027-after.json",
+      "bytes": 23588,
+      "sha256": "b9b286d9a1ff14b17bb57225306ec818568c27cda683bbeb213291349b4a1892"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/027-before.json",
+      "bytes": 23588,
+      "sha256": "b9b286d9a1ff14b17bb57225306ec818568c27cda683bbeb213291349b4a1892"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/028-after.json",
+      "bytes": 25069,
+      "sha256": "b17cb099a25f1300d25bafab3db5477eb6142d8d7fc54f7eef4ee73c0c679d33"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/028-before.json",
+      "bytes": 23588,
+      "sha256": "b9b286d9a1ff14b17bb57225306ec818568c27cda683bbeb213291349b4a1892"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/029-after.json",
+      "bytes": 25069,
+      "sha256": "b17cb099a25f1300d25bafab3db5477eb6142d8d7fc54f7eef4ee73c0c679d33"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/029-before.json",
+      "bytes": 25069,
+      "sha256": "b17cb099a25f1300d25bafab3db5477eb6142d8d7fc54f7eef4ee73c0c679d33"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/030-after.json",
+      "bytes": 25069,
+      "sha256": "b17cb099a25f1300d25bafab3db5477eb6142d8d7fc54f7eef4ee73c0c679d33"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/030-before.json",
+      "bytes": 25069,
+      "sha256": "b17cb099a25f1300d25bafab3db5477eb6142d8d7fc54f7eef4ee73c0c679d33"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/031-after.json",
+      "bytes": 25179,
+      "sha256": "79fedf184c4223e33c93789a14c810291f8471a6100c1d90b9acb907ead2a72f"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/031-before.json",
+      "bytes": 25069,
+      "sha256": "b17cb099a25f1300d25bafab3db5477eb6142d8d7fc54f7eef4ee73c0c679d33"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/032-after.json",
+      "bytes": 25179,
+      "sha256": "79fedf184c4223e33c93789a14c810291f8471a6100c1d90b9acb907ead2a72f"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/032-before.json",
+      "bytes": 25179,
+      "sha256": "79fedf184c4223e33c93789a14c810291f8471a6100c1d90b9acb907ead2a72f"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/033-after.json",
+      "bytes": 25179,
+      "sha256": "79fedf184c4223e33c93789a14c810291f8471a6100c1d90b9acb907ead2a72f"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/033-before.json",
+      "bytes": 25179,
+      "sha256": "79fedf184c4223e33c93789a14c810291f8471a6100c1d90b9acb907ead2a72f"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/034-after.json",
+      "bytes": 25286,
+      "sha256": "02ed673eaa4e8420b80f2d6ac75ddc55d3cbe6735b8c52f1b80220f007de8170"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/034-before.json",
+      "bytes": 25179,
+      "sha256": "79fedf184c4223e33c93789a14c810291f8471a6100c1d90b9acb907ead2a72f"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/035-after.json",
+      "bytes": 25388,
+      "sha256": "1c0a8c06df6c7c65b77ce5b2c9bebf2932af886b3f7d3b62a53d60de05b850f8"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/035-before.json",
+      "bytes": 25286,
+      "sha256": "02ed673eaa4e8420b80f2d6ac75ddc55d3cbe6735b8c52f1b80220f007de8170"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/036-after.json",
+      "bytes": 25388,
+      "sha256": "1c0a8c06df6c7c65b77ce5b2c9bebf2932af886b3f7d3b62a53d60de05b850f8"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/036-before.json",
+      "bytes": 25388,
+      "sha256": "1c0a8c06df6c7c65b77ce5b2c9bebf2932af886b3f7d3b62a53d60de05b850f8"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/037-after.json",
+      "bytes": 27721,
+      "sha256": "63ccfb05e2a33e709b8d7d88d92c74926ef1bb1beb29fa33deeeb8857591134c"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/037-before.json",
+      "bytes": 25388,
+      "sha256": "1c0a8c06df6c7c65b77ce5b2c9bebf2932af886b3f7d3b62a53d60de05b850f8"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/038-after.json",
+      "bytes": 29868,
+      "sha256": "c108f867e6ba9ae702bd9ea21e49e9aaf870ee1645c579c8d73001390dba7361"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/038-before.json",
+      "bytes": 27721,
+      "sha256": "63ccfb05e2a33e709b8d7d88d92c74926ef1bb1beb29fa33deeeb8857591134c"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/039-after.json",
+      "bytes": 30595,
+      "sha256": "2c03cb042f57b4cef6fe64267f664dadec1c7b3ace25df3693e0fe71193ebbef"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/039-before.json",
+      "bytes": 29868,
+      "sha256": "c108f867e6ba9ae702bd9ea21e49e9aaf870ee1645c579c8d73001390dba7361"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/040-after.json",
+      "bytes": 30595,
+      "sha256": "2c03cb042f57b4cef6fe64267f664dadec1c7b3ace25df3693e0fe71193ebbef"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/040-before.json",
+      "bytes": 30595,
+      "sha256": "2c03cb042f57b4cef6fe64267f664dadec1c7b3ace25df3693e0fe71193ebbef"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/041-after.json",
+      "bytes": 30651,
+      "sha256": "bcea44df7b345fe5f91e519fe5689322de99c88a592e442981e7b11e8b230d0a"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/041-before.json",
+      "bytes": 30595,
+      "sha256": "2c03cb042f57b4cef6fe64267f664dadec1c7b3ace25df3693e0fe71193ebbef"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/advance-01-liabilities-invariants.json",
+      "bytes": 566,
+      "sha256": "873ba55e82bf96d9c701bba5bc56ad894d965e1a4e7463a0575c83229bf6b5b1"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/advance-01-liabilities.json",
+      "bytes": 11114,
+      "sha256": "a4a56575c5e0e077578923297490715e7a2e8f52ec0a2995359ae446e29f2349"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/advance-02-created-invariants.json",
+      "bytes": 566,
+      "sha256": "873ba55e82bf96d9c701bba5bc56ad894d965e1a4e7463a0575c83229bf6b5b1"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/advance-02-created.json",
+      "bytes": 12629,
+      "sha256": "8a4989b61ea588b8129d5d41f81c551dd0d9b5edc74a80fb5496546e467dd53a"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/advance-03-part-applied-invariants.json",
+      "bytes": 566,
+      "sha256": "873ba55e82bf96d9c701bba5bc56ad894d965e1a4e7463a0575c83229bf6b5b1"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/advance-03-part-applied.json",
+      "bytes": 15280,
+      "sha256": "09d79c36137950b6f418de83ceb6360c4a5a4289f64a639b38ed2f287cb9c511"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/advance-04-bill-settled-invariants.json",
+      "bytes": 566,
+      "sha256": "873ba55e82bf96d9c701bba5bc56ad894d965e1a4e7463a0575c83229bf6b5b1"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/advance-04-bill-settled.json",
+      "bytes": 17602,
+      "sha256": "f07e0d6226733036125a4aff4d7ac720430a11f2d3c9e24f2bb791366e92c335"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/advance-05-guards-invariants.json",
+      "bytes": 566,
+      "sha256": "873ba55e82bf96d9c701bba5bc56ad894d965e1a4e7463a0575c83229bf6b5b1"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/advance-05-guards.json",
+      "bytes": 17602,
+      "sha256": "f07e0d6226733036125a4aff4d7ac720430a11f2d3c9e24f2bb791366e92c335"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/advance-06-applications-reversed-invariants.json",
+      "bytes": 566,
+      "sha256": "873ba55e82bf96d9c701bba5bc56ad894d965e1a4e7463a0575c83229bf6b5b1"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/advance-06-applications-reversed.json",
+      "bytes": 18606,
+      "sha256": "64a849eca72a75278a3f058b29e12516f9e4cd99033c73d513e2e96a16e09dea"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/advance-07-voided-invariants.json",
+      "bytes": 566,
+      "sha256": "873ba55e82bf96d9c701bba5bc56ad894d965e1a4e7463a0575c83229bf6b5b1"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/advance-07-voided.json",
+      "bytes": 18702,
+      "sha256": "db660156dd78812202bdc1100b7f3951b8829ed2d7ff0f6aa88f0025f055f33c"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/advance-08-unused-bank-void-invariants.json",
+      "bytes": 566,
+      "sha256": "873ba55e82bf96d9c701bba5bc56ad894d965e1a4e7463a0575c83229bf6b5b1"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/advance-08-unused-bank-void.json",
+      "bytes": 20295,
+      "sha256": "d68e44c2d1728718f79dc112ceee005a50852f0d09f61de5f83135659ae30dd8"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/advance-09-atomic-failure-invariants.json",
+      "bytes": 566,
+      "sha256": "873ba55e82bf96d9c701bba5bc56ad894d965e1a4e7463a0575c83229bf6b5b1"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/advance-09-atomic-failure.json",
+      "bytes": 20295,
+      "sha256": "d68e44c2d1728718f79dc112ceee005a50852f0d09f61de5f83135659ae30dd8"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/api-events.json",
+      "bytes": 35560,
+      "sha256": "15963ad552889ace22cc7c204de8f6bc5c85269c58d4f5a898ef4cbbd7e00cc5"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/cash-01-opening-invariants.json",
+      "bytes": 566,
+      "sha256": "873ba55e82bf96d9c701bba5bc56ad894d965e1a4e7463a0575c83229bf6b5b1"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/cash-01-opening.json",
+      "bytes": 27721,
+      "sha256": "63ccfb05e2a33e709b8d7d88d92c74926ef1bb1beb29fa33deeeb8857591134c"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/cash-02-opening-replaced-invariants.json",
+      "bytes": 566,
+      "sha256": "873ba55e82bf96d9c701bba5bc56ad894d965e1a4e7463a0575c83229bf6b5b1"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/cash-02-opening-replaced.json",
+      "bytes": 29868,
+      "sha256": "c108f867e6ba9ae702bd9ea21e49e9aaf870ee1645c579c8d73001390dba7361"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/cash-03-counted-invariants.json",
+      "bytes": 566,
+      "sha256": "873ba55e82bf96d9c701bba5bc56ad894d965e1a4e7463a0575c83229bf6b5b1"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/cash-03-counted.json",
+      "bytes": 30595,
+      "sha256": "2c03cb042f57b4cef6fe64267f664dadec1c7b3ace25df3693e0fe71193ebbef"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/cash-04-invalid-count-atomic-invariants.json",
+      "bytes": 566,
+      "sha256": "873ba55e82bf96d9c701bba5bc56ad894d965e1a4e7463a0575c83229bf6b5b1"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/cash-04-invalid-count-atomic.json",
+      "bytes": 30595,
+      "sha256": "2c03cb042f57b4cef6fe64267f664dadec1c7b3ace25df3693e0fe71193ebbef"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/cash-05-opening-zeroed-invariants.json",
+      "bytes": 566,
+      "sha256": "873ba55e82bf96d9c701bba5bc56ad894d965e1a4e7463a0575c83229bf6b5b1"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/cash-05-opening-zeroed.json",
+      "bytes": 30651,
+      "sha256": "bcea44df7b345fe5f91e519fe5689322de99c88a592e442981e7b11e8b230d0a"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/erp.db",
+      "bytes": 1630208,
+      "sha256": "d7d9fb8a4e8b52cb84592753dc7a8bc8c713a10d490758518dc9bf8f4b903b3f"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/expense-01-before-invariants.json",
+      "bytes": 566,
+      "sha256": "873ba55e82bf96d9c701bba5bc56ad894d965e1a4e7463a0575c83229bf6b5b1"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/expense-01-before.json",
+      "bytes": 20295,
+      "sha256": "d68e44c2d1728718f79dc112ceee005a50852f0d09f61de5f83135659ae30dd8"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/expense-02-recorded-invariants.json",
+      "bytes": 566,
+      "sha256": "873ba55e82bf96d9c701bba5bc56ad894d965e1a4e7463a0575c83229bf6b5b1"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/expense-02-recorded.json",
+      "bytes": 22102,
+      "sha256": "e14566c36b5f012fe9b5134fc06cca5e624d10fc6a6da6e85a9555a3e94e8861"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/expense-03-part-paid-invariants.json",
+      "bytes": 566,
+      "sha256": "873ba55e82bf96d9c701bba5bc56ad894d965e1a4e7463a0575c83229bf6b5b1"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/expense-03-part-paid.json",
+      "bytes": 23588,
+      "sha256": "b9b286d9a1ff14b17bb57225306ec818568c27cda683bbeb213291349b4a1892"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/expense-04-settled-invariants.json",
+      "bytes": 566,
+      "sha256": "873ba55e82bf96d9c701bba5bc56ad894d965e1a4e7463a0575c83229bf6b5b1"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/expense-04-settled.json",
+      "bytes": 25069,
+      "sha256": "b17cb099a25f1300d25bafab3db5477eb6142d8d7fc54f7eef4ee73c0c679d33"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/expense-05-payment-voided-invariants.json",
+      "bytes": 566,
+      "sha256": "873ba55e82bf96d9c701bba5bc56ad894d965e1a4e7463a0575c83229bf6b5b1"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/expense-05-payment-voided.json",
+      "bytes": 25179,
+      "sha256": "79fedf184c4223e33c93789a14c810291f8471a6100c1d90b9acb907ead2a72f"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/expense-06-atomic-failure-invariants.json",
+      "bytes": 566,
+      "sha256": "873ba55e82bf96d9c701bba5bc56ad894d965e1a4e7463a0575c83229bf6b5b1"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/expense-06-atomic-failure.json",
+      "bytes": 25179,
+      "sha256": "79fedf184c4223e33c93789a14c810291f8471a6100c1d90b9acb907ead2a72f"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/expense-07-cancelled-invariants.json",
+      "bytes": 566,
+      "sha256": "873ba55e82bf96d9c701bba5bc56ad894d965e1a4e7463a0575c83229bf6b5b1"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/expense-07-cancelled.json",
+      "bytes": 25388,
+      "sha256": "1c0a8c06df6c7c65b77ce5b2c9bebf2932af886b3f7d3b62a53d60de05b850f8"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/expense-08-cancelled-payment-guard-invariants.json",
+      "bytes": 566,
+      "sha256": "873ba55e82bf96d9c701bba5bc56ad894d965e1a4e7463a0575c83229bf6b5b1"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/expense-08-cancelled-payment-guard.json",
+      "bytes": 25388,
+      "sha256": "1c0a8c06df6c7c65b77ce5b2c9bebf2932af886b3f7d3b62a53d60de05b850f8"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/results.json",
+      "bytes": 138199,
+      "sha256": "05f958a4402b769aaaff7cc984359fc740cfa3e34fd092446a59ee3f35b9278f"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-hii4TA/schema.json",
+      "bytes": 64749,
+      "sha256": "be492c6bdd4d769d597bad1b26f692e0e14645ad88b3ed7ce50bad507eaa5c91"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-oN5SSD/erp.db",
+      "bytes": 1630208,
+      "sha256": "8c934c6da6868185ee08004322feb2fb4547301486852e81ffe444bdc5340602"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-oN5SSD/results.json",
+      "bytes": 1535,
+      "sha256": "4fc63ca6fcbddd44684ed939cd5fd32844bbbf64ee86da5b96c147217eeace90"
+    },
+    {
+      "path": "accounting-audit/evidence/payable-cash-run-oN5SSD/schema.json",
+      "bytes": 64749,
+      "sha256": "be492c6bdd4d769d597bad1b26f692e0e14645ad88b3ed7ce50bad507eaa5c91"
+    },
+    {
+      "path": "accounting-audit/evidence/quick.log",
+      "bytes": 6476,
+      "sha256": "170dd6ba99c49a7f0402b697f16e75e2e2c45ccf2eecfeaa8b7866c2ac6db719"
+    },
+    {
+      "path": "accounting-audit/evidence/repository-file-inventory.txt",
+      "bytes": 52371,
+      "sha256": "c8ec7ed68d8ba17bcba2ed962465e24209c0945fa1484d0d02d15bc76ae75059"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-console.log",
+      "bytes": 3945,
+      "sha256": "d02401314e157d72da0e8aa42f72ab55f250fc70c3c1b2b90d954189f995b4b9"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-exit.txt",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-latest-run.txt",
+      "bytes": 99,
+      "sha256": "d1145e71c6e7a591a7d9411ea1113c3042a56ce0eeb0097a5360f4ead814f2e4"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-5iZOGC/01-quotation-before.json",
+      "bytes": 7863,
+      "sha256": "f4af8b7f24de856c975a1b9c99b0ce0f475a2091eace401995c48d22b4ea9761"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-5iZOGC/02-quotation-converted-no-financial-effect.json",
+      "bytes": 9391,
+      "sha256": "d1d56ebe33b0fc49a019e1e944b5de61d19c63b13b46f980878295af1497fdf2"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-5iZOGC/03-sales-order-invoiced.json",
+      "bytes": 14759,
+      "sha256": "3e87e67ecef7632be97d1791c5b031698abfc8520d1ae20ae8a6022afeb7f389"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-5iZOGC/04-sales-order-cancelled.json",
+      "bytes": 15970,
+      "sha256": "69f7f264e08faa268d36fdbc8c55aa44a7397c1264439b22a78c133057e78c95"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-5iZOGC/05-sales-order-repeat-cancel.json",
+      "bytes": 15974,
+      "sha256": "4faefd24510ee120e90cfd4c59f3ff4a163f34bcf3759d88524ac9a2fc140e2d"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-5iZOGC/06-direct-order-before.json",
+      "bytes": 20673,
+      "sha256": "5cceab5489699be0db617225d1d8837ec7d575af930e41cd108a95e09a8daee9"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-5iZOGC/07-direct-order-delivered.json",
+      "bytes": 21343,
+      "sha256": "07fd8c9a8b3e6604422eb2b1fce0422d705e71669793aeee6ec9666b07b3d415"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-5iZOGC/08-direct-order-paid.json",
+      "bytes": 28842,
+      "sha256": "2f5ee311728334e9ddfefc9014e0123968c1ed212bed837da171157c562b4067"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-5iZOGC/09-direct-order-reversed.json",
+      "bytes": 30593,
+      "sha256": "d7c2807fc7b23470c5d733c4c19ac5e85407cc300441a22a2a88b5d82c8f7eca"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-5iZOGC/10-pos-cash-before.json",
+      "bytes": 35287,
+      "sha256": "8a48df90c1976a9ed510054fb496379480f70dadf361736702d9c395a4d7cb0a"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-5iZOGC/11-pos-cash-sale.json",
+      "bytes": 43395,
+      "sha256": "327787c4986b223bbe8f8444ac627f5d6f26ea6304cb3816fe95c2c67f1ccddd"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-5iZOGC/12-pos-cash-replay.json",
+      "bytes": 43397,
+      "sha256": "94d44b655bd27de0e5a1fb4025ae57f93ccfec97b383ed24b924d88248a22141"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-5iZOGC/13-pos-cash-return.json",
+      "bytes": 50989,
+      "sha256": "c80fcd8932fe8ec4b0a72eaf2eb34287019761fcac58beb6c6540f918bc6934d"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-5iZOGC/14-pos-credit-before.json",
+      "bytes": 55693,
+      "sha256": "f2909a7a6533abdfc01068dd370e556aedfd1f20f4738589df216c5b243ecb34"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-5iZOGC/15-pos-credit-sale.json",
+      "bytes": 60793,
+      "sha256": "cda11cb6aac01a348a844191decf081cc6478bb899cf9c07261f6c7382e56560"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-5iZOGC/16-pos-credit-return.json",
+      "bytes": 65422,
+      "sha256": "049bde811363a895a7299da244316d1c4d039e58a6da8ef5b9a9509c489a28bf"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-5iZOGC/17-pos-split-before.json",
+      "bytes": 70119,
+      "sha256": "1508127ffbdb326cfb63ac52e7ea0833f638b0c0f856cf43034e0952c4f42371"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-5iZOGC/18-pos-split-sale.json",
+      "bytes": 80042,
+      "sha256": "f67f794cf7d60dff4039e8197c6140f1ede99d0acec3fdf813a39a9620ded23e"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-5iZOGC/19-pos-zero-before.json",
+      "bytes": 84765,
+      "sha256": "179a1b737e91bffce8b1ee028810092c7a5744a4dff179a0347f69eb1bbd3824"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-5iZOGC/20-pos-zero-after.json",
+      "bytes": 92280,
+      "sha256": "911da194bc7055137a1836cc59068227ecf257981eea0d433230c581ce427c52"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-5iZOGC/21-reservation-before.json",
+      "bytes": 97332,
+      "sha256": "1610105c35a44207f1f78c1e8dfe71bcf239f72d74f6820dfe52a450b4aa8769"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-5iZOGC/22-reservation-replayed.json",
+      "bytes": 97751,
+      "sha256": "c4985562fcf319702a8867c882edc68eb0d6018b705e0dfe788873289c21a0f9"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-5iZOGC/23-reservation-released.json",
+      "bytes": 97770,
+      "sha256": "de49e4fa1920462906a52fc48faf35f7ee360a9c5b8e8c08c8761ff1c9da3550"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-5iZOGC/24-reservation-noline-before.json",
+      "bytes": 102823,
+      "sha256": "43a6215d3b1e7e779e8b559eab5d28c0df1c5c08989cf91296079bd4652e7257"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-5iZOGC/25-reservation-noline-after.json",
+      "bytes": 103238,
+      "sha256": "05a8f0d2ed5f6e0c23d779ed0f7042b333cb958d42401206dc7be9bee029ff00"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-5iZOGC/api-events.json",
+      "bytes": 65484,
+      "sha256": "9055428fc25a3ec5b1cbbb1917c688be9bdd67b39c67fc17b56cc9759a55d4f3"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-5iZOGC/auth.json",
+      "bytes": 138,
+      "sha256": "c78ca01ec4e1e09697c3717a3fe40f73b6b5001ce51d45bafc557d747e5c0645"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-5iZOGC/erp.db",
+      "bytes": 1650688,
+      "sha256": "61cd572ee72aec80eba8075b199e2f8ef77bedb0052c6ed28b938b20f402e69e"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-5iZOGC/results.json",
+      "bytes": 90424,
+      "sha256": "5d1f01ca7187a19de6a4f9c74e69db28c019ff18c5bae54053bab01e0b95477b"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-5iZOGC/schema.json",
+      "bytes": 69134,
+      "sha256": "48f44deef52ceeabdaee316a1726fa42d8153e68ee524afbdd521685bebf14ec"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-AFjr5O/01-quotation-before.json",
+      "bytes": 7863,
+      "sha256": "81431073520a17e8d3ebd8197d49e76237966f6d2528882b3dff86748c81cfee"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-AFjr5O/02-quotation-converted-no-financial-effect.json",
+      "bytes": 9391,
+      "sha256": "75a76e5ff432c2074e03e473ee1877693123b32cdf1e7885e943bd1af4311fd0"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-AFjr5O/03-sales-order-invoiced.json",
+      "bytes": 14759,
+      "sha256": "6fcb4d807cfb6c9f2e685a15937549e00ed26dcfda2a68116104f744bded2aad"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-AFjr5O/04-sales-order-cancelled.json",
+      "bytes": 15970,
+      "sha256": "8baa252fe1e96dfa803f4333b062604feb1f33ae1aa0dcdb523e0b1cd75718fc"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-AFjr5O/05-sales-order-repeat-cancel.json",
+      "bytes": 15974,
+      "sha256": "34784afc8d52144750c973dbcf30023eba0815344c2c8f67aee53aae2c96b228"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-AFjr5O/06-direct-order-before.json",
+      "bytes": 20673,
+      "sha256": "acea75a021a81c6ae307a5d4702383fb90a26d5b3dc0bbd0e0c02afef1708d28"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-AFjr5O/07-direct-order-delivered.json",
+      "bytes": 21343,
+      "sha256": "3a257dfa85d7a68f40fbb499097811dcfd5aed7e8ee9ab3f9c0710a2b1da34d4"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-AFjr5O/08-direct-order-paid.json",
+      "bytes": 28842,
+      "sha256": "e815dc7ae7f618ea37c3c06845d9b14d5388260ffc0aa5d9a19c16773de99a02"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-AFjr5O/09-direct-order-reversed.json",
+      "bytes": 30593,
+      "sha256": "80ca58255f736f8aa276bf1c5cf69b33b939cabc1a8e47aa0c3716daae2869ac"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-AFjr5O/10-pos-cash-before.json",
+      "bytes": 35287,
+      "sha256": "68782e3f372fb7b8143a705c1cc03bc9e390e5ae2c3932d00f5e8ec07a72879c"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-AFjr5O/11-pos-cash-sale.json",
+      "bytes": 43395,
+      "sha256": "15fe20a4dd3d925a7a05d7f51768d72e3c35776cca2df622ae233fa0ebbe81c2"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-AFjr5O/12-pos-cash-replay.json",
+      "bytes": 43397,
+      "sha256": "76aca48cd46e8a9bf41f3bbc7096f83f99ed28d534bb594951dd4d1a6ca82a21"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-AFjr5O/13-pos-cash-return.json",
+      "bytes": 50989,
+      "sha256": "e89841e8e50e94be5a905cb4cc910663c1c4bc9974aeae24883219c841514aac"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-AFjr5O/14-pos-credit-before.json",
+      "bytes": 55693,
+      "sha256": "d1e8e712d791082f1483c895775d5ab1fc7f1caddee6847ec9a89cc9c1e4d971"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-AFjr5O/15-pos-credit-sale.json",
+      "bytes": 60793,
+      "sha256": "4aa6d7aad75fb48b36c0b2998960baa9fcbccfa79aa4991dc713215f1aa598f0"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-AFjr5O/16-pos-credit-return.json",
+      "bytes": 65422,
+      "sha256": "17eb172ff956ba63b1ae07758424cc02ae5e44e19a44a851d61d7b35c1469cd3"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-AFjr5O/17-pos-split-before.json",
+      "bytes": 70119,
+      "sha256": "2e434d46aeb3f0e668735dcaaeaa39b434c4f8fa4e90e3dd8ab3ebc6e7ffd8a4"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-AFjr5O/18-pos-split-sale.json",
+      "bytes": 80042,
+      "sha256": "9b53381470d0504a294e21588878775404262174fff2c15d5ee42b9d757faac0"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-AFjr5O/19-pos-zero-before.json",
+      "bytes": 84765,
+      "sha256": "08c7abfe2c8e9e5522bca50449e2dcf62387e3eafcc34c625c576d6d61f7fd5b"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-AFjr5O/20-pos-zero-after.json",
+      "bytes": 92280,
+      "sha256": "70ee937a4c1e7a21a1fe4fdb9247598c860cb98b2b67c1a9dea3217bae10d37e"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-AFjr5O/21-reservation-before.json",
+      "bytes": 97332,
+      "sha256": "89d79e5a92a580337a3fcda726fdd5bed020b0a38f6357cbc003282d0c16abd5"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-AFjr5O/22-reservation-replayed.json",
+      "bytes": 97751,
+      "sha256": "b1e3bc5f4bbd898ecdced4099f37e5ef07e568ef4dbc3116abce448ab2f91016"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-AFjr5O/23-reservation-released.json",
+      "bytes": 97770,
+      "sha256": "e624de59c1ee785677e643a3d2d94c724906b335e8438533ace13ad1ed42165c"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-AFjr5O/24-reservation-control-before.json",
+      "bytes": 102852,
+      "sha256": "7078ab3e19e44596ecfb634f6b05f1a08a0fd789cfcc4cf3080cf505d06c992f"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-AFjr5O/25-reservation-control-active.json",
+      "bytes": 103266,
+      "sha256": "ebfbb2318d2d13209a11fe4c9127c0cc47b529620c9c744cad1744b12d30c94c"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-AFjr5O/26-reservation-control-released.json",
+      "bytes": 103288,
+      "sha256": "d33b21b4aefddb553eacf89c4de1137b02f6f35ff22c11b1013a0ab353f23f6d"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-AFjr5O/27-reservation-noline-before.json",
+      "bytes": 108334,
+      "sha256": "7f640263b39a592e71043efdd2ebe9ab2f871f79fe8d39e49c39b58360d83646"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-AFjr5O/28-reservation-noline-after.json",
+      "bytes": 108749,
+      "sha256": "50fe508d56c47ce6f19599cd8fac54b07f43ca763ee73adb055483c49fffb929"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-AFjr5O/api-events.json",
+      "bytes": 71680,
+      "sha256": "af1ab395d61793a868a96179b76f61c054e9541e817333169546e4b267e7047e"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-AFjr5O/auth.json",
+      "bytes": 138,
+      "sha256": "c78ca01ec4e1e09697c3717a3fe40f73b6b5001ce51d45bafc557d747e5c0645"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-AFjr5O/erp.db",
+      "bytes": 1650688,
+      "sha256": "878d57e321cbc98145e35fe70f4900a85c0b90857c53dcd3725f5e390730832a"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-AFjr5O/results.json",
+      "bytes": 101268,
+      "sha256": "ba2f2826851babd7c8ba3a7abada0c4d79f22384d4439f5d7bf6127a6b15fbb2"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-AFjr5O/schema.json",
+      "bytes": 69134,
+      "sha256": "48f44deef52ceeabdaee316a1726fa42d8153e68ee524afbdd521685bebf14ec"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-svc2jE/01-quotation-before.json",
+      "bytes": 7863,
+      "sha256": "414f55139abca52a5934d5d619b6d594da90ad3b088679cc85c11a3b020d95ca"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-svc2jE/02-quotation-converted-no-financial-effect.json",
+      "bytes": 9391,
+      "sha256": "cd0003c6d5f734c60d62a3208f85cd2653d3c23ac3ffade1e8b3ea7fa4606387"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-svc2jE/03-sales-order-invoiced.json",
+      "bytes": 14759,
+      "sha256": "8ba12f4cf89342271ed31bca5659c8ad109d4c33764e9bb3fb378f4f49279421"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-svc2jE/04-sales-order-cancelled.json",
+      "bytes": 15970,
+      "sha256": "6f69dc5832e4317537f48d57885ac8ade9b99d23aac9a41bafbfdbe20249bda4"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-svc2jE/05-sales-order-repeat-cancel.json",
+      "bytes": 15974,
+      "sha256": "faa69c9a3d4e11247225656911b256ca725bb9983c91e10912467431037dd542"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-svc2jE/06-direct-order-before.json",
+      "bytes": 20673,
+      "sha256": "6b848af3e5f7bbb3648b2752ce4348b3e251934b507c8d683ff8e5782cb527f9"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-svc2jE/07-direct-order-delivered.json",
+      "bytes": 21343,
+      "sha256": "c1f388049999ecdd14d8b3e6799dcccdec97dbaaca7f44d9b7430b31890f7c8f"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-svc2jE/08-direct-order-paid.json",
+      "bytes": 28842,
+      "sha256": "02440a9cdbdc891c1d9983627314d48d359ec9ce09358fb7ae9e6a291e73aed1"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-svc2jE/09-direct-order-reversed.json",
+      "bytes": 30593,
+      "sha256": "9a31ab246c3b95966c292050eb7bc3135c98d4f8f384183c73598125422df935"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-svc2jE/10-pos-cash-before.json",
+      "bytes": 35287,
+      "sha256": "4d5169e5e6b2ab990eedbd3a4d0d3f9a60738442c44c0aacccd3d19010a28cbf"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-svc2jE/11-pos-cash-sale.json",
+      "bytes": 43395,
+      "sha256": "962d79bfb41187d0446339283d72069d917a8983cf6bf6922000b14ec0e120a2"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-svc2jE/12-pos-cash-replay.json",
+      "bytes": 43397,
+      "sha256": "9fc2bbc0843162e4b8fcdffda031771e92a630808d0ef750bba2f775f300ccd1"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-svc2jE/13-pos-cash-return.json",
+      "bytes": 50989,
+      "sha256": "bcec5e6040aa4aa18f428083c95362010e8c9944fd60bb481f89b2e5ce736e64"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-svc2jE/14-pos-credit-before.json",
+      "bytes": 55693,
+      "sha256": "12d586a402469da94b486d7d6a09beff4753f093ba5d2e9dc415a0e3ffa1f1dc"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-svc2jE/15-pos-credit-sale.json",
+      "bytes": 60793,
+      "sha256": "7e677bf25bbebdeff526d42c2c27fb3f7772be522395a67495ef3bf06edf11d4"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-svc2jE/16-pos-credit-return.json",
+      "bytes": 65422,
+      "sha256": "1f43021f5c46aca941287acd4df8c0b2f27d165d8abeb333eb30e74ab4684769"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-svc2jE/17-pos-split-before.json",
+      "bytes": 70119,
+      "sha256": "509a97f21d4d0a20377d158e7578337528d2559e4e7ba662d18962ed7bcd02f5"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-svc2jE/18-pos-split-sale.json",
+      "bytes": 80042,
+      "sha256": "93f626578ccce87cb379c0420ec4a6c858db1ae9fa490099ae736478f4f603fc"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-svc2jE/19-pos-zero-before.json",
+      "bytes": 84765,
+      "sha256": "718d66772959d2c660e280b292fe0a60553da764f3d16e453e75d5ca4d60fed4"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-svc2jE/20-pos-zero-after.json",
+      "bytes": 84764,
+      "sha256": "1cd03dccda60ca2c67a0ca9e4243a53a4f50c584e949502cff17d5de3129394f"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-svc2jE/21-reservation-before.json",
+      "bytes": 89508,
+      "sha256": "c030a5dfb8856a60dd6a3fa59ca701a618bdbe116537bd7b019e7de45e8f2be4"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-svc2jE/22-reservation-noline-before.json",
+      "bytes": 94677,
+      "sha256": "e1fd2740ba094d2ac7ea36202d6e3482c1f990547a7a81a7499aba220e376cc6"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-svc2jE/23-reservation-noline-after.json",
+      "bytes": 95093,
+      "sha256": "ddce2bd0a67d613ada9e3a77e4c97ce54652b6de73a5d693b1158ed4514f6d1b"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-svc2jE/api-events.json",
+      "bytes": 63782,
+      "sha256": "9e0cf4ad298a770d7ac6aa5e169bcf6e1cf418084df8c1652e4b72c957d49f3c"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-svc2jE/auth.json",
+      "bytes": 138,
+      "sha256": "c78ca01ec4e1e09697c3717a3fe40f73b6b5001ce51d45bafc557d747e5c0645"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-svc2jE/erp.db",
+      "bytes": 1646592,
+      "sha256": "b4f12edd49e8d2b14f30cd0ad68b740ec01ced3fba17e01e592f31e7f8b25e0b"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-svc2jE/results.json",
+      "bytes": 83246,
+      "sha256": "03aa70f0f56a0ba46d7ed01db0046f91cfce27536e8d7b47b46cddfad1c28533"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-svc2jE/schema.json",
+      "bytes": 69134,
+      "sha256": "48f44deef52ceeabdaee316a1726fa42d8153e68ee524afbdd521685bebf14ec"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-uverx6/auth.json",
+      "bytes": 138,
+      "sha256": "c78ca01ec4e1e09697c3717a3fe40f73b6b5001ce51d45bafc557d747e5c0645"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-uverx6/erp.db",
+      "bytes": 1630208,
+      "sha256": "cb5603d1ae85d2dda69b1184e5b49616a02870c6d6e41e2810c2c7889d7293e7"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-uverx6/results.json",
+      "bytes": 1632,
+      "sha256": "d44224e5c140f3a47d9688f9ddc19f426dac1ea7bcb3b0a65189cd4fe6ccd0a9"
+    },
+    {
+      "path": "accounting-audit/evidence/sales-channel-run-uverx6/schema.json",
+      "bytes": 69134,
+      "sha256": "48f44deef52ceeabdaee316a1726fa42d8153e68ee524afbdd521685bebf14ec"
+    },
+    {
+      "path": "accounting-audit/evidence/server-full-resumed-results.json",
+      "bytes": 860473,
+      "sha256": "7bc7e239eedee08f939d55bbe680faf05c90a71196fbad4f3f65c2e82c2a07c3"
+    },
+    {
+      "path": "accounting-audit/evidence/server-full-resumed.log",
+      "bytes": 55430,
+      "sha256": "54f5f7fb951a071e1ef1e1427fe1d6be3e5dd0ec6f088f8186ededa196df7f76"
+    },
+    {
+      "path": "accounting-audit/evidence/server-full.log",
+      "bytes": 338,
+      "sha256": "41626aac56ba7b8e8a481b1ac30e684bda99bebe8a739420d9b3ea82d53373a8"
+    },
+    {
+      "path": "accounting-audit/evidence/server-journal-benchmark-results.json",
+      "bytes": 11291,
+      "sha256": "6e05202cfaa80df03bfcf277b8573bf6079c3dd2b58d885cc64f2b960b989f57"
+    },
+    {
+      "path": "accounting-audit/evidence/server-journal-benchmark-resumed.log",
+      "bytes": 2940,
+      "sha256": "47b65c8ccabed21fee4e313df26c9ad52d23f4510aeac84c4b886ec3de2de0e3"
+    },
+    {
+      "path": "accounting-audit/evidence/source-baseline.json",
+      "bytes": 140399,
+      "sha256": "0469a789ebfc13bd42e46fe91c1c744bb249b698e8a0eaf99f7753cc45beb862"
+    },
+    {
+      "path": "accounting-audit/evidence/source-preservation.json",
+      "bytes": 98,
+      "sha256": "9a7d9e030e6b76810ad7814075898438f9fbcb38c1c1caeccbcf224b22cd37fc"
+    },
+    {
+      "path": "accounting-audit/evidence/verification-runs.json",
+      "bytes": 1049,
+      "sha256": "517e412f5b910704385176547d69c689a025b3169389e988962f737ea7a7edbf"
+    },
+    {
+      "path": "accounting-audit/findings/F-001/database-proof.json",
+      "bytes": 1622,
+      "sha256": "fb10bc3b7b239feb415fcd2617da29173b6a6f228b0b52df9e1ca98502a382fc"
+    },
+    {
+      "path": "accounting-audit/findings/F-001/finding.md",
+      "bytes": 5078,
+      "sha256": "745082993b34946ad451d32760ae80daeccce282a6b7bc9f13b28ea531bb127a"
+    },
+    {
+      "path": "accounting-audit/findings/F-001/supplier-return-chronology-proof.json",
+      "bytes": 1252,
+      "sha256": "11ae0a0394421d1a2682825f1f11b501098e5317f129f79fc24c9972f586c454"
+    },
+    {
+      "path": "accounting-audit/findings/F-002/database-proof.json",
+      "bytes": 1265,
+      "sha256": "a6753815ea519d53702e64563328ce1feb8b7a7b6e341278bde550d6bd021810"
+    },
+    {
+      "path": "accounting-audit/findings/F-002/finding.md",
+      "bytes": 5085,
+      "sha256": "12cd8601c496e8be6db9a5904e4470d94d10641f2dd09cf2fd3e67c747623fb8"
+    },
+    {
+      "path": "accounting-audit/findings/F-020/finding.md",
+      "bytes": 3612,
+      "sha256": "c33dcada90e9488b2b5ae3bf38d18d8914293a050300709123dd5a0ecea6d676"
+    },
+    {
+      "path": "accounting-audit/findings/F-021/finding.md",
+      "bytes": 2471,
+      "sha256": "62d52b4117b89f002a8285dbeb4e36d06fe08dcb6565885d86fbdfce3a3a70a9"
+    },
+    {
+      "path": "accounting-audit/findings/F-022/finding.md",
+      "bytes": 3881,
+      "sha256": "c474759de2f39659ef7f879e95c1ae4d0ec05551b947dd81ad30a15a46117583"
+    },
+    {
+      "path": "accounting-audit/findings/F-023/finding.md",
+      "bytes": 3379,
+      "sha256": "fb99d80c51848c00f7924224d942b9722f7f24088f0ee89ffb55412b7def6339"
+    },
+    {
+      "path": "accounting-audit/findings/F-024/finding.md",
+      "bytes": 2955,
+      "sha256": "1d016c02ec7c45359387d909c3b624c7be630e885b40e50ec3efa1605c34c38d"
+    },
+    {
+      "path": "accounting-audit/findings/F-025/finding.md",
+      "bytes": 3204,
+      "sha256": "77200e6149bdc92acb49876303f60b84ee76a941e7fdb6d820ffa233fa2257eb"
+    },
+    {
+      "path": "accounting-audit/findings/F-040/finding.md",
+      "bytes": 2577,
+      "sha256": "9470a0d53f701dd0f8bc85f6060cecfb22c3666c716b9c3fef122026958f00c4"
+    },
+    {
+      "path": "accounting-audit/findings/F-041/finding.md",
+      "bytes": 2268,
+      "sha256": "4e00846c037358d1fa9d007ffa3933e755de831ecdfd3bab9bcac38a3145bfed"
+    },
+    {
+      "path": "accounting-audit/findings/F-042/finding.md",
+      "bytes": 2771,
+      "sha256": "d95ddc12ea19e3e2db600fe9b58ad410c80db97a4fc30c69383dfd3d55ba0980"
+    },
+    {
+      "path": "accounting-audit/findings/F-043/finding.md",
+      "bytes": 2735,
+      "sha256": "c7d0aed7c28705828df7381fa0e798134edc57927e02be7ea508b5124115326f"
+    },
+    {
+      "path": "accounting-audit/findings/F-060/finding.md",
+      "bytes": 3035,
+      "sha256": "005326b9ba591d1d23439b140e819071f30a750fc92e069bfcb9fafc47bd0509"
+    },
+    {
+      "path": "accounting-audit/findings/F-070/finding.md",
+      "bytes": 1454,
+      "sha256": "5e148561118fe189cb26581d9bf6861f58ea46f98a3a4f0f1e766812cbff50f2"
+    },
+    {
+      "path": "accounting-audit/findings/F-071/finding.md",
+      "bytes": 2429,
+      "sha256": "d0bc7aa609f2716cd8a9d51d2298522ed8fc064c5fd24e220053edb83d05c522"
+    },
+    {
+      "path": "accounting-audit/findings/F-072/finding.md",
+      "bytes": 1989,
+      "sha256": "5584902abef4a32e59e2399d8da143c80c17d69cce1791405bdfda1fa10122f5"
+    },
+    {
+      "path": "accounting-audit/findings/F-073/finding.md",
+      "bytes": 2773,
+      "sha256": "48a38abd6482f7f1864db0b5f132c33f07ced38adfa5db5dba170b20f2c681a0"
+    },
+    {
+      "path": "accounting-audit/run-verification.cjs",
+      "bytes": 7524,
+      "sha256": "a2f0d1b871b32329c0bd321314b55635e0eda27d0376ac876f1978271fdcc184"
+    },
+    {
+      "path": "accounting-audit/tests/backend-controls.cjs",
+      "bytes": 7290,
+      "sha256": "044ac03453f9659c1cd4bdd4100ce037c7247cfcca3809ace49aa4a0a7991908"
+    },
+    {
+      "path": "accounting-audit/tests/backend-count-risk.cjs",
+      "bytes": 5590,
+      "sha256": "fbec5a480a5f61b3ea9930778b0171dd38f8474fd550a46506e1e732ed3c2c37"
+    },
+    {
+      "path": "accounting-audit/tests/backend-extension.cjs",
+      "bytes": 8258,
+      "sha256": "2a722787fe6df39346cacf0602f4f47de3a0ccdd603614b956e50633a3233437"
+    },
+    {
+      "path": "accounting-audit/tests/backend-inventory.py",
+      "bytes": 1289,
+      "sha256": "ffa20312db1e384f4939e0eb00758baf715cf95cb718639982cd9825ad9ed509"
+    },
+    {
+      "path": "accounting-audit/tests/backend-verify-evidence.cjs",
+      "bytes": 2773,
+      "sha256": "5a2ead8842f4e41dbcbf79d848eff8d7f6ef25743c1213d7279a51d7931bedaa"
+    },
+    {
+      "path": "accounting-audit/tests/backend-verify-extension.py",
+      "bytes": 2085,
+      "sha256": "4001cbe1bb28f21b762f0e70de92797077e737936e392dffb89258e8ec7394e1"
+    },
+    {
+      "path": "accounting-audit/tests/final-extension-verifier.cjs",
+      "bytes": 5700,
+      "sha256": "576b65f1cfddee21000c23a993d55ade524255a55923e0a0b2aeff5c08b3cbce"
+    },
+    {
+      "path": "accounting-audit/tests/flutter_inventory.py",
+      "bytes": 6248,
+      "sha256": "cd08834fa033dc81517fe460c8010147bd72c79ccc3acee000c5fcf14ffea001"
+    },
+    {
+      "path": "accounting-audit/tests/flutter_oracle_reports_test.dart",
+      "bytes": 7190,
+      "sha256": "ab045f202466b5c271d8dfb9bcfff409de2add869d38e2f9cc6b6b1cccfb0620"
+    },
+    {
+      "path": "accounting-audit/tests/flutter_reports_test.dart",
+      "bytes": 9307,
+      "sha256": "e2546446222eda8ec0799cac5227e1d45ddfaa17c05c63dab5d08db4448f593b"
+    },
+    {
+      "path": "accounting-audit/tests/flutter_verify_evidence.py",
+      "bytes": 3338,
+      "sha256": "27d329d6df60d0ab20342474b563a77949e62f22ada5f90374515a603b10ed5d"
+    },
+    {
+      "path": "accounting-audit/tests/invariant-granularity.py",
+      "bytes": 1718,
+      "sha256": "c94c2a07799d2c42835996b3dda43217a9e89a34fd7fddcb4bad134ac8e4154c"
+    },
+    {
+      "path": "accounting-audit/tests/lib/isolated-fixture.cjs",
+      "bytes": 2718,
+      "sha256": "30f43865bfee2e1a8de27b39b3f585d26d113b6a5da6ecd17905459aec60396f"
+    },
+    {
+      "path": "accounting-audit/tests/oracle-lifecycle.cjs",
+      "bytes": 21941,
+      "sha256": "f40b8fbd131535d831b50ca023862dd6bdf69856ea08e93c35dd1dbe795c7d6f"
+    },
+    {
+      "path": "accounting-audit/tests/oracle-supplement.cjs",
+      "bytes": 11522,
+      "sha256": "6b4530588023ae6dd64bf062aa2b9358ce2161d2cc20d1b488015e3043632a3c"
+    },
+    {
+      "path": "accounting-audit/tests/payable-cash-extension.cjs",
+      "bytes": 21165,
+      "sha256": "b3a7eb725b57fbdf3bfa217c2467e4443739278525ca4ac875aeed7f1e45079d"
+    },
+    {
+      "path": "accounting-audit/tests/sales-channel-extension.cjs",
+      "bytes": 20063,
+      "sha256": "ee6553cc5e52028c36970d39d4ac52de4583d049a06af4a2ac0a90113082d0be"
+    },
+    {
+      "path": "accounting-audit/workstreams/adversarial-review.md",
+      "bytes": 13599,
+      "sha256": "0070e00b7e82085ed03934338ce62684b892d6dcb72e8a96541b4c3d5af4c84b"
+    },
+    {
+      "path": "accounting-audit/workstreams/backend-controls.md",
+      "bytes": 21389,
+      "sha256": "3a96e04a737e54bdfc8502ef953c4cb853c78c84cb78b9d355aef5eb8a36740e"
+    },
+    {
+      "path": "accounting-audit/workstreams/final-evidence-review.md",
+      "bytes": 7605,
+      "sha256": "a26379d796242fe5080335fd846bdad799adb5d750ebae50c415064374458032"
+    },
+    {
+      "path": "accounting-audit/workstreams/financial-oracle.md",
+      "bytes": 12187,
+      "sha256": "5dfebf160d876bf95323ad9a65bc5223f5b8619c213993070071b9c214e63e0f"
+    },
+    {
+      "path": "accounting-audit/workstreams/flutter-reports.md",
+      "bytes": 21256,
+      "sha256": "ab08ab5556a3661f51b618c7471eb9ec29a6a67e11725614a2946700591fc776"
+    },
+    {
+      "path": "accounting-audit/workstreams/payable-cash-extension.md",
+      "bytes": 3371,
+      "sha256": "b82681a3ec4e88904706206d0f11ebf0c3239e59490f1104a45db1ed67b36d59"
+    },
+    {
+      "path": "accounting-audit/workstreams/sales-channel-extension.md",
+      "bytes": 3304,
+      "sha256": "d1305dce89cb1a607223624df1ad62b61949ddd009d26f4df59b04170440c253"
+    }
+  ],
+  "brokenLinks": []
+}

@@ -1,0 +1,92 @@
+{
+  "compiledAt": "2026-10-26T01:32:12.081812+00:00",
+  "scope": "Executed2026-10-25 source snapshot; excludes later working-tree edits",
+  "server": {
+    "assertionSuccess": true,
+    "passedSuites": 232,
+    "failedSuites": 0,
+    "passedTests": 1918,
+    "failedTests": 0,
+    "startedAt": "2026-10-25T04:55:54.806000+00:00",
+    "lastTestEndedAt": "2026-10-25T05:34:40.909000+00:00",
+    "processExitCode": null,
+    "processExitVerified": false,
+    "openHandlesDiagnostic": "Jest did not exit one second after the test run has completed",
+    "evidence": "server-full-resumed-results.json"
+  },
+  "flutter": {
+    "visibleSuccess": 1034,
+    "hiddenLoadingSuccess": 96,
+    "completionEvents": 1130,
+    "final": {
+      "success": true,
+      "type": "done",
+      "time": 1300700
+    },
+    "run": {
+      "name": "flutter-full-resumed",
+      "command": [
+        "flutter",
+        "test",
+        "--reporter",
+        "json"
+      ],
+      "cwd": ".",
+      "startedAt": "2026-10-25T05:06:04.133Z",
+      "log": "accounting-audit/evidence/flutter-full-resumed.log",
+      "status": "COMPLETED",
+      "pid": 1114478,
+      "endedAt": "2026-10-25T05:27:57.934Z",
+      "exitCode": 0,
+      "signal": null
+    }
+  },
+  "runManifest": [
+    {
+      "name": "quick",
+      "command": [
+        "bash",
+        "scripts/check.sh",
+        "--quick"
+      ],
+      "cwd": ".",
+      "startedAt": "2026-10-25T03:13:15.276Z",
+      "endedAt": "2026-10-25T03:27:26.711Z",
+      "log": "accounting-audit/evidence/quick.log",
+      "exitCode": 1,
+      "signal": null
+    },
+    {
+      "name": "flutter-analyze-final",
+      "command": [
+        "flutter",
+        "analyze"
+      ],
+      "cwd": ".",
+      "startedAt": "2026-10-25T05:04:12.580Z",
+      "log": "accounting-audit/evidence/flutter-analyze-final.log",
+      "status": "COMPLETED",
+      "pid": 1112010,
+      "endedAt": "2026-10-25T05:05:37.208Z",
+      "exitCode": 0,
+      "signal": null
+    },
+    {
+      "name": "flutter-full-resumed",
+      "command": [
+        "flutter",
+        "test",
+        "--reporter",
+        "json"
+      ],
+      "cwd": ".",
+      "startedAt": "2026-10-25T05:06:04.133Z",
+      "log": "accounting-audit/evidence/flutter-full-resumed.log",
+      "status": "COMPLETED",
+      "pid": 1114478,
+      "endedAt": "2026-10-25T05:27:57.934Z",
+      "exitCode": 0,
+      "signal": null
+    }
+  ]
+}

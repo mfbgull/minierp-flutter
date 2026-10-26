@@ -1,0 +1,220 @@
+{
+  "checkedAt": "2026-10-26T01:32:12.081812+00:00",
+  "baselineRevision": "15a784180a51b816759dc0d3440d4c8743dcdb98",
+  "head": "8d2923282166d3c3b881db8e519b88580f6adc04",
+  "protectedBaselineFiles": 1172,
+  "changed": [
+    {
+      "path": "server/scripts/apply-customer15-correction.ts",
+      "baselineSha256": "c8eaa25f52212f8c4453bd90ebeda84abc91956bfdc5a6ea626d63dea9942c8b",
+      "currentSha256": "e5baa0209fbfdc7cb3d53eba32f22250eacaa2844773396def8a2c72b81192de"
+    },
+    {
+      "path": "server/scripts/dev/audit-trace.ts",
+      "baselineSha256": "a0e01c00ac7d5fb8c1066d5b1e3f889ae5fab5343b223f5cab894a6ed37ddad8",
+      "currentSha256": "452dc4ed8a83e3a0cf82a9b287776e7219aea388d449715c3fb687cd66a218c9"
+    },
+    {
+      "path": "server/scripts/fixtures/unapplied-cash-ui.cjs",
+      "baselineSha256": "d3b5e0dde3ba921310f8a7114b59661fcd288d0f88bc928a6d7e6bea23f87924",
+      "currentSha256": "cb5ad476a4122e72bbaf5f22c880ca4c7ccd6100d15aed295f9848dc9a1cb432"
+    },
+    {
+      "path": "server/scripts/lib/correctionSafety.ts",
+      "baselineSha256": "dfcdb7615eeb4ffa461a0be8cf2578c86d88ed05f7b50f09e1f06d80192f9c2b",
+      "currentSha256": "c3fba6996beeb461105f39c516ecc4de635bf1821de910289e9a2ea018ee0c80"
+    },
+    {
+      "path": "server/scripts/reconcile-customer-credits.ts",
+      "baselineSha256": "85c193690bf13cf24156c0c1861c7a2d7da39136c5988b38c8c9d7a394a7b723",
+      "currentSha256": "0c8e2c4b8a8f59bc0c272306048022ec41279068eddf10fa7c138ee27ab8e50b"
+    },
+    {
+      "path": "server/scripts/rollback-customer15-correction.ts",
+      "baselineSha256": "f84385eb504aba05edbf2a979c8374cfb03f9e6f3f5b32c595c49dfbdbd4e276",
+      "currentSha256": "4f67e42ba8b88cd3a4171be10f7ba3a42efbbf39120ed9ddb1effe93599384e9"
+    },
+    {
+      "path": "server/scripts/verify-reversal-rules.ts",
+      "baselineSha256": "c7f8004ddfaef4ca005a4b0048417e9b4d07bc99f9f1bafc940f4039dcfbf668",
+      "currentSha256": "37b833498b90f6445c91cdb687338dcd01ae4429e16171fae6305ea77cec6449"
+    },
+    {
+      "path": "server/src/models/Purchase.ts",
+      "baselineSha256": "d2cb4c6387788d27456506ed1e09bbdf8c14ffb07a2805cc5238eea8c611f624",
+      "currentSha256": "edeaa5dca70e207de4cbddb782f1578f25308f961ab661c23500fbfc4870740f"
+    },
+    {
+      "path": "server/src/scripts/fix-duplicate-purchase.ts",
+      "baselineSha256": "9c8c10b94ac1f79272ed64180b2c232f1c2eae44620786489bbf6a1179dc89e7",
+      "currentSha256": "d408ca0062f52fee33e3701cd909fadc0ac61b2382939e6f954496a97d786946"
+    },
+    {
+      "path": "server/src/utils/legacyBomMigration.ts",
+      "baselineSha256": "e76e848cf5fab2f11c74ddde11f879d8cae8f847970458ccab4922c8ccea0f71",
+      "currentSha256": "dd35f9d6118a304a0ad027c0599488fd5aa435785d793272d401ee704a4bb4d8"
+    }
+  ],
+  "added": [
+    {
+      "path": "server/src/utils/localNetwork.ts",
+      "sha256": "7295bf7764cf91dd5865271d081db25cff878cda23a9ae71ca13bafc9c1d1b4a"
+    },
+    {
+      "path": "server/src/__tests__/auditTraceReadiness.test.ts",
+      "sha256": "b6fadacc4d2107bdc5fc20b963991a8274f262f39bafea9a8eb6859ebea8ea4d"
+    },
+    {
+      "path": "server/src/__tests__/duplicatePurchaseRepairCli.test.ts",
+      "sha256": "458b5e77c2b9728c9c451fa276f1038f7b8543677decd46ca27c4d002bff4a75"
+    },
+    {
+      "path": "server/src/__tests__/isolatedAuditFixture.test.ts",
+      "sha256": "2a2f606c8f708ca58635af43d3b944044aa5066870b886a688dd5d03ca0461c3"
+    },
+    {
+      "path": "server/src/__tests__/localNetwork.test.ts",
+      "sha256": "052a5dbf48d85e1eeacdea4a9b110ae42cae877ed921044fd5ca0335205f5fcc"
+    },
+    {
+      "path": "server/src/__tests__/maintenance-batches-cli.test.ts",
+      "sha256": "4475fea1076e6ac56759390d9963d94f0ea54643ce8563dd0f0889278c3cba64"
+    },
+    {
+      "path": "server/src/__tests__/maintenance-ledger-cli.test.ts",
+      "sha256": "9bf6557b56372e45a54de6fb0691162d99f66a8d6823f414082b5a132e5f3fb4"
+    },
+    {
+      "path": "server/src/__tests__/maintenance-reconciliation-cli.test.ts",
+      "sha256": "4b11d99c8eeef7837c923d8b90faeb595d8f6144c566df9e3263b4d406f01b7f"
+    },
+    {
+      "path": "server/src/__tests__/maintenance-stock-repair-cli.test.ts",
+      "sha256": "644385d874c53ad85ce7d68eb1576c2e606eafb983a950c98aaa0fef549a6588"
+    },
+    {
+      "path": "server/src/__tests__/mergeFallowCoverage.test.ts",
+      "sha256": "bfb6a4dc21f542b987d4ef5c816db17fdd2abc5bfb002fa3f96b0a78755038ae"
+    },
+    {
+      "path": "server/src/__tests__/unappliedCashFixture.test.ts",
+      "sha256": "6fb3646678601032d49ab43181d66b476292babfcf34425a598968901aff4e0e"
+    },
+    {
+      "path": "server/src/__tests__/purchaseVoidJournalHeaders.test.ts",
+      "sha256": "61ebf205d6883dbec38db85bb3401dd716948812971f59f69bbceb47e894ba8a"
+    },
+    {
+      "path": "server/src/__tests__/reversalVerificationCli.test.ts",
+      "sha256": "9fa3fbe528c7240b2e451d18bf427794c746bee4d4bcd5073ac08ded4126fd48"
+    },
+    {
+      "path": "server/src/__tests__/correctionAuthorization.test.ts",
+      "sha256": "00e81f175c52d88568229d702f544d17a9da39c632e4cb39a0eb53a7d8825a6e"
+    },
+    {
+      "path": "server/src/__tests__/creditReconciliationCli.test.ts",
+      "sha256": "780e19e18c4190a64143979112ad177908caabc4b29dfecd7c692f2a6b77d85e"
+    },
+    {
+      "path": "server/src/__tests__/ownerCapitalListModelCoverage.test.ts",
+      "sha256": "27c707d051b5e234ef649235ed6b7983ac86e559e4a7a924dfd0446474d0f817"
+    },
+    {
+      "path": "server/scripts/lib/merge-fallow-coverage.cjs",
+      "sha256": "faf3d6ae5816ae52694586c41564ee695f67dab26a3ac0df6d015a299abaa237"
+    }
+  ],
+  "unchangedFindingSourceChecks": {
+    "server/src/controllers/posController.ts": true,
+    "server/src/models/StockReservation.ts": true,
+    "server/src/controllers/inventoryController.ts": true,
+    "server/src/controllers/salesController.ts": true,
+    "server/src/services/accountingService.ts": true,
+    "server/src/models/SupplierPrepayment.ts": true,
+    "server/src/models/ExpensePayment.ts": true,
+    "server/src/services/cashService.ts": true
+  },
+  "workingTreeStatus": [
+    " M .fallowrc.json",
+    " M .qoder/settings.local.json",
+    " M accounting-audit/00-executive-summary.md",
+    " M accounting-audit/01-accounting-architecture.md",
+    " M accounting-audit/03-coverage-matrix.md",
+    " M accounting-audit/04-reconciliation-results.md",
+    " M accounting-audit/05-test-scenarios.md",
+    " M accounting-audit/06-report-verification.md",
+    " M accounting-audit/07-unverified-areas.md",
+    " M accounting-audit/08-findings-register.md",
+    " M accounting-audit/audit-log.md",
+    " M accounting-audit/evidence/source-preservation.json",
+    " M accounting-audit/evidence/verification-runs.json",
+    " M accounting-audit/run-verification.cjs",
+    " M accounting-audit/tests/backend-controls.cjs",
+    " M accounting-audit/tests/backend-count-risk.cjs",
+    " M accounting-audit/tests/backend-extension.cjs",
+    " M audit/DECISIONS.md",
+    " M server/package-lock.json",
+    " M server/package.json",
+    " M server/scripts/apply-customer15-correction.ts",
+    " M server/scripts/dev/audit-trace.ts",
+    " M server/scripts/fixtures/unapplied-cash-ui.cjs",
+    " M server/scripts/lib/correctionSafety.ts",
+    " M server/scripts/reconcile-customer-credits.ts",
+    " M server/scripts/rollback-customer15-correction.ts",
+    " M server/scripts/verify-reversal-rules.ts",
+    " M server/server.ts",
+    " M server/src/models/Purchase.ts",
+    " M server/src/scripts/fix-duplicate-purchase.ts",
+    " M server/src/utils/legacyBomMigration.ts",
+    "?? accounting-audit/09-remediation-roadmap.md",
+    "?? accounting-audit/10-verification-results.md",
+    "?? accounting-audit/evidence/artifact-manifest.json",
+    "?? accounting-audit/evidence/final-extension-verification.json",
+    "?? accounting-audit/evidence/final-review-independent.json",
+    "?? accounting-audit/evidence/payable-cash-graph-coverage.json",
+    "?? accounting-audit/evidence/payable-cash-latest-run.txt",
+    "?? accounting-audit/evidence/payable-cash-run-GIxBh2/",
+    "?? accounting-audit/evidence/payable-cash-run-hii4TA/",
+    "?? accounting-audit/evidence/payable-cash-run-oN5SSD/",
+    "?? accounting-audit/evidence/sales-channel-exit.txt",
+    "?? accounting-audit/evidence/sales-channel-latest-run.txt",
+    "?? accounting-audit/evidence/sales-channel-run-5iZOGC/",
+    "?? accounting-audit/evidence/sales-channel-run-AFjr5O/",
+    "?? accounting-audit/evidence/sales-channel-run-svc2jE/",
+    "?? accounting-audit/evidence/sales-channel-run-uverx6/",
+    "?? accounting-audit/evidence/server-full-resumed-results.json",
+    "?? accounting-audit/evidence/server-journal-benchmark-results.json",
+    "?? accounting-audit/findings/F-060/",
+    "?? accounting-audit/findings/F-070/",
+    "?? accounting-audit/findings/F-071/",
+    "?? accounting-audit/findings/F-072/",
+    "?? accounting-audit/findings/F-073/",
+    "?? accounting-audit/tests/final-extension-verifier.cjs",
+    "?? accounting-audit/tests/lib/",
+    "?? accounting-audit/tests/payable-cash-extension.cjs",
+    "?? accounting-audit/tests/sales-channel-extension.cjs",
+    "?? accounting-audit/workstreams/final-evidence-review.md",
+    "?? accounting-audit/workstreams/payable-cash-extension.md",
+    "?? accounting-audit/workstreams/sales-channel-extension.md",
+    "?? audit/fallow-remediation-2026-10-26.md",
+    "?? server/scripts/lib/merge-fallow-coverage.cjs",
+    "?? server/src/__tests__/auditTraceReadiness.test.ts",
+    "?? server/src/__tests__/correctionAuthorization.test.ts",
+    "?? server/src/__tests__/creditReconciliationCli.test.ts",
+    "?? server/src/__tests__/duplicatePurchaseRepairCli.test.ts",
+    "?? server/src/__tests__/isolatedAuditFixture.test.ts",
+    "?? server/src/__tests__/localNetwork.test.ts",
+    "?? server/src/__tests__/maintenance-batches-cli.test.ts",
+    "?? server/src/__tests__/maintenance-ledger-cli.test.ts",
+    "?? server/src/__tests__/maintenance-reconciliation-cli.test.ts",
+    "?? server/src/__tests__/maintenance-stock-repair-cli.test.ts",
+    "?? server/src/__tests__/mergeFallowCoverage.test.ts",
+    "?? server/src/__tests__/ownerCapitalListModelCoverage.test.ts",
+    "?? server/src/__tests__/purchaseVoidJournalHeaders.test.ts",
+    "?? server/src/__tests__/reversalVerificationCli.test.ts",
+    "?? server/src/__tests__/unappliedCashFixture.test.ts",
+    "?? server/src/utils/localNetwork.ts"
+  ],
+  "scope": "Preserve later shared-workspace edits. Original audit was performed before these changes; no current-tree full-suite certification."
+}

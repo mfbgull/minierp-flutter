@@ -1,0 +1,791 @@
+{
+  "accountsPaise": {
+    "1000": 79925,
+    "1010": 100000,
+    "1200": 4936,
+    "1320": 1504,
+    "1330": 6535,
+    "2000": -2925,
+    "2115": 0,
+    "3000": 0,
+    "3200": -200000,
+    "6000": 10025
+  },
+  "settings": [
+    {
+      "key": "company_name",
+      "value": "Mini ERP",
+      "description": "Company name for invoices",
+      "updated_at": "2026-10-25 05:19:27"
+    },
+    {
+      "key": "company_email",
+      "value": "support@minierp.com",
+      "description": "Company email for invoices",
+      "updated_at": "2026-10-25 05:19:27"
+    },
+    {
+      "key": "company_phone",
+      "value": "+1 123 456 7890",
+      "description": "Company phone for invoices",
+      "updated_at": "2026-10-25 05:19:27"
+    },
+    {
+      "key": "company_address",
+      "value": "456 Enterprise Ave, BC 12345",
+      "description": "Company address for invoices",
+      "updated_at": "2026-10-25 05:19:27"
+    },
+    {
+      "key": "company_tax_id",
+      "value": "TAX-123456789",
+      "description": "Company tax ID for invoices",
+      "updated_at": "2026-10-25 05:19:27"
+    },
+    {
+      "key": "feature_batch_locations",
+      "value": "0",
+      "description": null,
+      "updated_at": "2026-10-25 05:19:29"
+    },
+    {
+      "key": "CAP_last_no_2609",
+      "value": "2",
+      "description": null,
+      "updated_at": "2026-10-25 05:19:50"
+    },
+    {
+      "key": "PURCH_last_no_1026",
+      "value": "1",
+      "description": null,
+      "updated_at": "2026-10-25 05:19:50"
+    },
+    {
+      "key": "BATCH_last_no_1026",
+      "value": "1",
+      "description": null,
+      "updated_at": "2026-10-25 05:19:50"
+    },
+    {
+      "key": "STK_last_no_1026",
+      "value": "1",
+      "description": null,
+      "updated_at": "2026-10-25 05:19:50"
+    },
+    {
+      "key": "PAY_last_no",
+      "value": "2",
+      "description": null,
+      "updated_at": "2026-10-25 05:19:51"
+    }
+  ],
+  "opening_balances": [
+    {
+      "account_key": "cash",
+      "amount": 0,
+      "updated_at": "2026-10-25 05:19:28"
+    },
+    {
+      "account_key": "bank",
+      "amount": 0,
+      "updated_at": "2026-10-25 05:19:28"
+    },
+    {
+      "account_key": "easypaisa",
+      "amount": 0,
+      "updated_at": "2026-10-25 05:19:28"
+    },
+    {
+      "account_key": "jazzcash",
+      "amount": 0,
+      "updated_at": "2026-10-25 05:19:28"
+    },
+    {
+      "account_key": "upaisa",
+      "amount": 0,
+      "updated_at": "2026-10-25 05:19:28"
+    }
+  ],
+  "idempotency_keys": [
+    {
+      "id": 1,
+      "key": "pc-create",
+      "scope": "supplier-prepayments.create",
+      "request_hash": "77bea2b2c162e40cca7e0e7a074e024d2802371f9805b05b66d5db5dcdb703e4",
+      "resource_id": 1,
+      "created_at": "2026-10-25 05:19:50",
+      "completed_at": "2026-10-25 05:19:50"
+    },
+    {
+      "id": 2,
+      "key": "pc-apply",
+      "scope": "supplier-prepayments.apply",
+      "request_hash": "cc1d3ccd4d71777db42badb793283826da467beecedc99b2143131e4484b1897",
+      "resource_id": 1,
+      "created_at": "2026-10-25 05:19:51",
+      "completed_at": "2026-10-25 05:19:51"
+    }
+  ],
+  "accounting_periods": [
+    {
+      "id": 1,
+      "period_name": "2026-09",
+      "start_date": "2026-09-01",
+      "end_date": "2026-09-30",
+      "status": "open",
+      "closed_at": null,
+      "closed_by": null,
+      "created_at": "2026-10-25 05:19:49"
+    }
+  ],
+  "journal_entries": [
+    {
+      "id": 1,
+      "reference_type": "OWNER_CAPITAL",
+      "reference_id": 1,
+      "entry_date": "2026-09-01",
+      "description": "Owner capital CAP-2609-00001 — 1000.00 (1000)",
+      "debit_account": "1",
+      "credit_account": "24",
+      "amount": 1000,
+      "created_by": 1,
+      "voided": 0,
+      "created_at": "2026-10-25 05:19:49"
+    },
+    {
+      "id": 2,
+      "reference_type": "OWNER_CAPITAL",
+      "reference_id": 2,
+      "entry_date": "2026-09-01",
+      "description": "Owner capital CAP-2609-00002 — 1000.00 (1010)",
+      "debit_account": "2",
+      "credit_account": "24",
+      "amount": 1000,
+      "created_by": 1,
+      "voided": 0,
+      "created_at": "2026-10-25 05:19:50"
+    },
+    {
+      "id": 3,
+      "reference_type": "SUPPLIER_BILL",
+      "reference_id": 1,
+      "entry_date": "2026-09-03",
+      "description": "Supplier bill PC-BILL",
+      "debit_account": "13",
+      "credit_account": "5",
+      "amount": 115.29,
+      "created_by": 1,
+      "voided": 0,
+      "created_at": "2026-10-25 05:19:50"
+    },
+    {
+      "id": 4,
+      "reference_type": "PURCHASE",
+      "reference_id": 1,
+      "entry_date": "2026-09-03",
+      "description": "Purchase PURCH-1026-0001 — total 49.36",
+      "debit_account": "4",
+      "credit_account": "5",
+      "amount": 49.36,
+      "created_by": 1,
+      "voided": 0,
+      "created_at": "2026-10-25 05:19:50"
+    },
+    {
+      "id": 5,
+      "reference_type": "SUPPLIER_PREPAYMENT",
+      "reference_id": 1,
+      "entry_date": "2026-09-02",
+      "description": "Supplier advance 1",
+      "debit_account": "35",
+      "credit_account": "1",
+      "amount": 200.75,
+      "created_by": 1,
+      "voided": 0,
+      "created_at": "2026-10-25 05:19:50"
+    },
+    {
+      "id": 6,
+      "reference_type": "PAYMENT",
+      "reference_id": 1,
+      "entry_date": "2026-09-04",
+      "description": "Supplier advance applied by PAY-1026-00001",
+      "debit_account": "5",
+      "credit_account": "35",
+      "amount": 80.24,
+      "created_by": 1,
+      "voided": 0,
+      "created_at": "2026-10-25 05:19:51"
+    },
+    {
+      "id": 7,
+      "reference_type": "PAYMENT",
+      "reference_id": 2,
+      "entry_date": "2026-09-04",
+      "description": "Supplier advance applied by PAY-1026-00002",
+      "debit_account": "5",
+      "credit_account": "35",
+      "amount": 55.16,
+      "created_by": 1,
+      "voided": 0,
+      "created_at": "2026-10-25 05:19:51"
+    }
+  ],
+  "journal_lines": [
+    {
+      "id": 1,
+      "journal_entry_id": 1,
+      "account_id": 1,
+      "debit": 1000,
+      "credit": 0,
+      "description": "Capital contributed via CAP-2609-00001",
+      "line_date": "2026-09-01",
+      "reference_type": "OWNER_CAPITAL",
+      "reference_id": 1,
+      "voided": 0,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:19:49",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null
+    },
+    {
+      "id": 2,
+      "journal_entry_id": 1,
+      "account_id": 24,
+      "debit": 0,
+      "credit": 1000,
+      "description": "Owner contribution CAP-2609-00001",
+      "line_date": "2026-09-01",
+      "reference_type": "OWNER_CAPITAL",
+      "reference_id": 1,
+      "voided": 0,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:19:49",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null
+    },
+    {
+      "id": 3,
+      "journal_entry_id": 2,
+      "account_id": 2,
+      "debit": 1000,
+      "credit": 0,
+      "description": "Capital contributed via CAP-2609-00002",
+      "line_date": "2026-09-01",
+      "reference_type": "OWNER_CAPITAL",
+      "reference_id": 2,
+      "voided": 0,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:19:50",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null
+    },
+    {
+      "id": 4,
+      "journal_entry_id": 2,
+      "account_id": 24,
+      "debit": 0,
+      "credit": 1000,
+      "description": "Owner contribution CAP-2609-00002",
+      "line_date": "2026-09-01",
+      "reference_type": "OWNER_CAPITAL",
+      "reference_id": 2,
+      "voided": 0,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:19:50",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null
+    },
+    {
+      "id": 5,
+      "journal_entry_id": 3,
+      "account_id": 13,
+      "debit": 100.25,
+      "credit": 0,
+      "description": null,
+      "line_date": "2026-09-03",
+      "reference_type": "SUPPLIER_BILL",
+      "reference_id": 1,
+      "voided": 0,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:19:50",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null
+    },
+    {
+      "id": 6,
+      "journal_entry_id": 3,
+      "account_id": 34,
+      "debit": 15.04,
+      "credit": 0,
+      "description": null,
+      "line_date": "2026-09-03",
+      "reference_type": "SUPPLIER_BILL",
+      "reference_id": 1,
+      "voided": 0,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:19:50",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null
+    },
+    {
+      "id": 7,
+      "journal_entry_id": 3,
+      "account_id": 5,
+      "debit": 0,
+      "credit": 115.29,
+      "description": null,
+      "line_date": "2026-09-03",
+      "reference_type": "SUPPLIER_BILL",
+      "reference_id": 1,
+      "voided": 0,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:19:50",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null
+    },
+    {
+      "id": 8,
+      "journal_entry_id": 4,
+      "account_id": 4,
+      "debit": 49.36,
+      "credit": 0,
+      "description": "Inventory received via PURCH-1026-0001",
+      "line_date": "2026-09-03",
+      "reference_type": "PURCHASE",
+      "reference_id": 1,
+      "voided": 0,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:19:50",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null
+    },
+    {
+      "id": 9,
+      "journal_entry_id": 4,
+      "account_id": 5,
+      "debit": 0,
+      "credit": 49.36,
+      "description": "Obligation for PURCH-1026-0001",
+      "line_date": "2026-09-03",
+      "reference_type": "PURCHASE",
+      "reference_id": 1,
+      "voided": 0,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:19:50",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null
+    },
+    {
+      "id": 10,
+      "journal_entry_id": 5,
+      "account_id": 35,
+      "debit": 200.75,
+      "credit": 0,
+      "description": null,
+      "line_date": "2026-09-02",
+      "reference_type": "SUPPLIER_PREPAYMENT",
+      "reference_id": 1,
+      "voided": 0,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:19:50",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null
+    },
+    {
+      "id": 11,
+      "journal_entry_id": 5,
+      "account_id": 1,
+      "debit": 0,
+      "credit": 200.75,
+      "description": null,
+      "line_date": "2026-09-02",
+      "reference_type": "SUPPLIER_PREPAYMENT",
+      "reference_id": 1,
+      "voided": 0,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:19:50",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null
+    },
+    {
+      "id": 12,
+      "journal_entry_id": 6,
+      "account_id": 5,
+      "debit": 80.24,
+      "credit": 0,
+      "description": null,
+      "line_date": "2026-09-04",
+      "reference_type": "PAYMENT",
+      "reference_id": 1,
+      "voided": 0,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:19:51",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null
+    },
+    {
+      "id": 13,
+      "journal_entry_id": 6,
+      "account_id": 35,
+      "debit": 0,
+      "credit": 80.24,
+      "description": null,
+      "line_date": "2026-09-04",
+      "reference_type": "PAYMENT",
+      "reference_id": 1,
+      "voided": 0,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:19:51",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null
+    },
+    {
+      "id": 14,
+      "journal_entry_id": 7,
+      "account_id": 5,
+      "debit": 55.16,
+      "credit": 0,
+      "description": null,
+      "line_date": "2026-09-04",
+      "reference_type": "PAYMENT",
+      "reference_id": 2,
+      "voided": 0,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:19:51",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null
+    },
+    {
+      "id": 15,
+      "journal_entry_id": 7,
+      "account_id": 35,
+      "debit": 0,
+      "credit": 55.16,
+      "description": null,
+      "line_date": "2026-09-04",
+      "reference_type": "PAYMENT",
+      "reference_id": 2,
+      "voided": 0,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:19:51",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null
+    }
+  ],
+  "suppliers": [
+    {
+      "id": 1,
+      "supplier_code": "PC-SUP",
+      "supplier_name": "Payable cash fixture",
+      "contact_person": null,
+      "email": null,
+      "phone": null,
+      "address": null,
+      "payment_terms": null,
+      "is_active": 1,
+      "created_at": "2026-10-25 05:19:50",
+      "updated_at": "2026-10-25 05:19:50",
+      "current_balance": 29.250000000000014
+    }
+  ],
+  "supplier_ledger": [
+    {
+      "id": 1,
+      "supplier_id": 1,
+      "transaction_date": "2026-09-03",
+      "transaction_type": "SUPPLIER_BILL",
+      "reference_no": "BILL-1",
+      "debit": 115.29,
+      "credit": 0,
+      "balance": 115.29,
+      "description": "PC-BILL",
+      "created_at": "2026-10-25 05:19:50",
+      "voided": 0,
+      "reversed_by": null
+    },
+    {
+      "id": 2,
+      "supplier_id": 1,
+      "transaction_date": "2026-09-03",
+      "transaction_type": "PURCHASE",
+      "reference_no": "PURCH-1026-0001",
+      "debit": 49.36,
+      "credit": 0,
+      "balance": 164.65,
+      "description": "Purchase PURCH-1026-0001",
+      "created_at": "2026-10-25 05:19:50",
+      "voided": 0,
+      "reversed_by": null
+    },
+    {
+      "id": 3,
+      "supplier_id": 1,
+      "transaction_date": "2026-09-04",
+      "transaction_type": "PAYMENT",
+      "reference_no": "PAY-1026-00001",
+      "debit": 0,
+      "credit": 80.24,
+      "balance": 84.41000000000001,
+      "description": "Payment against PC-BILL, PURCH-1026-0001",
+      "created_at": "2026-10-25 05:19:51",
+      "voided": 0,
+      "reversed_by": null
+    },
+    {
+      "id": 4,
+      "supplier_id": 1,
+      "transaction_date": "2026-09-04",
+      "transaction_type": "PAYMENT",
+      "reference_no": "PAY-1026-00002",
+      "debit": 0,
+      "credit": 55.16,
+      "balance": 29.250000000000014,
+      "description": "Payment against PC-BILL",
+      "created_at": "2026-10-25 05:19:51",
+      "voided": 0,
+      "reversed_by": null
+    }
+  ],
+  "supplier_bills": [
+    {
+      "id": 1,
+      "supplier_id": 1,
+      "bill_no": "PC-BILL",
+      "bill_date": "2026-09-03",
+      "due_date": null,
+      "description": "Fixture services",
+      "net_amount": 100.25,
+      "input_tax_amount": 15.04,
+      "total_amount": 115.29,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:19:50",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null
+    }
+  ],
+  "supplier_bill_allocations": [
+    {
+      "id": 1,
+      "payment_id": 1,
+      "bill_id": 1,
+      "amount": 60.13,
+      "voided_at": null
+    },
+    {
+      "id": 2,
+      "payment_id": 2,
+      "bill_id": 1,
+      "amount": 55.16,
+      "voided_at": null
+    }
+  ],
+  "supplier_prepayments": [
+    {
+      "id": 1,
+      "supplier_id": 1,
+      "prepay_date": "2026-09-02",
+      "amount": 200.75,
+      "payment_method": "Cash",
+      "reference_no": null,
+      "notes": null,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:19:50",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null
+    }
+  ],
+  "supplier_prepayment_applications": [
+    {
+      "id": 1,
+      "prepayment_id": 1,
+      "payment_id": 1,
+      "amount": 80.24,
+      "created_at": "2026-10-25 05:19:51"
+    },
+    {
+      "id": 2,
+      "prepayment_id": 1,
+      "payment_id": 2,
+      "amount": 55.16,
+      "created_at": "2026-10-25 05:19:51"
+    }
+  ],
+  "payments": [
+    {
+      "id": 1,
+      "payment_no": "PAY-1026-00001",
+      "customer_id": null,
+      "supplier_id": 1,
+      "invoice_id": null,
+      "payment_date": "2026-09-04",
+      "amount": 80.24,
+      "payment_method": "credit",
+      "reference_no": "",
+      "notes": "Supplier advance 1 applied",
+      "purchase_order_id": null,
+      "created_by": null,
+      "created_at": "2026-10-25 05:19:51",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "payment_kind": "RECEIPT"
+    },
+    {
+      "id": 2,
+      "payment_no": "PAY-1026-00002",
+      "customer_id": null,
+      "supplier_id": 1,
+      "invoice_id": null,
+      "payment_date": "2026-09-04",
+      "amount": 55.16,
+      "payment_method": "credit",
+      "reference_no": "",
+      "notes": "Supplier advance 1 applied",
+      "purchase_order_id": null,
+      "created_by": null,
+      "created_at": "2026-10-25 05:19:51",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "payment_kind": "RECEIPT"
+    }
+  ],
+  "purchase_allocations": [
+    {
+      "id": 1,
+      "payment_id": 1,
+      "purchase_id": 1,
+      "amount": 20.11,
+      "created_at": "2026-10-25 05:19:51",
+      "voided_at": null
+    }
+  ],
+  "po_allocations": [],
+  "purchases": [
+    {
+      "id": 1,
+      "purchase_no": "PURCH-1026-0001",
+      "item_id": 1,
+      "warehouse_id": 1,
+      "quantity": 4,
+      "unit_cost": 12.34,
+      "total_cost": 49.36,
+      "supplier_name": "Payable cash fixture",
+      "purchase_date": "2026-09-03",
+      "invoice_no": null,
+      "remarks": null,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:19:50",
+      "updated_at": "2026-10-25 05:19:50",
+      "supplier_id": 1,
+      "returned_quantity": 0,
+      "batch_id": 1,
+      "batch_no": "BATCH-1026-PUR-00001",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null,
+      "input_tax_amount": 0
+    }
+  ],
+  "items": [
+    {
+      "id": 1,
+      "item_code": "PC-ITEM",
+      "item_name": "Fixture item",
+      "description": null,
+      "category": null,
+      "unit_of_measure": "pcs",
+      "current_stock": 4,
+      "reorder_level": 0,
+      "standard_cost": 0,
+      "standard_selling_price": 0,
+      "is_raw_material": 0,
+      "is_finished_good": 0,
+      "is_purchased": 1,
+      "is_manufactured": 0,
+      "is_active": 1,
+      "created_by": 1,
+      "created_at": "2026-10-25 05:19:50",
+      "updated_at": "2026-10-25 05:19:50",
+      "has_expiry": 0,
+      "near_expiry_threshold_days": 30,
+      "sale_type": "packed",
+      "qty_decimal_precision": 0,
+      "rounding_step": null,
+      "deleted_at": null,
+      "deleted_by": null
+    }
+  ],
+  "stock_movements": [
+    {
+      "id": 1,
+      "movement_no": "STK-1026-0001",
+      "item_id": 1,
+      "warehouse_id": 1,
+      "movement_type": "PURCHASE",
+      "quantity": 4,
+      "unit_cost": 12.34,
+      "reference_doctype": "Purchase",
+      "reference_docno": "PURCH-1026-0001",
+      "remarks": "Purchase: PURCH-1026-0001 from Payable cash fixture (batch 1)",
+      "movement_date": "2026-09-03",
+      "created_by": 1,
+      "created_at": "2026-10-25 05:19:50",
+      "purchase_return_id": null,
+      "financial_value": 0,
+      "financial_posted": 1,
+      "journal_entry_id": null,
+      "batch_id": 1
+    }
+  ],
+  "stock_batches": [
+    {
+      "id": 1,
+      "batch_no": "BATCH-1026-PUR-00001",
+      "item_id": 1,
+      "warehouse_id": 1,
+      "source_type": "PURCHASE",
+      "source_id": 1,
+      "quantity_original": 4,
+      "quantity_remaining": 4,
+      "unit_cost": 12.34,
+      "received_date": "2026-09-03",
+      "created_at": "2026-10-25 05:19:50",
+      "expiry_date": null,
+      "halted": 0,
+      "halted_reason": null
+    }
+  ],
+  "stock_balances": [
+    {
+      "item_id": 1,
+      "warehouse_id": 1,
+      "quantity": 4,
+      "last_updated": null,
+      "quantity_physical": null,
+      "quantity_reserved": null,
+      "quantity_available": null
+    }
+  ],
+  "expenses": [],
+  "expense_payments": [],
+  "cash_reconciliations": []
+}

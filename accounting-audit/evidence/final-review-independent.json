@@ -1,0 +1,549 @@
+{
+  "backend-count-risk-run-ZBybHv": {
+    "integrity": [
+      {
+        "integrity_check": "ok"
+      }
+    ],
+    "fk": [],
+    "gl": [
+      {
+        "code": "1200",
+        "amount": 140
+      },
+      {
+        "code": "2000",
+        "amount": -250
+      },
+      {
+        "code": "7200",
+        "amount": 110
+      }
+    ],
+    "stocks": [
+      {
+        "item_id": 1,
+        "quantity": 2
+      },
+      {
+        "item_id": 2,
+        "quantity": 10
+      }
+    ],
+    "countItems": [
+      {
+        "count_id": 1,
+        "item_id": 1,
+        "counted_quantity": 2,
+        "variance": -8,
+        "adjustment_posted": 1,
+        "adjustment_movement_id": 3
+      },
+      {
+        "count_id": 2,
+        "item_id": 1,
+        "counted_quantity": 2,
+        "variance": 0,
+        "adjustment_posted": 1,
+        "adjustment_movement_id": 9
+      },
+      {
+        "count_id": 2,
+        "item_id": 2,
+        "counted_quantity": 8,
+        "variance": -2,
+        "adjustment_posted": 1,
+        "adjustment_movement_id": 6
+      }
+    ]
+  },
+  "backend-extension-run-OF2b8i": {
+    "integrity": [
+      {
+        "integrity_check": "ok"
+      }
+    ],
+    "fk": [],
+    "gl": [
+      {
+        "code": "1010",
+        "amount": 1000
+      },
+      {
+        "code": "1200",
+        "amount": 90
+      },
+      {
+        "code": "2000",
+        "amount": -100
+      },
+      {
+        "code": "3200",
+        "amount": -1000
+      },
+      {
+        "code": "7200",
+        "amount": 10
+      }
+    ],
+    "stocks": [
+      {
+        "item_id": 1,
+        "quantity": 9
+      },
+      {
+        "item_id": 2,
+        "quantity": 0
+      },
+      {
+        "item_id": 3,
+        "quantity": 0
+      }
+    ]
+  },
+  "oracle-run-TQ4hqh": {
+    "integrity": [
+      {
+        "integrity_check": "ok"
+      }
+    ],
+    "fk": [],
+    "gl": [
+      {
+        "code": "1000",
+        "amount": 9900
+      },
+      {
+        "code": "1200",
+        "amount": 115
+      },
+      {
+        "code": "2000",
+        "amount": -15
+      },
+      {
+        "code": "3200",
+        "amount": -10000
+      }
+    ],
+    "stocks": [
+      {
+        "item_id": 1,
+        "quantity": 6
+      }
+    ],
+    "allocations": [
+      {
+        "id": 1,
+        "payment_id": 1,
+        "purchase_id": 1,
+        "amount": 100,
+        "created_at": "2026-10-25 03:39:58",
+        "voided_at": null
+      }
+    ]
+  },
+  "oracle-run-ZHkdJ8": {
+    "integrity": [
+      {
+        "integrity_check": "ok"
+      }
+    ],
+    "fk": [],
+    "gl": [
+      {
+        "code": "1000",
+        "amount": 10000
+      },
+      {
+        "code": "1200",
+        "amount": 90
+      },
+      {
+        "code": "2000",
+        "amount": -90
+      },
+      {
+        "code": "3200",
+        "amount": -10000
+      }
+    ],
+    "stocks": [
+      {
+        "item_id": 1,
+        "quantity": 9
+      }
+    ],
+    "chronology": [
+      {
+        "return_date": "2026-09-09",
+        "purchase_date": "2026-09-10"
+      }
+    ]
+  },
+  "mixedRollbackAllSnapshotFields": true,
+  "partialCorrection": {
+    "actualInventory": 140,
+    "expectedInventory": 120,
+    "actualLoss": 110,
+    "expectedLoss": 130
+  },
+  "01-before-production": {
+    "accounts": {
+      "1010": 1000,
+      "1200": 100,
+      "2000": -100,
+      "2200": 0,
+      "3200": -1000,
+      "3300": 0,
+      "6000": 0,
+      "6100": 0,
+      "7000": 0,
+      "7100": 0,
+      "7200": 0
+    },
+    "stock": [
+      {
+        "item_id": 1,
+        "warehouse_id": 1,
+        "quantity": 10
+      }
+    ]
+  },
+  "02-production-overhead": {
+    "accounts": {
+      "1010": 1000,
+      "1200": 130,
+      "2000": -100,
+      "2200": -30,
+      "3200": -1000,
+      "3300": 0,
+      "6000": 0,
+      "6100": 0,
+      "7000": 0,
+      "7100": 0,
+      "7200": 0
+    },
+    "stock": [
+      {
+        "item_id": 1,
+        "warehouse_id": 1,
+        "quantity": 4
+      },
+      {
+        "item_id": 2,
+        "warehouse_id": 1,
+        "quantity": 2
+      },
+      {
+        "item_id": 3,
+        "warehouse_id": 1,
+        "quantity": 3
+      }
+    ]
+  },
+  "03-production-reversed": {
+    "accounts": {
+      "1010": 1000,
+      "1200": 100,
+      "2000": -100,
+      "2200": 0,
+      "3200": -1000,
+      "3300": 0,
+      "6000": 0,
+      "6100": 0,
+      "7000": 0,
+      "7100": 0,
+      "7200": 0
+    },
+    "stock": [
+      {
+        "item_id": 1,
+        "warehouse_id": 1,
+        "quantity": 10
+      },
+      {
+        "item_id": 2,
+        "warehouse_id": 1,
+        "quantity": 0
+      },
+      {
+        "item_id": 3,
+        "warehouse_id": 1,
+        "quantity": 0
+      }
+    ]
+  },
+  "04-owner-goods": {
+    "accounts": {
+      "1010": 1000,
+      "1200": 70,
+      "2000": -100,
+      "2200": 0,
+      "3200": -1000,
+      "3300": 30,
+      "6000": 0,
+      "6100": 0,
+      "7000": 0,
+      "7100": 0,
+      "7200": 0
+    },
+    "stock": [
+      {
+        "item_id": 1,
+        "warehouse_id": 1,
+        "quantity": 7
+      },
+      {
+        "item_id": 2,
+        "warehouse_id": 1,
+        "quantity": 0
+      },
+      {
+        "item_id": 3,
+        "warehouse_id": 1,
+        "quantity": 0
+      }
+    ]
+  },
+  "05-owner-cash": {
+    "accounts": {
+      "1010": 950,
+      "1200": 70,
+      "2000": -100,
+      "2200": 0,
+      "3200": -1000,
+      "3300": 80,
+      "6000": 0,
+      "6100": 0,
+      "7000": 0,
+      "7100": 0,
+      "7200": 0
+    },
+    "stock": [
+      {
+        "item_id": 1,
+        "warehouse_id": 1,
+        "quantity": 7
+      },
+      {
+        "item_id": 2,
+        "warehouse_id": 1,
+        "quantity": 0
+      },
+      {
+        "item_id": 3,
+        "warehouse_id": 1,
+        "quantity": 0
+      }
+    ]
+  },
+  "06-owner-reversed": {
+    "accounts": {
+      "1010": 1000,
+      "1200": 100,
+      "2000": -100,
+      "2200": 0,
+      "3200": -1000,
+      "3300": 0,
+      "6000": 0,
+      "6100": 0,
+      "7000": 0,
+      "7100": 0,
+      "7200": 0
+    },
+    "stock": [
+      {
+        "item_id": 1,
+        "warehouse_id": 1,
+        "quantity": 10
+      },
+      {
+        "item_id": 2,
+        "warehouse_id": 1,
+        "quantity": 0
+      },
+      {
+        "item_id": 3,
+        "warehouse_id": 1,
+        "quantity": 0
+      }
+    ]
+  },
+  "07-count-completed": {
+    "accounts": {
+      "1010": 1000,
+      "1200": 80,
+      "2000": -100,
+      "2200": 0,
+      "3200": -1000,
+      "3300": 0,
+      "6000": 0,
+      "6100": 0,
+      "7000": 0,
+      "7100": 0,
+      "7200": 20
+    },
+    "stock": [
+      {
+        "item_id": 1,
+        "warehouse_id": 1,
+        "quantity": 8
+      },
+      {
+        "item_id": 2,
+        "warehouse_id": 1,
+        "quantity": 0
+      },
+      {
+        "item_id": 3,
+        "warehouse_id": 1,
+        "quantity": 0
+      }
+    ]
+  },
+  "08-count-corrected": {
+    "accounts": {
+      "1010": 1000,
+      "1200": 90,
+      "2000": -100,
+      "2200": 0,
+      "3200": -1000,
+      "3300": 0,
+      "6000": 0,
+      "6100": 0,
+      "7000": 0,
+      "7100": 0,
+      "7200": 10
+    },
+    "stock": [
+      {
+        "item_id": 1,
+        "warehouse_id": 1,
+        "quantity": 9
+      },
+      {
+        "item_id": 2,
+        "warehouse_id": 1,
+        "quantity": 0
+      },
+      {
+        "item_id": 3,
+        "warehouse_id": 1,
+        "quantity": 0
+      }
+    ]
+  },
+  "09-count-repeat-rejected": {
+    "accounts": {
+      "1010": 1000,
+      "1200": 90,
+      "2000": -100,
+      "2200": 0,
+      "3200": -1000,
+      "3300": 0,
+      "6000": 0,
+      "6100": 0,
+      "7000": 0,
+      "7100": 0,
+      "7200": 10
+    },
+    "stock": [
+      {
+        "item_id": 1,
+        "warehouse_id": 1,
+        "quantity": 9
+      },
+      {
+        "item_id": 2,
+        "warehouse_id": 1,
+        "quantity": 0
+      },
+      {
+        "item_id": 3,
+        "warehouse_id": 1,
+        "quantity": 0
+      }
+    ]
+  },
+  "supplierCreditAttempt": [
+    {
+      "method": "post",
+      "url": "/api/payments",
+      "body": {
+        "supplier_id": 1,
+        "payment_date": "2026-09-04",
+        "amount": 60,
+        "payment_method": "credit",
+        "credit_note_id": 1,
+        "purchase_allocations": [
+          {
+            "purchase_id": 2,
+            "amount": 30
+          },
+          {
+            "purchase_id": 3,
+            "amount": 30
+          }
+        ]
+      },
+      "status": 500,
+      "response": {
+        "success": false,
+        "error": "Failed to create payment"
+      },
+      "economicHashBefore": "045104b63a4dc16dae51b453888fa1df9d14a10ab187f1334209c4dbbc7d4ea9",
+      "economicHashAfter": "045104b63a4dc16dae51b453888fa1df9d14a10ab187f1334209c4dbbc7d4ea9"
+    }
+  ],
+  "pnl": {
+    "success": true,
+    "data": {
+      "startDate": "2026-09-01",
+      "endDate": "2026-10-31",
+      "totalRevenue": 210,
+      "totalCogs": 140,
+      "grossProfit": 70,
+      "expenses": [
+        {
+          "expense_category": "Office Supplies",
+          "total": 10
+        }
+      ],
+      "totalExpenses": 20,
+      "netProfit": 50,
+      "grossProfitMargin": 33.33333333333333,
+      "netProfitMargin": 23.809523809523807
+    }
+  },
+  "pnlWidget": {
+    "source_events": "accounting-audit/evidence/oracle-run-AbsZeT/api-events.json",
+    "provider_loads_after_refresh_tap": 2,
+    "visible_text": [
+      "Profit & Loss Report",
+      "Oct 1–31, 2026",
+      "This month",
+      "Export to CSV",
+      "Total Revenue",
+      "Rs. 210.00",
+      "Cost of Goods Sold (COGS)",
+      "Rs. 140.00",
+      "Gross Profit",
+      "Rs. 70.00",
+      "Total Expenses",
+      "Rs. 20.00",
+      "Net Profit",
+      "Rs. 50.00",
+      "Gross Profit Margin / Net Profit Margin",
+      "33.333% / 23.81%",
+      "Period: Sep 1, 2026 To Oct 31, 2026",
+      "Expenses by Category",
+      "Office Supplies",
+      "Rs. 10.00"
+    ]
+  },
+  "sourceHashes": {
+    "count": 1172,
+    "changed": []
+  }
+}

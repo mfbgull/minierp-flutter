@@ -34,10 +34,27 @@ async function start() {
   database.applyPendingMigrations();
   await database.dbSeedReady;
   const db = database.default;
-  const express = require('express');
   const accounting = require('../../src/services/accountingService').default;
   const checks = require('../../src/__tests__/helpers/accountingInvariants');
   const { pruneIdempotencyKeys } = require('../../src/utils/idempotency');
+  const { api, control } = createFixtureApps({ db, accounting, checks, pruneIdempotencyKeys, directory, marker, before, fingerprints, app: require('../../src/app').default });
+  const apiServer = api.listen(4327, '127.0.0.1');
+  const controlServer = control.listen(4328, '127.0.0.1');
+  const shutdown = () => {
+    apiServer.close();
+    controlServer.close();
+    db.close();
+    const unchanged = JSON.stringify(before) === JSON.stringify(fingerprints());
+    console.log(JSON.stringify({ stopped: true, canonicalUnchanged: unchanged, directory }));
+    process.exit(unchanged ? 0 : 1);
+  };
+  process.once('SIGINT', shutdown);
+  process.once('SIGTERM', shutdown);
+  console.log(JSON.stringify({ ready: true, directory, marker, api: 'http://127.0.0.1:4327/api' }));
+}
+
+function createFixtureApps({ db, accounting, checks, pruneIdempotencyKeys, directory, marker, before, fingerprints, app }) {
+  const express = require('express');
   const date = new Date().toISOString().slice(0, 10);
   let dropPath = null;
   let unsupported = false;
@@ -66,7 +83,7 @@ async function start() {
     }
     next();
   });
-  api.use(require('../../src/app').default);
+  api.use(app);
   const control = express();
   control.use(express.json({ limit: '16kb' }));
   control.use((request, response, next) => {
@@ -145,20 +162,7 @@ async function start() {
       canonicalUnchanged: JSON.stringify(before) === JSON.stringify(fingerprints()),
     });
   });
-  const apiServer = api.listen(4327, '127.0.0.1');
-  const controlServer = control.listen(4328, '127.0.0.1');
-  const shutdown = () => {
-    apiServer.close();
-    controlServer.close();
-    db.close();
-    const unchanged = JSON.stringify(before) === JSON.stringify(fingerprints());
-    console.log(JSON.stringify({ stopped: true, canonicalUnchanged: unchanged, directory }));
-    process.exit(unchanged ? 0 : 1);
-  };
-  process.once('SIGINT', shutdown);
-  process.once('SIGTERM', shutdown);
-  console.log(JSON.stringify({ ready: true, directory, marker, api: 'http://127.0.0.1:4327/api' }));
+  return { api, control };
 }
-
-module.exports = { validateEnvironment };
+module.exports = { validateEnvironment, createFixtureApps };
 if (require.main === module) start().catch(error => { console.error(error.message); process.exitCode = 1; });

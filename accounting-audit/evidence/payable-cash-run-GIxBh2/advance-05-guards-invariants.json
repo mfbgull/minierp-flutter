@@ -1,0 +1,26 @@
+{
+  "customerArImbalances": [],
+  "supplierApImbalances": [],
+  "stockImbalances": [],
+  "arImbalances": [],
+  "apImbalances": [],
+  "inventoryImbalances": [],
+  "cashImbalances": [],
+  "orphanSourceBatches": [],
+  "unappliedLiabilityImbalances": [],
+  "creditSourceConsumptionImbalances": [],
+  "creditSourceBoundsImbalances": [],
+  "receiptAllocationImbalances": [],
+  "supplierAdvanceImbalances": [],
+  "expensePayableImbalances": [],
+  "inputTaxImbalances": [],
+  "gl": {
+    "groups": [],
+    "totalDiff": 0
+  },
+  "eachJournal": [],
+  "headers": [],
+  "voidedSourceGl": [],
+  "orphanAllocations": [],
+  "fullAssertion": "PASS"
+}

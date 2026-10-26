@@ -1,0 +1,295 @@
+{
+  "label": "quotation-before",
+  "balances": {
+    "1000": 1000000,
+    "1010": 0,
+    "1100": 0,
+    "1110": 0,
+    "1200": 37000,
+    "2000": -37000,
+    "4000": 0,
+    "4100": 0,
+    "5000": 0
+  },
+  "state": {
+    "quotations": [],
+    "quotation_items": [],
+    "sales_orders": [],
+    "sales_order_items": [],
+    "invoices": [],
+    "invoice_items": [],
+    "invoice_returns": [],
+    "invoice_return_items": [],
+    "return_settlements": [],
+    "payments": [],
+    "payment_allocations": [],
+    "customers": [
+      {
+        "id": 1,
+        "customer_code": "CUST-1026-00001",
+        "customer_name": "Quotation lifecycle",
+        "contact_person": "",
+        "email": "",
+        "phone": "03000000000",
+        "billing_address": "",
+        "shipping_address": "",
+        "payment_terms": "",
+        "is_active": 1,
+        "created_at": "2026-10-25 05:20:44",
+        "updated_at": "2026-10-25 05:20:44",
+        "credit_limit": 0,
+        "current_balance": 0,
+        "opening_balance": 0,
+        "payment_terms_days": 14,
+        "credit_balance": 0,
+        "deleted_at": null,
+        "deleted_by": null
+      }
+    ],
+    "customer_ledger": [],
+    "suppliers": [
+      {
+        "id": 1,
+        "supplier_code": "SC-S-1",
+        "supplier_name": "Quotation lifecycle",
+        "contact_person": null,
+        "email": null,
+        "phone": null,
+        "address": null,
+        "payment_terms": null,
+        "is_active": 1,
+        "created_at": "2026-10-25 05:20:44",
+        "updated_at": "2026-10-25 05:20:44",
+        "current_balance": 370
+      }
+    ],
+    "supplier_ledger": [
+      {
+        "id": 1,
+        "supplier_id": 1,
+        "transaction_date": "2026-09-01",
+        "transaction_type": "PURCHASE",
+        "reference_no": "PURCH-1026-0001",
+        "debit": 370,
+        "credit": 0,
+        "balance": 370,
+        "description": "Purchase PURCH-1026-0001",
+        "created_at": "2026-10-25 05:20:44",
+        "voided": 0,
+        "reversed_by": null
+      }
+    ],
+    "purchases": [
+      {
+        "id": 1,
+        "purchase_no": "PURCH-1026-0001",
+        "item_id": 1,
+        "warehouse_id": 1,
+        "quantity": 40,
+        "unit_cost": 9.25,
+        "total_cost": 370,
+        "supplier_name": "Quotation lifecycle",
+        "purchase_date": "2026-09-01",
+        "invoice_no": null,
+        "remarks": null,
+        "created_by": 1,
+        "created_at": "2026-10-25 05:20:44",
+        "updated_at": "2026-10-25 05:20:44",
+        "supplier_id": 1,
+        "returned_quantity": 0,
+        "batch_id": 1,
+        "batch_no": "BATCH-1026-PUR-00001",
+        "voided_at": null,
+        "voided_by": null,
+        "void_reason": null,
+        "input_tax_amount": 0
+      }
+    ],
+    "stock_balances": [
+      {
+        "item_id": 1,
+        "warehouse_id": 1,
+        "quantity": 40,
+        "last_updated": null,
+        "quantity_physical": null,
+        "quantity_reserved": null,
+        "quantity_available": null
+      }
+    ],
+    "stock_batches": [
+      {
+        "id": 1,
+        "batch_no": "BATCH-1026-PUR-00001",
+        "item_id": 1,
+        "warehouse_id": 1,
+        "source_type": "PURCHASE",
+        "source_id": 1,
+        "quantity_original": 40,
+        "quantity_remaining": 40,
+        "unit_cost": 9.25,
+        "received_date": "2026-09-01",
+        "created_at": "2026-10-25 05:20:44",
+        "expiry_date": null,
+        "halted": 0,
+        "halted_reason": null
+      }
+    ],
+    "stock_movements": [
+      {
+        "id": 1,
+        "movement_no": "STK-1026-0001",
+        "item_id": 1,
+        "warehouse_id": 1,
+        "movement_type": "PURCHASE",
+        "quantity": 40,
+        "unit_cost": 9.25,
+        "reference_doctype": "Purchase",
+        "reference_docno": "PURCH-1026-0001",
+        "remarks": "Purchase: PURCH-1026-0001 from Quotation lifecycle (batch 1)",
+        "movement_date": "2026-09-01",
+        "created_by": 1,
+        "created_at": "2026-10-25 05:20:44",
+        "purchase_return_id": null,
+        "financial_value": 0,
+        "financial_posted": 1,
+        "journal_entry_id": null,
+        "batch_id": 1
+      }
+    ],
+    "stock_reservations": [],
+    "batch_stock_by_location": [],
+    "journal_entries": [
+      {
+        "id": 1,
+        "reference_type": "OWNER_CAPITAL",
+        "reference_id": 1,
+        "entry_date": "2026-09-01",
+        "description": "Owner capital CAP-2609-00001 — 10000.00 (1000)",
+        "debit_account": "1",
+        "credit_account": "24",
+        "amount": 10000,
+        "created_by": 1,
+        "voided": 0,
+        "created_at": "2026-10-25 05:20:44"
+      },
+      {
+        "id": 2,
+        "reference_type": "PURCHASE",
+        "reference_id": 1,
+        "entry_date": "2026-09-01",
+        "description": "Purchase PURCH-1026-0001 — total 370.00",
+        "debit_account": "4",
+        "credit_account": "5",
+        "amount": 370,
+        "created_by": 1,
+        "voided": 0,
+        "created_at": "2026-10-25 05:20:44"
+      }
+    ],
+    "journal_lines": [
+      {
+        "id": 1,
+        "journal_entry_id": 1,
+        "account_id": 1,
+        "debit": 10000,
+        "credit": 0,
+        "description": "Capital contributed via CAP-2609-00001",
+        "line_date": "2026-09-01",
+        "reference_type": "OWNER_CAPITAL",
+        "reference_id": 1,
+        "voided": 0,
+        "created_by": 1,
+        "created_at": "2026-10-25 05:20:44",
+        "voided_at": null,
+        "voided_by": null,
+        "void_reason": null
+      },
+      {
+        "id": 2,
+        "journal_entry_id": 1,
+        "account_id": 24,
+        "debit": 0,
+        "credit": 10000,
+        "description": "Owner contribution CAP-2609-00001",
+        "line_date": "2026-09-01",
+        "reference_type": "OWNER_CAPITAL",
+        "reference_id": 1,
+        "voided": 0,
+        "created_by": 1,
+        "created_at": "2026-10-25 05:20:44",
+        "voided_at": null,
+        "voided_by": null,
+        "void_reason": null
+      },
+      {
+        "id": 3,
+        "journal_entry_id": 2,
+        "account_id": 4,
+        "debit": 370,
+        "credit": 0,
+        "description": "Inventory received via PURCH-1026-0001",
+        "line_date": "2026-09-01",
+        "reference_type": "PURCHASE",
+        "reference_id": 1,
+        "voided": 0,
+        "created_by": 1,
+        "created_at": "2026-10-25 05:20:44",
+        "voided_at": null,
+        "voided_by": null,
+        "void_reason": null
+      },
+      {
+        "id": 4,
+        "journal_entry_id": 2,
+        "account_id": 5,
+        "debit": 0,
+        "credit": 370,
+        "description": "Obligation for PURCH-1026-0001",
+        "line_date": "2026-09-01",
+        "reference_type": "PURCHASE",
+        "reference_id": 1,
+        "voided": 0,
+        "created_by": 1,
+        "created_at": "2026-10-25 05:20:44",
+        "voided_at": null,
+        "voided_by": null,
+        "void_reason": null
+      }
+    ],
+    "accounting_periods": [
+      {
+        "id": 1,
+        "period_name": "2026-09",
+        "start_date": "2026-09-01",
+        "end_date": "2026-09-30",
+        "status": "open",
+        "closed_at": null,
+        "closed_by": null,
+        "created_at": "2026-10-25 05:20:44"
+      }
+    ]
+  },
+  "invariants": {
+    "customerArImbalances": [],
+    "supplierApImbalances": [],
+    "stockImbalances": [],
+    "arImbalances": [],
+    "apImbalances": [],
+    "inventoryImbalances": [],
+    "cashImbalances": [],
+    "orphanSourceBatches": [],
+    "unappliedLiabilityImbalances": [],
+    "creditSourceConsumptionImbalances": [],
+    "creditSourceBoundsImbalances": [],
+    "receiptAllocationImbalances": [],
+    "supplierAdvanceImbalances": [],
+    "expensePayableImbalances": [],
+    "inputTaxImbalances": []
+  },
+  "referenceGroups": {
+    "groups": [],
+    "totalDiff": 0
+  },
+  "individualJournalGroups": [],
+  "signedArPaise": 0
+}

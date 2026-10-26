@@ -1,0 +1,97 @@
+{
+  "accountsPaise": {
+    "1000": 0,
+    "1010": 0,
+    "1200": 0,
+    "1320": 0,
+    "1330": 0,
+    "2000": 0,
+    "2115": 0,
+    "3000": 0,
+    "3200": 0,
+    "6000": 0
+  },
+  "settings": [
+    {
+      "key": "company_name",
+      "value": "Mini ERP",
+      "description": "Company name for invoices",
+      "updated_at": "2026-10-25 05:17:20"
+    },
+    {
+      "key": "company_email",
+      "value": "support@minierp.com",
+      "description": "Company email for invoices",
+      "updated_at": "2026-10-25 05:17:20"
+    },
+    {
+      "key": "company_phone",
+      "value": "+1 123 456 7890",
+      "description": "Company phone for invoices",
+      "updated_at": "2026-10-25 05:17:20"
+    },
+    {
+      "key": "company_address",
+      "value": "456 Enterprise Ave, BC 12345",
+      "description": "Company address for invoices",
+      "updated_at": "2026-10-25 05:17:20"
+    },
+    {
+      "key": "company_tax_id",
+      "value": "TAX-123456789",
+      "description": "Company tax ID for invoices",
+      "updated_at": "2026-10-25 05:17:20"
+    },
+    {
+      "key": "feature_batch_locations",
+      "value": "0",
+      "description": null,
+      "updated_at": "2026-10-25 05:17:23"
+    }
+  ],
+  "opening_balances": [
+    {
+      "account_key": "cash",
+      "amount": 0,
+      "updated_at": "2026-10-25 05:17:21"
+    },
+    {
+      "account_key": "bank",
+      "amount": 0,
+      "updated_at": "2026-10-25 05:17:21"
+    },
+    {
+      "account_key": "easypaisa",
+      "amount": 0,
+      "updated_at": "2026-10-25 05:17:21"
+    },
+    {
+      "account_key": "jazzcash",
+      "amount": 0,
+      "updated_at": "2026-10-25 05:17:21"
+    },
+    {
+      "account_key": "upaisa",
+      "amount": 0,
+      "updated_at": "2026-10-25 05:17:21"
+    }
+  ],
+  "accounting_periods": [],
+  "journal_entries": [],
+  "journal_lines": [],
+  "suppliers": [],
+  "supplier_ledger": [],
+  "supplier_bills": [],
+  "supplier_bill_allocations": [],
+  "supplier_prepayments": [],
+  "supplier_prepayment_applications": [],
+  "payments": [],
+  "purchase_allocations": [],
+  "po_allocations": [],
+  "purchases": [],
+  "stock_batches": [],
+  "stock_balances": [],
+  "expenses": [],
+  "expense_payments": [],
+  "cash_reconciliations": []
+}

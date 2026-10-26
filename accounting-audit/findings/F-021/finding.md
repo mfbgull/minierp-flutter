@@ -14,4 +14,4 @@ Evidence: `accounting-audit/evidence/backend-run-Lbw3la/results.json` scenario `
 
 Potential impact: historical loan/cash/asset balances are misstated, and a later genuine disbursement appears funded by an impossible earlier repayment. Global Dr=Cr invariants do not detect chronology.
 
-Proposed regression: disburse500 on15Sep; direct repayment200 on14Sep must reject with unchanged rows and GL,15Sep must succeed; same validation should hold for salary-linked repayment and all accepted date formats. Reuse a shared chronology validator at the domain boundary. No production change made.
+Recommended correction and regression: disburse500 on15Sep; direct repayment200 on14Sep must reject with unchanged rows and GL,15Sep must succeed; same validation should hold for salary-linked repayment and all accepted date formats. Reuse a shared chronology validator at the domain boundary. No production change made.

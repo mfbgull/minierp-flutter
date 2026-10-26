@@ -45,7 +45,7 @@ The graph has best-effort SQL parsing gaps; the saved coverage metadata records 
 | Business owner equity | OwnerCapital, OwnerWithdrawal | Capital, cash/goods drawings, edits and reversal; goods use cost |
 | Owner personal loans | ownerPersonalLoansController | Separate personal memorandum loans/repayments/borrower merge; no business GL assumed |
 | Manufacturing | BOM, Production, StockMovement, AccountingService | Recipe/version, material consumption, joint outputs, overhead accrual, cancellation/reversal |
-| Accounting and cash | Period, AccountingService, cashService, cashBalanceGuard | Journal/period controls, opening balances, transfers, reconciliation and reversals |
+| Accounting and cash | Period, AccountingService, cashService, cashBalanceGuard | Journal/period controls, opening balances, reconciliation and reversals; dedicated cash-transfer route unverified |
 | Reports | Reports, arAging, Dashboard, CustomReport, reportQueryEngine, entityRegistry | Dated statements/aging, operational aggregations, custom selected-field expressions |
 | Forecasts/configuration/security | forecastService, Settings, preferences, DashboardLayout, Role, activityLogger | Indirect inventory/cash presentation, cash-opening settings, authorizations, auditability |
 
@@ -54,3 +54,5 @@ The graph has best-effort SQL parsing gaps; the saved coverage metadata records 
 - No carton conversion engine or serial-number accounting workflow was established from current source discovery. A unit-of-measure label is not proof of quantity conversion. These requested cases remain unsupported/unverified rather than being simulated as a nonexistent feature.
 - Every discovered workflow is assigned a status in [module coverage](03-coverage-matrix.md) and the finer backend/Flutter registers. A single feature directory may include many unrun edit/delete/reversal variants.
 - Existing suites cover additional behavior, but do not establish an independent expected economic value for every route or figure.
+
+Final bounded extensions are documented in [sales channels](workstreams/sales-channel-extension.md) and [payables/cash counts](workstreams/payable-cash-extension.md). Inventory counts and original graph artifacts refer to the audit snapshot, not later added source/tests. [Final source state](evidence/final-source-state.json) records10 changed baseline files and17 added protected-scope files without modifying them.

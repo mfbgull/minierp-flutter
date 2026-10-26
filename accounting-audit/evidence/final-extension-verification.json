@@ -1,0 +1,324 @@
+{
+  "verifiedAt": "2026-10-26T01:21:24.930Z",
+  "scope": "Retained synthetic DBs only; no application boot or financial writes",
+  "findings": {
+    "F073": {
+      "request": {
+        "method": "post",
+        "url": "/api/pos/sale",
+        "body": {
+          "warehouse_id": 1,
+          "sale_date": "2026-10-25",
+          "items": [
+            {
+              "item_id": 6,
+              "quantity": 1,
+              "unit_price": 17.35
+            }
+          ],
+          "cash_received": 0
+        },
+        "headers": {
+          "Idempotency-Key": "SC-zero-cash-valid"
+        },
+        "status": 201,
+        "response": {
+          "success": true,
+          "message": "POS sale completed successfully",
+          "data": {
+            "transaction_no": "INV-1026-00006",
+            "sale_date": "2026-10-25",
+            "warehouse_id": 1,
+            "warehouse_name": "Main Warehouse",
+            "customer_name": "Walk-in Customer",
+            "items": [
+              {
+                "sale_id": 6,
+                "sale_no": "INV-1026-00006",
+                "item_id": 6,
+                "item_code": "SC-6",
+                "item_name": "POS zero tender",
+                "unit_of_measure": "pcs",
+                "quantity": 1,
+                "unit_price": 17.35,
+                "line_total": 17.35
+              }
+            ],
+            "discount_scope": "invoice",
+            "discount_type": "percentage",
+            "discount_value": 0,
+            "payments": [
+              {
+                "payment_method": "Cash",
+                "amount": 17.35
+              }
+            ],
+            "subtotal": 17.35,
+            "total": 17.35,
+            "cash_received": 17.35,
+            "change": 0,
+            "items_count": 1,
+            "sale_ids": [
+              6
+            ]
+          }
+        },
+        "before": "7b40d75cc7d7cb6997501fd31ad67e9ddbc6d4ba087ac5170caecf1d22057853",
+        "after": "ad656754d7cb0b15ca6a6cbf8a5ea467d5fb683181e2060ba2081d77a1fc1bd8"
+      },
+      "expectedCashDeltaPaise": 0,
+      "actualCashDeltaPaise": 1735,
+      "actualArDeltaPaise": 0,
+      "actualInventoryDeltaPaise": -925,
+      "fabricatedPayment": {
+        "id": 6,
+        "payment_no": "PAY-1026-00006",
+        "customer_id": 4,
+        "supplier_id": null,
+        "invoice_id": null,
+        "payment_date": "2026-10-25",
+        "amount": 17.35,
+        "payment_method": "Cash",
+        "reference_no": "",
+        "notes": "",
+        "purchase_order_id": null,
+        "created_by": null,
+        "created_at": "2026-10-25 05:21:45",
+        "voided_at": null,
+        "voided_by": null,
+        "void_reason": null,
+        "payment_kind": "RECEIPT"
+      }
+    },
+    "F071": {
+      "replayRow": {
+        "id": 1,
+        "item_id": 7,
+        "warehouse_id": 1,
+        "location_id": 1,
+        "batch_id": 7,
+        "quantity_reserved": 3,
+        "reference_doctype": "SALES_ORDER",
+        "reference_docno": "SC-RES-REPLAY",
+        "reference_line_id": 1,
+        "status": "ACTIVE",
+        "created_at": "2026-10-25 05:21:45",
+        "released_at": null,
+        "consumed_at": null
+      },
+      "replayLocation": {
+        "id": 1,
+        "batch_id": 7,
+        "location_id": 1,
+        "quantity_physical": 10,
+        "quantity_reserved": 6,
+        "quantity_available": 4,
+        "status_override": null,
+        "created_at": "2026-10-25 05:21:45",
+        "updated_at": "2026-10-25 05:21:45"
+      },
+      "releasedLocation": {
+        "id": 1,
+        "batch_id": 7,
+        "location_id": 1,
+        "quantity_physical": 10,
+        "quantity_reserved": 3,
+        "quantity_available": 7,
+        "status_override": null,
+        "created_at": "2026-10-25 05:21:45",
+        "updated_at": "2026-10-25 05:21:45"
+      },
+      "expectedFinalReserved": 0,
+      "expectedFinalAvailable": 10
+    },
+    "F072": {
+      "retainedReservation": {
+        "id": 3,
+        "item_id": 9,
+        "warehouse_id": 1,
+        "location_id": 1,
+        "batch_id": 9,
+        "quantity_reserved": 2,
+        "reference_doctype": "SALES_ORDER",
+        "reference_docno": "SC-RES-NOLINE",
+        "reference_line_id": null,
+        "status": "ACTIVE",
+        "created_at": "2026-10-25 05:21:46",
+        "released_at": null,
+        "consumed_at": null
+      },
+      "release": {
+        "method": "delete",
+        "url": "/api/inventory/reservations/3/release",
+        "headers": {},
+        "status": 400,
+        "response": {
+          "error": "Reservation is not active"
+        },
+        "before": "5ca10e9031add6f30d92381c0681567e8ae877c08dee4116c6c8f5e87a49879c",
+        "after": "5ca10e9031add6f30d92381c0681567e8ae877c08dee4116c6c8f5e87a49879c"
+      },
+      "nonNullLinePositiveControl": "200 and availability restored10"
+    },
+    "F070": {
+      "repeat": {
+        "method": "post",
+        "url": "/api/sales-orders/1/cancel",
+        "body": {},
+        "headers": {},
+        "status": 500,
+        "response": {
+          "error": "Sales order is already cancelled"
+        },
+        "before": "5a4976e88c27bffbce17d09a82445616f1d2888f9fd58e6ba0f6b989aa52e8a0",
+        "after": "5a4976e88c27bffbce17d09a82445616f1d2888f9fd58e6ba0f6b989aa52e8a0"
+      },
+      "expectedStatus": "4xx",
+      "secondMutation": false
+    },
+    "F060": {
+      "staleHeaders": [
+        {
+          "id": 5,
+          "reference_type": "SUPPLIER_PREPAYMENT",
+          "reference_id": 1,
+          "voided": 0,
+          "line_count": 2,
+          "active_lines": 0
+        },
+        {
+          "id": 6,
+          "reference_type": "PAYMENT",
+          "reference_id": 1,
+          "voided": 0,
+          "line_count": 2,
+          "active_lines": 0
+        },
+        {
+          "id": 7,
+          "reference_type": "PAYMENT",
+          "reference_id": 2,
+          "voided": 0,
+          "line_count": 2,
+          "active_lines": 0
+        },
+        {
+          "id": 8,
+          "reference_type": "SUPPLIER_PREPAYMENT",
+          "reference_id": 2,
+          "voided": 0,
+          "line_count": 2,
+          "active_lines": 0
+        },
+        {
+          "id": 9,
+          "reference_type": "EXPENSE",
+          "reference_id": 1,
+          "voided": 0,
+          "line_count": 2,
+          "active_lines": 0
+        },
+        {
+          "id": 10,
+          "reference_type": "EXPENSE_PAYMENT",
+          "reference_id": 1,
+          "voided": 0,
+          "line_count": 2,
+          "active_lines": 0
+        },
+        {
+          "id": 11,
+          "reference_type": "EXPENSE_PAYMENT",
+          "reference_id": 2,
+          "voided": 0,
+          "line_count": 2,
+          "active_lines": 0
+        },
+        {
+          "id": 12,
+          "reference_type": "OPENING_BALANCE",
+          "reference_id": 0,
+          "voided": 0,
+          "line_count": 4,
+          "active_lines": 0
+        },
+        {
+          "id": 13,
+          "reference_type": "OPENING_BALANCE",
+          "reference_id": 0,
+          "voided": 0,
+          "line_count": 4,
+          "active_lines": 0
+        }
+      ],
+      "canonicalUnbalancedEntries": [],
+      "economicEffectClaim": "None demonstrated; canonical active-line accounting remains balanced"
+    }
+  },
+  "payable": {
+    "checks": 552,
+    "integrity": [
+      {
+        "integrity_check": "ok"
+      }
+    ],
+    "foreignKeys": []
+  },
+  "source": {
+    "baselineRevision": "15a784180a51b816759dc0d3440d4c8743dcdb98",
+    "protectedFiles": 1172,
+    "changed": [
+      {
+        "file": "server/scripts/apply-customer15-correction.ts",
+        "baseline": "c8eaa25f52212f8c4453bd90ebeda84abc91956bfdc5a6ea626d63dea9942c8b",
+        "current": "e5baa0209fbfdc7cb3d53eba32f22250eacaa2844773396def8a2c72b81192de"
+      },
+      {
+        "file": "server/scripts/dev/audit-trace.ts",
+        "baseline": "a0e01c00ac7d5fb8c1066d5b1e3f889ae5fab5343b223f5cab894a6ed37ddad8",
+        "current": "452dc4ed8a83e3a0cf82a9b287776e7219aea388d449715c3fb687cd66a218c9"
+      },
+      {
+        "file": "server/scripts/fixtures/unapplied-cash-ui.cjs",
+        "baseline": "d3b5e0dde3ba921310f8a7114b59661fcd288d0f88bc928a6d7e6bea23f87924",
+        "current": "cb5ad476a4122e72bbaf5f22c880ca4c7ccd6100d15aed295f9848dc9a1cb432"
+      },
+      {
+        "file": "server/scripts/lib/correctionSafety.ts",
+        "baseline": "dfcdb7615eeb4ffa461a0be8cf2578c86d88ed05f7b50f09e1f06d80192f9c2b",
+        "current": "c3fba6996beeb461105f39c516ecc4de635bf1821de910289e9a2ea018ee0c80"
+      },
+      {
+        "file": "server/scripts/reconcile-customer-credits.ts",
+        "baseline": "85c193690bf13cf24156c0c1861c7a2d7da39136c5988b38c8c9d7a394a7b723",
+        "current": "0c8e2c4b8a8f59bc0c272306048022ec41279068eddf10fa7c138ee27ab8e50b"
+      },
+      {
+        "file": "server/scripts/rollback-customer15-correction.ts",
+        "baseline": "f84385eb504aba05edbf2a979c8374cfb03f9e6f3f5b32c595c49dfbdbd4e276",
+        "current": "4f67e42ba8b88cd3a4171be10f7ba3a42efbbf39120ed9ddb1effe93599384e9"
+      },
+      {
+        "file": "server/scripts/verify-reversal-rules.ts",
+        "baseline": "c7f8004ddfaef4ca005a4b0048417e9b4d07bc99f9f1bafc940f4039dcfbf668",
+        "current": "37b833498b90f6445c91cdb687338dcd01ae4429e16171fae6305ea77cec6449"
+      },
+      {
+        "file": "server/src/models/Purchase.ts",
+        "baseline": "d2cb4c6387788d27456506ed1e09bbdf8c14ffb07a2805cc5238eea8c611f624",
+        "current": "edeaa5dca70e207de4cbddb782f1578f25308f961ab661c23500fbfc4870740f"
+      },
+      {
+        "file": "server/src/scripts/fix-duplicate-purchase.ts",
+        "baseline": "9c8c10b94ac1f79272ed64180b2c232f1c2eae44620786489bbf6a1179dc89e7",
+        "current": "d408ca0062f52fee33e3701cd909fadc0ac61b2382939e6f954496a97d786946"
+      },
+      {
+        "file": "server/src/utils/legacyBomMigration.ts",
+        "baseline": "e76e848cf5fab2f11c74ddde11f879d8cae8f847970458ccab4922c8ccea0f71",
+        "current": "dd35f9d6118a304a0ad027c0599488fd5aa435785d793272d401ee704a4bb4d8"
+      }
+    ],
+    "interpretation": "Later shared-workspace changes are preserved and are not attributed to this audit; original fixture executions are snapshot evidence"
+  }
+}

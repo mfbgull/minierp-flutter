@@ -49,6 +49,15 @@ export function sha256File(filePath: string): string {
   return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
 }
 
+function targetsLiveDatabase(dbPath: string): boolean {
+  if (dbPath === path.resolve(LIVE_DB_PATH)) return true;
+  const live = fs.statSync(LIVE_DB_PATH, { bigint: true, throwIfNoEntry: false });
+  if (!live) return false;
+  // stat follows directory/file symlinks; device and inode also identify hardlinks.
+  const target = fs.statSync(dbPath, { bigint: true, throwIfNoEntry: false });
+  return live.dev === target?.dev && live.ino === target?.ino;
+}
+
 /**
  * Runs every gate and returns the resolved target, or exits non-zero.
  * Call this before opening any write.
@@ -76,7 +85,7 @@ export function assertCorrectionAuthorized(scriptName: string): GateResult {
   if (!fs.existsSync(dbPath)) {
     fail(scriptName, `No database file at ${dbPath}`);
   }
-  const isLive = dbPath === path.resolve(LIVE_DB_PATH);
+  const isLive = targetsLiveDatabase(dbPath);
 
   // ── Gate 3: the live database needs a separate, checksum-bound override ──
   if (isLive) {

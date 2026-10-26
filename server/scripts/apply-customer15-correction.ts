@@ -11,15 +11,17 @@
  * All inside ONE transaction (rule 1.3).
  */
 import fs from 'fs';
-import db from '../src/config/database';
-import { AccountingService } from '../src/services/accountingService';
-import StockMovementModel from '../src/models/StockMovement';
-import ledger from '../src/utils/ledgerUtils';
 import { assertCorrectionAuthorized } from './lib/correctionSafety';
 
 // ── Safety gate: runs before any write. Without CORRECTION_AUTHORIZED, an
 // explicit DATABASE_PATH, and --apply, this script exits without touching data.
 assertCorrectionAuthorized('apply-customer15-correction');
+
+// CommonJS preserves this order: even database initialization follows the gate.
+import db from '../src/config/database';
+import { AccountingService } from '../src/services/accountingService';
+import StockMovementModel from '../src/models/StockMovement';
+import ledger from '../src/utils/ledgerUtils';
 
 const {
   reverseLedgerEntry,
