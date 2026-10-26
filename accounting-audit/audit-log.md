@@ -23,3 +23,23 @@ This journal records observations as they arrive. Final conclusions must link to
 - Source inventory means discovered, not reviewed or economically verified.
 - A model/widget fixture is distinct from a mounted API transaction and from a live desktop workflow.
 - Financial-policy changes and all production fixes remain unauthorized.
+
+## Extension and recovery observations
+
+- Review corrected the receivable oracle direction: after duplicate credit funds a further60 sale, economic/GL receivable75 is correct; customer/invoice15 is understated60. The consolidated figure matrix uses that economic basis.
+- Ordinary attributable-overhead production/cancellation, owner goods/cash drawings/voids and single-cost count correction passed. Extra count probes then reproduced F-024 mixed-layer correction failure and F-025 omitted-item stock restoration; both reviewed independently against retained SQLite/snapshots.
+- Supplier credit across multiple purchases was attempted after review found that it had not initially been tested. Actual public API returns500 without mutation; return credit and supplier prepayment are different mechanisms. Aggregate AP15 passes, target allocation remains unsupported/unverified.
+- A supplier return before purchase also posts historical inventory/AP−10; F-001 now includes both sales and purchasing source chronology.
+- Final CSV detector uses a quote-aware parser with positive quoting controls. F-043 proves missing damage detail, not wrong profit. Leader severity normalization assigns F-040 Medium presentation impact, F-021 High dated GL misstatement, and F-023 Accounting-policy decision required.
+- User interruption/daemon recovery left the first full-suite log incomplete. Resumed server suite remained alive after a later daemon restart; no duplicate writer/test run was launched against its fixtures. Full Flutter and final analyzer results are recorded only after completion.
+- During the interruption a shared-workspace artifact/settings commit8d292328 appeared; the subsequent checkpoint still matched all1,172 protected files. This audit did not create that commit.
+- D15 was appended to audit/DECISIONS.md as OPEN-DECISION for later open-period settlement of liabilities originating in closed periods. It records the question and alternatives without changing policy or period guards.
+
+## Finalization on2026-10-26
+
+- Full server assertions completed232 suites/1,918 tests with zero failed; Jest logged open handles and a clean shell exit was not recovered. Flutter completed successfully with exit0,1,034 visible tests and96 hidden loading checks. Full root analyzer passed. No incomplete run was relabeled as a clean exit.
+- Late sales-channel execution finished692 checks/7 genuine mismatches and a positive reservation control. Root independently verified POS zero-tender fabricated cash17.35, duplicate reservation phantom3, NULL-line release failure and repeated SO cancellation500 with no second mutation; findingsF-070–073.
+- Late payable/cash execution made41 requests/552 checks. Canonical economic checks pass;17 repeated audit-header assertions expose9 active headers with all child lines void. Root read-only proof confirms one shared F-060, not17 defects or demonstrated duplicate money.
+- These workers did not finish their prose handoffs. The lead completed findings/workstream documentation from the already executed final runs, source checks and a new readonly retained-evidence verifier; no missing execution was invented.
+- Later external working-tree edits change10 baseline files and add17 protected-scope files, plus config/dependencies. They are preserved. Eight source files backing the late findings still match baseline. Earlier full-suite results are snapshot-scoped; later current-tree CI is not certified.
+- No production repairs were implemented. Final register:16 confirmed defects (2Critical/6High/7Medium/1Low), plus policy-qualified F-023/D15. All discovered scope retains explicit status and limitations.

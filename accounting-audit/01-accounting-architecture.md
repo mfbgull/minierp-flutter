@@ -1,6 +1,6 @@
 # Accounting architecture and truth model
 
-Status: draft; detailed source inventory and executed reconciliations are being integrated.
+Status: source-grounded architecture map with bounded executed reconciliations. This describes the implemented model; it does not certify every writer or reporting branch.
 
 The client is Flutter/Riverpod with Dio repositories; server routes/controllers delegate to models and specialized services over better-sqlite3. Journal lines are the financial GL; journal headers retain grouping and lineage. Operational document balances, party ledgers, allocations, stock balances, stock batches, and movements are separate representations that need reconciliation rather than mutual agreement alone.
 
@@ -28,7 +28,7 @@ The account codes below were read from the fresh migrated database's chart and c
 
 | Economic dimension | Modules that can change it | Operational representation | GL / reporting dependency |
 |---|---|---|---|
-| Cash and bank | Receipts, supplier/expense/salary payments, refunds, capital/drawings, employee loans, transfers, reconciliation | payments, linked document/payment records, cash counts | 1000 cash, 1010 bank, 1020–1040 wallets; cashService and cash-flow reports |
+| Cash and bank | Receipts, supplier/expense/salary payments, refunds, capital/drawings, employee loans, opening replacement and reconciliation; dedicated cash-transfer route not established | payments, linked document/payment records, cash counts | 1000 cash, 1010 bank, 1020–1040 wallets; cashService and cash-flow reports |
 | Customer receivables | Invoices, returns, payments, offsets, unapplied-cash applications, reversals | invoices, customer_ledger, payment allocations | 1100 AR and 1110 customer credit; aging and customer statements |
 | Supplier payables | Direct purchases, GRNs, bills, payments, returns, credit applications/refunds, reversals | purchases/receipts/bills, supplier_ledger and allocations | 2000 AP; supplier ledger and aging |
 | Inventory quantity | Receipt/purchase, sale, return, production, adjustment, count, transfer, damage/write-off, goods withdrawal | stock_balances, stock_batches, stock_movements; item mirror | 1200 inventory, valuation/movement reports; quantity must reconcile independently of GL |
@@ -61,6 +61,6 @@ The economic oracle does not call MiniERP calculation functions to derive expect
 
 Inventory loss recognition and attributable production cost are cross-checked against the IFRS Foundation's [IAS 2 overview](https://www.ifrs.org/issued-standards/list-of-standards/ias-2-inventories/). This is an accounting-control benchmark, not an assertion that every business using MiniERP is required to report under IFRS.
 
-## Known documentation discrepancy to resolve
+## Resolved documentation discrepancy
 
-`audit/DECISIONS.md` D12 describes historical current-stock allocation behavior. The fresh API oracle already rejects a sale dated before its receipt. This older description is not treated as a current defect; the final report will follow executed current behavior.
+`audit/DECISIONS.md` D12 describes historical current-stock allocation behavior. The fresh API oracle rejects a sale dated before its receipt. That older description is not a current confirmed defect. Separate new evidence proves that sales/purchase returns and a direct employee-loan repayment still accept invalid source chronology.

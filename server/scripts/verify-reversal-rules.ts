@@ -17,7 +17,7 @@ process.env.DEFAULT_ADMIN_PASSWORD = 'verify-admin-pass';
 const testDbDir = fs.mkdtempSync(path.join(os.tmpdir(), 'minierp-verify-'));
 process.env.DATABASE_PATH = testDbDir;
 
-import db, { dbSeedReady } from '../src/config/database';
+import db, { applyPendingMigrations, dbSeedReady } from '../src/config/database';
 import InvoiceModel from '../src/models/Invoice';
 import PurchaseOrderModel from '../src/models/PurchaseOrder';
 import SalesOrderModel from '../src/models/SalesOrder';
@@ -26,6 +26,7 @@ import StockMovementModel from '../src/models/StockMovement';
 import PurchaseModel from '../src/models/Purchase';
 import PhysicalCountModel from '../src/models/PhysicalCount';
 import SupplierModel from '../src/models/Supplier';
+import OwnerCapitalModel from '../src/models/OwnerCapital';
 import EmployeeModel from '../src/models/Employee';
 import EmployeeLoanModel from '../src/models/EmployeeLoan';
 import PaymentModel from '../src/models/Payment';
@@ -67,6 +68,7 @@ function activeLines(refType: string, refId: number): number {
 
 function finishVerification(): never {
   console.log(`\nResult: ${passed} passed, ${failed} failed`);
+  db.close();
   if (passed + failed !== EXPECTED_ASSERTIONS) {
     console.error(
       `Assertion count drift: expected ${EXPECTED_ASSERTIONS}, ran ${passed + failed}. ` +
@@ -80,6 +82,7 @@ function finishVerification(): never {
 }
 
 async function main(): Promise<void> {
+  applyPendingMigrations();
   // The admin seed hash is computed off the event loop — wait for the
   // row before any FK (created_by) references it.
   await dbSeedReady;
@@ -108,18 +111,21 @@ async function main(): Promise<void> {
   ).run('VERIF-CUST-1', 'Verify Customer', '555-0001');
   const customerId = Number(customerRes.lastInsertRowid);
   const customerStartBalance = 0;
+  const supplierId = SupplierModel.create({ supplier_code: `VERIF-SUP-${Date.now()}`, supplier_name: 'Verify Supplier' }, db);
+  OwnerCapitalModel.create(db, {
+    capital_no: 'VERIF-CAP-1', capital_date: '2026-07-31', amount: 100000,
+    payment_method: 'cash', created_by: 1,
+  });
 
   // Stock via the purchase model path (FIFO batches + GL).
   PurchaseModel.recordPurchase({
-    item_id: itemId, warehouse_id: warehouseId, quantity: 50, unit_cost: 10,
+    item_id: itemId, warehouse_id: warehouseId, quantity: 50, unit_cost: 10, supplier_id: supplierId,
     purchase_date: '2026-08-01', invoice_no: 'VERIF-PUR-1',
   } as never, 1, db);
   PurchaseModel.recordPurchase({
-    item_id: rawItemId, warehouse_id: warehouseId, quantity: 20, unit_cost: 5,
+    item_id: rawItemId, warehouse_id: warehouseId, quantity: 20, unit_cost: 5, supplier_id: supplierId,
     purchase_date: '2026-08-01', invoice_no: 'VERIF-PUR-2',
   } as never, 1, db);
-
-  const supplierId = SupplierModel.create({ supplier_code: `VERIF-SUP-${Date.now()}`, supplier_name: 'Verify Supplier' }, db);
 
   const stockOf = (id: number): number =>
     (db.prepare('SELECT quantity FROM stock_balances WHERE item_id = ? AND warehouse_id = ?')
@@ -630,6 +636,7 @@ function createPostedInvoice(invoiceNo: string, qty: number, unitPrice: number):
 
 void main().catch((err) => {
   console.error('Verification crashed:', err);
+  db.close();
   fs.rmSync(testDbDir, { recursive: true, force: true });
   process.exit(1);
 });

@@ -2,7 +2,7 @@
 
 **Status:** CONFIRMED, current logic, fresh isolated fixture. **Severity:** High. **Category:** recognition/valuation/report propagation. **Owner:** backend-controls. No fix applied.
 
-## Economic rule and independent oracle
+## Economic rule and independent expected accounting
 
 For a monthly salary of 1,000, paying 1,200 in August should expense August wages 1,000 and recognize a 200 advance. After September salary is completed using that 200 advance plus 800 new cash, cumulative salary expense must be 2,000 and the advance asset zero. Cash paid is 2,000. This follows the approved split salary/advance model (audit/DECISIONS.md D3), with the advance becoming earned salary when applied. It does not require changing the salary amount, expense category or payment method.
 

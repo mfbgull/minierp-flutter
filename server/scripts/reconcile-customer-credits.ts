@@ -12,8 +12,8 @@ function fingerprint(filename: string): string | null {
     : null;
 }
 
-async function main(): Promise<void> {
-  const sourcePath = process.argv[2];
+export async function main(args: readonly string[] = process.argv.slice(2)): Promise<void> {
+  const sourcePath = args[0];
   if (!sourcePath) throw new Error('Usage: ts-node scripts/reconcile-customer-credits.ts <source-db>');
   const files = [sourcePath, `${sourcePath}-wal`, `${sourcePath}-shm`];
   const before = files.map(fingerprint);
@@ -68,7 +68,9 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-});
+if (require.main === module) {
+  main().catch((error: unknown) => {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  });
+}

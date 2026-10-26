@@ -373,3 +373,20 @@ name. Choosing one changes behaviour, so it is a decision, not a cleanup. `Payme
 resolved by renaming the model-side copy to `PaymentAllocationRow`, because the two were
 genuinely unrelated types (a persisted row vs a command input) sharing one name.
 
+## D15 — Later settlement of liabilities from closed periods (2026-10-25)
+
+**Status: OPEN-DECISION. No accounting policy or production behavior changed.**
+
+The isolated audit reproduces F-023: a recorded credit expense and supplier bill dated
+in a closed period both reject a new payment dated in a later open period with409.
+Existing policy approves accrual expenses/bills and protects closed-period entries,
+but does not explicitly decide whether that also freezes all future settlement of
+their outstanding liabilities.
+
+Decision required: permit a new open-period settlement that debits the liability and
+credits cash while preserving the original closed journal, or deliberately prohibit
+that workflow and disclose the restriction before period closure. Ordinary accrual
+settlement favors the first option; this audit does not select or implement it.
+
+Evidence and exact requests: [F-023](../accounting-audit/findings/F-023/finding.md).
+

@@ -39,7 +39,8 @@
       "Bash(python3 - <<'EOF'\nimport json\np='/home/fawad/.config/manicode/projects/minierp-flutter/chats/2026-10-22T00-18-20.612Z/chat-messages.json'\nwith open\\(p\\) as f: data=json.load\\(f\\)\nfor idx in \\(3,5,7\\):\n    print\\('='*80\\); print\\('USER MSG', idx\\); print\\(json.dumps\\(data[idx], indent=1\\)[:3000]\\)\nEOF)",
       "Bash(python3 - <<'EOF'\nimport json\np='/home/fawad/.config/manicode/projects/minierp-flutter/chats/2026-10-22T00-18-20.612Z/chat-messages.json'\nwith open\\(p\\) as f: data=json.load\\(f\\)\nm=data[8]\nfor j,b in enumerate\\(m.get\\('blocks'\\) or []\\):\n    if b.get\\('type'\\)=='text':\n        print\\(f'--- TEXT {j} ---'\\)\n        print\\(b.get\\('content',''\\)[:2500]\\)\n    elif b.get\\('type'\\)=='tool':\n        print\\(f'--- TOOL {j}: {b.get\\(\"toolName\"\\)} ---'\\)\n        print\\(json.dumps\\(b.get\\('input'\\)\\)[:300]\\)\n        print\\('OUT:', str\\(b.get\\('output'\\) or ''\\)[:600].replace\\('\\\\n',' | '\\)\\)\nEOF)",
       "Bash(python3 - <<'EOF'\nimport json\np='/home/fawad/.config/manicode/projects/minierp-flutter/chats/2026-10-22T00-18-20.612Z/log.jsonl'\nlines=open\\(p, encoding='utf-8', errors='replace'\\).read\\(\\).splitlines\\(\\)[-400:]\nout=[]\nfor ln in lines:\n    try: d=json.loads\\(ln\\)\n    except Exception: continue\n    ts=d.get\\('timestamp',''\\)\n    msg=d.get\\('msg',''\\)\n    data=d.get\\('data'\\) or {}\n    tool=data.get\\('toolName'\\) or data.get\\('path'\\) or data.get\\('command'\\) or ''\n    out.append\\(\\(ts,msg,str\\(tool\\)[:160]\\)\\)\nfor r in out[-30:]:\n    print\\(' | '.join\\(r\\)\\)\nEOF)",
-      "Bash(scripts/check.sh --flutter --quick 2>&1 | tail -8)"
+      "Bash(scripts/check.sh --flutter --quick 2>&1 | tail -8)",
+      "Bash(grep -n \"Test Suites:\\\\|Tests:\\\\|EXIT:\" /tmp/server-coverage10.log | tail -3; grep -c PASS /tmp/server-coverage10.log)"
     ]
   }
 }

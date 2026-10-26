@@ -44,10 +44,34 @@ The return/resale sequence therefore passes the requested economic test in this 
 | Independent economic obligation | Expected | Actual | Difference / impact | Evidence |
 |---|---|---|---|---|
 | Return cannot precede its source sale/receipt | Reject; no 9 September movement | Accepted; 9 September revenue −15, COGS −10, inventory +10 | Historical statements contain effects before source events | [F-001](findings/F-001/finding.md) |
+| Supplier return cannot precede acquisition | Reject; no 9 September movement | Return accepted201; dated inventory/AP each −10 before purchase10 September | Historical assets/liabilities appear before acquisition | [F-001](findings/F-001/finding.md) |
 | Consumed return credit cannot regenerate | One Rs 60 entitlement | Void/reissue allowed and another Rs 60 sale paid with reused credit | Rs 60 undercollection and signed AR mismatch | [F-002](findings/F-002/finding.md) |
+| Explicit zero POS cash is zero real tender | Reject walk-in sale; cash delta0, stock unchanged | Cash/payment+17.35, stock value−9.25, AR delta0 | Fictitious cash collection; goods released without supplied tender | [F-073](findings/F-073/finding.md) |
 | Two Rs 1,000 salary periods fully settled using Rs 200 carried advance | Expense 2,000; advance asset 0 | Expense 1,800; advance asset 200 | Profit/assets/equity overstated 200 | [F-020](findings/F-020/finding.md) |
 | No loan principal exists before disbursement | Pre-loan receivable 0 | Pre-loan receivable −200 | Dated asset/cash position misstated | [F-021](findings/F-021/finding.md) |
 | Rs 0.02 production cost conserved, output costs nonnegative | Inventory 0.02; clearing 0 | Inventory GL 0.03; clearing −0.01; batch cost −0.01 | Inventory GL/valuation inconsistency and phantom clearing credit | [F-022](findings/F-022/finding.md) |
+| Mixed-cost count correction preserves original layers | Recount2→8 yields inventory130/loss20 | Correction500; rollback retains inventory40/loss110 | Legitimate correction blocked; no committed mutation on failed request | [F-024](findings/F-024/finding.md) |
+| Correcting item A preserves omitted item B's shortage | Aggregate inventory120/loss130 | Inventory140/loss110; B restored while its count row still says shortage | Inventory +20, loss −20, profit/equity +20 | [F-025](findings/F-025/finding.md) |
+
+## Additional ordinary-case reconciliation
+
+Evidence: [extension verification](evidence/backend-extension-verification.json), `backend-extension-run-OF2b8i/results.json` and ordered SQL/API stage snapshots.
+
+- Production: six units at10 consume60; attributable overhead30 creates payable30, output cost90 allocated60/30. Including remaining raw stock40, inventory130; clearing0. Cancellation restores all initial account balances and materials, repeated delete404. This does not refute the tiny-pool rounding defect F-022.
+- Owner drawings: three goods at cost10 reduce inventory30 and debit drawings30, despite selling value300; cash withdrawal50 takes drawings to80 and bank to950. Both voids restore initial balances and10 raw units. No operating expense is created.
+- Ordinary physical count:10 units at10 counted8 gives stock8/inventory80/loss20; correction9 gives inventory90/loss10. A repeated correction is rejected400 without mutation. Mixed-cost and partial-body correction failures are independently documented above.
+- Supplier split attempt: purchase100 paid100, return60 on account, new purchases30 and45 yield aggregate payable15 and cash9,900. Requested credit30+30 across target purchases returns500; targets remain unpaid30/45 and economic state is unchanged. Aggregate reconciliation passes; the requested allocation capability is unsupported/unverified, not a successful scenario.
+
+## Late channel/payable controls and audit-store reconciliation
+
+AFjr5O sales-channel and GIxBh2 payable fixtures were independently verified read-only in [final-extension-verification.json](evidence/final-extension-verification.json).
+
+- Ordinary quotation/SO conversion and cancellation have no premature recognition; paid SO cancellation is blocked409; reversing payment then cancelling is neutral. Repeating a completed cancellation returns500 but makes no second mutation (F-070 Low).
+- POS split52.05 is Cash20 + Bank15 + AR17.05; ordinary cash/credit partial returns and same-key replay pass. Explicit zero tender is a separate critical failure; the cash oracle is actual supplied tender, not the returned fabricated payment.
+- Supplier advance200.75 is an asset/cash movement, not an expense or AP reduction. Applying80.24 moves no cash and leaves advance120.51/AP84.41. Reversal restores the original asset/payable; consumed-source guards and injected failure rollback pass.
+- Credit expense120.37 recognizes payable without cash. Payment40.12 leaves80.25, exact payment settles; void/cancel economic effects reconcile. Opening cash/bank seeds100.10/50.20, count variance−0.15 and unknown-account atomic rejection were tested.
+- Despite correct canonical monetary effects,9 headers remain active with all child lines voided (F-060). No reboot duplication or extra money is claimed.
+- Reservation replay leaves reserved6 vs one active row3; after release, physical10/available7/reserved3 with no active entitlement (F-071). A NULL optional line ID leaves an accepted reservation unreleasable (F-072). These are availability/control discrepancies, not demonstrated changes to inventory GL value.
 
 ## Invariants and their limits
 

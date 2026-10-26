@@ -3,7 +3,7 @@
  * MINIERP — FINANCIAL AUDIT TRACE
  * ████████████████████████████████████████████████████████████████████████████████
  *
- * Traces every financial calculation end-to-end through the live database.
+ * Traces historical financial scenarios in an owned temporary database.
  * Each scenario:
  *   1. Creates test data
  *   2. Executes the business logic
@@ -12,10 +12,11 @@
  *   5. Compares expected vs actual
  *
  * Run: npx ts-node scripts/dev/audit-trace.ts (from server/)
- * Environment: DATABASE_PATH must be set, or uses default
+ * Environment: always creates a fresh temporary DATABASE_PATH.
  */
 
-import Database from 'better-sqlite3';
+import os from 'os';
+import { randomUUID } from 'crypto';
 import path from 'path';
 import fs from 'fs';
 
@@ -23,30 +24,20 @@ import fs from 'fs';
 // SETUP
 // ═══════════════════════════════════════════════════════════════════════
 
-const AUDIT_DB_DIR = path.join(__dirname, '../../audit-db');
-const AUDIT_DB_PATH = path.join(AUDIT_DB_DIR, 'audit-trace.db');
-// ts-node __dirname is the CWD (server/), not the file directory
-// Resolve absolutely to the migration location
-const MIGRATIONS_DIR = path.resolve(__dirname, 'migrations');
-
-// Clean slate
-if (fs.existsSync(AUDIT_DB_DIR)) {
-  fs.rmSync(AUDIT_DB_DIR, { recursive: true, force: true });
-}
-fs.mkdirSync(AUDIT_DB_DIR, { recursive: true });
-
-// Override DATABASE_PATH before any module loads
+const AUDIT_DB_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'minierp-audit-trace-'));
+const AUDIT_DB_PATH = path.join(AUDIT_DB_DIR, 'erp.db');
 process.env.DATABASE_PATH = AUDIT_DB_DIR;
-
-const db = new Database(AUDIT_DB_PATH);
-db.pragma('foreign_keys = ON');
-db.pragma('journal_mode = WAL');
+process.env.NODE_ENV = 'test';
+process.env.DEFAULT_ADMIN_PASSWORD = `Audit-${randomUUID()}`;
+const database: typeof import('../../src/config/database') = require('../../src/config/database');
+const db = database.default;
 
 // We'll import the application modules AFTER setting up the env
 // Since they read process.env.DATABASE_PATH at import time
 
 console.log('══════════════════════════════════════════════════════════════');
 console.log('  MINIERP — COMPLETE FINANCIAL AUDIT TRACE');
+console.log('  Historical SQL simulations; findings do not verify current model behavior.');
 console.log(`  Database: ${AUDIT_DB_PATH}`);
 console.log('══════════════════════════════════════════════════════════════\n');
 
@@ -54,146 +45,8 @@ console.log('══════════════════════�
 // HELPER: Run the initialization SQL manually so we have full control
 // ═══════════════════════════════════════════════════════════════════════
 
-function runInitSQL(): void {
-  const initSQLPath = path.join(MIGRATIONS_DIR, 'init.sql');
-  if (!fs.existsSync(initSQLPath)) {
-    throw new Error(`Migration file not found at ${initSQLPath}. CWD=${process.cwd()}, __dirname=${__dirname}`);
-  }
-  const initSQL = fs.readFileSync(initSQLPath, 'utf8');
-  db.exec(initSQL);
-  console.log('  [OK] init.sql executed');
-}
-
-function runMigration(name: string): void {
-  const sqlPath = path.join(MIGRATIONS_DIR, name); // name always comes from the hardcoded migrations list below — mimosa-ignore
-  if (fs.existsSync(sqlPath)) {
-    const sql = fs.readFileSync(sqlPath, 'utf8');
-    db.exec(sql);
-    console.log(`  [OK] migration ${name} executed`);
-  }
-}
-
 function runAllMigrations(): void {
-  runInitSQL();
-  
-  // All migrations in dependency order (matching database.ts)
-  const migrations = [
-    'add-expenses-table.sql',
-    'add-purchases-table.sql',
-    'add-purchase-return-fields.sql',
-    'add-production-tables.sql',
-    'add-bom-tables.sql',
-    'add-full-sales-cycle.sql',
-    'create-supplier-ledger.sql',
-    'add-activity-log-fields.sql',
-    'add-raw-materials-warehouse.sql',
-    'add-warehouse-to-production-inputs.sql',
-    'add-mobile-invoice-tables.sql',
-    'add-performance-indexes.sql',
-    'add-missing-indexes.sql',
-    'add-missing-fk-indexes.sql',
-    'add-roles-permissions.sql',
-    'add-stock-adjustment-financial.sql',
-    'add-gl-foundation.sql',
-    'add-batch-costing.sql',
-    'add-salary-payments.sql',
-    'add-credit-balance.sql',
-    'add-employees-table.sql',
-    'add-physical-counts.sql',
-    'add-demand-forecasts.sql',
-    'add-custom-reports.sql',
-    'add-dashboard-layouts.sql',
-    'add-invoice-discount-tax-fields.sql',
-    'add-customer-ar-fields.sql',
-    'create-customer-ledger.sql',
-    'create-payment-allocations.sql',
-  ];
-  
-  for (const m of migrations) {
-    try { runMigration(m); } catch (e: any) {
-      console.log(`  [WARN] migration ${m} error (may be expected): ${e.message}`);
-    }
-  }
-  
-  // Additional ALTER TABLE migrations for columns
-  const alterMigrations = [
-    // returned_amount on invoices
-    `ALTER TABLE invoices ADD COLUMN returned_amount DECIMAL(15,2) NOT NULL DEFAULT 0`,
-    `ALTER TABLE invoices ADD COLUMN return_fee DECIMAL(15,2) NOT NULL DEFAULT 0`,
-    `ALTER TABLE invoice_items ADD COLUMN returned_qty DECIMAL(15,3) NOT NULL DEFAULT 0`,
-    `ALTER TABLE invoice_items ADD COLUMN tax_rate DECIMAL(5,2) DEFAULT 0`,
-    `ALTER TABLE invoice_items ADD COLUMN discount_type VARCHAR(20) DEFAULT 'none'`,
-    `ALTER TABLE invoice_items ADD COLUMN discount_value DECIMAL(15,2) DEFAULT 0`,
-    `ALTER TABLE invoices ADD COLUMN discount_scope VARCHAR(20) DEFAULT 'invoice'`,
-    `ALTER TABLE invoices ADD COLUMN discount_type VARCHAR(20) DEFAULT 'percentage'`,
-    `ALTER TABLE invoices ADD COLUMN discount_value DECIMAL(15,2) DEFAULT 0`,
-    `ALTER TABLE invoices ADD COLUMN terms TEXT`,
-    `ALTER TABLE customers ADD COLUMN credit_limit DECIMAL(15,2) DEFAULT 0`,
-    `ALTER TABLE customers ADD COLUMN current_balance DECIMAL(15,2) DEFAULT 0`,
-    `ALTER TABLE customers ADD COLUMN opening_balance DECIMAL(15,2) DEFAULT 0`,
-    `ALTER TABLE customers ADD COLUMN payment_terms_days INTEGER DEFAULT 14`,
-    `ALTER TABLE customers ADD COLUMN credit_balance DECIMAL(15,2) DEFAULT 0`,
-  ];
-  
-  for (const sql of alterMigrations) {
-    try { db.exec(sql); } catch (e: any) { /* ignore - column may already exist */ }
-  }
-  
-  // Batch-costing columns (handled by TypeScript migration code in the main app)
-  const batchColumns = [
-    `ALTER TABLE stock_movements ADD COLUMN batch_id INTEGER REFERENCES stock_batches(id)`,
-    `ALTER TABLE stock_movements ADD COLUMN financial_value DECIMAL(15,4) DEFAULT 0`,
-    `ALTER TABLE stock_movements ADD COLUMN financial_posted BOOLEAN DEFAULT FALSE`,
-    `ALTER TABLE stock_movements ADD COLUMN journal_entry_id INTEGER REFERENCES journal_entries(id)`,
-  ];
-  for (const sql of batchColumns) {
-    try { db.exec(sql); } catch (e: any) { /* ignore */ }
-  }
-  
-  // Production batch-costing columns (from runBatchCostingMigration)
-  const prodBatchColumns = [
-    `ALTER TABLE productions ADD COLUMN batch_id INTEGER REFERENCES stock_batches(id)`,
-    `ALTER TABLE productions ADD COLUMN batch_no VARCHAR(50)`,
-    `ALTER TABLE productions ADD COLUMN unit_cost DECIMAL(15,4) DEFAULT 0`,
-    `ALTER TABLE productions ADD COLUMN total_material_cost DECIMAL(15,4) DEFAULT 0`,
-    `ALTER TABLE productions ADD COLUMN total_batch_cost DECIMAL(15,4) DEFAULT 0`,
-    `ALTER TABLE productions ADD COLUMN bom_id INTEGER REFERENCES boms(id)`,
-    `ALTER TABLE productions ADD COLUMN overhead_cost DECIMAL(15,2) DEFAULT 0`,
-  ];
-  for (const sql of prodBatchColumns) {
-    try { db.exec(sql); } catch (e: any) { /* ignore */ }
-  }
-
-  // Seed roles
-  db.exec(`
-    INSERT OR IGNORE INTO roles (id, role_name, description) VALUES (1, 'Admin', 'Full access');
-    INSERT OR IGNORE INTO roles (id, role_name, description) VALUES (2, 'User', 'Read-only');
-  `);
-  
-  // Insert GL chart of accounts if GL foundation migration added the table
-  try {
-    const hasCOA = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='chart_of_accounts'").get();
-    if (hasCOA) {
-      db.exec(`
-        INSERT OR IGNORE INTO chart_of_accounts (id, code, name, type, normal_balance, text_code, is_active) VALUES
-        (1, '1000', 'Cash', 'asset', 'debit', 'cash', 1),
-        (2, '1100', 'Accounts Receivable', 'asset', 'debit', 'accounts_receivable', 1),
-        (3, '1200', 'Inventory Asset', 'asset', 'debit', 'inventory_asset', 1),
-        (4, '2000', 'Accounts Payable', 'liability', 'credit', 'accounts_payable', 1),
-        (5, '2100', 'Tax Payable', 'liability', 'credit', 'tax_payable', 1),
-        (6, '3000', 'Opening Retained Earnings', 'equity', 'credit', 'opening_retained_earnings', 1),
-        (7, '4000', 'Sales Revenue', 'revenue', 'credit', 'sales_revenue', 1),
-        (8, '5000', 'Cost of Goods Sold', 'expense', 'debit', 'cogs', 1),
-        (9, '5100', 'Operating Expenses', 'expense', 'debit', 'operating_expenses', 1),
-        (10, '5200', 'Sales Returns', 'expense', 'debit', 'sales_returns', 1),
-        (11, '5300', 'Inventory Shrinkage', 'expense', 'debit', 'inventory_shrinkage', 1),
-        (12, '5400', 'Inventory Correction', 'expense', 'debit', 'inventory_correction', 1),
-        (13, '5500', 'Production Clearing', 'expense', 'debit', 'production_clearing', 1)
-      `);
-    }
-  } catch (e: any) { /* table may not exist */ }
-  
-  console.log('  [OK] All migrations applied');
+  database.applyPendingMigrations();
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -247,8 +100,8 @@ function testPurchaseToInventory(results: TestResult): void {
   db.prepare(`INSERT INTO items (id, item_code, item_name, category, unit_of_measure, current_stock, standard_cost, is_purchased, is_active)
     VALUES (102, 'ITEM-SALE', 'Saleable Item', 'General', 'Nos', 0, 10.00, 1, 1)`).run();
   
-  db.prepare(`INSERT INTO warehouses (id, warehouse_code, warehouse_name, is_active) VALUES (1, 'WH-001', 'Main Warehouse', 1)`).run();
-  db.prepare(`INSERT INTO warehouses (id, warehouse_code, warehouse_name, is_active) VALUES (2, 'WH-002', 'Secondary Warehouse', 1)`).run();
+  db.prepare(`INSERT OR IGNORE INTO warehouses (id, warehouse_code, warehouse_name, is_active) VALUES (1, 'WH-001', 'Main Warehouse', 1)`).run();
+  db.prepare(`INSERT OR IGNORE INTO warehouses (id, warehouse_code, warehouse_name, is_active) VALUES (2, 'WH-002', 'Secondary Warehouse', 1)`).run();
   
   db.prepare(`INSERT INTO customers (id, customer_code, customer_name, is_active) VALUES (1, 'CUST-001', 'Test Customer', 1)`).run();
   db.prepare(`INSERT INTO suppliers (id, supplier_code, supplier_name, is_active) VALUES (1, 'SUPP-001', 'Test Supplier', 1)`).run();
@@ -1228,12 +1081,13 @@ function testCustomerStatement(results: TestResult): void {
 // MAIN
 // ═══════════════════════════════════════════════════════════════════════
 
-function main(): void {
+async function main(): Promise<void> {
   console.log('\n═══ INITIALIZING DATABASE ═══');
   runAllMigrations();
+  await database.dbSeedReady;
   
   // Create default user
-  db.prepare(`INSERT INTO users (id, username, email, password_hash, full_name, role, is_active) VALUES (1, 'audit', 'audit@test.com', 'x', 'Audit User', 'admin', 1)`).run();
+  db.prepare(`INSERT OR IGNORE INTO users (id, username, email, password_hash, full_name, role, is_active) VALUES (1, 'audit', 'audit@test.com', 'x', 'Audit User', 'admin', 1)`).run();
   
   const results: TestResult = {
     name: 'Complete Financial Audit',
@@ -1272,7 +1126,7 @@ function main(): void {
     }
   }
   
-  console.log('\n  -- Bugs Confirmed via Live Database Trace --');
+  console.log('\n  -- Historical Simulation Outcomes (not current application verification) --');
   
   // Check which bugs were reproduced
   const bugMap: Record<string, string> = {
@@ -1340,5 +1194,8 @@ function main(): void {
 }
 
 if (require.main === module) {
-  main();
+  main().catch((error: unknown) => {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  }).finally(() => db.close());
 }

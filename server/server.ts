@@ -13,6 +13,7 @@ import logger from './src/utils/logger';
 import { disposeLogger } from './src/services/activityLogger';
 import { startBackupScheduler } from './src/services/backupService';
 import { runExpiryDetection } from './src/boot/expiryDetection';
+import { getLocalIP } from './src/utils/localNetwork';
 
 const PORT = parseInt(process.env.PORT || '3011', 10);
 const HOST = process.env.BIND_ADDRESS || process.env.HOST || '127.0.0.1';
@@ -102,19 +103,6 @@ void dbSeedReady.then(async () => {
   });
 });
 
-function getLocalIP(): string {
-  const { networkInterfaces } = require('os');
-  const nets = networkInterfaces();
-
-  for (const name of Object.keys(nets)) {
-    for (const net of nets[name]) {
-      if (net.family === 'IPv4' && !net.internal) {
-        return net.address;
-      }
-    }
-  }
-  return '0.0.0.0';
-}
 
 process.on('SIGTERM', () => {
   console.log('SIGTERM received. Closing server...');

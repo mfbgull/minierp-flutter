@@ -2,7 +2,7 @@
 
 **Status:** CONFIRMED, current mounted API, fresh DB. **Severity:** High integrity defect (minimal example is one cent). **Category:** allocation rounding / batch valuation / GL completeness. **Owner:** backend-controls. No fix applied.
 
-## Independent arithmetic
+## Independent expected accounting
 
 A production consumes a single raw-material unit costing0.02 and produces four distinct outputs, quantity1 each, each with selling price1. Total pool=0.02. All output allocations must be nonnegative and sum0.02; any deterministic residual policy may assign two cents to two of the products and zero to the other two. Net inventory valuation must remain0.02 and production clearing must return0.
 
@@ -29,6 +29,6 @@ Graph discovery and exact path coverage checked; no recorded gaps in these TypeS
 
 `accounting-audit/evidence/backend-run-Lbw3la/results.json`, scenario `BACKEND-PRODUCTION-ROUNDING`: status201, four exact output rows, before/after account balances, defectReproduced=true. Same artifact captures authenticated request body, response and canonical journal. Retained SQLite `backend-run-Lbw3la/erp.db` contains stock_batches/production_outputs for inspection. `accounting-audit/evidence/backend-probes-verified.log` records completed run. All four consolidated scenarios reproduced in this run.
 
-## Remediation direction
+## Recommended correction and regression requirements
 
 Allocate integer currency minor units with a nonnegative remainder algorithm (for example floor shares and distribute leftover cents by a deterministic largest-remainder order). Enforce nonnegative output allocation before any batch persistence. Do not fix merely by posting a negative journal amount or ignoring the final output. Test four equal outputs/pool2c, many outputs with tiny last weight, order changes, zero-priced outputs, positive overhead, reversal and sale of the affected outputs; assert nonnegative costs, exact pool sum, inventory=GL and clearing0.
