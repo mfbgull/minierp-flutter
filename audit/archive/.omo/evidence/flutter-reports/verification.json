@@ -1,0 +1,171 @@
+{
+  "checks_passed": true,
+  "artifact_count": 33,
+  "artifacts": [
+    {
+      "path": "accounting-audit/evidence/flutter-inventory-run.log",
+      "bytes": 808,
+      "sha256": "340a12bed98599890b14209d97c7ab94a9e4ff9353fe38f2a6450a7b6c9dfd30"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-inventory-run.exit",
+      "bytes": 1,
+      "sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-inventory-summary.json",
+      "bytes": 807,
+      "sha256": "2d2121a505d85968affdc7138b1591407a8c7dc8b437cda2e6d3b0e636e6da87"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-figures.csv",
+      "bytes": 5039468,
+      "sha256": "2de934152588d96f44a2e7eac12d9d5edcdacdd3be42a569c95deecd70b8a95a"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-surfaces.csv",
+      "bytes": 93947,
+      "sha256": "da0f1d768c431963ae94238e9e1c31539d698a0f9c9e062d2c893fbd39457074"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-support.csv",
+      "bytes": 234816,
+      "sha256": "e81801d44a638a355f92a1bfca874c85c8f8b9d32d9b76185fe886b07799fa5d"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-graph-discovery.json",
+      "bytes": 87018,
+      "sha256": "ce8cfbb7d43540b7a9104fb061f6608748b5adcfc00a6ae54b585917f582675a"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-graph-coverage.json",
+      "bytes": 4181,
+      "sha256": "03d5f38581391b6eda567733b39f9da2f455f6e169d4ef56bb07e45871dd0f7f"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-report-regressions.log",
+      "bytes": 5746,
+      "sha256": "d71688eae3201745a6de55ba9d569956c9a7165f1d836337d6d27f9cc9e64e75"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-report-regressions.exit",
+      "bytes": 1,
+      "sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-balance-sheet-widget.json",
+      "bytes": 1815,
+      "sha256": "349d433a3576ee1b8179de80201227e36db13aba8f54fc1e05e501a04aab8433"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-balance-sheet.png",
+      "bytes": 117519,
+      "sha256": "b840aaf89a34ffa0ea9c456f8077608204522bfa24f9b0dec0abf2e2daa1af83"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-balance-sheet.csv",
+      "bytes": 496,
+      "sha256": "9eac348365f4390887571126fdfc8623ea4974690fdb3c030f048d64acac0c95"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-csv-observation.json",
+      "bytes": 164,
+      "sha256": "9aa9caee23f7c890739ea665230fc81d68c4838b47312489888bdaf6ce4a46d5"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-salary-carryover-widget.json",
+      "bytes": 1282,
+      "sha256": "b33fd31f004b3ee7da2748ab9397705e6dadf3582134e4b8326f745533dd253b"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-payroll-api-fixture.json",
+      "bytes": 484,
+      "sha256": "c4ee92397ff100a01ed2c837471288a434af4cf179e69430d52ab28372bcf48f"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-csv-regression.log",
+      "bytes": 1626,
+      "sha256": "9d42431249c7708f02f4438d7cdcbd115cf685c2fd7b442ccb84338d5672a123"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-csv-regression.exit",
+      "bytes": 1,
+      "sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-oracle-replay.log",
+      "bytes": 369,
+      "sha256": "4892354bd7893752ec383bbb35299adb69f845398874dbe5d1eb418f298ebefd"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-oracle-replay.exit",
+      "bytes": 1,
+      "sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-oracle-models.json",
+      "bytes": 957,
+      "sha256": "469c76dc2dd3afa031a42c6db908f48770647345d0c92a9eb6cc7a1006581491"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-oracle-pnl-widget.json",
+      "bytes": 623,
+      "sha256": "2cfcb064689a1a42df4b65482408bf754b94f43fb316fc32dc253e2ef87b8a5f"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-oracle-balance-widget.json",
+      "bytes": 913,
+      "sha256": "5d373c405f0ad42e234675bd16250e53a1294ba764c6d2f0f5bede3d6a1efb71"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-pnl-breakdown.log",
+      "bytes": 894,
+      "sha256": "8e4384aee5f47457829f2bbd2c7aa8b805a308d976a7565bbb4aef02860a422f"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-pnl-breakdown.exit",
+      "bytes": 1,
+      "sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-pnl-breakdown.json",
+      "bytes": 701,
+      "sha256": "09ba7ec687e036e442946423850df051fef586b8491590fd2dd680f67b514b8d"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-harness-analyze.log",
+      "bytes": 97,
+      "sha256": "bd36e58e6ba2ff28847fc66281360e0709ba765af736eab4dc780fa8085b693c"
+    },
+    {
+      "path": "accounting-audit/evidence/flutter-harness-analyze.exit",
+      "bytes": 1,
+      "sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    },
+    {
+      "path": "accounting-audit/findings/F-040/finding.md",
+      "bytes": 2489,
+      "sha256": "ef05d43c959356c4c91c3ce984ac0f2df01b13ebdfd345e60cea3487dcec41b0"
+    },
+    {
+      "path": "accounting-audit/findings/F-041/finding.md",
+      "bytes": 2268,
+      "sha256": "4e00846c037358d1fa9d007ffa3933e755de831ecdfd3bab9bcac38a3145bfed"
+    },
+    {
+      "path": "accounting-audit/findings/F-042/finding.md",
+      "bytes": 2771,
+      "sha256": "d95ddc12ea19e3e2db600fe9b58ad410c80db97a4fc30c69383dfd3d55ba0980"
+    },
+    {
+      "path": "accounting-audit/findings/F-043/finding.md",
+      "bytes": 2735,
+      "sha256": "c7d0aed7c28705828df7381fa0e798134edc57927e02be7ea508b5124115326f"
+    },
+    {
+      "path": "accounting-audit/workstreams/flutter-reports.md",
+      "bytes": 21256,
+      "sha256": "ab08ab5556a3661f51b618c7471eb9ec29a6a67e11725614a2946700591fc776"
+    }
+  ]
+}

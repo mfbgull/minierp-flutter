@@ -1,0 +1,69 @@
+{
+  "project": "media-fawad-26F2EFA7F2EF7987-D-minierp-flutter",
+  "signal": "best_effort",
+  "indexed_at": "2026-10-25T03:03:34Z",
+  "metadata": {
+    "generation": "2026-10-25T03:03:34Z",
+    "index_mode": "full",
+    "recorded_at": "2026-10-25T03:03:36Z",
+    "recording_status": "complete",
+    "ignored_files_stored": 203,
+    "ignored_files_total": 203,
+    "hash_records_complete": true,
+    "coverage_version": 3,
+    "generation_matches": true
+  },
+  "paths": [
+    {
+      "requested_path": "server/src/services/SupplierPaymentService.ts",
+      "path": "server/src/services/SupplierPaymentService.ts",
+      "status": "no_recorded_issue",
+      "freshness": "metadata_match",
+      "recommended_action": "use_graph_with_best_effort_caveat",
+      "coverage": []
+    },
+    {
+      "requested_path": "server/src/services/paymentRecordingTypes.ts",
+      "path": "server/src/services/paymentRecordingTypes.ts",
+      "status": "no_recorded_issue",
+      "freshness": "metadata_match",
+      "recommended_action": "use_graph_with_best_effort_caveat",
+      "coverage": []
+    },
+    {
+      "requested_path": "server/src/models/PurchaseReturn.ts",
+      "path": "server/src/models/PurchaseReturn.ts",
+      "status": "no_recorded_issue",
+      "freshness": "metadata_match",
+      "recommended_action": "use_graph_with_best_effort_caveat",
+      "coverage": []
+    },
+    {
+      "requested_path": "server/src/controllers/paymentsController.ts",
+      "path": "server/src/controllers/paymentsController.ts",
+      "status": "no_recorded_issue",
+      "freshness": "metadata_match",
+      "recommended_action": "use_graph_with_best_effort_caveat",
+      "coverage": []
+    }
+  ],
+  "scopes": [
+    {
+      "requested_scope": "server/src/routes",
+      "scope": "server/src/routes",
+      "total": 0,
+      "has_more": false,
+      "entries": [],
+      "status": "no_recorded_issue"
+    },
+    {
+      "requested_scope": "server/src/services",
+      "scope": "server/src/services",
+      "total": 0,
+      "has_more": false,
+      "entries": [],
+      "status": "no_recorded_issue"
+    }
+  ],
+  "caveat": "Best-effort signal only. No recorded issue does not prove graph or source completeness; read flagged source and qualify claims when metadata is changed or unavailable."
+}

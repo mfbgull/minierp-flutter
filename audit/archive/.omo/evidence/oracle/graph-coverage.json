@@ -1,0 +1,76 @@
+{
+  "project": "media-fawad-26F2EFA7F2EF7987-D-minierp-flutter",
+  "signal": "best_effort",
+  "indexed_at": "2026-10-25T03:03:34Z",
+  "metadata": {
+    "generation": "2026-10-25T03:03:34Z",
+    "index_mode": "full",
+    "recorded_at": "2026-10-25T03:03:36Z",
+    "recording_status": "complete",
+    "ignored_files_stored": 203,
+    "ignored_files_total": 203,
+    "hash_records_complete": true,
+    "coverage_version": 3,
+    "generation_matches": true
+  },
+  "paths": [
+    {
+      "requested_path": "server/src/services/invoiceReturnService.ts",
+      "path": "server/src/services/invoiceReturnService.ts",
+      "status": "no_recorded_issue",
+      "freshness": "metadata_match",
+      "recommended_action": "use_graph_with_best_effort_caveat",
+      "coverage": []
+    },
+    {
+      "requested_path": "server/src/services/inventoryEffectiveDate.ts",
+      "path": "server/src/services/inventoryEffectiveDate.ts",
+      "status": "no_recorded_issue",
+      "freshness": "metadata_match",
+      "recommended_action": "use_graph_with_best_effort_caveat",
+      "coverage": []
+    },
+    {
+      "requested_path": "server/src/models/StockMovement.ts",
+      "path": "server/src/models/StockMovement.ts",
+      "status": "no_recorded_issue",
+      "freshness": "metadata_match",
+      "recommended_action": "use_graph_with_best_effort_caveat",
+      "coverage": []
+    },
+    {
+      "requested_path": "server/src/controllers/invoiceController.ts",
+      "path": "server/src/controllers/invoiceController.ts",
+      "status": "no_recorded_issue",
+      "freshness": "metadata_match",
+      "recommended_action": "use_graph_with_best_effort_caveat",
+      "coverage": []
+    },
+    {
+      "requested_path": "server/src/__tests__/helpers/accountingInvariants.ts",
+      "path": "server/src/__tests__/helpers/accountingInvariants.ts",
+      "status": "no_recorded_issue",
+      "freshness": "metadata_match",
+      "recommended_action": "use_graph_with_best_effort_caveat",
+      "coverage": []
+    },
+    {
+      "requested_path": "server/src/config/database.ts",
+      "path": "server/src/config/database.ts",
+      "status": "no_recorded_issue",
+      "freshness": "metadata_match",
+      "recommended_action": "use_graph_with_best_effort_caveat",
+      "coverage": []
+    },
+    {
+      "requested_path": "server/src/app.ts",
+      "path": "server/src/app.ts",
+      "status": "no_recorded_issue",
+      "freshness": "metadata_match",
+      "recommended_action": "use_graph_with_best_effort_caveat",
+      "coverage": []
+    }
+  ],
+  "scopes": [],
+  "caveat": "Best-effort signal only. No recorded issue does not prove graph or source completeness; read flagged source and qualify claims when metadata is changed or unavailable."
+}

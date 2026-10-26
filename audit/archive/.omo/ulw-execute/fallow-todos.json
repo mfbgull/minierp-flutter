@@ -1,0 +1,92 @@
+{
+  "plan": ".omo/plans/fallow-remediation-2026-10-21.md",
+  "delivery": "committed as 8bb623b9, 1711b2a1 and 0e245f40; Phase 4 docs closure uncommitted",
+  "phases": [
+    {
+      "id": "wave1",
+      "status": "done",
+      "goal": "Reconcile and verify the existing baseline, source mapping and dead-method removal."
+    },
+    {
+      "id": "wave2",
+      "status": "done",
+      "goal": "Complete structural and duplicate remediation in disjoint ownership lanes."
+    },
+    {
+      "id": "wave3",
+      "status": "done",
+      "goal": "Refresh coverage, close genuine health gaps, complete the ledger and verification."
+    }
+  ],
+  "tasks": [
+    {
+      "id": "1",
+      "status": "done",
+      "title": "Establish an honest baseline and remove the one confirmed dead method"
+    },
+    {
+      "id": "2",
+      "status": "done",
+      "title": "Resolve controller complexity and controller duplication"
+    },
+    {
+      "id": "3",
+      "status": "done",
+      "title": "Resolve model complexity and atomic document numbering duplication"
+    },
+    {
+      "id": "4",
+      "status": "done",
+      "title": "Resolve service complexity and shared cash-account lookup"
+    },
+    {
+      "id": "5",
+      "status": "done",
+      "title": "Resolve remaining scripts, bootstrap, route, and fixture findings"
+    },
+    {
+      "id": "6",
+      "status": "done",
+      "title": "Recompute mapped coverage and close genuine remaining health gaps"
+    },
+    {
+      "id": "7",
+      "status": "done",
+      "title": "Finish the complete disposition ledger and integrated checks"
+    },
+    {
+      "id": "F1",
+      "status": "done",
+      "title": "Plan compliance audit",
+      "note": "consolidated Phase 4 verification"
+    },
+    {
+      "id": "F2",
+      "status": "done",
+      "title": "Code quality review",
+      "note": "consolidated Phase 4 verification"
+    },
+    {
+      "id": "F3",
+      "status": "done",
+      "title": "Real manual QA",
+      "note": "consolidated Phase 4 verification"
+    },
+    {
+      "id": "F4",
+      "status": "done",
+      "title": "Ideal-state fidelity",
+      "note": "consolidated Phase 4 verification"
+    },
+    {
+      "id": "setup",
+      "status": "done",
+      "title": "Preserve and transfer partial remediation to isolated worktree"
+    },
+    {
+      "id": "cleanup",
+      "status": "done",
+      "title": "Reconcile verified local delivery and clean up temporary QA resources"
+    }
+  ]
+}

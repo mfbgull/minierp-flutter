@@ -1,0 +1,699 @@
+{
+  "generatedAt": "2026-10-25T03:42:05.283Z",
+  "owner": "financial-oracle",
+  "safety": "fresh disposable DB paths only; no production edits",
+  "findings": [
+    "F-001 HIGH",
+    "F-002 CRITICAL"
+  ],
+  "runs": [
+    {
+      "dir": "oracle-run-AbsZeT",
+      "invocation": "node accounting-audit/tests/oracle-lifecycle.cjs",
+      "observable": "families1–6,8–10PASS;family7FAIL F001;392/397 checks pass"
+    },
+    {
+      "dir": "oracle-run-z9sfxV",
+      "invocation": "ORACLE_SUPPLEMENT=1 ORACLE_FAMILY=2b node accounting-audit/tests/oracle-lifecycle.cjs",
+      "observable": "before-void invariants pass;void/reissue/spend succeeds;GL75 customer15;64/73 checks pass;F002"
+    },
+    {
+      "dir": "oracle-run-9MmRSv",
+      "invocation": "ORACLE_SUPPLEMENT=1 node accounting-audit/tests/oracle-lifecycle.cjs",
+      "observable": "5b/7b/10b/9b/10c PASS;3b cap assumption superseded by eVTI6t;2b F002"
+    },
+    {
+      "dir": "oracle-run-eVTI6t",
+      "invocation": "ORACLE_SUPPLEMENT=1 ORACLE_FAMILY=3b node accounting-audit/tests/oracle-lifecycle.cjs",
+      "observable": "42/42 checks PASS"
+    },
+    {
+      "dir": "oracle-run-TQ4hqh",
+      "invocation": "ORACLE_SUPPLEMENT=1 ORACLE_FAMILY=3c node accounting-audit/tests/oracle-lifecycle.cjs",
+      "observable": "43 checks;5 unmet capability assertions: credit split unsupported500; target balances30/45 remain;AP15/cash9900 unchanged;all invariants pass"
+    },
+    {
+      "dir": "oracle-run-ZHkdJ8",
+      "invocation": "ORACLE_SUPPLEMENT=1 ORACLE_FAMILY=7c node accounting-audit/tests/oracle-lifecycle.cjs",
+      "observable": "21 checks;4 F001 chronology failures: return201 before purchase;historical inventory/AP each−10"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/tests/oracle-lifecycle.cjs",
+      "bytes": 21941,
+      "sha256": "f40b8fbd131535d831b50ca023862dd6bdf69856ea08e93c35dd1dbe795c7d6f"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/tests/oracle-supplement.cjs",
+      "bytes": 11522,
+      "sha256": "6b4530588023ae6dd64bf062aa2b9358ce2161d2cc20d1b488015e3043632a3c"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/workstreams/financial-oracle.md",
+      "bytes": 12187,
+      "sha256": "5dfebf160d876bf95323ad9a65bc5223f5b8619c213993070071b9c214e63e0f"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/findings/F-001/finding.md",
+      "bytes": 5078,
+      "sha256": "745082993b34946ad451d32760ae80daeccce282a6b7bc9f13b28ea531bb127a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/findings/F-001/database-proof.json",
+      "bytes": 1622,
+      "sha256": "fb10bc3b7b239feb415fcd2617da29173b6a6f228b0b52df9e1ca98502a382fc"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/findings/F-002/finding.md",
+      "bytes": 5085,
+      "sha256": "12cd8601c496e8be6db9a5904e4470d94d10641f2dd09cf2fd3e67c747623fb8"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/findings/F-002/database-proof.json",
+      "bytes": 1265,
+      "sha256": "a6753815ea519d53702e64563328ce1feb8b7a7b6e341278bde550d6bd021810"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/.omo/evidence/oracle/graph-coverage.json",
+      "bytes": 2734,
+      "sha256": "fc7c3faf52247eff32d853c04f24ff8ed0999cdb19b7309123aeb858eaa47a82"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/.omo/evidence/oracle/syntax-checks.json",
+      "bytes": 451,
+      "sha256": "b196b6fcd5a523dad577b0e59706b0779937058b78b2397c8a24b8c0304d79cb"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/.omo/evidence/oracle/finding-source.txt",
+      "bytes": 8851,
+      "sha256": "06d6478c608da14d67a9331539f577f334efecaa579c7caded31c9733d01873a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/008-retail-return-1-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/008-retail-return-1.json",
+      "bytes": 16389,
+      "sha256": "8a168fbd6ccf395784869cbf6c814fdb51c31b33a3b2bef1407bb5e4264d85a6"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/009-retail-return-2-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/009-retail-return-2.json",
+      "bytes": 21651,
+      "sha256": "546c730d72712e4625668b47df6789e32f9a3db4169aeeb06e85096b02fc39bf"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/010-retail-return-3-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/010-retail-return-3.json",
+      "bytes": 26915,
+      "sha256": "7c7f1d74b4e3b81ae418f3fffc6a7e7927d56b0867c35687d36aa2a8cde1e29a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/015-retail-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/015-retail.json",
+      "bytes": 32862,
+      "sha256": "4853d9dd3c26c3555361c0b0d0a6a791e5ef6443c140fb9c01a8e9b4644379e1"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/031-credit-settled-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/031-credit-settled.json",
+      "bytes": 47713,
+      "sha256": "9cc35885b1e7f0d8445a44545ded9d3213b835e26a6c32b35d7a1d7e430b0d0b"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/032-credit-over-refund-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/032-credit-over-refund.json",
+      "bytes": 47717,
+      "sha256": "0b72d998f3ea7f44f4d98a0fa795e33900a7aae7dbb495dd97857a7a7d4368cd"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/033-credit-applied-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/033-credit-applied.json",
+      "bytes": 52483,
+      "sha256": "eeabd9d2b18487944d814aa1ade7ea07f04d4da0843424c5965146e92ea5e862"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/036-unapplied-cash-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/036-unapplied-cash.json",
+      "bytes": 56522,
+      "sha256": "5317649bf1b8045a36bd94e1deebcdc3af16ce981eed940f683343166af578cc"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/042-supplier-return-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/042-supplier-return.json",
+      "bytes": 63810,
+      "sha256": "697ca01e2669b3d9ded9491d9480ecf62e7f2fe4bde7c3f21cd7f46d38f6c92d"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/043-supplier-refund-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/043-supplier-refund.json",
+      "bytes": 65103,
+      "sha256": "e69926aec9475efc8600db05f2f54a35b0a9bf9e840540e61f6d8375d02ffe70"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/051-po-partial-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/051-po-partial.json",
+      "bytes": 72453,
+      "sha256": "b8ab5c51ae899eec636157caae1c6872e48e07f1b389a961008f70002bf42205"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/057-damage-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/057-damage.json",
+      "bytes": 77429,
+      "sha256": "04df5e35fd28770834c519bc7632b6569b7e19dfaa2ef89020ff938744dc3ec8"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/059-expense-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/059-expense.json",
+      "bytes": 78290,
+      "sha256": "181fe424cd8b3076d244bd27e3406064f8b381ebf468b8a39c4a647ec18ecaf1"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/068-reversals-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/068-reversals.json",
+      "bytes": 88070,
+      "sha256": "d08a92825c7bae62e747d073193942259f2e885aa9c4d687fa8be60eae1e92fa"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/073-backdate-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/073-backdate.json",
+      "bytes": 91490,
+      "sha256": "57a9cf1a752aaafd8660b6ba3cfb98e595feb8dea6fc2f3787eb13298e011191"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/076-early-return-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/076-early-return.json",
+      "bytes": 97835,
+      "sha256": "cdef0218e34d6b26f85e062ac4d8a8f12e0bcee99ce450cbf6813fb77094d08a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/085-duplicates-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/085-duplicates.json",
+      "bytes": 104678,
+      "sha256": "49c22d12466368058ecee4ad967ea682f5b9578f02e22e7bd50e9c2e63b2302f"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/086-atomicity-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/086-atomicity.json",
+      "bytes": 104677,
+      "sha256": "a12fc3ae7c75e4c78417f77a01029626de4a3c5080ab40d9207848fd5924d6e3"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/089-period-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/089-period.json",
+      "bytes": 104935,
+      "sha256": "36775446b5a17c37408a5b994918886a470403787cefbdd968b5cd381310c0f1"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/096-boundaries-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/096-boundaries.json",
+      "bytes": 111797,
+      "sha256": "057c03b8451349d28a30d7f4bffcaec706e5ca401c3e21fd48fcb09983138336"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/api-events.json",
+      "bytes": 111914,
+      "sha256": "3c8976dbd51e6e23ed44ea19cd6bc09f64cf47e76534a8312773ee7712564a68"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/erp.db",
+      "bytes": 1683456,
+      "sha256": "ea1332edda9ef95c55958ba4229ecbb0b6028999c13dd02f53ef67d66d48e313"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/results.json",
+      "bytes": 52422,
+      "sha256": "263225418c11fdcb599c0cb09789505ed84aeca413393b9a0825e397818ad962"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-AbsZeT/schema.json",
+      "bytes": 64749,
+      "sha256": "be492c6bdd4d769d597bad1b26f692e0e14645ad88b3ed7ce50bad507eaa5c91"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-z9sfxV/010-credit-before-void-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-z9sfxV/010-credit-before-void.json",
+      "bytes": 24112,
+      "sha256": "2832b71fec084aa731345f611243ae562963b6d05f52f4e343b61cba81054803"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-z9sfxV/011-credit-two-targets-invariants.json",
+      "bytes": 611,
+      "sha256": "29c520d8f0ee6cf2952b603ec8e70eb2025d96a76c802833e509ea8a689befbb"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-z9sfxV/011-credit-two-targets.json",
+      "bytes": 24518,
+      "sha256": "06fbb762d33fc648be9c960c3ba45cedacb4c93d60c3d5fe9c90de597a312850"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-z9sfxV/012-credit-reissued-invariants.json",
+      "bytes": 611,
+      "sha256": "29c520d8f0ee6cf2952b603ec8e70eb2025d96a76c802833e509ea8a689befbb"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-z9sfxV/012-credit-reissued.json",
+      "bytes": 25334,
+      "sha256": "63f0441b9f89c82ba5edda6ab7582012999d202fb024198eb9f9624d3b8239b2"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-z9sfxV/013-credit-double-spend-invariants.json",
+      "bytes": 610,
+      "sha256": "fd425ff8329bbd76811ef48ce2b690c2ba4095659bd0d6beb6d125a111465b62"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-z9sfxV/013-credit-double-spend.json",
+      "bytes": 30281,
+      "sha256": "fb0e6f9a27a7612c5c50e628dc98e78585d621ef5ba80ab12303804893006385"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-z9sfxV/api-events.json",
+      "bytes": 17326,
+      "sha256": "c3079c0985661886d07614ab4023100dd989ff23e2ff64e710bfc353b3f37021"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-z9sfxV/erp.db",
+      "bytes": 1638400,
+      "sha256": "ed5d1abed43bf044a30dc6836bec6d22a8c580720561a8b16c2b9ac0df1438e3"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-z9sfxV/results.json",
+      "bytes": 10546,
+      "sha256": "5f92896dc706cedcef16b8a05611ab25a272bbc6e46c33fb4bd50a94d1cc9ba5"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-z9sfxV/schema.json",
+      "bytes": 64749,
+      "sha256": "be492c6bdd4d769d597bad1b26f692e0e14645ad88b3ed7ce50bad507eaa5c91"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-9MmRSv/007-supplier-partial-0-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-9MmRSv/007-supplier-partial-0.json",
+      "bytes": 7475,
+      "sha256": "15291cb2e1c3abd38e625b2da4f00f0d384e35ab69db2a57cf75c848f3d7c5b3"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-9MmRSv/015-supplier-partial-50-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-9MmRSv/015-supplier-partial-50.json",
+      "bytes": 17373,
+      "sha256": "ca6a5e69444ccfe312c0bb1db1a3423a60761c64690d15f3c7cec321f8eec1fd"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-9MmRSv/021-warehouse-transfer-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-9MmRSv/021-warehouse-transfer.json",
+      "bytes": 21443,
+      "sha256": "2d30b8593a82e89b205dd0eaf1f72e0f38064b418e8c52d5af49a39ac2313153"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-9MmRSv/022-warehouse-transfer-void-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-9MmRSv/022-warehouse-transfer-void.json",
+      "bytes": 23322,
+      "sha256": "1ae005448bc2187c3f5dbed4e939d9f8156f0236596bf51990968704467918ae"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-9MmRSv/028-fefo-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-9MmRSv/028-fefo.json",
+      "bytes": 32874,
+      "sha256": "f0a832e959b774bf2c657cf0f2e3b5ebeaadc50123f618a93d0b58ec10c3183b"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-9MmRSv/033-nonexpiry-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-9MmRSv/033-nonexpiry.json",
+      "bytes": 38584,
+      "sha256": "453018e6c32250e7c3361db910f90147a9b74ea465bcd6bd335df2240c0f9fe2"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-9MmRSv/039-stock-funds-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-9MmRSv/039-stock-funds.json",
+      "bytes": 42002,
+      "sha256": "fe7266ab6c26bee09d045fd9a0678ad7cf88f18bea33825fe8b19bca80025afb"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-9MmRSv/048-year-boundary-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-9MmRSv/048-year-boundary.json",
+      "bytes": 51223,
+      "sha256": "64b1c0e08dace77e38af9d3c40c5ca32048441762231088c8eefed276315e296"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-9MmRSv/055-tax-first-receipt-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-9MmRSv/055-tax-first-receipt.json",
+      "bytes": 57433,
+      "sha256": "e5fa5d35848a0f7f523d1decd2e452ce17eb93d018e4bd9cf6b81c267200a6bd"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-9MmRSv/056-tax-complete-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-9MmRSv/056-tax-complete.json",
+      "bytes": 59874,
+      "sha256": "78b1f6971b265b3805addf038224fd1a061b0b6c1dc37cc88f55bad92b94711c"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-9MmRSv/057-tax-reversed-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-9MmRSv/057-tax-reversed.json",
+      "bytes": 59942,
+      "sha256": "e038c4c2690cc54dcf21303b11a49eae4304b7960d88906c037d1d0c095e0bc8"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-9MmRSv/066-credit-before-void-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-9MmRSv/066-credit-before-void.json",
+      "bytes": 82004,
+      "sha256": "c0429b338e1643a569a7365e79a25e247b302400c5f95fb424deec18f11edea7"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-9MmRSv/067-credit-two-targets-invariants.json",
+      "bytes": 609,
+      "sha256": "2454aac9d82b605932c9a3756b27b0440d4f39d5a6c10e3b1ab4d06ff997b00e"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-9MmRSv/067-credit-two-targets.json",
+      "bytes": 82411,
+      "sha256": "5b0e37e52fcefa69b133d8f5d802fbe229a91e9f2e3a63677dfd0af9dc72cf12"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-9MmRSv/068-credit-reissued-invariants.json",
+      "bytes": 609,
+      "sha256": "2454aac9d82b605932c9a3756b27b0440d4f39d5a6c10e3b1ab4d06ff997b00e"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-9MmRSv/068-credit-reissued.json",
+      "bytes": 83227,
+      "sha256": "d971c4878436c312c57822e43f58e04cc2cc2a3b7894324e153f89da264167c4"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-9MmRSv/069-credit-double-spend-invariants.json",
+      "bytes": 611,
+      "sha256": "d3cfca0eb7df5ca2f8ef83b7db7d8cfc620d7702d9871d11b3031bfc04c2e804"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-9MmRSv/069-credit-double-spend.json",
+      "bytes": 87932,
+      "sha256": "cc576596f3568af06ae12a34597218b0dfe85fe49dcb2bb3044ed152839185a8"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-9MmRSv/api-events.json",
+      "bytes": 76167,
+      "sha256": "fef2bef3fe8d35163f28f97f8c6d52e6a289cf97658007df849cf2653aec2fb8"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-9MmRSv/erp.db",
+      "bytes": 1667072,
+      "sha256": "dcaf6e539f5af6368de814a71abbfd431c4439c0ca9335ec274fe2628fafcb1a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-9MmRSv/results.json",
+      "bytes": 40034,
+      "sha256": "7cea5be3e13bcf5e2daaa98d0c28e152f74120f5bcc75e42b2a5c96859bd5c6d"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-9MmRSv/schema.json",
+      "bytes": 64749,
+      "sha256": "be492c6bdd4d769d597bad1b26f692e0e14645ad88b3ed7ce50bad507eaa5c91"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-eVTI6t/007-supplier-partial-0-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-eVTI6t/007-supplier-partial-0.json",
+      "bytes": 7475,
+      "sha256": "6baa2b2953bae13c929057d341011131ea1c8c331743ba70c90d09d942689941"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-eVTI6t/015-supplier-partial-50-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-eVTI6t/015-supplier-partial-50.json",
+      "bytes": 16042,
+      "sha256": "640ed8319223d4f2012bad7df9fa769b1a34428cf218cf51a4111af60d9b49d5"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-eVTI6t/api-events.json",
+      "bytes": 15932,
+      "sha256": "ba92e7553b1c330d58134351128a1d168d6346686eba136b83f29cd5d8274367"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-eVTI6t/erp.db",
+      "bytes": 1630208,
+      "sha256": "da92790ddd7c320b82226019697adf025afa6188a9540ce26763e46c93f610e1"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-eVTI6t/results.json",
+      "bytes": 6106,
+      "sha256": "b7f1721ccd072c762ad05a83e3193b59a7bfd676a87953e1c94c32c39b6f9874"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-eVTI6t/schema.json",
+      "bytes": 64749,
+      "sha256": "be492c6bdd4d769d597bad1b26f692e0e14645ad88b3ed7ce50bad507eaa5c91"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-console-5.log",
+      "bytes": 2438,
+      "sha256": "f16ad250f666dfdb871de95ebe6d2849fab956b0e225da913b16d4eb1eca77f4"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-credit-repro.log",
+      "bytes": 3002,
+      "sha256": "98e2aed5629200e7a13884e42ae36d5ee3357739a44797ce609fc7f452a1987d"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-supplement-console-2.log",
+      "bytes": 3967,
+      "sha256": "1c989bd26e5c2aa11f1264fde55421eb5b2a76c514cf64171fab257d403c6c21"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-supplier-repro.log",
+      "bytes": 279,
+      "sha256": "56a5a878dd0565a6249f14f12b8e52f39b0f26b22833eed4166efb1b19442229"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-TQ4hqh/009-supplier-credit-before-split-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-TQ4hqh/009-supplier-credit-before-split.json",
+      "bytes": 13798,
+      "sha256": "a6cb8bb37fc89fd6ab9ab5d797db30e550d10c465feea2b11f4f2028d4612545"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-TQ4hqh/012-supplier-credit-after-split-attempt-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-TQ4hqh/012-supplier-credit-after-split-attempt.json",
+      "bytes": 13805,
+      "sha256": "0db9c3075f2806e2944be207ed0b6a32b9dcedeb7573d94e199342e27e1ca1bb"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-TQ4hqh/api-events.json",
+      "bytes": 13492,
+      "sha256": "90feeb0ee99ea37b21d9217d7cc6676cde1b51db34f0b1e748b44b0950b237d8"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-TQ4hqh/erp.db",
+      "bytes": 1630208,
+      "sha256": "bece048c2ea7aa944bd86b2f57a629874c6c62f4ae20af0a151a40bf86e09515"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-TQ4hqh/results.json",
+      "bytes": 6607,
+      "sha256": "6aafecadbbf30495f9ddf8874f84d065787491a508742c3da40a389d3e07ae77"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-TQ4hqh/schema.json",
+      "bytes": 64749,
+      "sha256": "be492c6bdd4d769d597bad1b26f692e0e14645ad88b3ed7ce50bad507eaa5c91"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-TQ4hqh/supplier-credit-split-proof.json",
+      "bytes": 2275,
+      "sha256": "67941618e4b5930d3fc06cf42815dc4916cdccb42e3f10b312fa1fcb713a7ec1"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-ZHkdJ8/008-supplier-early-return-invariants.json",
+      "bytes": 466,
+      "sha256": "4b06ae2341aef5dbc0d48956c861e916e8510f54cce4c4a23ab410fc3306bb3a"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-ZHkdJ8/008-supplier-early-return.json",
+      "bytes": 7502,
+      "sha256": "aaa7923bdca75147bea2383d5dfb7631fe75fb8c3f808e28484ed46e8ac92e1e"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-ZHkdJ8/api-events.json",
+      "bytes": 8781,
+      "sha256": "2922a4406036576e76b9632ad68750d994e173c55992784e0fa055af5749ce6e"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-ZHkdJ8/erp.db",
+      "bytes": 1630208,
+      "sha256": "834c3c35a1cf09f025896acbbdf4ec57bd4e87e302efe872101b3f379cc455b9"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-ZHkdJ8/results.json",
+      "bytes": 3150,
+      "sha256": "018deea36d9ed01e98c73a35335111beedf6bc9704ba36d2e8867aba425bae90"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-run-ZHkdJ8/schema.json",
+      "bytes": 64749,
+      "sha256": "be492c6bdd4d769d597bad1b26f692e0e14645ad88b3ed7ce50bad507eaa5c91"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-supplier-split.log",
+      "bytes": 1235,
+      "sha256": "845944aa2221bcc5ecace79d71d347d84af462a2350bee8d49eedbf5bd4d7177"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/evidence/oracle-supplier-chronology.log",
+      "bytes": 1117,
+      "sha256": "a91a80872dc68dc3de5137b673baf316cddf81e56b5706aea3a3bbabe98de634"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/accounting-audit/findings/F-001/supplier-return-chronology-proof.json",
+      "bytes": 1252,
+      "sha256": "11ae0a0394421d1a2682825f1f11b501098e5317f129f79fc24c9972f586c454"
+    },
+    {
+      "path": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/.omo/evidence/oracle/supplier-coverage.json",
+      "bytes": 2283,
+      "sha256": "760f617068305c701a35ae4e68f5eb70e08b96b80732265bda70143cfbbb2f9f"
+    }
+  ],
+  "reviewFollowup": "Mandatory supplier return-credit split attempted through actual API, unsupported500 without mutation; purchase-return chronology extends F001; no substitution with customer credit or supplier advance."
+}

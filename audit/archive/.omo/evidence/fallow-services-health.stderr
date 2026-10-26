@@ -1,0 +1,3 @@
+   1.521635039s  WARN fallow: 'node_modules' does not exist. Package exports and conditional exports cannot be read, framework plugins that activate on an installed package stay inactive, and dependency classification degrades, so imports and dependencies can be misreported. Run npm install / pnpm install / yarn / bun install first.
+   1.527700765s  WARN fallow: entry glob "server/scripts/*.js" no longer matches 1 file, because "*" and "?" no longer match "/". To keep the old match, use "server/scripts/**/*.js".
+[X] Exit code 1: gate health-findings (33 at or above error) failed. To report complexity findings without a failure, set the rules complexity-cyclomatic, complexity-cognitive and complexity-crap to "warn", or run `fallow health --report-only`.

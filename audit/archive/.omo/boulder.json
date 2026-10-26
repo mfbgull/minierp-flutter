@@ -1,0 +1,15 @@
+{
+  "schema_version": 2,
+  "active_work_id": "fallow-remediation-2026-10-21",
+  "works": {
+    "fallow-remediation-2026-10-21": {
+      "work_id": "fallow-remediation-2026-10-21",
+      "active_plan": ".omo/plans/fallow-remediation-2026-10-21.md",
+      "plan_name": "fallow-remediation-2026-10-21",
+      "session_ids": ["codex:01a160da-acbd-7ef0-9609-133470746904"],
+      "status": "active",
+      "worktree_path": null,
+      "worktree_note": "Isolated resume worktree removed on 2026-10-22 after verification: it was a frozen 04:52 snapshot superseded by the main checkout. Its unique artifact (340-row finding inventory) was preserved at audit/fallow-remediation-2026-10-21.inventory.json. Delivery now happens in the main checkout."
+    }
+  }
+}

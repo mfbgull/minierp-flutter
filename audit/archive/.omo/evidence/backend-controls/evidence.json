@@ -1,0 +1,416 @@
+{
+  "invocation": "node accounting-audit/tests/backend-controls.cjs",
+  "run": "accounting-audit/evidence/backend-run-Lbw3la",
+  "scenarioAssertions": [
+    {
+      "scenario": "BACKEND-SALARY-ADVANCE-RECOGNITION",
+      "binaryObservable": "defectReproduced === true",
+      "actual": {
+        "august": {
+          "salaryExpense": 1000,
+          "advanceAsset": 200,
+          "bank": 8800
+        },
+        "september": {
+          "salaryExpense": 1800,
+          "advanceAsset": 200,
+          "bank": 8000
+        },
+        "history": {
+          "success": true,
+          "data": [
+            {
+              "pay_period": "2026-09",
+              "employee_salary": 1000,
+              "total_paid": 1000,
+              "remaining": 0,
+              "status": "paid",
+              "payment_count": 2,
+              "advance_carryover": 200,
+              "advance_source_period": "2026-08",
+              "first_payment_date": "2026-08-20",
+              "last_payment_date": "2026-09-20"
+            },
+            {
+              "pay_period": "2026-08",
+              "employee_salary": 1000,
+              "total_paid": 1000,
+              "remaining": 0,
+              "status": "paid",
+              "payment_count": 1,
+              "advance_carryover": 0,
+              "advance_source_period": null,
+              "first_payment_date": "2026-08-20",
+              "last_payment_date": "2026-08-20"
+            }
+          ]
+        },
+        "profitLoss": {
+          "success": true,
+          "data": {
+            "startDate": "2026-08-01",
+            "endDate": "2026-09-30",
+            "totalRevenue": 0,
+            "totalCogs": 0,
+            "grossProfit": 0,
+            "expenses": [],
+            "totalExpenses": 1800,
+            "netProfit": -1800,
+            "grossProfitMargin": 0,
+            "netProfitMargin": 0
+          }
+        },
+        "balanceSheet": {
+          "success": true,
+          "data": {
+            "asOfDate": "2026-09-30",
+            "assets": {
+              "inventory": 0,
+              "accounts_receivable": 0,
+              "cash": 8000,
+              "other": 200,
+              "total": 8200
+            },
+            "liabilities": {
+              "accounts_payable": 0,
+              "tax_payable": 0,
+              "other": 0,
+              "total": 0
+            },
+            "equity": {
+              "opening_retained_earnings": 0,
+              "owner_capital": 10000,
+              "owner_drawings": 0,
+              "net_income_ytd": -1800,
+              "revenue_ytd": 0,
+              "cogs_ytd": 0,
+              "expenses_ytd": 1800,
+              "total": 8200
+            },
+            "totals": {
+              "total_assets": 8200,
+              "total_liabilities": 0,
+              "total_equity": 8200,
+              "total_liab_and_equity": 8200,
+              "balanced": true
+            }
+          }
+        }
+      },
+      "artifact": "accounting-audit/evidence/backend-run-Lbw3la/results.json"
+    },
+    {
+      "scenario": "BACKEND-LOAN-PREDISBURSEMENT",
+      "binaryObservable": "defectReproduced === true",
+      "actual": {
+        "status": 201,
+        "loanReceivableBeforeDisbursement": -200
+      },
+      "artifact": "accounting-audit/evidence/backend-run-Lbw3la/results.json"
+    },
+    {
+      "scenario": "BACKEND-PRODUCTION-ROUNDING",
+      "binaryObservable": "defectReproduced === true",
+      "actual": {
+        "status": 201,
+        "outputRows": [
+          {
+            "id": 1,
+            "production_id": 1,
+            "item_id": 2,
+            "quantity": 1,
+            "unit_cost": 0.01,
+            "allocated_cost": 0.01
+          },
+          {
+            "id": 2,
+            "production_id": 1,
+            "item_id": 3,
+            "quantity": 1,
+            "unit_cost": 0.01,
+            "allocated_cost": 0.01
+          },
+          {
+            "id": 3,
+            "production_id": 1,
+            "item_id": 4,
+            "quantity": 1,
+            "unit_cost": 0.01,
+            "allocated_cost": 0.01
+          },
+          {
+            "id": 4,
+            "production_id": 1,
+            "item_id": 5,
+            "quantity": 1,
+            "unit_cost": -0.01,
+            "allocated_cost": -0.01
+          }
+        ],
+        "productionBefore": {
+          "inventory": 0.02,
+          "clearing": 0
+        },
+        "productionAfter": {
+          "inventory": 0.03,
+          "clearing": -0.01
+        }
+      },
+      "artifact": "accounting-audit/evidence/backend-run-Lbw3la/results.json"
+    },
+    {
+      "scenario": "BACKEND-CLOSED-SOURCE-SETTLEMENT",
+      "binaryObservable": "defectReproduced === true",
+      "actual": {
+        "expenseStatus": 409,
+        "billStatus": 409,
+        "beforeSettlement": {
+          "bank": 7700,
+          "expensePayable": -100,
+          "ap": -100.02
+        },
+        "afterSettlement": {
+          "bank": 7700,
+          "expensePayable": -100,
+          "ap": -100.02
+        }
+      },
+      "artifact": "accounting-audit/evidence/backend-run-Lbw3la/results.json"
+    }
+  ],
+  "databaseIntegrity": "ok",
+  "foreignKeyViolations": 0,
+  "artifacts": [
+    {
+      "path": "accounting-audit/tests/backend-controls.cjs",
+      "bytes": 9109,
+      "sha256": "b48a344316875f15a1dcb80fed88804be2125b5466d3f62127b31376074f2aa2"
+    },
+    {
+      "path": "accounting-audit/workstreams/backend-controls.md",
+      "bytes": 21389,
+      "sha256": "3a96e04a737e54bdfc8502ef953c4cb853c78c84cb78b9d355aef5eb8a36740e"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-source-inventory.json",
+      "bytes": 327951,
+      "sha256": "374bafcca20dce6401bed10cb5fb417320c0f8c7f7826b866d5fae18000be579"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-run-Lbw3la/results.json",
+      "bytes": 126485,
+      "sha256": "00795e5cbc20c662c0e6c0a98f4980cb4370bce135baff3a270202525888ea9d"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-run-Lbw3la/erp.db",
+      "bytes": 1630208,
+      "sha256": "341cdeafb89f915e52747b9635752149c65259f0bac4955dc442cbaaf4ae07af"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-probes-verified.log",
+      "bytes": 5434,
+      "sha256": "aad33ea37e44c561d13f66683f228fb1816de082fdb442deba0fefbfb5e1718a"
+    },
+    {
+      "path": "accounting-audit/findings/F-020/finding.md",
+      "bytes": 3599,
+      "sha256": "d580e93bbe48f4f501f8d22f513c7aefde58df331903b809fa67a4b4ce203e61"
+    },
+    {
+      "path": "accounting-audit/findings/F-021/finding.md",
+      "bytes": 2453,
+      "sha256": "ac01bb8eeb4a521e556e0a3b50a55dbf7f0cdeacc0c88cdab01e2e1bdd45014b"
+    },
+    {
+      "path": "accounting-audit/findings/F-022/finding.md",
+      "bytes": 3843,
+      "sha256": "bdbff560b4f156187b134e51efcf4fe57e5bb15857b7d3cc1e3037c7caadcac3"
+    },
+    {
+      "path": "accounting-audit/findings/F-023/finding.md",
+      "bytes": 3379,
+      "sha256": "fb99d80c51848c00f7924224d942b9722f7f24088f0ee89ffb55412b7def6339"
+    },
+    {
+      "path": "accounting-audit/tests/backend-verify-evidence.cjs",
+      "bytes": 2773,
+      "sha256": "5a2ead8842f4e41dbcbf79d848eff8d7f6ef25743c1213d7279a51d7931bedaa"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-verification.json",
+      "bytes": 634,
+      "sha256": "27c81e698bc858302e37c552d2aa7288a0ded20ee4c573aba0bb237e1bd4cf6e"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-verification.log",
+      "bytes": 635,
+      "sha256": "57861c3b375b44aa06487e8d3ad03391f1a6f00e6f68108b58aab5a2a00447de"
+    },
+    {
+      "path": "accounting-audit/tests/backend-inventory.py",
+      "bytes": 1289,
+      "sha256": "ffa20312db1e384f4939e0eb00758baf715cf95cb718639982cd9825ad9ed509"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-inventory.log",
+      "bytes": 219,
+      "sha256": "ed0fc6bed71323f260ec73245355fc712f88325b3124759327027a9dce8eaf03"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-graph-coverage.json",
+      "bytes": 3902,
+      "sha256": "d9e6b3bd00b4c276dc62e0ce06c1de8bfd7a6a9d49bc395f951df93db558f33d"
+    },
+    {
+      "path": "accounting-audit/tests/backend-extension.cjs",
+      "bytes": 10077,
+      "sha256": "91020d326abb771631b0dd304f7409b6e55106cd685409952e86818b2afa84af"
+    },
+    {
+      "path": "accounting-audit/tests/backend-count-risk.cjs",
+      "bytes": 7409,
+      "sha256": "28a5d028f9c8d040bb7d48d5e913717eac74f4dfe3eca1c69f08f47dbd91970f"
+    },
+    {
+      "path": "accounting-audit/tests/backend-verify-extension.py",
+      "bytes": 2085,
+      "sha256": "4001cbe1bb28f21b762f0e70de92797077e737936e392dffb89258e8ec7394e1"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-verified.log",
+      "bytes": 3980,
+      "sha256": "ed0013469c697da6e7dd40ba3023e0973e1443fce5d71b562f63e4e7ba289617"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-count-risk-verified.log",
+      "bytes": 2281,
+      "sha256": "876a31665ff5426d985510cf5512fad37d52c55dbc15001e86b53b9e2eaec97d"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-verification.json",
+      "bytes": 313,
+      "sha256": "827ee197298b1aef71277b31b30629149a7c7ee96bda8095dd3b7fed9b972f9e"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-verification.log",
+      "bytes": 314,
+      "sha256": "c407865621fbcaddf689d1ca0287461a6f53f7446ca7adda952353a728b9d385"
+    },
+    {
+      "path": "accounting-audit/findings/F-024/finding.md",
+      "bytes": 2918,
+      "sha256": "be1621204904bd4791323bfd22d8286f3202828d294b6441edce6a3bb8b891b3"
+    },
+    {
+      "path": "accounting-audit/findings/F-025/finding.md",
+      "bytes": 3204,
+      "sha256": "77200e6149bdc92acb49876303f60b84ee76a941e7fdb6d820ffa233fa2257eb"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-run-OF2b8i/01-before-production.json",
+      "bytes": 3748,
+      "sha256": "e2fb6491889e9d64be68f1b5c86e890b6887a22ecdf01eab733daeaa77b6fae4"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-run-OF2b8i/02-production-overhead.json",
+      "bytes": 11465,
+      "sha256": "dee9a3a54a42eb68ca6fb5e2df7cc1ca599c4548bc4096259b5a1e3a74c36fc2"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-run-OF2b8i/03-production-reversed.json",
+      "bytes": 13436,
+      "sha256": "50d8d52a475f47b584d9bb6021937f908e3a4fba5f580b4bd987b88a8956d31c"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-run-OF2b8i/04-owner-goods.json",
+      "bytes": 15318,
+      "sha256": "1efd5b7b7a6974b3c438f8e3ac849e76896dc909189dbd607fd3b14c3dc30965"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-run-OF2b8i/05-owner-cash.json",
+      "bytes": 16616,
+      "sha256": "3314d06b0a0e4135488b85b7039cea1d9530953ae8f75231200a2db0f6b8142d"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-run-OF2b8i/06-owner-reversed.json",
+      "bytes": 17351,
+      "sha256": "1252948162f14b1628eb57d2e8d32102e5c71de19e0e44beebf6685e1d814120"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-run-OF2b8i/07-count-completed.json",
+      "bytes": 19298,
+      "sha256": "09557b2454ef0c4756400e7140790e7e8817c976e952f0680b563e7a79d003d3"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-run-OF2b8i/08-count-corrected.json",
+      "bytes": 21991,
+      "sha256": "47340b09df03392eda4a94c011a961f365e90c47c7b7fc75e2dad24a521f7e91"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-run-OF2b8i/09-count-repeat-rejected.json",
+      "bytes": 21997,
+      "sha256": "50e17d5ec92e4f3f3aa648febd554c7840fa9c72d815501605834f317ecd342a"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-run-OF2b8i/erp.db",
+      "bytes": 1630208,
+      "sha256": "6ab9a35c9d896e64604f456ee0f7e50d05ccaa96573e0eb25afcb99dd83b3f73"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-extension-run-OF2b8i/results.json",
+      "bytes": 19270,
+      "sha256": "86e63b7e46cbb94bf64d02abb812bb5e4d09a089677b5da54f60c0fa5d02ffad"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-count-risk-run-ZBybHv/01-mixed-count-completed.json",
+      "bytes": 6055,
+      "sha256": "f8143759d08101a5e5943b8c46a6daa5894bac34ccd3d57f0442063bf4f5cdb8"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-count-risk-run-ZBybHv/02-mixed-count-corrected.json",
+      "bytes": 6055,
+      "sha256": "d1e35a73991a70b8c2ed4e8f4bcd279258cf07173c440f7328ecf9b8c7a40ce3"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-count-risk-run-ZBybHv/03-two-item-count-completed.json",
+      "bytes": 12227,
+      "sha256": "7ae11717f4f8f7d39583cad1cb924d095ea6f07c6e84a2ebc8fb97d18b17b08e"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-count-risk-run-ZBybHv/04-partial-item-correction.json",
+      "bytes": 14232,
+      "sha256": "379969c7ff02adbd225ebfcc9862816ab5ccdc9c78ff18b0e0eceb878d018e6e"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-count-risk-run-ZBybHv/erp.db",
+      "bytes": 1630208,
+      "sha256": "fa8c62b571695858e7db5b8d53c37d0ba1ca8fb5200a1c35e0ea55a8ee3189b7"
+    },
+    {
+      "path": "accounting-audit/evidence/backend-count-risk-run-ZBybHv/results.json",
+      "bytes": 16227,
+      "sha256": "288b74fea0422102ef90af27990eda5d0194a0bfb39f00abd629776eb236dd3c"
+    }
+  ],
+  "fullSuites": "Not run by backend-controls; leader owns combined gates.",
+  "productionChanges": false,
+  "liveDatabaseOpened": false,
+  "inventoryInvocation": "python3 accounting-audit/tests/backend-inventory.py",
+  "verificationInvocation": "node accounting-audit/tests/backend-verify-evidence.cjs",
+  "inventoryFileCount": 325,
+  "extensionInvocations": [
+    "node accounting-audit/tests/backend-extension.cjs",
+    "node accounting-audit/tests/backend-count-risk.cjs",
+    "python3 accounting-audit/tests/backend-verify-extension.py"
+  ],
+  "extensionVerification": {
+    "status": "VERIFIED",
+    "positiveRun": "accounting-audit/evidence/backend-extension-run-OF2b8i",
+    "riskRun": "accounting-audit/evidence/backend-count-risk-run-ZBybHv",
+    "positiveScenarios": 3,
+    "reproducedCountDefects": 2,
+    "sqliteIntegrity": "ok",
+    "foreignKeyViolations": 0,
+    "unbalancedJournals": 0
+  }
+}

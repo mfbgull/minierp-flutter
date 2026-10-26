@@ -1,0 +1,211 @@
+328:   static processReturn(input: ProcessReturnInput): ProcessReturnResult {
+329:     if (!input.items || input.items.length === 0) {
+330:       throw new ReturnError(400, 'Invalid request: items must be a non-empty array');
+331:     }
+332: 
+333:     requireReturnableInvoice(input.invoiceId);
+334:     const returnDate = resolveReturnDate(input.returnDate);
+335:     const warehouseId = resolveWarehouse(input.warehouseId);
+336:     const feeType: FeeType = normalizeFeeType(input.feeType, input.deductionType);
+337:     const feeValue = Number(input.feeValue ?? input.deductionValue ?? 0) || 0;
+338: 
+339:     // Legacy clients (no `settlements` array) keep their old disposition
+340:     // semantics; new clients pass explicit settlements.
+341:     const isLegacy = !input.settlements || input.settlements.length === 0;
+342:     const legacyDisposition = isLegacy ? input.disposition ?? null : null;
+343: 
+344:     const txn = db.transaction(() => {
+345:       // Fresh re-read INSIDE the transaction — the per-line returned_qty
+346:       // guard must see concurrent writes (scenario 14's double-spend).
+347:       const fresh = requireReturnableInvoice(input.invoiceId);
+348:       // Locked books are never modified (D23). Today's date is always
+349:       // allowed; only back-dated returns can be blocked.
+350:       assertPeriodOpen(returnDate);
+351: 
+352:       const lines = discountedReturnLines(input, fresh);
+
+390: 
+391:       // Reverse stock — restocked into the chosen warehouse. The movement
+392:       // ids are attributed to the returned lines so a later void can post
+393:       // the exact equal-and-opposite movement.
+394:       const movements = InvoiceModel.reverseStockForItems(
+395:         db,
+396:         lines.map((l) => ({
+397:           item_id: l.item_id,
+398:           quantity: l.returnedQuantity,
+399:           unit_price: roundCurrency(l.returnedGross / l.returnedQuantity),
+400:         })),
+401:         fresh.invoice_no,
+402:         input.userId,
+403:         'RETURN',
+404:         warehouseId ?? undefined,
+405:       );
+406:       movements.forEach((m) => {
+407:         const idx = lines.findIndex((l) => l.item_id === m.item_id);
+408:         if (idx >= 0) {
+409:           InvoiceReturnModel.setStockMovementId(db, returnItemIds[idx], m.movement_id);
+410:         }
+411:       });
+412: 
+413:       // GL — separate journal entries (D20).
+414:       AccountingService.postInvoiceReturnEntry(db, {
+415:         returnId: header.id,
+416:         invoiceNo: fresh.invoice_no,
+417:         lines: lines.map((l) => ({ returnedNet: l.returnedNet, returnedTax: l.returnedTax })),
+418:         entryDate: returnDate,
+419:         userId: input.userId,
+420:       });
+421:       if (feeAmount > 0) {
+422:         AccountingService.postReturnFeeEntry(db, {
+423:           returnId: header.id,
+424:           invoiceNo: fresh.invoice_no,
+425:           feeAmount,
+426:           entryDate: returnDate,
+427:           userId: input.userId,
+428:         });
+429:       }
+430:       const cogsAmount = computeReturnCogs(db, fresh.invoice_no, lines);
+431:       if (cogsAmount > 0) {
+432:         AccountingService.postCOGSReversalEntry(db, {
+433:           invoiceId: input.invoiceId,
+434:           invoiceNo: fresh.invoice_no,
+435:           cogsAmount,
+436:           entryDate: returnDate,
+437:           userId: input.userId,
+438:           referenceId: header.id,
+439:         });
+440:       }
+
+701: 
+702:   // ======================================================================
+703:   // 4. VOID ONE SETTLEMENT (spec §5.2 / D24)
+704:   // ======================================================================
+705: 
+706:   static voidSettlement(settlementId: number, userId: number, reason?: string | null): void {
+707:     const txn = db.transaction(() => {
+708:       const row = db.prepare('SELECT * FROM return_settlements WHERE id = ?')
+709:         .get(settlementId) as ReturnSettlementRow | undefined;
+710:       if (!row) throw new ReturnError(404, 'Settlement not found');
+711:       if (row.voided_at) throw new ReturnError(400, 'Settlement is already voided');
+712: 
+713:       const ret = InvoiceReturnModel.getById(db, row.return_id);
+714:       if (!ret) throw new ReturnError(404, 'Return not found');
+715:       if (ret.voided_at) {
+716:         throw new ReturnError(400, 'Cannot void a settlement of a voided return');
+717:       }
+718: 
+719:       AccountingService.assertPeriodNotClosed(db, ret.return_date, `Sales return ${ret.return_no}`);
+720: 
+721:       InvoiceReturnService.revertSettlement(
+722:         db,
+723:         row,
+724:         ret.customer_id,
+725:         userId,
+726:         reason ?? 'settlement voided',
+727:       );
+728:       InvoiceReturnModel.voidSettlement(db, settlementId, userId);
+729: 
+730:       calculateInvoiceBalance(ret.invoice_id);
+731:       updateInvoiceStatus(ret.invoice_id);
+732:       recalcCustomerBalanceFromLedger(ret.customer_id);
+733:       // The target invoice of an adjust may now be unpaid again.
+734:       if (row.target_invoice_id) {
+735:         calculateInvoiceBalance(row.target_invoice_id);
+736:         updateInvoiceStatus(row.target_invoice_id);
+737:       }
+738: 
+
+1074:     },
+1075:   ): PostedSettlement {
+1076:     const today = todayLocal();
+1077:     const { userId } = args;
+1078:     const creditNo = InvoiceReturnModel.generateCreditNoAtomic(dbArg);
+1079: 
+1080:     // Consuming debit: the ledger credit is moved into the store-credit
+1081:     // pool. Without this row the ledger would still show the credit and
+1082:     // the cap would not free up once it has been used.
+1083:     createLedgerEntry(
+1084:       args.customerId,
+1085:       today,
+1086:       'CREDIT',
+1087:       creditNo,
+1088:       args.amount,
+1089:       0,
+1090:       `Credit note ${creditNo} from return ${args.returnHeader.return_no} on Invoice ${args.invoiceNo}`,
+1091:     );
+1092:     dbArg.prepare('UPDATE customers SET credit_balance = credit_balance + ? WHERE id = ?')
+1093:       .run(args.amount, args.customerId);
+1094: 
+1095:     const record = InvoiceReturnModel.createSettlement(dbArg, {
+1096:       return_id: args.returnHeader.id,
+1097:       settlement_no: creditNo,
+1098:       type: 'credit',
+1099:       amount: args.amount,
+1100:       method: null,
+1101:       reference: creditNo,
+1102:       settled_date: today,
+1103:       created_by: userId,
+1104:     });
+1105:     return { record, appliedAmount: args.amount };
+1106:   }
+1107: 
+1108:   /** ADJUST: apply the credit to another invoice as a payment allocation. */
+1109:   private static applyAdjust(
+
+1296:   private static revertSettlement(
+1297:     dbArg: Database.Database,
+1298:     settlement: ReturnSettlementRow,
+1299:     customerId: number,
+1300:     userId: number,
+1301:     reason: string,
+1302:   ): void {
+1303:     const nowIso = new Date().toISOString();
+1304: 
+1305:     if (settlement.type === 'refund') {
+1306:       // Reverse the REFUND ledger row, void the negative allocation (the
+1307:       // negative payment row stays as the audit record) and void the
+1308:       // refund's GL group keyed to the payment.
+1309:       revertLedgerByReference(dbArg, {
+1310:         customerId,
+1311:         transactionType: 'REFUND',
+1312:         referenceNo: settlement.reference,
+1313:         reason,
+1314:       });
+1315:       if (settlement.payment_id) {
+1316:         dbArg.prepare(
+1317:           'UPDATE payment_allocations SET voided_at = ? WHERE payment_id = ? AND voided_at IS NULL'
+1318:         ).run(nowIso, settlement.payment_id);
+1319:         AccountingService.voidJournalLinesByReference(dbArg, 'PAYMENT', settlement.payment_id, {
+1320:           voidedBy: userId,
+1321:           voidReason: reason,
+1322:         });
+1323:       }
+1324:       return;
+1325:     }
+1326: 
+1327:     if (settlement.type === 'credit') {
+1328:       // Release the store credit back to the customer ledger.
+1329:       dbArg.prepare('UPDATE customers SET credit_balance = MAX(0, credit_balance - ?) WHERE id = ?')
+1330:         .run(Number(settlement.amount), customerId);
+1331:       revertLedgerByReference(dbArg, {
+1332:         customerId,
+1333:         transactionType: 'CREDIT',
+1334:         referenceNo: settlement.reference,
+1335:         reason,
+1336:       });
+1337:       return;
+1338:     }
+1339: 
+1340:     // adjust: drop the allocation from the target invoice (the payment row
+1341:     // stays as the audit record) and recompute its balance.
+
+1364: 
+1365: function resolveReturnDate(raw?: string | null): string {
+1366:   if (!raw || !String(raw).trim()) return todayLocal();
+1367:   const value = String(raw).trim();
+1368:   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+1369:     throw new ReturnError(400, `Invalid return_date: ${value} (expected YYYY-MM-DD)`);
+1370:   }
+1371:   return value;
+1372: }
+1373: 

@@ -1,0 +1,18 @@
+[
+  {
+    "scenario": "audit harness syntax after supplier follow-up",
+    "invocation": "node --check accounting-audit/tests/oracle-lifecycle.cjs",
+    "exitCode": 0,
+    "stdout": "",
+    "stderr": "",
+    "pass": true
+  },
+  {
+    "scenario": "audit harness syntax after supplier follow-up",
+    "invocation": "node --check accounting-audit/tests/oracle-supplement.cjs",
+    "exitCode": 0,
+    "stdout": "",
+    "stderr": "",
+    "pass": true
+  }
+]
