@@ -88,7 +88,7 @@ function replayPosSaleResult(invoiceId: number, reqBody: Record<string, unknown>
     .reduce((sum, leg) => sum + Number(leg.amount), 0);
   const cashReceived = usesLegs
     ? cashLeg
-    : parseFloat(String(reqBody.cash_received ?? '')) || total;
+    : legacyCashReceived(reqBody.cash_received, total);
 
   return {
     transaction_no: inv.invoice_no,
@@ -114,6 +114,14 @@ function replayPosSaleResult(invoiceId: number, reqBody: Record<string, unknown>
 function customerNameOrDefault(raw: unknown): string {
   const name = typeof raw === 'string' ? raw.trim() : '';
   return name || 'Walk-in Customer';
+}
+
+function legacyCashReceived(raw: unknown, total: number): number {
+  // Omitted tender retains old-client compatibility; an explicit zero is real.
+  if (raw === undefined) return total;
+  if (typeof raw !== 'number' && typeof raw !== 'string') return NaN;
+  if (String(raw).trim() === '') return NaN;
+  return Number(raw);
 }
 
 
@@ -159,8 +167,8 @@ function resolvePosPaymentLegs(
   usesLegs: boolean
 ): { legs: PosPaymentLeg[] } | { error: string } {
   if (!usesLegs) {
-    const cashReceived = parseFloat(String(body.cash_received)) || total;
-    if (cashReceived < total) {
+    const cashReceived = legacyCashReceived(body.cash_received, total);
+    if (!Number.isFinite(cashReceived) || cashReceived < 0 || cashReceived < total) {
       return {
         error: `Insufficient cash. Total: ${total.toFixed(2)}, Received: ${cashReceived.toFixed(2)}`,
       };
