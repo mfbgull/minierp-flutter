@@ -9,6 +9,7 @@ import { isValidPaymentMethod } from './cashService';
 import { claimIdempotencyKey, findIdempotencyRecord } from '../utils/idempotency';
 import { generateDocNo } from '../utils/sequence';
 import { BusinessRuleError } from '../utils/businessRuleError';
+import { recordLedgerCreditDraws, recordStoreCreditDraws } from './storeCreditOwnership';
 import type {
   InvoiceCreationInput,
   InvoiceCreationItemResult,
@@ -378,9 +379,12 @@ export class InvoiceCreationService {
       const customer = this.db.prepare('SELECT COALESCE(credit_balance, 0) AS credit_balance FROM customers WHERE id = ?').get(input.customerId) as { credit_balance: number };
       const poolApplied = Math.min(creditOffset, Math.max(0, customer.credit_balance));
       if (poolApplied > 0) {
+        recordStoreCreditDraws(this.db, input.customerId, invoiceId, poolApplied);
         this.db.prepare('UPDATE customers SET credit_balance = MAX(0, credit_balance - ?) WHERE id = ?').run(poolApplied, input.customerId);
         InvoiceModel.createLedgerEntry(this.db, input.customerId, 'CREDIT', `CREDIT-${invoiceNo}`, input.invoiceDate, 0, poolApplied, `Store credit applied to Invoice ${invoiceNo}`);
       }
+      if (creditOffset > poolApplied) recordLedgerCreditDraws(this.db, input.customerId, invoiceId, invoiceNo,
+        creditOffset - poolApplied, input.invoiceDate, input.userId);
     }
   }
 

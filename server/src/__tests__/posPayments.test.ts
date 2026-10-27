@@ -116,6 +116,17 @@ describe('POS sale — payment legs, discount, tax, closed period', () => {
   }
 
   describe('R1/R2 — legacy payload is unchanged', () => {
+    it.each([0, -1, 99.99])('F-073 rejects real tender %s without committing a sale', async cash => {
+      const before = ['invoices', 'payments', 'journal_lines', 'stock_movements', 'stock_batches']
+        .map(table => db.prepare(`SELECT * FROM ${table} ORDER BY id`).all());
+      const res = await request(app).post('/api/pos/sale').set('Cookie', authCookie)
+        .set('Idempotency-Key', `audit-pos-tender-${cash}`)
+        .send(basePayload({ cash_received: cash }));
+      expect(res.status).toBe(400);
+      expect(['invoices', 'payments', 'journal_lines', 'stock_movements', 'stock_batches']
+        .map(table => db.prepare(`SELECT * FROM ${table} ORDER BY id`).all())).toEqual(before);
+    });
+
     it('full cash sale with no new fields posts one Cash leg and marks it Paid', async () => {
       const res = await postSale(basePayload({ cash_received: 100 }));
       expect(res.status).toBe(201);

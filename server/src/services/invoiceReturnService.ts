@@ -52,6 +52,7 @@ import { decomposeLineAmount, parseCurrency, roundCurrency } from '../utils/curr
 import { todayLocal, AR_OUTSTANDING } from '../utils/reportSql';
 import { isFeatureEnabled } from '../utils/featureFlags';
 import { logCRUD, newCorrelationId } from './activityLogger';
+import { hasStoreCreditConsumption } from './storeCreditOwnership';
 
 const {
   createLedgerEntry,
@@ -619,8 +620,18 @@ export class InvoiceReturnService {
       const invoice = InvoiceModel.getById(ret.invoice_id, db);
       if (!invoice) throw new ReturnError(404, 'Invoice not found');
 
+      const position = InvoiceReturnService.getPosition(ret.invoice_id);
+      const ownSettlements = InvoiceReturnModel.getActiveSettlements(db, returnId);
+      const afterVoid = computePosition({ originalTotal: position.originalTotal,
+        totalReturned: position.totalReturned - Number(ret.returned_amount),
+        totalFees: position.totalFees - Number(ret.fee_amount), totalPaid: position.totalPaid,
+        totalSettled: position.totalSettled - ownSettlements.reduce((sum, row) => sum + Number(row.amount), 0) });
+      if (afterVoid.totalSettled > afterVoid.refundCreditDue + 0.005) {
+        throw new ReturnError(409, 'Cannot void a return supporting other active credit or refund settlements');
+      }
+
       // 1. Void every active settlement (reverses each money leg).
-      for (const settlement of InvoiceReturnModel.getActiveSettlements(db, returnId)) {
+      for (const settlement of ownSettlements) {
         InvoiceReturnService.revertSettlement(
           db,
           settlement,
@@ -1301,6 +1312,9 @@ export class InvoiceReturnService {
     reason: string,
   ): void {
     const nowIso = new Date().toISOString();
+    if (dbArg.prepare('SELECT 1 FROM store_credit_draws WHERE settlement_id=? LIMIT 1').get(settlement.id)) {
+      throw new ReturnError(409, 'Cannot void consumed credit while its invoice applications remain active');
+    }
 
     if (settlement.type === 'refund') {
       // Reverse the REFUND ledger row, void the negative allocation (the
@@ -1325,9 +1339,13 @@ export class InvoiceReturnService {
     }
 
     if (settlement.type === 'credit') {
+      if (hasStoreCreditConsumption(dbArg, customerId, settlement.id)) {
+        throw new ReturnError(409, 'Cannot void consumed store credit while its invoice applications remain active');
+      }
       // Release the store credit back to the customer ledger.
-      dbArg.prepare('UPDATE customers SET credit_balance = MAX(0, credit_balance - ?) WHERE id = ?')
-        .run(Number(settlement.amount), customerId);
+      const removed = dbArg.prepare('UPDATE customers SET credit_balance = credit_balance - ? WHERE id = ? AND credit_balance >= ?')
+        .run(Number(settlement.amount), customerId, Number(settlement.amount));
+      if (removed.changes !== 1) throw new ReturnError(409, 'Cannot void consumed store credit');
       revertLedgerByReference(dbArg, {
         customerId,
         transactionType: 'CREDIT',
