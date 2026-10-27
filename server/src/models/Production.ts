@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { parseCurrency, roundCurrency } from '../utils/currency';
+import { parseCurrency, roundCurrency, toMinorUnits } from '../utils/currency';
 import { roundQty } from '../utils/quantity';
 import { generateDocNo, generateReceiptBatchNo } from '../utils/sequence';
 import { sanitizeSortParams, PRODUCTION_SORT_COLUMNS } from '../utils/sqlSanitizer';
@@ -386,8 +386,8 @@ class ProductionModel {
       // lines by RELATIVE SALES VALUE — each line's share is its quantity x
       // the item's standard selling price, over the total of those. The pool
       // is what was actually posted (materials + overhead, each rounded to
-      // cents), so Dr/Cr production_clearing nets to exactly zero. The last
-      // line absorbs the rounding remainder; a production with no priced
+      // cents), so Dr/Cr production_clearing nets to exactly zero. Largest
+      // remainders receive the remaining cents; a production with no priced
       // outputs falls back to a quantity split rather than dividing by zero.
       const allocationPool = roundCurrency(consumedValue + overheadValue);
       const priceStmt = db.prepare(`SELECT standard_selling_price FROM items WHERE id = ?`);
@@ -402,17 +402,14 @@ class ProductionModel {
         : outputLines.map((line) => Number(line.quantity));
       const totalWeight = weights.reduce((sum, v) => sum + v, 0) || 1;
 
-      let allocatedSoFar = 0;
-      const allocations = outputLines.map((line, index) => {
-        if (index === outputLines.length - 1) {
-          const rest = roundCurrency(allocationPool - allocatedSoFar);
-          allocatedSoFar = allocationPool;
-          return rest;
-        }
-        const share = roundCurrency(allocationPool * (weights[index] / totalWeight));
-        allocatedSoFar = roundCurrency(allocatedSoFar + share);
-        return share;
-      });
+      const poolMinor = toMinorUnits(allocationPool);
+      const exactShares = weights.map(weight => poolMinor * weight / totalWeight);
+      const minorShares = exactShares.map(Math.floor);
+      const order = exactShares.map((share, index) => ({ index, fraction: share - minorShares[index] }))
+        .sort((a, b) => b.fraction - a.fraction || a.index - b.index);
+      const remainder = poolMinor - minorShares.reduce((sum, share) => sum + share, 0);
+      for (let n = 0; n < remainder; n++) minorShares[order[n].index] += 1;
+      const allocations = minorShares.map(share => share / 100);
 
       // One stock_batch + one PRODUCTION movement + one GL posting per output
       // line, each carrying that line's allocated cost.
