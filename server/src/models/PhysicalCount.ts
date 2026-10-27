@@ -3,8 +3,8 @@ import Database from 'better-sqlite3';
 import { sanitizeSortParams, PHYSICAL_COUNT_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import StockMovementModel from './StockMovement';
 import AccountingService from '../services/accountingService';
-import { isFeatureEnabled } from '../utils/featureFlags';
 import { SqlParam } from '../utils/sqlTypes';
+import { consumeCountLayers, consumeSurplusCountBins, countConsumptionUnitCost, restoreCountLayers } from './physicalCountLayers';
 
 /** Next sequence number for ADJUSTMENT-sourced batch numbers. */
 function getNextBatchSequence(db: Database.Database): number {
@@ -50,6 +50,7 @@ interface PhysicalCountItem {
   counted_quantity: number | null;
   variance: number | null;
   unit_cost: number | null;
+  snapshot_unit_cost: number | null;
   variance_value: number | null;
   adjustment_posted: boolean;
   adjustment_movement_id: number | null;
@@ -146,12 +147,12 @@ class PhysicalCountModel {
       `).all(data.warehouse_id) as { item_id: number; quantity: number; standard_cost: number }[];
 
       const insertItem = db.prepare(`
-        INSERT INTO physical_count_items (count_id, item_id, system_quantity, unit_cost)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO physical_count_items (count_id, item_id, system_quantity, unit_cost, snapshot_unit_cost)
+        VALUES (?, ?, ?, ?, ?)
       `);
 
       for (const item of stockItems) {
-        insertItem.run(countId, item.item_id, item.quantity, item.standard_cost || 0);
+        insertItem.run(countId, item.item_id, item.quantity, item.standard_cost || 0, item.standard_cost || 0);
       }
 
       return countId;
@@ -316,20 +317,14 @@ class PhysicalCountModel {
       const postCountAdjustment = (item: typeof adjustmentItems[number]): void => {
         // INV-01: count completion reconciles ALL THREE tables — movements,
         // balances AND cost layers — inside this one transaction.
-        let consumedCost = item.unit_cost;
+        let consumedCost = item.snapshot_unit_cost ?? item.unit_cost;
         let consumption: Array<{ batchId: number | null; consumed: number; unitCost: number }> = [];
+        let countLayers: ReturnType<typeof consumeCountLayers> | undefined;
         if (item.variance < 0) {
           // Shortage: consume FIFO-oldest layers at their actual costs.
-          consumption = StockMovementModel.consumeFromOldestBatches(
-            item.item_id,
-            count.warehouse_id,
-            Math.abs(item.variance),
-            db
-          );
-          const totalConsumed = consumption.reduce((s, c) => s + c.consumed, 0);
-          consumedCost = totalConsumed > 0
-            ? consumption.reduce((s, c) => s + c.consumed * c.unitCost, 0) / totalConsumed
-            : item.unit_cost;
+          countLayers = consumeCountLayers(db, item.item_id, count.warehouse_id, Math.abs(item.variance), count.count_date);
+          consumption = countLayers.consumption;
+          consumedCost = countConsumptionUnitCost(consumption, item.unit_cost);
         }
 
         // ADJUSTMENT movement via the shared sequential generator
@@ -356,11 +351,12 @@ class PhysicalCountModel {
         );
 
         const movementId = movementResult.lastInsertRowid as number;
+        countLayers?.save(movementId);
 
         // Surplus: insert an ADJUSTMENT-sourced cost layer at item.unit_cost.
         if (item.variance > 0) {
           const nextBatchNo = getNextBatchSequence(db);
-          db.prepare(`
+          const batch = db.prepare(`
             INSERT INTO stock_batches (
               batch_no, item_id, warehouse_id, source_type,
               source_id, quantity_original, quantity_remaining,
@@ -376,6 +372,7 @@ class PhysicalCountModel {
             item.unit_cost,
             count.count_date
           );
+          StockMovementModel.syncBatchStockByLocationForNewBatch(Number(batch.lastInsertRowid), count.warehouse_id, item.variance, db);
         }
 
         // Update stock_balances
@@ -399,14 +396,15 @@ class PhysicalCountModel {
 
         // Update items.current_stock
         StockMovementModel.refreshItemStockMirror(item.item_id, db);
+        StockMovementModel.syncStockBalancesExtension(item.item_id, count.warehouse_id, db);
 
         // Mark adjustment as posted
         db.prepare(`
           UPDATE physical_count_items
           SET adjustment_posted = TRUE,
-              adjustment_movement_id = ?
+              adjustment_movement_id = ?, unit_cost = ?, variance_value = ?
           WHERE count_id = ? AND item_id = ?
-        `).run(movementId, countId, item.item_id);
+        `).run(movementId, consumedCost, item.variance * (consumedCost ?? 0), countId, item.item_id);
 
         // Post financial entry for adjustment — valued at the ACTUAL
         // consumed layer costs on shortages (not the snapshot unit_cost).
@@ -513,6 +511,11 @@ class PhysicalCountModel {
     const transaction = db.transaction(() => {
       const items = this.getItems(data.countId, db);
       const byItemId = new Map(items.map((i) => [i.item_id, i]));
+      const correctedIds = new Set(data.corrections.map(c => c.item_id));
+      if (correctedIds.size !== data.corrections.length) throw new Error('Duplicate count correction item');
+      for (const itemId of correctedIds) {
+        if (!byItemId.has(itemId)) throw new Error(`No snapshot row for item ${itemId}`);
+      }
 
       // ---- 1. Reverse the original adjustments (stock + GL). ----------
       const reverseCountAdjustment = (item: typeof items[number]): void => {
@@ -541,64 +544,18 @@ class PhysicalCountModel {
           if (originalVariance > 0) {
             const adjBatch = db.prepare(`
               SELECT id, quantity_remaining FROM stock_batches
-              WHERE source_type = 'ADJUSTMENT' AND source_id = ?
-            `).get(data.countId) as { id: number; quantity_remaining: number } | undefined;
+              WHERE source_type = 'ADJUSTMENT' AND source_id = ? AND item_id = ?
+            `).get(data.countId, item.item_id) as { id: number; quantity_remaining: number } | undefined;
             if (!adjBatch || Number(adjBatch.quantity_remaining) + 1e-9 < originalVariance) {
               throw new Error(
                 `Cannot correct count ${count.count_no}: surplus units of item ${item.item_id} were already consumed`
               );
             }
-            if (isFeatureEnabled(db, 'feature_batch_locations')) {
-              const locRow = db.prepare(`
-                SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
-              `).get(count.warehouse_id) as { id: number } | undefined;
-              if (locRow) {
-                db.prepare(`
-                  UPDATE batch_stock_by_location
-                  SET quantity_physical = quantity_physical - ?, quantity_available = quantity_available - ?
-                  WHERE batch_id = ? AND location_id = ?
-                `).run(originalVariance, originalVariance, adjBatch.id, locRow.id);
-              }
-            } else {
-              db.prepare(`UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?`)
-                .run(originalVariance, adjBatch.id);
-            }
+            consumeSurplusCountBins(db, adjBatch.id, count.warehouse_id, originalVariance);
+            db.prepare('UPDATE stock_batches SET quantity_remaining=quantity_remaining-? WHERE id=?').run(originalVariance, adjBatch.id);
           } else {
-            const restoreCountShortage = (): void => {
-              // Shortage: restore the layers consumed by the original
-              // adjustment movement (its batch_id is the primary consumed
-              // layer). Layer provenance across multiple batches is recorded
-              // only on the primary batch, so restore the full shortage there;
-              // the re-application step below re-consumes FIFO-oldest layers,
-              // netting aggregate layer quantity back out exactly.
-              if (item.adjustment_movement_id !== null) {
-                const origMovement = db.prepare(`
-                  SELECT batch_id, quantity FROM stock_movements WHERE id = ?
-                `).get(item.adjustment_movement_id) as { batch_id: number | null; quantity: number } | undefined;
-                if (origMovement?.batch_id != null) {
-                  if (isFeatureEnabled(db, 'feature_batch_locations')) {
-                    const locRow = db.prepare(`
-                      SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
-                    `).get(count.warehouse_id) as { id: number } | undefined;
-                    if (locRow) {
-                      db.prepare(`
-                        INSERT INTO batch_stock_by_location (batch_id, location_id, quantity_physical, quantity_reserved, quantity_available)
-                        VALUES (?, ?, ?, 0, ?)
-                        ON CONFLICT(batch_id, location_id) DO UPDATE SET
-                          quantity_physical = quantity_physical + excluded.quantity_physical,
-                          quantity_available = quantity_available + excluded.quantity_available
-                      `).run(origMovement.batch_id, locRow.id, Math.abs(originalVariance), Math.abs(originalVariance));
-                    }
-                  } else {
-                    db.prepare(`
-                      UPDATE stock_batches
-                      SET quantity_remaining = quantity_remaining + ? WHERE id = ?
-                    `).run(Math.abs(originalVariance), origMovement.batch_id);
-                  }
-                }
-              }
-            };
-            restoreCountShortage();
+            if (item.adjustment_movement_id === null) throw new Error('Missing count adjustment provenance');
+            restoreCountLayers(db, item.adjustment_movement_id, Math.abs(originalVariance));
           }
         };
         reverseCountStockVariance();
@@ -632,7 +589,7 @@ class PhysicalCountModel {
         `).run(originalVariance, item.item_id, count.warehouse_id);
       };
       for (const item of items) {
-        reverseCountAdjustment(item);
+        if (correctedIds.has(item.item_id)) reverseCountAdjustment(item);
       }
 
       // ---- 2. Re-apply corrected variances via recordCount + completeCount
@@ -648,19 +605,13 @@ class PhysicalCountModel {
 
         const correctedVariance = correction.counted_quantity - item.system_quantity;
 
-        let consumedCost = item.unit_cost;
+        let consumedCost = item.snapshot_unit_cost ?? item.unit_cost;
         let consumption: Array<{ batchId: number | null; consumed: number; unitCost: number }> = [];
+        let countLayers: ReturnType<typeof consumeCountLayers> | undefined;
         if (correctedVariance < 0) {
-          consumption = StockMovementModel.consumeFromOldestBatches(
-            item.item_id,
-            count.warehouse_id,
-            Math.abs(correctedVariance),
-            db
-          );
-          const totalConsumed = consumption.reduce((s, c) => s + c.consumed, 0);
-          consumedCost = totalConsumed > 0
-            ? consumption.reduce((s, c) => s + c.consumed * c.unitCost, 0) / totalConsumed
-            : item.unit_cost;
+          countLayers = consumeCountLayers(db, item.item_id, count.warehouse_id, Math.abs(correctedVariance), new Date().toISOString().slice(0, 10));
+          consumption = countLayers.consumption;
+          consumedCost = countConsumptionUnitCost(consumption, item.unit_cost);
         }
 
         const movementNo = StockMovementModel.generateMovementNo(db);
@@ -684,6 +635,7 @@ class PhysicalCountModel {
           primaryBatchId
         );
         const movementId = movementResult.lastInsertRowid as number;
+        countLayers?.save(movementId);
 
         if (correctedVariance > 0) {
           const nextBatchNo = getNextBatchSequence(db);
@@ -692,7 +644,7 @@ class PhysicalCountModel {
               batch_no, item_id, warehouse_id, source_type,
               source_id, quantity_original, quantity_remaining,
               unit_cost, received_date
-            ) VALUES (?, ?, ?, 'ADJUSTMENT_CORRECTION', ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, 'ADJUSTMENT', ?, ?, ?, ?, ?)
           `).run(
             `BATCH-${new Date().getFullYear() % 100}-ADJ-${nextBatchNo.toString().padStart(4, '0')}`,
             item.item_id,
@@ -700,7 +652,7 @@ class PhysicalCountModel {
             data.countId,
             correctedVariance,
             correctedVariance,
-            item.unit_cost,
+            consumedCost,
             count.count_date
           );
           const newBatchId = batchResult.lastInsertRowid as number;
@@ -714,12 +666,13 @@ class PhysicalCountModel {
         `).run(correctedVariance, item.item_id, count.warehouse_id);
 
         StockMovementModel.refreshItemStockMirror(item.item_id, db);
+        StockMovementModel.syncStockBalancesExtension(item.item_id, count.warehouse_id, db);
 
         db.prepare(`
           UPDATE physical_count_items
           SET counted_quantity = ?,
               variance = ?,
-              variance_value = ? * unit_cost,
+              variance_value = ?, unit_cost = ?,
               adjustment_posted = TRUE,
               adjustment_movement_id = ?,
               notes = COALESCE(?, notes)
@@ -727,7 +680,7 @@ class PhysicalCountModel {
         `).run(
           correction.counted_quantity,
           correctedVariance,
-          correctedVariance,
+          correctedVariance * (consumedCost ?? 0), consumedCost,
           movementId,
           correction.notes ?? null,
           data.countId,

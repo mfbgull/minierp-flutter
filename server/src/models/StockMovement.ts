@@ -181,9 +181,9 @@ function selectLocationBatches(
   useFEFO: boolean
 ): LocationBatchRow[] {
   const locationFilter = useFEFO
-    ? `AND sb.halted = 0 AND COALESCE(bsl.status_override, 'ACTIVE') = 'ACTIVE'
+    ? `AND COALESCE(sb.halted, 0) = 0 AND COALESCE(bsl.status_override, 'ACTIVE') = 'ACTIVE'
        AND (sb.expiry_date IS NULL OR sb.expiry_date >= @asOf)`
-    : `AND sb.halted = 0 AND COALESCE(bsl.status_override, 'ACTIVE') = 'ACTIVE'`;
+    : `AND COALESCE(sb.halted, 0) = 0 AND COALESCE(bsl.status_override, 'ACTIVE') = 'ACTIVE'`;
 
   return db.prepare(`
     SELECT sb.id, sb.unit_cost, sb.received_date, sb.expiry_date,
@@ -1038,7 +1038,7 @@ class StockMovementModel {
     `).run(batchId, locRow.id, quantity, quantity);
   }
 
-  private static syncStockBalancesExtension(itemId: number, warehouseId: number, db: Database.Database): void {
+  static syncStockBalancesExtension(itemId: number, warehouseId: number, db: Database.Database): void {
     if (!isFeatureEnabled(db, 'feature_batch_locations')) return;
     const sums = db.prepare(`
       SELECT COALESCE(SUM(bsl.quantity_physical), 0) as physical,
