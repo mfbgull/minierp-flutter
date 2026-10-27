@@ -88,6 +88,7 @@ beforeEach(() => {
     CREATE TABLE chart_of_accounts (
       id   INTEGER PRIMARY KEY,
       code TEXT NOT NULL,
+      name TEXT NOT NULL DEFAULT 'Fixture account',
       type TEXT NOT NULL
     );
     CREATE TABLE journal_lines (

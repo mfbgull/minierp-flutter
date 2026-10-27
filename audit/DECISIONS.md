@@ -375,7 +375,16 @@ genuinely unrelated types (a persisted row vs a command input) sharing one name.
 
 ## D15 — Later settlement of liabilities from closed periods (2026-10-25)
 
-**Status: OPEN-DECISION. No accounting policy or production behavior changed.**
+**Status: APPROVED 2026-10-26 by Gull in the remediation chat. Implementation verification in progress.**
+
+Permit a new settlement dated in a later open period for an outstanding liability
+recorded in a closed period. Preserve the original closed-period accrual journal.
+The new payment debits the liability and credits the actual tender account in its
+own open period. It must not precede the source, exceed the outstanding liability,
+or bypass payment-period closure. Source edits and source voids remain protected.
+See [current remediation status](../accounting-audit/remediation/STATUS.md).
+
+Historical decision context follows:
 
 The isolated audit reproduces F-023: a recorded credit expense and supplier bill dated
 in a closed period both reject a new payment dated in a later open period with409.

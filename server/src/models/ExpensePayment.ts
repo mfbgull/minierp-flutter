@@ -50,7 +50,6 @@ export function payCreditExpense(db: Database.Database, expenseId: number, input
     const paid = listExpensePayments(db, expenseId).filter(p => !p.voided_at).reduce((sum, p) => roundCurrency(sum + p.amount), 0);
     if (amount > roundCurrency(expense.amount - paid)) throw new BusinessRuleError(400, 'Payment exceeds the outstanding expense');
     if (input.payment_date < expense.expense_date) throw new BusinessRuleError(400, 'Payment cannot precede the expense');
-    AccountingService.assertPeriodNotClosed(db, expense.expense_date, expense.expense_no);
     AccountingService.assertPeriodNotClosed(db, input.payment_date, 'Expense payment');
     const cash = AccountingService.getAccountByCode(db, AccountingService._cashOrBankAccountCode(input.payment_method));
     const payable = AccountingService.getAccountByCode(db, '2115');

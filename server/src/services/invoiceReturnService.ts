@@ -346,6 +346,7 @@ export class InvoiceReturnService {
       // Fresh re-read INSIDE the transaction — the per-line returned_qty
       // guard must see concurrent writes (scenario 14's double-spend).
       const fresh = requireReturnableInvoice(input.invoiceId);
+      if (returnDate < fresh.invoice_date) throw new ReturnError(400, 'Return cannot precede its source invoice');
       // Locked books are never modified (D23). Today's date is always
       // allowed; only back-dated returns can be blocked.
       assertPeriodOpen(returnDate);

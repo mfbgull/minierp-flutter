@@ -6,7 +6,7 @@ import { logCRUD, ActionType } from '../services/activityLogger';
 import db from '../config/database';
 import logger from '../utils/logger';
 import { initializeSequenceFromMax, getNextSequenceNumber } from '../utils/sequence';
-import EmployeeModel, { Employee } from '../models/Employee';
+import EmployeeModel, { Employee, assertEmployeeSalary } from '../models/Employee';
 import { EmployeeLoanModel } from '../models/EmployeeLoan';
 import { AccountingService } from '../services/accountingService';
 import { isValidPaymentMethod } from '../services/cashService';
@@ -24,6 +24,7 @@ import { roundCurrency } from '../utils/currency';
 import { defaultUploadsDir } from '../utils/serverRoot';
 import { BusinessRuleError, handleBusinessError } from '../utils/businessRuleError';
 import { assertCashTimeline } from '../services/cashBalanceGuard';
+import { recognizeSalaryAdvances } from '../models/salaryAdvanceRecognition';
 
 function findEmployeeForResponse(employeeId: number, res: Response) {
   const record = EmployeeModel.getById(employeeId, db);
@@ -141,6 +142,10 @@ function createEmployee(req: Request, res: Response): void {
     res.status(201).json({ success: true, data: employee });
   } catch (error: unknown) {
     logger.error('Error creating employee:', error);
+    if (error instanceof BusinessRuleError) {
+      res.status(error.status).json({ success: false, error: error.message });
+      return;
+    }
     if (errorCode(error) === 'SQLITE_CONSTRAINT_UNIQUE') {
       res.status(409).json({ success: false, error: 'Employee code already exists' });
     } else {
@@ -180,6 +185,10 @@ function updateEmployee(req: Request, res: Response): void {
     res.json({ success: true, data: updated });
   } catch (error) {
     logger.error('Error updating employee:', error);
+    if (error instanceof BusinessRuleError) {
+      res.status(error.status).json({ success: false, error: error.message });
+      return;
+    }
     res.status(500).json({ success: false, error: 'Failed to update employee' });
   }
 }
@@ -226,6 +235,7 @@ type SalaryEmployeeRef = {
   first_name: string;
   last_name: string;
   employee_code: string;
+  salary: number;
 };
 
 /**
@@ -280,13 +290,35 @@ function createSalaryAdvance(
   userId: number | undefined
 ): number | null {
   if (excess <= 0) return null;
+  assertEmployeeSalary(employee.salary);
+  // Bound work in one SQLite transaction, independently of accounting policy.
+  const maxPeriodsPerRequest = 1200;
+  if (employee.salary > 0 && Math.ceil(excess / employee.salary) > maxPeriodsPerRequest) {
+    throw new BusinessRuleError(422, 'Advance exceeds the payroll periods supported in one request');
+  }
 
   const [year, month] = payPeriod.split('-').map(Number);
   const nextDate = new Date(year, month, 1);
+  let remaining = excess;
+  let firstAdvance: number | null = null;
+  let periodsVisited = 0;
+  while (remaining > 0) {
+  periodsVisited++;
+  if (periodsVisited > maxPeriodsPerRequest || nextDate.getFullYear() > 9999) {
+    throw new BusinessRuleError(422, 'Advance exceeds the payroll periods supported in one request');
+  }
   const nextPayPeriod = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}`;
+  const scheduled = db.prepare('SELECT COALESCE(SUM(amount),0) AS amount FROM salary_payments WHERE employee_id=? AND pay_period=? AND voided_at IS NULL')
+    .get(employeeId, nextPayPeriod) as { amount: number };
+  const capacity = employee.salary > 0 ? Math.max(0, roundCurrency(employee.salary - scheduled.amount)) : remaining;
+  if (capacity === 0) {
+    nextDate.setMonth(nextDate.getMonth() + 1);
+    continue;
+  }
+  const advanceAmount = Math.min(remaining, capacity);
   const advanceCreated = EmployeeModel.addSalaryPayment({
     employee_id: employeeId,
-    amount: excess,
+    amount: advanceAmount,
     payment_date: paymentDate,
     payment_method: method,
     reference_no: `ADV-${payPeriod}`,
@@ -300,7 +332,7 @@ function createSalaryAdvance(
     salaryPaymentId: advanceCreated,
     employeeName: `${employee.first_name} ${employee.last_name}`,
     employeeCode: employee.employee_code,
-    amount: excess,
+    amount: advanceAmount,
     paymentDate,
     paymentMethod: method,
     userId,
@@ -310,7 +342,11 @@ function createSalaryAdvance(
     db.prepare('UPDATE salary_payments SET journal_entry_id = ? WHERE id = ?')
       .run(advanceEntry.journal_entry_id, advanceCreated);
   }
-  return advanceCreated;
+  firstAdvance ??= advanceCreated;
+  remaining = roundCurrency(remaining - advanceAmount);
+  nextDate.setMonth(nextDate.getMonth() + 1);
+  }
+  return firstAdvance;
 }
 
 /**
@@ -415,10 +451,11 @@ function paySalary(req: Request, res: Response): void {
 
     const employee = findEmployeeForResponse(employeeId, res);
     if (!employee) return;
+    assertEmployeeSalary(employee.salary);
 
     const { amount, payment_date, payment_method, reference_no, notes, payment_type, loan_deduction, loan_id } = req.body;
     validateSalaryLoanDeduction(loan_deduction);
-    if (typeof amount !== 'number' || !Number.isFinite(amount) || roundCurrency(amount) <= 0) {
+    if (typeof amount !== 'number' || !Number.isFinite(amount) || roundCurrency(amount) < 0) {
       res.status(422).json({ success: false, error: 'Valid amount is required' });
       return;
     }
@@ -471,6 +508,13 @@ function paySalary(req: Request, res: Response): void {
         'SELECT COALESCE(SUM(amount), 0) AS total FROM salary_payments WHERE employee_id = ? AND pay_period = ? AND voided_at IS NULL'
       ).get(employeeId, payPeriod);
       const remaining = Math.max(0, roundCurrency(employee.salary - (paid?.total ?? 0)));
+      if (paidAmount === 0) {
+        const covered = db.prepare(`SELECT 1 FROM salary_payments a
+          WHERE a.employee_id=? AND a.pay_period=? AND a.parent_payment_id IS NOT NULL AND a.voided_at IS NULL
+          AND ROUND(a.amount*100) > COALESCE((SELECT SUM(r.amount_minor) FROM salary_advance_recognitions r WHERE r.advance_id=a.id AND r.voided_at IS NULL),0) LIMIT 1`)
+          .get(employeeId, payPeriod);
+        if (safeType !== 'full' || remaining > 0 || !covered) throw new BusinessRuleError(422, 'Valid amount is required unless earned salary is fully covered by an advance');
+      }
       const salaryAmount = employee.salary > 0 ? Math.min(paidAmount, remaining) : paidAmount;
       const excess = roundCurrency(paidAmount - salaryAmount);
       const paymentId = EmployeeModel.addSalaryPayment({
@@ -491,6 +535,7 @@ function paySalary(req: Request, res: Response): void {
       const journalEntryId = postSalaryPaymentGl(
         db, employee, paymentId, salaryAmount, payment_date, method, authReq.user?.id
       );
+      if (safeType !== 'advance') recognizeSalaryAdvances(db, employeeId, employee.salary, paymentId, payment_date, authReq.user?.id);
 
       const advanceCreated = createSalaryAdvance(
         db, employee, employeeId, excess, paymentId, payPeriod, payment_date, method, authReq.user?.id
@@ -587,6 +632,9 @@ function deleteSalaryPayment(req: Request, res: Response): void {
         'SELECT id, payment_date FROM salary_payments WHERE parent_payment_id = ? AND voided_at IS NULL'
       ).all(salaryPaymentId);
       for (const advance of advances) {
+        if (db.prepare('SELECT 1 FROM salary_advance_recognitions WHERE advance_id=? AND voided_at IS NULL LIMIT 1').get(advance.id)) {
+          throw new BusinessRuleError(409, 'Reverse earned salary payments before voiding their consumed advance');
+        }
         AccountingService.assertPeriodNotClosed(db, advance.payment_date, `Salary advance #${advance.id}`);
         AccountingService.voidJournalLinesByReference(db, 'SALARY_PAYMENT', advance.id, {
           voidedBy: authReq.user?.id, voidReason: `Parent salary payment ${salaryPaymentId} voided`,
@@ -598,6 +646,10 @@ function deleteSalaryPayment(req: Request, res: Response): void {
         voidedBy: authReq.user?.id,
         voidReason: `Salary payment voided for ${employee.first_name} ${employee.last_name}`,
       });
+      AccountingService.voidJournalLinesByReference(db, 'SALARY_ADVANCE_EARNED', salaryPaymentId, {
+        voidedBy: authReq.user?.id, voidReason: 'Salary recognition reversed with payment',
+      });
+      db.prepare('UPDATE salary_advance_recognitions SET voided_at=CURRENT_TIMESTAMP WHERE payment_id=? AND voided_at IS NULL').run(salaryPaymentId);
 
       // Salary-deduction repayments linked to this payment must be
       // voided with it — otherwise the loan stays 'repaid' while the
@@ -627,6 +679,10 @@ function deleteSalaryPayment(req: Request, res: Response): void {
     res.status(204).send();
   } catch (error: unknown) {
     const message = errorMessage(error) || 'Failed to delete salary payment';
+    if (error instanceof BusinessRuleError) {
+      res.status(error.status).json({ success: false, error: message });
+      return;
+    }
     if (message.includes('inside closed accounting period')) {
       res.status(409).json({ success: false, error: message });
       return;

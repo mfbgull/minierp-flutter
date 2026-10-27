@@ -1,5 +1,15 @@
 import Database from 'better-sqlite3';
 import { SqlParam } from '../utils/sqlTypes';
+import { BusinessRuleError } from '../utils/businessRuleError';
+import { roundCurrency } from '../utils/currency';
+
+export function assertEmployeeSalary(salary: unknown): void {
+  if (salary === undefined) return;
+  if (typeof salary !== 'number' || !Number.isFinite(salary) || salary < 0 ||
+      !Number.isSafeInteger(Math.round(salary * 100)) || Math.abs(roundCurrency(salary) - salary) > 1e-9) {
+    throw new BusinessRuleError(422, 'Salary must be a nonnegative currency amount with at most two decimal places');
+  }
+}
 
 export interface Employee {
   id: number;
@@ -294,6 +304,7 @@ class EmployeeModel {
   }
 
   static create(data: CreateEmployeeDTO, db: Database.Database): number {
+    assertEmployeeSalary(data.salary);
     const result = db.prepare(`
       INSERT INTO employees (
         employee_code, first_name, last_name, email, phone, mobile,
@@ -308,6 +319,7 @@ class EmployeeModel {
   }
 
   static update(id: number, data: UpdateEmployeeDTO, db: Database.Database): Database.RunResult {
+    assertEmployeeSalary(data.salary);
     return db.prepare(`
       UPDATE employees SET
         first_name = COALESCE(?, first_name),

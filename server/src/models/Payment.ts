@@ -604,7 +604,6 @@ export class PaymentModel {
           if ((data.payment_date ?? existing.payment_date) < bill.bill_date) {
             throw new BusinessRuleError(400, 'Payment cannot precede the supplier bill');
           }
-          AccountingService.assertPeriodNotClosed(db, bill.bill_date, 'Supplier bill');
         }
       }
     };

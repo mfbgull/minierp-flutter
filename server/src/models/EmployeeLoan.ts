@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { BusinessRuleError } from '../utils/businessRuleError';
 
 export interface EmployeeLoan {
   id: number;
@@ -167,6 +168,11 @@ export class EmployeeLoanModel {
     salary_payment_id?: number;
     created_by?: number;
   }, db: Database.Database): number {
+    const source = this.getById(data.loan_id, db);
+    if (!source || source.employee_id !== data.employee_id || source.voided_at) {
+      throw new BusinessRuleError(400, 'Repayment requires an active loan for this employee');
+    }
+    if (data.payment_date < source.disbursement_date) throw new BusinessRuleError(400, 'Repayment cannot precede loan disbursement');
     const result = db.prepare(`
       INSERT INTO employee_loan_repayments (
         loan_id, employee_id, amount, payment_date, payment_method,
