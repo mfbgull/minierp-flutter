@@ -446,6 +446,13 @@ function getProfitLossReport(startDate: string, endDate: string, db: Database.Da
   ) GROUP BY expense_category ORDER BY total DESC`).all(startDate, endDate, startDate, endDate) as Array<{ expense_category: string; total: number }>;
 
   const totalExpenses = round2(opexMovement.total_debit - opexMovement.total_credit);
+  const otherAccounts = db.prepare(`SELECT a.code,a.name,ROUND(SUM(j.debit-j.credit),2) AS total
+    FROM journal_lines j JOIN chart_of_accounts a ON a.id=j.account_id
+    WHERE a.type='expense' AND a.code NOT IN ('5000','6000') AND j.voided=0 AND j.line_date BETWEEN ? AND ?
+    GROUP BY a.id HAVING ABS(SUM(j.debit-j.credit))>0.005 ORDER BY a.code`).all(startDate, endDate) as Array<{ code: string; name: string; total: number }>;
+  expenses.push(...otherAccounts.map(account => ({ expense_category: account.name, total: account.total })));
+  const remainder = round2(totalExpenses - expenses.reduce((sum, expense) => sum + expense.total, 0));
+  if (remainder !== 0) expenses.push({ expense_category: 'Other operating journal expenses', total: remainder });
   const grossProfit = revenue.total - cogs.total;
   const netProfit = grossProfit - totalExpenses;
   const grossProfitMargin = revenue.total > 0 ? (grossProfit / revenue.total) * 100 : 0;

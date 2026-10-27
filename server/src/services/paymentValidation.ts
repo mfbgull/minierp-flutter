@@ -6,7 +6,6 @@
  * nothing (the H7 invariant).
  */
 import type Database from 'better-sqlite3';
-import AccountingService from './accountingService';
 import { BusinessRuleError } from '../utils/businessRuleError';
 import { parseCurrency } from '../utils/currency';
 import type {
@@ -164,7 +163,6 @@ function validateSupplierAllocation(
     `).get(alloc.id) as { supplier_id: number; total_amount: number; bill_date: string; paid_amount: number } | undefined;
     if (!bill || bill.supplier_id !== input.supplierId) throw new BusinessRuleError(400, 'Supplier bill not found for this supplier');
     if (input.paymentDate < bill.bill_date) throw new BusinessRuleError(400, 'Payment cannot precede the supplier bill');
-    AccountingService.assertPeriodNotClosed(db, bill.bill_date, 'Supplier bill');
     assertWithinBalance(`supplier bill ${alloc.id}`, alloc, bill.total_amount, bill.paid_amount);
     return;
   }

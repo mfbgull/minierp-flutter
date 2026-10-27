@@ -9,6 +9,7 @@ import { isFeatureEnabled } from '../utils/featureFlags';
 import { roundQty } from '../utils/quantity';
 import { addCurrency, roundCurrency } from '../utils/currency';
 import { SqlParam } from '../utils/sqlTypes';
+import { BusinessRuleError } from '../utils/businessRuleError';
 
 /**
  * PurchaseReturnModel — the redesigned, first-class purchase return document.
@@ -189,7 +190,8 @@ function validatePurchaseSourceLine(
   db: Database.Database,
   sourceId: number,
   sourceItemId: number,
-  agg: AggregatedReturnLine
+  agg: AggregatedReturnLine,
+  returnDate: string
 ): PurchaseReturnLine {
   const purchase = db.prepare(`
     SELECT p.*, i.item_name
@@ -197,9 +199,10 @@ function validatePurchaseSourceLine(
     WHERE p.id = ?
   `).get(sourceItemId) as {
     id: number; item_id: number; item_name: string;
-    quantity: number; unit_cost: number; returned_quantity: number; input_tax_amount: number;
+    quantity: number; unit_cost: number; returned_quantity: number; input_tax_amount: number; purchase_date: string;
   } | undefined;
   if (!purchase) throw new Error(`Purchase line ${sourceItemId} not found`);
+  if (returnDate < purchase.purchase_date) throw new BusinessRuleError(400, 'Return cannot precede its source purchase');
   if (purchase.id !== sourceId) {
     throw new Error(`Purchase ${sourceItemId} does not belong to source ${sourceId}`);
   }
@@ -242,7 +245,8 @@ function validatePurchaseOrderSourceLine(
   db: Database.Database,
   sourceId: number,
   sourceItemId: number,
-  agg: AggregatedReturnLine
+  agg: AggregatedReturnLine,
+  returnDate: string
 ): PurchaseReturnLine {
   const poItem = db.prepare(`
     SELECT poi.*, i.item_name
@@ -265,6 +269,12 @@ function validatePurchaseOrderSourceLine(
       `Return quantity (${returnQty}) exceeds net received quantity ` +
       `(${netReceived}) for PO line ${poItem.id}`
     );
+  }
+  const eligible = db.prepare(`SELECT COALESCE(SUM(i.received_quantity),0) AS quantity
+    FROM goods_receipt_items i JOIN goods_receipts r ON r.id=i.receipt_id
+    WHERE i.po_item_id=? AND r.voided_at IS NULL AND r.receipt_date<=?`).get(poItem.id, returnDate) as { quantity: number };
+  if (roundQty(agg.quantity + returned) > roundQty(eligible.quantity)) {
+    throw new BusinessRuleError(400, 'Return quantity exceeds goods received as of the return date');
   }
 
   const amount = roundCurrency(agg.quantity * poItem.unit_price);
@@ -578,8 +588,8 @@ class PurchaseReturnModel {
       // Validate each AGGREGATE against its source document headroom.
       for (const [sourceItemId, agg] of aggregated) {
         const line = data.source_type === 'PURCHASE'
-          ? validatePurchaseSourceLine(db, data.source_id, sourceItemId, agg)
-          : validatePurchaseOrderSourceLine(db, data.source_id, sourceItemId, agg);
+          ? validatePurchaseSourceLine(db, data.source_id, sourceItemId, agg, data.return_date)
+          : validatePurchaseOrderSourceLine(db, data.source_id, sourceItemId, agg, data.return_date);
         lines.push(line);
         totalQty += line.quantity;
         totalAmount += line.amount;
