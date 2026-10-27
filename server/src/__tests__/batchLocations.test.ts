@@ -131,6 +131,8 @@ describe('7.2 reservation create/release/consume idempotency', () => {
     );
     expect(r1.status).toBe('ACTIVE');
     expect(r1.quantity_reserved).toBe(5);
+    expect(db.prepare(`SELECT quantity_reserved FROM batch_stock_by_location WHERE batch_id=?`).get(batchId))
+      .toEqual({ quantity_reserved: 0 });
 
     // Duplicate create for same reference line → same row, no new insert
     const r2 = StockReservationModel.create(
@@ -157,6 +159,8 @@ describe('7.2 reservation create/release/consume idempotency', () => {
     expect(r3.id).toBe(r1.id);
     expect(r3.status).toBe('ACTIVE');
     expect(r3.quantity_reserved).toBe(7);
+    expect(db.prepare(`SELECT quantity_reserved FROM batch_stock_by_location WHERE batch_id=?`).get(batchId))
+      .toEqual({ quantity_reserved: 0 });
     const count2 = (db.prepare(`SELECT COUNT(*) AS c FROM stock_reservations`).get() as { c: number }).c;
     expect(count2).toBe(1);
   });

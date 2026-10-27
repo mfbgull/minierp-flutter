@@ -6,6 +6,7 @@ import PhysicalCountModel from '../models/PhysicalCount';
 import { StockReservationModel } from '../models/StockReservation';
 import StockMovementModel from '../models/StockMovement';
 import logger from '../utils/logger';
+import { isFeatureEnabled, setFeatureEnabled } from '../utils/featureFlags';
 import { getAuthCookie } from './helpers/invoiceReturnSpec';
 
 /**
@@ -252,24 +253,19 @@ describe('inventory CRAP-42 controllers', () => {
          VALUES (?, ?, 10, 3, 7)`
       ).run(batch.lastInsertRowid, location.lastInsertRowid);
 
-      jest
-        .spyOn(StockReservationModel, 'getById')
-        .mockReturnValue({
-          id: 7,
-          reference_doctype: 'INVOICE',
-          reference_docno: 'INV-1',
-          reference_line_id: 1,
-          batch_id: batch.lastInsertRowid,
-          location_id: location.lastInsertRowid,
-          quantity_reserved: 2,
-        } as unknown as ReturnType<typeof StockReservationModel.getById>);
-      jest
-        .spyOn(StockReservationModel, 'release')
-        .mockReturnValue({ id: 7, status: 'released' } as ReturnType<
-          typeof StockReservationModel.release
-        >);
-
-      expect((await release()).status).toBe(200);
+      db.prepare(`INSERT INTO stock_reservations
+        (id,item_id,warehouse_id,batch_id,location_id,quantity_reserved,
+         reference_doctype,reference_docno,reference_line_id,status)
+        VALUES (7,?,?,?,?,2,'INVOICE','INV-1',1,'ACTIVE')`)
+        .run(item.lastInsertRowid, warehouse.lastInsertRowid, batch.lastInsertRowid, location.lastInsertRowid);
+      const previousFlag = isFeatureEnabled(db, 'feature_batch_locations');
+      setFeatureEnabled(db, 'feature_batch_locations', true);
+      try {
+        expect((await release()).status).toBe(200);
+        expect((await release()).status).toBe(400);
+      } finally {
+        setFeatureEnabled(db, 'feature_batch_locations', previousFlag);
+      }
 
       const row = db
         .prepare(
@@ -286,12 +282,13 @@ describe('inventory CRAP-42 controllers', () => {
     it('returns a sanitized 500 when the release fails', async () => {
       jest.spyOn(logger, 'error').mockImplementation(() => logger);
       jest.spyOn(StockReservationModel, 'getById').mockImplementation(() => {
-        throw new Error('forced release failure');
+        throw new Error('SQLITE_ERROR: internal connection password=private-test-value');
       });
 
       const res = await release();
       expect(res.status).toBe(500);
-      expect(res.body).toEqual({ error: 'forced release failure' });
+      expect(res.body).toEqual({ error: 'Failed to release reservation' });
+      expect(JSON.stringify(res.body)).not.toContain('private-test-value');
     });
   });
 });
