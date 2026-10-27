@@ -1436,6 +1436,9 @@ export class AccountingService {
     // and both mean the same thing once written to the column.
     attribution?: { voidedBy?: number | null; voidReason?: string | null }
   ): number {
+    return db.transaction(() => {
+    const affected = db.prepare(`SELECT DISTINCT journal_entry_id AS id FROM journal_lines
+      WHERE reference_type=? AND reference_id=? AND voided=0`).all(referenceType, referenceId) as Array<{ id: number }>;
     const result = db.prepare(`
       UPDATE journal_lines
       SET voided = 1,
@@ -1451,7 +1454,13 @@ export class AccountingService {
       referenceType,
       referenceId
     );
+    for (const entry of affected) {
+      db.prepare(`UPDATE journal_entries SET voided=1,voided_at=CURRENT_TIMESTAMP,voided_by=?,void_reason=?
+        WHERE id=? AND NOT EXISTS(SELECT 1 FROM journal_lines WHERE journal_entry_id=? AND voided=0)`)
+        .run(attribution?.voidedBy ?? null, attribution?.voidReason ?? null, entry.id, entry.id);
+    }
     return result.changes;
+    })();
   }
 
   /**
@@ -1476,7 +1485,7 @@ export class AccountingService {
     const owningInvoiceId = options?.owningInvoiceId;
     const result = db.prepare(`
       UPDATE journal_lines
-      SET voided = 0, voided_by = NULL, void_reason = NULL
+      SET voided = 0, voided_at = NULL, voided_by = NULL, void_reason = NULL
       WHERE reference_type = ?
         AND reference_id = ?
         AND voided = 1
@@ -1491,6 +1500,9 @@ export class AccountingService {
       referenceId,
       ...(owningInvoiceId === undefined ? [] : [owningInvoiceId]),
     );
+    db.prepare(`UPDATE journal_entries SET voided=0,voided_at=NULL,voided_by=NULL,void_reason=NULL
+      WHERE id IN (SELECT journal_entry_id FROM journal_lines WHERE reference_type=? AND reference_id=? AND voided=0)`)
+      .run(referenceType, referenceId);
     return result.changes;
   }
 
@@ -1518,27 +1530,12 @@ export class AccountingService {
     // and both mean the same thing once written to the column.
     attribution?: { voidedBy?: number | null; voidReason?: string | null }
   ): number {
-    const result = db.prepare(`
-      UPDATE journal_lines
-      SET voided = 1,
-          voided_at = CURRENT_TIMESTAMP,
-          voided_by = ?,
-          void_reason = ?
-      WHERE reference_type = 'INVOICE_RETURN'
-        AND reference_id = ?
-        AND voided = 0
-        AND NOT EXISTS (
-          SELECT 1 FROM invoice_returns other_returns
-          WHERE other_returns.id = journal_lines.reference_id
-            AND other_returns.invoice_id <> ?
-        )
-    `).run(
-      attribution?.voidedBy ?? null,
-      attribution?.voidReason ?? null,
-      invoiceId,
-      invoiceId
-    );
-    return result.changes;
+    return db.transaction(() => {
+      const otherOwner = db.prepare('SELECT 1 FROM invoice_returns WHERE id=? AND invoice_id<>?')
+        .get(invoiceId, invoiceId);
+      if (otherOwner) return 0;
+      return AccountingService.voidJournalLinesByReference(db, 'INVOICE_RETURN', invoiceId, attribution);
+    })();
   }
 
   // ------------------------------------------------------------------
