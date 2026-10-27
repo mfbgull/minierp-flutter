@@ -12,6 +12,7 @@ import db from '../config/database';
 import logger from '../utils/logger';
 import { errorMessage } from '../utils/errorMessage';
 import { SqlParam } from '../utils/sqlTypes';
+import { BusinessRuleError, handleBusinessError } from '../utils/businessRuleError';
 
 function getItems(req: Request, res: Response): void {
   try {
@@ -952,6 +953,10 @@ function correctPhysicalCount(req: AuthRequest, res: Response): void {
       return;
     }
     logger.error('Correct physical count error:', error);
+    if (error instanceof BusinessRuleError) {
+      res.status(error.status).json({ error: message });
+      return;
+    }
     res.status(500).json({ error: message || 'Failed to correct count' });
   }
 }
@@ -1338,19 +1343,11 @@ export function createReservation(req: AuthRequest, res: Response): Response | v
       db
     );
 
-    // Decrement quantity_available in batch_stock_by_location
-    if (location_id && batch_id) {
-      db.prepare(`
-        UPDATE batch_stock_by_location
-        SET quantity_reserved = quantity_reserved + ?, quantity_available = quantity_physical - (quantity_reserved + ?)
-        WHERE batch_id = ? AND location_id = ?
-      `).run(quantity_reserved, quantity_reserved, batch_id, location_id);
-    }
 
     return res.status(201).json(reservation);
   } catch (error: unknown) {
     logger.error('[Reservation] create failed:', error);
-    return res.status(500).json({ error: errorMessage(error) });
+    return handleBusinessError(res, error, 'Create reservation', 'Failed to create reservation');
   }
 }
 
@@ -1373,19 +1370,11 @@ export function releaseReservation(req: AuthRequest, res: Response): Response | 
       return res.status(400).json({ error: 'Reservation is not active' });
     }
 
-    // Restore quantity_available
-    if (reservation.batch_id && reservation.location_id) {
-      db.prepare(`
-        UPDATE batch_stock_by_location
-        SET quantity_reserved = MAX(0, quantity_reserved - ?), quantity_available = quantity_physical - quantity_reserved
-        WHERE batch_id = ? AND location_id = ?
-      `).run(reservation.quantity_reserved, reservation.batch_id, reservation.location_id);
-    }
 
     return res.json(released);
   } catch (error: unknown) {
     logger.error('[Reservation] release failed:', error);
-    return res.status(500).json({ error: errorMessage(error) });
+    return handleBusinessError(res, error, 'Release reservation', 'Failed to release reservation');
   }
 }
 
