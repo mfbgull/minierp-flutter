@@ -2231,6 +2231,11 @@ export function applyPendingMigrations(): void {
   runLedgered('114_supplier_prepayments.sql');
   runLedgered('115_purchase_input_tax.sql');
   runLedgered('116_purchase_order_input_tax.sql');
+  runLedgered('117_store_credit_draws.sql');
+  runLedgered('118_count_cost_layers.sql');
+  runLedgered('119_salary_advance_recognition.sql');
+  runLedgered('120_journal_header_void_attribution.sql');
+  runLedgered('121_count_snapshot_cost.sql');
   // Boot-time guard (spec §4.1): the restocking-fee posting resolves 4150 at
   // return time — a legacy COA predating GL foundation must fail the boot
   // with a clear error, never mis-post.
