@@ -1,0 +1,45 @@
+
+> mini-erp-server@1.0.0 test
+> jest --runInBand auditPayrollChronology.test.ts auditStockRemediation.test.ts --testNamePattern sub-cent salary|original surplus valuation
+
+FAIL src/__tests__/auditStockRemediation.test.ts (77.437 s)
+  ● audited count and production economics › preserves original surplus valuation after a mixed-layer shortage
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 200
+    Received: 500
+
+      119 |     const before = net('1200');
+      120 |     const id = await count([[item, 2]]);
+    > 121 |     expect((await post(`/api/inventory/physical-counts/${id}/correct`, { corrections: [{ item_id: item, counted_quantity: 11 }] })).status).toBe(200);
+          |                                                                                                                                             ^
+      122 |     expect(net('1200') - before).toBe(2000);
+      123 |     expect(db.prepare("SELECT unit_cost FROM stock_batches WHERE item_id=? AND source_type='ADJUSTMENT_CORRECTION'").get(item)).toEqual({ unit_cost: 20 });
+      124 |   });
+
+      at Object.<anonymous> (src/__tests__/auditStockRemediation.test.ts:121:141)
+
+FAIL src/__tests__/auditPayrollChronology.test.ts (11.368 s)
+  ● salary recognition, chronology and D15 › rejects sub-cent salary at the employee write boundary
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 422
+    Received: 201
+
+      58 |   it('rejects sub-cent salary at the employee write boundary', async () => {
+      59 |     const created = await post('/api/employees', { employee_code: 'SUB-CENT', first_name: 'Invalid', last_name: 'Salary', salary: 0.001 });
+    > 60 |     expect(created.status).toBe(422);
+         |                            ^
+      61 |     expect(db.prepare("SELECT id FROM employees WHERE employee_code='SUB-CENT'").get()).toBeUndefined();
+      62 |   });
+      63 |   it('F-020 recognizes a large advance over two months, including a zero-cash payroll', async () => {
+
+      at Object.<anonymous> (src/__tests__/auditPayrollChronology.test.ts:60:28)
+
+Test Suites: 2 failed, 2 total
+Tests:       2 failed, 12 skipped, 14 total
+Snapshots:   0 total
+Time:        93.65 s
+Ran all test suites matching auditPayrollChronology.test.ts|auditStockRemediation.test.ts with tests matching "sub-cent salary|original surplus valuation".

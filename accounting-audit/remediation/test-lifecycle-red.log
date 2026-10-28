@@ -1,0 +1,28 @@
+
+> mini-erp-server@1.0.0 test
+> jest --runInBand auditTestLifecycle.test.ts
+
+FAIL src/__tests__/auditTestLifecycle.test.ts (44.925 s)
+
+
+  ● Test suite failed to run
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 1
+    Received: 0
+
+      22 |     'SELECT COUNT(*) count FROM activity_log WHERE description=?',
+      23 |   ).get(marker);
+    > 24 |   expect(row?.count).toBe(1);
+         |                      ^
+      25 | });
+      26 |
+
+      at Object.<anonymous> (src/__tests__/auditTestLifecycle.test.ts:24:22)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        46.665 s
+Ran all test suites matching auditTestLifecycle.test.ts.

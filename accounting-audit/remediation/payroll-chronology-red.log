@@ -1,0 +1,102 @@
+
+> mini-erp-server@1.0.0 test
+> jest --runInBand auditPayrollChronology.test.ts
+
+FAIL src/__tests__/auditPayrollChronology.test.ts (36.651 s)
+  salary recognition, chronology and D15
+    ✕ F-020 earns the advance once and reverses recognition before releasing its source (92 ms)
+    ✕ F-021 rejects a repayment before disbursement without a historical loan credit (52 ms)
+    ✕ F-001 rejects a sales return dated before its source invoice (341 ms)
+    ✕ F-001 rejects a purchase return dated before its source purchase (108 ms)
+    ✕ F-023 settles closed July liabilities in October without rewriting July (137 ms)
+
+  ● salary recognition, chronology and D15 › F-020 earns the advance once and reverses recognition before releasing its source
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 200000
+    Received: 180000
+
+      26 |     const second = await post(`/api/employees/${employee}/salary/pay`, { amount: 800, payment_date: '2026-09-20', payment_method: 'Bank', payment_type: 'full' });
+      27 |     expect(second.status).toBe(201);
+    > 28 |     expect(net('6100')).toBe(200000);
+         |                         ^
+      29 |     expect(net('1310')).toBe(0);
+      30 |     expect(net('1010')).toBe(800000);
+      31 |     const blocked = await request(app).delete(`/api/employees/${employee}/salary/${first.body.data.id}`).set('Cookie', cookie);
+
+      at Object.<anonymous> (src/__tests__/auditPayrollChronology.test.ts:28:25)
+
+  ● salary recognition, chronology and D15 › F-021 rejects a repayment before disbursement without a historical loan credit
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 400
+    Received: 201
+
+      45 |     const before = db.prepare('SELECT * FROM journal_lines ORDER BY id').all();
+      46 |     const repay = await post(`/api/employees/${employee}/loans/${loan.body.data.id}/repay`, { amount: 200, payment_date: '2026-09-01', payment_method: 'Bank' });
+    > 47 |     expect(repay.status).toBe(400);
+         |                          ^
+      48 |     expect(db.prepare('SELECT * FROM journal_lines ORDER BY id').all()).toEqual(before);
+      49 |   });
+      50 |   it('F-001 rejects a sales return dated before its source invoice', async () => {
+
+      at Object.<anonymous> (src/__tests__/auditPayrollChronology.test.ts:47:26)
+
+  ● salary recognition, chronology and D15 › F-001 rejects a sales return dated before its source invoice
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 400
+    Received: 200
+
+      56 |     const before = db.prepare('SELECT * FROM journal_lines ORDER BY id').all();
+      57 |     const ret = await processReturn(invoice.invoiceId, { invoiceItemIds: invoice.invoiceItemIds, quantities: [1], warehouseId: warehouse, returnDate: '2026-09-10' }, cookie);
+    > 58 |     expect(ret.status).toBe(400);
+         |                        ^
+      59 |     expect(db.prepare('SELECT * FROM journal_lines ORDER BY id').all()).toEqual(before);
+      60 |   });
+      61 |   it('F-001 rejects a purchase return dated before its source purchase', async () => {
+
+      at Object.<anonymous> (src/__tests__/auditPayrollChronology.test.ts:58:24)
+
+  ● salary recognition, chronology and D15 › F-001 rejects a purchase return dated before its source purchase
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 400
+    Received: 201
+
+      66 |     const before = db.prepare('SELECT * FROM journal_lines ORDER BY id').all();
+      67 |     const ret = await post('/api/purchase-returns', { source_type: 'PURCHASE', source_id: source.id, return_date: '2026-09-09', warehouse_id: warehouse, disposition: 'credit_on_account', items: [{ source_item_id: source.id, quantity: 1 }] });
+    > 68 |     expect(ret.status).toBe(400);
+         |                        ^
+      69 |     expect(db.prepare('SELECT * FROM journal_lines ORDER BY id').all()).toEqual(before);
+      70 |   });
+      71 |   it('F-023 settles closed July liabilities in October without rewriting July', async () => {
+
+      at Object.<anonymous> (src/__tests__/auditPayrollChronology.test.ts:68:24)
+
+  ● salary recognition, chronology and D15 › F-023 settles closed July liabilities in October without rewriting July
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 201
+    Received: 409
+
+      85 |       const body = { amount: 100, payment_date: '2026-10-01', payment_method: 'Bank' };
+      86 |       const paid = await request(app).post(url).set('Cookie', cookie).set('Idempotency-Key', `D15-${url}`).send(body);
+    > 87 |       expect(paid.status).toBe(201);
+         |                           ^
+      88 |       expect((await request(app).post(url).set('Cookie', cookie).set('Idempotency-Key', `D15-${url}`).send(body)).status).toBe(201);
+      89 |     }
+      90 |     expect(net('1010') - bank).toBe(-20000);
+
+      at Object.<anonymous> (src/__tests__/auditPayrollChronology.test.ts:87:27)
+
+Test Suites: 1 failed, 1 total
+Tests:       5 failed, 5 total
+Snapshots:   0 total
+Time:        38.543 s
+Ran all test suites matching auditPayrollChronology.test.ts.

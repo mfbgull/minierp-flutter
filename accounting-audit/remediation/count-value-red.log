@@ -1,0 +1,61 @@
+
+> mini-erp-server@1.0.0 test
+> jest --runInBand auditStockRemediation.test.ts --testNamePattern F-024 restores exact
+
+FAIL src/__tests__/auditStockRemediation.test.ts (68.24 s)
+  audited count and production economics
+    ✕ F-024 restores exact 5@10 + 3@20 layers (locations=false) (690 ms)
+    ✕ F-024 restores exact 5@10 + 3@20 layers (locations=true) (190 ms)
+    ○ skipped F-025 partial correction preserves omitted shortage and its journal
+    ○ skipped F-022 two cents across four outputs stays nonnegative and clears exactly
+    ○ skipped F-024 location surplus completion and reversal keep master and bins equal
+
+  ● audited count and production economics › F-024 restores exact 5@10 + 3@20 layers (locations=false)
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 1
+
+      Object {
+    -   "variance_value": -110,
+    +   "variance_value": 0,
+      }
+
+      60 |     }
+      61 |     const id = await count([[item, 2]]);
+    > 62 |     expect(db.prepare('SELECT variance_value FROM physical_count_items WHERE count_id=? AND item_id=?').get(id, item)).toEqual({ variance_value: -110 });
+         |                                                                                                                        ^
+      63 |     const before = net('1200');
+      64 |     const res = await post(`/api/inventory/physical-counts/${id}/correct`, { corrections: [{ item_id: item, counted_quantity: 8 }] });
+      65 |     expect(res.status).toBe(200);
+
+      at src/__tests__/auditStockRemediation.test.ts:62:120
+
+  ● audited count and production economics › F-024 restores exact 5@10 + 3@20 layers (locations=true)
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 1
+
+      Object {
+    -   "variance_value": -110,
+    +   "variance_value": 0,
+      }
+
+      60 |     }
+      61 |     const id = await count([[item, 2]]);
+    > 62 |     expect(db.prepare('SELECT variance_value FROM physical_count_items WHERE count_id=? AND item_id=?').get(id, item)).toEqual({ variance_value: -110 });
+         |                                                                                                                        ^
+      63 |     const before = net('1200');
+      64 |     const res = await post(`/api/inventory/physical-counts/${id}/correct`, { corrections: [{ item_id: item, counted_quantity: 8 }] });
+      65 |     expect(res.status).toBe(200);
+
+      at src/__tests__/auditStockRemediation.test.ts:62:120
+
+Test Suites: 1 failed, 1 total
+Tests:       2 failed, 3 skipped, 5 total
+Snapshots:   0 total
+Time:        72.093 s
+Ran all test suites matching auditStockRemediation.test.ts with tests matching "F-024 restores exact".

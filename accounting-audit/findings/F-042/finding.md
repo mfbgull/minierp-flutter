@@ -1,5 +1,7 @@
 # F-042 — Salary payment hint subtracts the same advance twice
 
+> Current assessment, 2026-10-26: this report preserves its historical audit snapshot. See [remediation status](../../remediation/STATUS.md) for current source verification, fixes, tests and remaining limits.
+
 - Severity: MEDIUM; status: FAIL, reproduced in the mounted salary-pay dialog.
 - Root cause: `lib/features/employees/salary_pay_dialog.dart:421` sums `totalPaid`; line 422 separately sums `advanceCarryover`; line 430 computes `employee.salary - totalPaid - advanceCarryover`. Backend `Employee.ts:386` sums all active salary-payment amounts, including auto advances, into total_paid; `Employee.ts:551` returns remaining=max(0,salary−total_paid) and separately labels advance_carryover. The Flutter model preserves server remaining at `employee_models.dart:218`, but the hint ignores it.
 - Independent expected result: monthly salary 1,000, prior-month advance already paid 200, no further payment: remaining salary **800**. The same 200 must not reduce salary twice.

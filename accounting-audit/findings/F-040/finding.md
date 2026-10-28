@@ -1,5 +1,7 @@
 # F-040 — Balance sheet drops nonzero asset and liability categories
 
+> Current assessment, 2026-10-26: this report preserves its historical audit snapshot. See [remediation status](../../remediation/STATUS.md) for current source verification, fixes, tests and remaining limits.
+
 - Severity: MEDIUM (misleading financial presentation with correct aggregate API totals and no demonstrated underlying corruption); status: Confirmed defect, reproduced.
 - Scope: Flutter balance-sheet screen and its CSV; no database corruption demonstrated.
 - Root cause: `lib/data/models/report.dart:709` and `:731` omit `assets.other`, `liabilities.tax_payable`, and `liabilities.other` even though `server/src/models/Reports.ts:531` returns them. `lib/features/reports/balance_sheet_report_screen.dart:107` renders only inventory/AR/cash and AP. `lib/core/utils/csv_export.dart:401` repeats the incomplete presentation.

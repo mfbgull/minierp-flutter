@@ -399,63 +399,36 @@ String buildApAgingCsv(AppLocalizations l10n, ApAgingReport report) {
 }
 
 String buildBalanceSheetCsv(AppLocalizations l10n, BalanceSheetReport report) {
-  final buf = StringBuffer();
-  buf.writeln('Balance Sheet,,${Formatters.date(report.asOfDate)}');
-  buf.writeln();
-  buf.writeln('Assets,,');
-  buf.writeln('Inventory,,${Formatters.currency(report.assets.inventory)}');
-  buf.writeln(
-    'Accounts Receivable,,${Formatters.currency(report.assets.accountsReceivable)}',
-  );
-  buf.writeln('Cash,,${Formatters.currency(report.assets.cash)}');
-  buf.writeln(
-    '${l10n.commonTotal},,${Formatters.currency(report.assets.total)}',
-  );
-  buf.writeln();
-  buf.writeln('Liabilities,,');
-  buf.writeln(
-    'Accounts Payable,,${Formatters.currency(report.liabilities.accountsPayable)}',
-  );
-  buf.writeln(
-    '${l10n.commonTotal},,${Formatters.currency(report.liabilities.total)}',
-  );
-  buf.writeln();
-  buf.writeln('Equity,,');
-  buf.writeln(
-    'Opening Retained Earnings,,${Formatters.currency(report.equity.openingRetainedEarnings)}',
-  );
-  if (report.equity.ownerCapital != null) {
-    buf.writeln(
-      'Owner Capital,,${Formatters.currency(report.equity.ownerCapital!)}',
-    );
-  }
-  if (report.equity.ownerDrawings != null) {
-    buf.writeln(
-      'Owner Drawings,,${Formatters.currency(report.equity.ownerDrawings!)}',
-    );
-  }
-  buf.writeln(
-    'Net Income (YTD),,${Formatters.currency(report.equity.netIncomeYtd)}',
-  );
-  buf.writeln(
-    'Revenue (YTD),,${Formatters.currency(report.equity.revenueYtd)}',
-  );
-  buf.writeln('COGS (YTD),,${Formatters.currency(report.equity.cogsYtd)}');
-  buf.writeln(
-    'Expenses (YTD),,${Formatters.currency(report.equity.expensesYtd)}',
-  );
-  buf.writeln(
-    '${l10n.commonTotal},,${Formatters.currency(report.equity.total)}',
-  );
-  buf.writeln();
-  buf.writeln(
-    'Total Assets,,${Formatters.currency(report.totals.totalAssets)}',
-  );
-  buf.writeln(
-    'Total Liabilities & Equity,,${Formatters.currency(report.totals.totalLiabAndEquity)}',
-  );
-  buf.writeln('Balanced,,${report.totals.balanced ? "Yes" : "No"}');
-  return buf.toString();
+  List<String> money(String label, num value) => [label, '', Formatters.currency(value)];
+  final rows = <List<String>>[
+    ['Assets', '', ''],
+    money('Inventory', report.assets.inventory),
+    money('Accounts Receivable', report.assets.accountsReceivable),
+    money('Cash', report.assets.cash),
+    money(l10n.reportsOtherAssets, report.assets.other),
+    money(l10n.commonTotal, report.assets.total),
+    ['', '', ''],
+    ['Liabilities', '', ''],
+    money('Accounts Payable', report.liabilities.accountsPayable),
+    money(l10n.reportsTaxPayable, report.liabilities.taxPayable),
+    money(l10n.reportsOtherLiabilities, report.liabilities.other),
+    money(l10n.commonTotal, report.liabilities.total),
+    ['', '', ''],
+    ['Equity', '', ''],
+    money('Opening Retained Earnings', report.equity.openingRetainedEarnings),
+    if (report.equity.ownerCapital case final value?) money('Owner Capital', value),
+    if (report.equity.ownerDrawings case final value?) money('Owner Drawings', value),
+    money('Net Income (YTD)', report.equity.netIncomeYtd),
+    money('Revenue (YTD)', report.equity.revenueYtd),
+    money('COGS (YTD)', report.equity.cogsYtd),
+    money('Expenses (YTD)', report.equity.expensesYtd),
+    money(l10n.commonTotal, report.equity.total),
+    ['', '', ''],
+    money('Total Assets', report.totals.totalAssets),
+    money('Total Liabilities & Equity', report.totals.totalLiabAndEquity),
+    ['Balanced', '', report.totals.balanced ? 'Yes' : 'No'],
+  ];
+  return buildGridCsv(['Balance Sheet', '', Formatters.date(report.asOfDate)], rows, (row) => row);
 }
 
 /// Builds the CSV text for the DSO report — a Metric | Value table

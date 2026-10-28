@@ -1,0 +1,639 @@
+
+> mini-erp-server@1.0.0 test
+> jest --maxWorkers=2 --workerIdleMemoryLimit=1024MB --coverage --coverageReporters=json --coverageReporters=text-summary
+
+PASS src/__tests__/journalBalanceCommit.test.ts (209.115 s)
+PASS src/__tests__/unappliedCashGl.test.ts (311.144 s)
+PASS src/__tests__/purchaseReturn.test.ts (128.393 s)
+PASS src/__tests__/duplicatePurchaseRepairCli.test.ts (67.979 s)
+PASS src/__tests__/stockAdjustmentCostedBatch.test.ts (66.343 s)
+PASS src/__tests__/supplierRefund.test.ts (82.183 s)
+PASS src/__tests__/unappliedCashMigration.test.ts (99.546 s)
+PASS src/__tests__/batchLocations.test.ts (91.564 s)
+PASS src/__tests__/arSurfaceConsistency.test.ts (72.276 s)
+PASS src/__tests__/inventoryReconciliation.test.ts (36.927 s)
+PASS src/__tests__/supplierPaymentAllocation.test.ts (62.222 s)
+PASS src/__tests__/purchaseVoid.test.ts (65.109 s)
+PASS src/__tests__/c06PoReturnLayerKey.test.ts (65.43 s)
+PASS src/__tests__/posPayments.test.ts (21.868 s)
+PASS src/__tests__/auditPayrollChronology.test.ts (6.573 s)
+PASS src/__tests__/cashTruth.test.ts (57.7 s)
+PASS src/__tests__/supplierModelQuery.test.ts (64.4 s)
+PASS src/__tests__/expiryDetection.test.ts (55.035 s)
+PASS src/__tests__/reversalSymmetry.test.ts (55.658 s)
+PASS src/__tests__/modelQueryBatch.test.ts (48.579 s)
+PASS src/__tests__/supplierlessPurchase.test.ts (53.994 s)
+PASS src/__tests__/expenseStatusConsistency.test.ts (56.057 s)
+PASS src/__tests__/apSingleDerivation.test.ts (48.283 s)
+PASS src/__tests__/batchLocationIntegration.test.ts (43.414 s)
+PASS src/__tests__/apReporting.test.ts (35.884 s)
+PASS src/__tests__/mobileInvoiceCancelStock.test.ts (40.203 s)
+PASS src/__tests__/purchaseSummaryVoided.test.ts (7.038 s)
+PASS src/__tests__/closedPeriodImmutability.test.ts (7.373 s)
+PASS src/__tests__/validation.test.ts (5.51 s)
+PASS src/__tests__/backfillGoodsReceipts.test.ts (30.383 s)
+PASS src/__tests__/creditReconciliation.test.ts (35.212 s)
+PASS src/__tests__/mobileInvoiceDraft.test.ts (35.376 s)
+PASS src/__tests__/paymentGuards.test.ts (35.779 s)
+PASS src/__tests__/physicalCountQuery.test.ts (36.278 s)
+PASS src/__tests__/inventoryQueryControllers.test.ts (12.019 s)
+PASS src/__tests__/poCancelReversal.test.ts (5.54 s)
+PASS src/__tests__/ownerWithdrawalCount.test.ts (25.588 s)
+PASS src/__tests__/security.regression.test.ts (7.684 s)
+PASS src/__tests__/expiryTransfer.test.ts (33.354 s)
+PASS src/__tests__/openingBalanceOnboarding.test.ts (29.179 s)
+PASS src/__tests__/accountingInvariants.test.ts (25.092 s)
+PASS src/__tests__/envHardening.test.ts (28.023 s)
+PASS src/__tests__/cashReconciliationWrite.test.ts (26.798 s)
+PASS src/__tests__/expiryReportModel.test.ts (25.607 s)
+PASS src/__tests__/physicalCountBatchSync.test.ts (18.071 s)
+PASS src/__tests__/isolatedAuditFixture.test.ts (25.966 s)
+PASS src/__tests__/api.integration.test.ts (12.071 s)
+PASS src/__tests__/supplierPurchasesFilter.test.ts (18.329 s)
+PASS src/__tests__/expressionCastCoverage.test.ts
+PASS src/__tests__/dashboardWeek.test.ts
+PASS src/__tests__/glBackfill.test.ts (20.84 s)
+PASS src/__tests__/auditRegression9.test.ts (10.184 s)
+PASS src/__tests__/reverseStockRestock.test.ts (9.203 s)
+PASS src/__tests__/reversalVerificationCli.test.ts (18.831 s)
+PASS src/__tests__/invoiceCreationService.test.ts (7.408 s)
+PASS src/__tests__/employeeAdvanceCarryover.test.ts (16.638 s)
+PASS src/__tests__/databaseInitialization.test.ts (12.125 s)
+PASS src/__tests__/migrationChecksumValidation.test.ts
+PASS src/__tests__/auditStockRemediation.test.ts (9.109 s)
+PASS src/__tests__/creditReconciliationCli.test.ts (12.317 s)
+PASS src/__tests__/controllers.test.ts (9.437 s)
+PASS src/__tests__/salaryHistory.test.ts (8.855 s)
+PASS src/__tests__/auditCreditOwnership.test.ts (8.577 s)
+PASS src/__tests__/auditRegression2.test.ts (7.467 s)
+PASS src/__tests__/liveDbGuard.test.ts
+PASS src/__tests__/idempotencyRound2.test.ts (10.609 s)
+PASS src/__tests__/headerDiscountRepairMigration.test.ts (8.926 s)
+PASS src/__tests__/invoiceReturnAcceptance.test.ts (10.031 s)
+PASS src/__tests__/creditOffsetSubledger.test.ts (9.72 s)
+PASS src/__tests__/auditRegression8.test.ts (11.781 s)
+PASS src/__tests__/purchaseOrderInputTax.test.ts (33.034 s)
+PASS src/__tests__/headerDiscountAllocation.unit.test.ts (23.928 s)
+PASS src/__tests__/zz_scratch_probe.test.ts (9.58 s)
+  ● Console
+
+    console.log
+      
+      ===== invoices =====
+      CREATE TABLE invoices (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          invoice_no VARCHAR(50) UNIQUE NOT NULL,
+          customer_id INTEGER NOT NULL,
+          so_id INTEGER, -- Can be null for direct invoices
+          invoice_date DATE NOT NULL,
+          due_date DATE,
+          status VARCHAR(20) DEFAULT 'Unpaid', -- Unpaid, Partially Paid, Paid, Overdue
+          total_amount DECIMAL(15,2) DEFAULT 0,
+          paid_amount DECIMAL(15,2) DEFAULT 0,
+          balance_amount DECIMAL(15,2) DEFAULT 0,
+          notes TEXT,
+          created_by INTEGER,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, discount_scope VARCHAR(20) DEFAULT 'invoice', discount_type VARCHAR(20) DEFAULT 'percentage', discount_value DECIMAL(15,2) DEFAULT 0, terms TEXT, returned_amount DECIMAL(15,2) NOT NULL DEFAULT 0, return_fee DECIMAL(15,2) NOT NULL DEFAULT 0, source_type VARCHAR(20), quotation_id INTEGER, customer_name VARCHAR(200), expiry_notes TEXT, override_sale INTEGER DEFAULT 0, deleted_at TEXT, deleted_by INTEGER, deleted_from_status TEXT, credit_offset DECIMAL(15,2) NOT NULL DEFAULT 0, payment_status TEXT NOT NULL DEFAULT 'Unpaid', return_status TEXT NOT NULL DEFAULT 'None', deleted_from_payment_status TEXT, deleted_from_return_status TEXT,
+          FOREIGN KEY (customer_id) REFERENCES customers(id),
+          FOREIGN KEY (so_id) REFERENCES sales_orders(id),
+          FOREIGN KEY (created_by) REFERENCES users(id)
+      )
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:16:13)
+
+    console.log
+      
+      ===== invoice_items =====
+      CREATE TABLE invoice_items (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          invoice_id INTEGER NOT NULL,
+          item_id INTEGER NOT NULL,
+          quantity DECIMAL(15,3) NOT NULL,
+          unit_price DECIMAL(15,2) NOT NULL,
+          amount DECIMAL(15,2) NOT NULL, tax_rate DECIMAL(5,2) DEFAULT 0, discount_type VARCHAR(20) DEFAULT 'percentage', discount_value DECIMAL(15,2) DEFAULT 0, returned_qty DECIMAL(15,3) NOT NULL DEFAULT 0, expiry_date DATE, is_expired_at_sale BOOLEAN DEFAULT 0, net_amount DECIMAL(15,2) NOT NULL DEFAULT 0, tax_amount DECIMAL(15,2) NOT NULL DEFAULT 0,
+          FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE,
+          FOREIGN KEY (item_id) REFERENCES items(id)
+      )
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:16:13)
+
+    console.log
+      
+      ===== stock_movements =====
+      CREATE TABLE stock_movements (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          movement_no VARCHAR(50) UNIQUE NOT NULL,
+          item_id INTEGER NOT NULL,
+          warehouse_id INTEGER NOT NULL,
+          movement_type VARCHAR(50) NOT NULL, -- PURCHASE, SALE, TRANSFER, PRODUCTION, ADJUSTMENT
+          quantity DECIMAL(15,3) NOT NULL, -- Positive for IN, Negative for OUT
+          unit_cost DECIMAL(15,2),
+          reference_doctype VARCHAR(50), -- PurchaseOrder, SalesOrder, WorkOrder
+          reference_docno VARCHAR(50),
+          remarks TEXT,
+          movement_date DATE NOT NULL,
+          created_by INTEGER,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP, purchase_return_id INTEGER REFERENCES purchase_returns(id), financial_value DECIMAL(15,4) DEFAULT 0, financial_posted BOOLEAN DEFAULT FALSE, journal_entry_id INTEGER REFERENCES journal_entries(id), batch_id INTEGER REFERENCES stock_batches(id),
+          FOREIGN KEY (item_id) REFERENCES items(id),
+          FOREIGN KEY (warehouse_id) REFERENCES warehouses(id),
+          FOREIGN KEY (created_by) REFERENCES users(id)
+      )
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:16:13)
+
+    console.log
+      
+      ===== stock_batches =====
+      CREATE TABLE "stock_batches" (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    batch_no VARCHAR(50) UNIQUE NOT NULL,
+                    item_id INTEGER NOT NULL REFERENCES items(id),
+                    warehouse_id INTEGER NOT NULL REFERENCES warehouses(id),
+                    source_type VARCHAR(20) NOT NULL CHECK(source_type IN ('PRODUCTION','PURCHASE','GOODS_RECEIPT','RETURN','ADJUSTMENT','OPENING','TRANSFER','RECON')),
+                    source_id INTEGER NOT NULL,
+                    quantity_original DECIMAL(15,3) NOT NULL DEFAULT 0,
+                    quantity_remaining DECIMAL(15,3) NOT NULL DEFAULT 0
+                      CHECK(quantity_remaining >= 0 AND quantity_remaining <= quantity_original),
+                    unit_cost DECIMAL(15,4) NOT NULL DEFAULT 0,
+                    received_date DATE NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    expiry_date DATE,
+                    halted BOOLEAN DEFAULT 0,
+                    halted_reason TEXT
+                )
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:16:13)
+
+    console.log
+      
+      ===== stock_balances =====
+      CREATE TABLE "stock_balances" (
+                    item_id INTEGER NOT NULL REFERENCES items(id),
+                    warehouse_id INTEGER NOT NULL REFERENCES warehouses(id),
+                    quantity DECIMAL(15,3) NOT NULL DEFAULT 0 CHECK(quantity >= 0),
+                    last_updated DATETIME, quantity_physical DECIMAL(15,3), quantity_reserved DECIMAL(15,3), quantity_available DECIMAL(15,3),
+                    PRIMARY KEY (item_id, warehouse_id)
+                )
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:16:13)
+
+    console.log
+      
+      ===== purchases =====
+      CREATE TABLE purchases (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          purchase_no VARCHAR(50) UNIQUE NOT NULL,
+          item_id INTEGER NOT NULL,
+          warehouse_id INTEGER NOT NULL,
+          quantity DECIMAL(15,3) NOT NULL,
+          unit_cost DECIMAL(15,2) NOT NULL,
+          total_cost DECIMAL(15,2) NOT NULL,
+          supplier_name VARCHAR(200),
+          purchase_date DATE NOT NULL,
+          invoice_no VARCHAR(100),
+          remarks TEXT,
+          created_by INTEGER NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, supplier_id INTEGER REFERENCES suppliers(id), returned_quantity DECIMAL(15,3) NOT NULL DEFAULT 0, batch_id INTEGER REFERENCES stock_batches(id), batch_no VARCHAR(50), voided_at TEXT, voided_by INTEGER REFERENCES users(id), void_reason TEXT, input_tax_amount REAL NOT NULL DEFAULT 0 CHECK (input_tax_amount >= 0),
+          FOREIGN KEY (item_id) REFERENCES items(id),
+          FOREIGN KEY (warehouse_id) REFERENCES warehouses(id),
+          FOREIGN KEY (created_by) REFERENCES users(id)
+      )
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:16:13)
+
+    console.log
+      
+      ===== expenses =====
+      CREATE TABLE expenses (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          expense_no VARCHAR(50) UNIQUE NOT NULL,
+          expense_category VARCHAR(100) NOT NULL,
+          description TEXT,
+          amount DECIMAL(15,2) NOT NULL,
+          expense_date DATE NOT NULL,
+          payment_method VARCHAR(50), -- Cash, Check, Bank Transfer, Card, Credit
+          reference_no VARCHAR(100), -- Receipt number, check number, etc.
+          vendor_name VARCHAR(200), -- Name of vendor/supplier
+          project VARCHAR(100), -- Project or department associated with expense
+          status VARCHAR(20) DEFAULT 'Draft', -- Draft, Recorded, Cancelled (TASK 25 Option A)
+          created_by INTEGER,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (created_by) REFERENCES users(id)
+      )
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:16:13)
+
+    console.log
+      
+      ===== opening_balances =====
+      CREATE TABLE opening_balances (
+          account_key TEXT PRIMARY KEY,   -- 'cash' | 'bank' | 'easypaisa' | 'jazzcash' | 'upaisa'
+          amount      DECIMAL(15,2) NOT NULL DEFAULT 0,
+          updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:16:13)
+
+    console.log
+      
+      ===== suppliers =====
+      CREATE TABLE suppliers (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          supplier_code VARCHAR(50) UNIQUE NOT NULL,
+          supplier_name VARCHAR(200) NOT NULL,
+          contact_person VARCHAR(100),
+          email VARCHAR(100),
+          phone VARCHAR(20),
+          address TEXT,
+          payment_terms VARCHAR(100), -- Net 30, Net 60, COD
+          is_active BOOLEAN DEFAULT 1,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      , current_balance DECIMAL(15,2) DEFAULT 0)
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:16:13)
+
+    console.log
+      
+      ===== customers =====
+      CREATE TABLE customers (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          customer_code VARCHAR(50) UNIQUE NOT NULL,
+          customer_name VARCHAR(200) NOT NULL,
+          contact_person VARCHAR(100),
+          email VARCHAR(100),
+          phone VARCHAR(20),
+          billing_address TEXT,
+          shipping_address TEXT,
+          payment_terms VARCHAR(100),
+          is_active BOOLEAN DEFAULT 1,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      , credit_limit DECIMAL(15,2) DEFAULT 0, current_balance DECIMAL(15,2) DEFAULT 0, opening_balance DECIMAL(15,2) DEFAULT 0, payment_terms_days INTEGER DEFAULT 14, credit_balance DECIMAL(15,2) NOT NULL DEFAULT 0, deleted_at TEXT, deleted_by INTEGER)
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:16:13)
+
+    console.log
+      
+      ===== items =====
+      CREATE TABLE items (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          item_code VARCHAR(50) UNIQUE NOT NULL,
+          item_name VARCHAR(200) NOT NULL,
+          description TEXT,
+          category VARCHAR(100),
+          unit_of_measure VARCHAR(20) DEFAULT 'Nos', -- Nos, Kg, Ltr, Box, etc.
+          current_stock DECIMAL(15,3) DEFAULT 0,
+          reorder_level DECIMAL(15,3) DEFAULT 0,
+          standard_cost DECIMAL(15,2) DEFAULT 0,
+          standard_selling_price DECIMAL(15,2) DEFAULT 0,
+          is_raw_material BOOLEAN DEFAULT 0,
+          is_finished_good BOOLEAN DEFAULT 0,
+          is_purchased BOOLEAN DEFAULT 1,
+          is_manufactured BOOLEAN DEFAULT 0,
+          is_active BOOLEAN DEFAULT 1,
+          created_by INTEGER,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, has_expiry BOOLEAN DEFAULT 0, near_expiry_threshold_days INTEGER DEFAULT 30, sale_type TEXT NOT NULL DEFAULT 'packed' CHECK(sale_type IN ('packed','loose')), qty_decimal_precision INTEGER NOT NULL DEFAULT 0, rounding_step REAL DEFAULT NULL, deleted_at TEXT, deleted_by INTEGER,
+          FOREIGN KEY (created_by) REFERENCES users(id)
+      )
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:16:13)
+
+    console.log
+      
+      ===== warehouses =====
+      CREATE TABLE warehouses (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          warehouse_code VARCHAR(50) UNIQUE NOT NULL,
+          warehouse_name VARCHAR(100) NOT NULL,
+          location TEXT,
+          is_active BOOLEAN DEFAULT 1,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      , is_system BOOLEAN NOT NULL DEFAULT 0)
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:16:13)
+
+    console.log
+      
+      ===== supplier_ledger =====
+      CREATE TABLE supplier_ledger (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          supplier_id INTEGER NOT NULL,
+          transaction_date DATE NOT NULL,
+          transaction_type VARCHAR(50), -- PURCHASE_ORDER, RECEIPT, PAYMENT, ADJUSTMENT, OPENING_BALANCE
+          reference_no VARCHAR(100),
+          debit DECIMAL(15,2) DEFAULT 0,
+          credit DECIMAL(15,2) DEFAULT 0,
+          balance DECIMAL(15,2) NOT NULL,
+          description TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, voided BOOLEAN DEFAULT 0, reversed_by INTEGER REFERENCES supplier_ledger(id),
+          FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
+      )
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:16:13)
+
+    console.log
+      
+      ===== accounting_periods =====
+      CREATE TABLE accounting_periods (
+          id              INTEGER PRIMARY KEY AUTOINCREMENT,
+          period_name     TEXT UNIQUE NOT NULL,          -- e.g. '2026-01', 'FY2026-Q2'
+          start_date      DATE NOT NULL,
+          end_date        DATE NOT NULL,
+          status          TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','closed')),
+          closed_at       TIMESTAMP,
+          closed_by       INTEGER REFERENCES users(id),
+          created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:16:13)
+
+    console.log
+      
+      ===== settings =====
+      CREATE TABLE settings (
+          key VARCHAR(50) PRIMARY KEY,
+          value TEXT,
+          description TEXT,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:16:13)
+
+    console.log
+      
+      ===== NOTNULL-without-default columns per table =====
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:18:11)
+
+    console.log
+      invoices: invoice_no, customer_id, invoice_date
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:22:13)
+
+    console.log
+      invoice_items: invoice_id, item_id, quantity, unit_price, amount
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:22:13)
+
+    console.log
+      stock_movements: movement_no, item_id, warehouse_id, movement_type, quantity, movement_date
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:22:13)
+
+    console.log
+      stock_batches: batch_no, item_id, warehouse_id, source_type, source_id, received_date
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:22:13)
+
+    console.log
+      stock_balances:
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:22:13)
+
+    console.log
+      purchases: purchase_no, item_id, warehouse_id, quantity, unit_cost, total_cost, purchase_date, created_by
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:22:13)
+
+    console.log
+      expenses: expense_no, expense_category, amount, expense_date
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:22:13)
+
+    console.log
+      opening_balances:
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:22:13)
+
+    console.log
+      suppliers: supplier_code, supplier_name
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:22:13)
+
+    console.log
+      customers: customer_code, customer_name
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:22:13)
+
+    console.log
+      items: item_code, item_name
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:22:13)
+
+    console.log
+      warehouses: warehouse_code, warehouse_name
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:22:13)
+
+    console.log
+      supplier_ledger: supplier_id, transaction_date, balance
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:22:13)
+
+    console.log
+      accounting_periods: period_name, start_date, end_date
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:22:13)
+
+    console.log
+      settings:
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:22:13)
+
+PASS src/__tests__/invoiceCancelReversal.test.ts (15.937 s)
+PASS src/__tests__/settlementCashIntegrity.test.ts (8.998 s)
+PASS src/__tests__/paymentEditReposting.test.ts (8.703 s)
+PASS src/__tests__/invoiceIdempotency.test.ts (8.842 s)
+PASS src/__tests__/ownerPersonalLoans.test.ts (8.199 s)
+PASS src/__tests__/unappliedCashReplay.test.ts (10.67 s)
+PASS src/__tests__/auditReservationHeaders.test.ts (6.595 s)
+PASS src/__tests__/creditOffsetUpdate.test.ts (10.061 s)
+PASS src/__tests__/moneyPaths.test.ts (6.734 s)
+PASS src/__tests__/inventoryEffectiveDate.test.ts (8.559 s)
+PASS src/__tests__/adminBackup.test.ts (8.742 s)
+PASS src/__tests__/paymentDeletion.test.ts (7.836 s)
+PASS src/__tests__/invoiceReturnLegacyAdjust.test.ts (6.682 s)
+PASS src/__tests__/auditRegression6.test.ts (8.592 s)
+PASS src/__tests__/invoiceCancelReturnCollision.test.ts (6.756 s)
+PASS src/__tests__/auditTestLifecycle.test.ts
+PASS src/__tests__/stockBatchRoutes.test.ts (6.402 s)
+PASS src/__tests__/unappliedCashApi.test.ts (10.008 s)
+PASS src/__tests__/glPostingMatrix.test.ts (7.628 s)
+PASS src/__tests__/invoiceReturnVoidsAndPrint.test.ts (8.834 s)
+PASS src/__tests__/businessErrorClassification.test.ts (7.578 s)
+PASS src/__tests__/creditOffset.test.ts (6.559 s)
+PASS src/__tests__/multiOutputProduction.test.ts (8.181 s)
+PASS src/__tests__/auditRegression4.test.ts (8.513 s)
+PASS src/__tests__/idempotencyRound1.test.ts (7.642 s)
+PASS src/__tests__/passwordPolicy.test.ts (6.921 s)
+PASS src/__tests__/statusMachine.test.ts (5.618 s)
+PASS src/__tests__/openspecArchiveGuard.test.ts
+PASS src/__tests__/expiryHasExpiryGuard.test.ts (7.415 s)
+PASS src/__tests__/expiredStockSaleBlocking.test.ts (8.024 s)
+PASS src/__tests__/salaryAtomicDeduction.test.ts (7.282 s)
+PASS src/__tests__/auditRegression.test.ts (9.016 s)
+PASS src/__tests__/paymentRecordingMatrix.test.ts (6.87 s)
+PASS src/__tests__/headerDiscountPersistence.test.ts (7.535 s)
+PASS src/__tests__/employeeLoanDelete.test.ts (31.352 s)
+PASS src/__tests__/taxPostingConsistency.test.ts (5.84 s)
+PASS src/__tests__/authAuthority.test.ts
+PASS src/__tests__/auditRegression7.test.ts (30.129 s)
+PASS src/__tests__/cashInflowReversal.test.ts
+PASS src/__tests__/search.test.ts
+PASS src/__tests__/invoiceReturnEdgeCases.test.ts (5.659 s)
+PASS src/__tests__/reportingCoverage.test.ts
+PASS src/__tests__/forecastTrendData.test.ts
+PASS src/__tests__/customerStoreCredit.test.ts (5.513 s)
+PASS src/__tests__/supplierBills.test.ts (8.186 s)
+PASS src/__tests__/miscControllerCoverage.test.ts (13.023 s)
+PASS src/__tests__/auditRegression3.test.ts (8.923 s)
+PASS src/__tests__/poReceiptGl.test.ts (9.602 s)
+PASS src/__tests__/creditExpenses.test.ts (6.718 s)
+PASS src/__tests__/preferences.test.ts (7.34 s)
+PASS src/__tests__/employeeUpdateAndRepayCoverage.test.ts
+PASS src/__tests__/stockInputTax.test.ts (6.02 s)
+PASS src/__tests__/invoiceDeleteCoverage.test.ts (5.286 s)
+PASS src/__tests__/authAsync.test.ts (6.752 s)
+PASS src/__tests__/inventoryValuation.test.ts (5.975 s)
+PASS src/__tests__/invoiceSplitStatus.test.ts (5.777 s)
+PASS src/__tests__/clientValidationStatus.test.ts (6.081 s)
+PASS src/__tests__/fabricatedStockGuard.test.ts (5.924 s)
+PASS src/__tests__/cashReconciliationController.test.ts (6.06 s)
+PASS src/__tests__/migrationReplay.test.ts (5.801 s)
+PASS src/__tests__/ledgerIntegrity.test.ts (7.265 s)
+PASS src/__tests__/maintenance-reconciliation-cli.test.ts (6.16 s)
+PASS src/__tests__/arHistoricalAging.test.ts (5.843 s)
+PASS src/__tests__/ownerBorrowerUpdate.test.ts (6.447 s)
+PASS src/__tests__/arPartialReturn.test.ts (7.297 s)
+PASS src/__tests__/poCancelPartialReceipt.test.ts (8.497 s)
+PASS src/__tests__/expenseCategoryCrud.test.ts (7.627 s)
+PASS src/__tests__/reportsControllerStatements.test.ts (32.862 s)
+PASS src/__tests__/productionDeleteGl.test.ts (6.763 s)
+PASS src/__tests__/activityLogApiCoverage.test.ts (6.246 s)
+PASS src/__tests__/remainingModelAndAccountingCoverage.test.ts (6.413 s)
+PASS src/__tests__/statementControllers.test.ts (6.761 s)
+PASS src/__tests__/invoiceCreationMatrix.test.ts (8.208 s)
+PASS src/__tests__/integrationsSettingsRoute.test.ts (5.869 s)
+PASS src/__tests__/writeOff.test.ts (6.654 s)
+PASS src/__tests__/mobileReturn.test.ts (5.299 s)
+PASS src/__tests__/auditRegression3Recovered.test.ts (6.306 s)
+PASS src/__tests__/stockTransferVoid.test.ts (5.205 s)
+PASS src/__tests__/supplierPrepayments.test.ts (6.622 s)
+PASS src/__tests__/stockTransfer.test.ts (5.99 s)
+PASS src/__tests__/purchaseOrderAndWithdrawalCoverage.test.ts (6.465 s)
+PASS src/__tests__/dashboardBoot.test.ts (6.007 s)
+PASS src/__tests__/auditRegression5.test.ts (7.71 s)
+PASS src/__tests__/invoiceMigrationTelemetry.test.ts (7.506 s)
+PASS src/__tests__/reportExpressionSecurity.test.ts (6.423 s)
+PASS src/__tests__/forecastConfigInjection.test.ts (32.214 s)
+PASS src/__tests__/glPoCommitment.test.ts (9.261 s)
+PASS src/__tests__/expensePaymentMethodOptions.test.ts (7.433 s)
+PASS src/__tests__/auditTrail.test.ts (7.223 s)
+PASS src/__tests__/systemWarehouseGuard.test.ts (6.05 s)
+PASS src/__tests__/purchaseOrderLineUpdate.test.ts (7.587 s)
+PASS src/__tests__/glLifecycle.test.ts (7.332 s)
+PASS src/__tests__/rolesUpdateDelete.test.ts
+PASS src/__tests__/inventoryOpeningAndReconcileCoverage.test.ts (6.26 s)
+PASS src/__tests__/opsControllerCoverage.test.ts
+PASS src/__tests__/controllerQueryBatch.test.ts
+PASS src/__tests__/payrollRecoveryLifecycle.test.ts
+PASS src/__tests__/dashboardLayoutCrud.test.ts
+PASS src/__tests__/invoiceRestore.test.ts
+PASS src/__tests__/glAuthority.test.ts
+PASS src/__tests__/bomControllerCreate.test.ts
+PASS src/__tests__/glSoftDelete.test.ts
+PASS src/__tests__/activityLogCurrency.test.ts
+PASS src/__tests__/supplierUpdateController.test.ts
+PASS src/__tests__/bomItemsSchemaRepair.test.ts
+PASS src/__tests__/dashboardLayoutRename.test.ts
+PASS src/__tests__/expenseTransitionMatrix.test.ts
+PASS src/__tests__/forecastModelsAndDashboard.test.ts
+PASS src/__tests__/purchaseOrderSupplierSummary.test.ts (6.042 s)
+PASS src/__tests__/dashboardKpiBatch.test.ts
+PASS src/__tests__/mobileInvoiceDeprecation.test.ts
+PASS src/__tests__/overAllocationGuard.test.ts (18.863 s)
+PASS src/__tests__/goodsReceiptVoid.test.ts (19.142 s)
+PASS src/__tests__/stockRepairAndReconciliationCoverage.test.ts
+PASS src/__tests__/userSelfRole.test.ts
+PASS src/__tests__/taxGlRepairMigration.test.ts
+PASS src/__tests__/expiredStockMigration.test.ts
+PASS src/__tests__/supplierListController.test.ts
+PASS src/__tests__/customReportValidation.test.ts
+PASS src/__tests__/maintenance-batches-cli.test.ts
+PASS src/__tests__/stockAuthority.test.ts
+PASS src/__tests__/ownerEquityLists.test.ts
+PASS src/__tests__/glBalanceInvariant.test.ts
+PASS src/__tests__/countCorrection.test.ts (5.622 s)
+PASS src/__tests__/stockMovementController.test.ts
+PASS src/__tests__/bootIdempotency.test.ts
+PASS src/__tests__/purchaseVoidJournalHeaders.test.ts
+PASS src/__tests__/supplierRefundValidation.test.ts
+PASS src/__tests__/cashOpeningAndFlow.test.ts
+PASS src/__tests__/models.test.ts
+PASS src/__tests__/ownerEquity.test.ts
+PASS src/__tests__/bomUpdateAndExpiryReport.test.ts
+PASS src/__tests__/softDelete.test.ts
+PASS src/__tests__/sqlKeyInjectionGuard.test.ts
+PASS src/__tests__/backupPathResolution.test.ts
+PASS src/__tests__/accountingPeriodRoller.test.ts
+PASS src/__tests__/sortSanitizer.test.ts
+PASS src/__tests__/forecastGeneration.test.ts
+PASS src/__tests__/documentNumbering.test.ts
+PASS src/__tests__/maintenance-stock-repair-cli.test.ts
+PASS src/__tests__/ownerWithdrawalListModelCoverage.test.ts
+PASS src/__tests__/maintenance-ledger-cli.test.ts
+PASS src/__tests__/unappliedCashFixture.test.ts
+PASS src/__tests__/errorMessageHelpers.test.ts
+PASS src/__tests__/expensePagination.test.ts
+PASS src/__tests__/dashboardKpi.test.ts
+PASS src/__tests__/glUnification.test.ts
+PASS src/__tests__/reportFilterGroupCoverage.test.ts
+PASS src/__tests__/accountingExtensionMigrations.test.ts
+PASS src/__tests__/strictNullChecksRegressions.test.ts
+PASS src/__tests__/backupWal.test.ts
+PASS src/__tests__/releaseBundle.test.ts
+PASS src/__tests__/forecastTrendCoverage.test.ts
+PASS src/__tests__/historicalDataIntegrityScanner.test.ts
+PASS src/__tests__/activityLogModel.test.ts
+PASS src/__tests__/dashboardKpiAndMiscCoverage.test.ts
+PASS src/__tests__/serverPathResolution.test.ts
+PASS src/__tests__/auditTraceReadiness.test.ts
+PASS src/__tests__/forecastCacheRead.test.ts
+PASS src/__tests__/dbIntegrityConstraints.test.ts
+PASS src/__tests__/backupVerifySnapshot.test.ts
+PASS src/__tests__/mergeFallowCoverage.test.ts
+PASS src/__tests__/activityLog.test.ts
+PASS src/__tests__/glReturnTaxBalance.test.ts
+PASS src/__tests__/ownerCapitalListModelCoverage.test.ts
+PASS src/__tests__/ownerWithdrawalEditRoutes.test.ts
+PASS src/__tests__/invoiceAndSalesOrderListCoverage.test.ts
+PASS src/__tests__/forecastOverride.test.ts
+PASS src/__tests__/adminBackupDotfileDownload.test.ts
+PASS src/__tests__/returnMath.test.ts
+PASS src/__tests__/localNetwork.test.ts
+PASS src/__tests__/unappliedCashReadApi.test.ts
+PASS src/__tests__/correctionAuthorization.test.ts
+PASS src/__tests__/invoiceReturnMigration.test.ts
+PASS src/__tests__/floatingPointPrecision.test.ts
+PASS src/__tests__/weekMath.test.ts
+PASS src/__tests__/reportBetween.test.ts
+PASS src/services/__tests__/accountingCashLookup.test.ts
+PASS src/__tests__/userPreferences.test.ts
+
+=============================== Coverage summary ===============================
+Statements   : 77.32% ( 14900/19269 )
+Branches     : 72.11% ( 7467/10355 )
+Functions    : 83.28% ( 1983/2381 )
+Lines        : 79% ( 14145/17905 )
+================================================================================
+
+Test Suites: 252 passed, 252 total
+Tests:       2002 passed, 2002 total
+Snapshots:   0 total
+Time:        2057.547 s, estimated 2236 s
+Ran all test suites.

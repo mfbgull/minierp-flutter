@@ -1,5 +1,7 @@
 # Remediation roadmap — proposal only
 
+> Current assessment, 2026-10-26: this report preserves its historical audit snapshot. See [remediation status](remediation/STATUS.md) for current source verification, fixes, tests and remaining limits.
+
 Production fixes, accounting-policy changes, historical corrections and deployment require separate authorization. The order below follows proven financial risk and dependencies.
 
 | Order | Work | Required behavior / evidence before acceptance |

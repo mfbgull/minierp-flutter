@@ -1,0 +1,45 @@
+
+> mini-erp-server@1.0.0 test
+> jest --runInBand invoiceCancelReversal.test.ts auditPayrollChronology.test.ts --testNamePattern F-070|F-043
+
+FAIL src/__tests__/auditPayrollChronology.test.ts (121.287 s)
+  ● salary recognition, chronology and D15 › F-043 explains all salary expense in report category rows
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 10000
+    Received: 0
+
+      48 |     expect(data.totalExpenses).toBe(100);
+      49 |     const categories = data.expenses as Array<{ total: number }>;
+    > 50 |     expect(categories.reduce((sum, row) => sum + Math.round(row.total * 100), 0)).toBe(10000);
+         |                                                                                   ^
+      51 |   });
+      52 |   it('F-021 rejects a repayment before disbursement without a historical loan credit', async () => {
+      53 |     const loan = await post(`/api/employees/${employee}/loans`, { amount: 500, disbursement_date: '2026-09-15', payment_method: 'Bank' });
+
+      at Object.<anonymous> (src/__tests__/auditPayrollChronology.test.ts:50:83)
+
+FAIL src/__tests__/invoiceCancelReversal.test.ts (9.328 s)
+  ● Invoice/SO cancellation reversal (C1 + C4) › F-070 repeated SO cancellation is a controlled conflict without mutation
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 409
+    Received: 500
+
+      226 |     expect((await request(app).post(url).set('Cookie', authCookie)).status).toBe(200);
+      227 |     const before = db.prepare('SELECT * FROM journal_lines ORDER BY id').all();
+    > 228 |     expect((await request(app).post(url).set('Cookie', authCookie)).status).toBe(409);
+          |                                                                             ^
+      229 |     expect(db.prepare('SELECT * FROM journal_lines ORDER BY id').all()).toEqual(before);
+      230 |   });
+      231 |
+
+      at Object.<anonymous> (src/__tests__/invoiceCancelReversal.test.ts:228:77)
+
+Test Suites: 2 failed, 2 total
+Tests:       2 failed, 10 skipped, 12 total
+Snapshots:   0 total
+Time:        132.833 s
+Ran all test suites matching invoiceCancelReversal.test.ts|auditPayrollChronology.test.ts with tests matching "F-070|F-043".

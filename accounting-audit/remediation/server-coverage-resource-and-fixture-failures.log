@@ -1,0 +1,1170 @@
+
+> mini-erp-server@1.0.0 test
+> jest --maxWorkers=2 --coverage --coverageReporters=json --coverageReporters=text-summary
+
+PASS src/__tests__/posPayments.test.ts (36.757 s)
+PASS src/__tests__/auditPayrollChronology.test.ts (36.732 s)
+PASS src/__tests__/journalBalanceCommit.test.ts (219.797 s)
+PASS src/__tests__/unappliedCashGl.test.ts (336.222 s)
+PASS src/__tests__/purchaseReturn.test.ts (167.035 s)
+PASS src/__tests__/auditStockRemediation.test.ts (7.557 s)
+PASS src/__tests__/unappliedCashMigration.test.ts (108.026 s)
+PASS src/__tests__/stockAdjustmentCostedBatch.test.ts (89.771 s)
+PASS src/__tests__/supplierRefund.test.ts (91.596 s)
+PASS src/__tests__/arSurfaceConsistency.test.ts (77.478 s)
+PASS src/__tests__/batchLocations.test.ts (100.196 s)
+PASS src/__tests__/supplierPaymentAllocation.test.ts (72.85 s)
+PASS src/__tests__/purchaseVoid.test.ts (51.092 s)
+PASS src/__tests__/duplicatePurchaseRepairCli.test.ts (72.45 s)
+PASS src/__tests__/auditCreditOwnership.test.ts (8.917 s)
+PASS src/__tests__/expenseStatusConsistency.test.ts (47.287 s)
+PASS src/__tests__/auditReservationHeaders.test.ts (5.721 s)
+PASS src/__tests__/api.integration.test.ts (15.138 s)
+PASS src/__tests__/auditRegression9.test.ts (15.945 s)
+PASS src/__tests__/cashTruth.test.ts (62.796 s)
+PASS src/__tests__/reversalSymmetry.test.ts (59.903 s)
+PASS src/__tests__/expiryDetection.test.ts (60.343 s)
+PASS src/__tests__/supplierlessPurchase.test.ts (60.642 s)
+PASS src/__tests__/supplierModelQuery.test.ts (68.2 s)
+PASS src/__tests__/batchLocationIntegration.test.ts (45.585 s)
+PASS src/__tests__/c06PoReturnLayerKey.test.ts (69.471 s)
+PASS src/__tests__/apSingleDerivation.test.ts (54.169 s)
+PASS src/__tests__/expiryTransfer.test.ts (38.515 s)
+PASS src/__tests__/models.test.ts (7.41 s)
+PASS src/__tests__/inventoryReconciliation.test.ts (42.087 s)
+PASS src/__tests__/apReporting.test.ts (38.163 s)
+PASS src/__tests__/mobileInvoiceCancelStock.test.ts (55.351 s)
+PASS src/__tests__/modelQueryBatch.test.ts (63.955 s)
+PASS src/__tests__/paymentGuards.test.ts (37.878 s)
+PASS src/__tests__/openingBalanceOnboarding.test.ts (34.393 s)
+PASS src/__tests__/creditReconciliationCli.test.ts (15.726 s)
+PASS src/__tests__/physicalCountQuery.test.ts (44.654 s)
+PASS src/__tests__/mobileInvoiceDraft.test.ts (43.709 s)
+PASS src/__tests__/creditReconciliation.test.ts (35.45 s)
+PASS src/__tests__/backfillGoodsReceipts.test.ts (38.604 s)
+PASS src/__tests__/supplierPurchasesFilter.test.ts (22.838 s)
+PASS src/__tests__/cashReconciliationWrite.test.ts (3926.089 s)
+PASS src/__tests__/expiryReportModel.test.ts (3924.427 s)
+PASS src/__tests__/physicalCountBatchSync.test.ts (26.088 s)
+PASS src/__tests__/ownerWithdrawalCount.test.ts (38.788 s)
+PASS src/__tests__/creditOffset.test.ts (9.419 s)
+PASS src/__tests__/glBackfill.test.ts (24.133 s)
+PASS src/__tests__/employeeAdvanceCarryover.test.ts (18.383 s)
+PASS src/__tests__/isolatedAuditFixture.test.ts (33.246 s)
+PASS src/__tests__/databaseInitialization.test.ts (22.533 s)
+PASS src/__tests__/customerStoreCredit.test.ts (10.077 s)
+PASS src/__tests__/creditOffsetSubledger.test.ts (12.909 s)
+PASS src/__tests__/envHardening.test.ts (33.192 s)
+PASS src/__tests__/reversalVerificationCli.test.ts (22.929 s)
+PASS src/__tests__/invoiceReturnLegacyAdjust.test.ts (10.734 s)
+PASS src/__tests__/salaryHistory.test.ts (13.246 s)
+PASS src/__tests__/zz_scratch_probe.test.ts (12.158 s)
+  ● Console
+
+    console.log
+      
+      ===== invoices =====
+      CREATE TABLE invoices (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          invoice_no VARCHAR(50) UNIQUE NOT NULL,
+          customer_id INTEGER NOT NULL,
+          so_id INTEGER, -- Can be null for direct invoices
+          invoice_date DATE NOT NULL,
+          due_date DATE,
+          status VARCHAR(20) DEFAULT 'Unpaid', -- Unpaid, Partially Paid, Paid, Overdue
+          total_amount DECIMAL(15,2) DEFAULT 0,
+          paid_amount DECIMAL(15,2) DEFAULT 0,
+          balance_amount DECIMAL(15,2) DEFAULT 0,
+          notes TEXT,
+          created_by INTEGER,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, discount_scope VARCHAR(20) DEFAULT 'invoice', discount_type VARCHAR(20) DEFAULT 'percentage', discount_value DECIMAL(15,2) DEFAULT 0, terms TEXT, returned_amount DECIMAL(15,2) NOT NULL DEFAULT 0, return_fee DECIMAL(15,2) NOT NULL DEFAULT 0, source_type VARCHAR(20), quotation_id INTEGER, customer_name VARCHAR(200), expiry_notes TEXT, override_sale INTEGER DEFAULT 0, deleted_at TEXT, deleted_by INTEGER, deleted_from_status TEXT, credit_offset DECIMAL(15,2) NOT NULL DEFAULT 0, payment_status TEXT NOT NULL DEFAULT 'Unpaid', return_status TEXT NOT NULL DEFAULT 'None', deleted_from_payment_status TEXT, deleted_from_return_status TEXT,
+          FOREIGN KEY (customer_id) REFERENCES customers(id),
+          FOREIGN KEY (so_id) REFERENCES sales_orders(id),
+          FOREIGN KEY (created_by) REFERENCES users(id)
+      )
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:16:13)
+
+    console.log
+      
+      ===== invoice_items =====
+      CREATE TABLE invoice_items (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          invoice_id INTEGER NOT NULL,
+          item_id INTEGER NOT NULL,
+          quantity DECIMAL(15,3) NOT NULL,
+          unit_price DECIMAL(15,2) NOT NULL,
+          amount DECIMAL(15,2) NOT NULL, tax_rate DECIMAL(5,2) DEFAULT 0, discount_type VARCHAR(20) DEFAULT 'percentage', discount_value DECIMAL(15,2) DEFAULT 0, returned_qty DECIMAL(15,3) NOT NULL DEFAULT 0, expiry_date DATE, is_expired_at_sale BOOLEAN DEFAULT 0, net_amount DECIMAL(15,2) NOT NULL DEFAULT 0, tax_amount DECIMAL(15,2) NOT NULL DEFAULT 0,
+          FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE,
+          FOREIGN KEY (item_id) REFERENCES items(id)
+      )
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:16:13)
+
+    console.log
+      
+      ===== stock_movements =====
+      CREATE TABLE stock_movements (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          movement_no VARCHAR(50) UNIQUE NOT NULL,
+          item_id INTEGER NOT NULL,
+          warehouse_id INTEGER NOT NULL,
+          movement_type VARCHAR(50) NOT NULL, -- PURCHASE, SALE, TRANSFER, PRODUCTION, ADJUSTMENT
+          quantity DECIMAL(15,3) NOT NULL, -- Positive for IN, Negative for OUT
+          unit_cost DECIMAL(15,2),
+          reference_doctype VARCHAR(50), -- PurchaseOrder, SalesOrder, WorkOrder
+          reference_docno VARCHAR(50),
+          remarks TEXT,
+          movement_date DATE NOT NULL,
+          created_by INTEGER,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP, purchase_return_id INTEGER REFERENCES purchase_returns(id), financial_value DECIMAL(15,4) DEFAULT 0, financial_posted BOOLEAN DEFAULT FALSE, journal_entry_id INTEGER REFERENCES journal_entries(id), batch_id INTEGER REFERENCES stock_batches(id),
+          FOREIGN KEY (item_id) REFERENCES items(id),
+          FOREIGN KEY (warehouse_id) REFERENCES warehouses(id),
+          FOREIGN KEY (created_by) REFERENCES users(id)
+      )
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:16:13)
+
+    console.log
+      
+      ===== stock_batches =====
+      CREATE TABLE "stock_batches" (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    batch_no VARCHAR(50) UNIQUE NOT NULL,
+                    item_id INTEGER NOT NULL REFERENCES items(id),
+                    warehouse_id INTEGER NOT NULL REFERENCES warehouses(id),
+                    source_type VARCHAR(20) NOT NULL CHECK(source_type IN ('PRODUCTION','PURCHASE','GOODS_RECEIPT','RETURN','ADJUSTMENT','OPENING','TRANSFER','RECON')),
+                    source_id INTEGER NOT NULL,
+                    quantity_original DECIMAL(15,3) NOT NULL DEFAULT 0,
+                    quantity_remaining DECIMAL(15,3) NOT NULL DEFAULT 0
+                      CHECK(quantity_remaining >= 0 AND quantity_remaining <= quantity_original),
+                    unit_cost DECIMAL(15,4) NOT NULL DEFAULT 0,
+                    received_date DATE NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    expiry_date DATE,
+                    halted BOOLEAN DEFAULT 0,
+                    halted_reason TEXT
+                )
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:16:13)
+
+    console.log
+      
+      ===== stock_balances =====
+      CREATE TABLE "stock_balances" (
+                    item_id INTEGER NOT NULL REFERENCES items(id),
+                    warehouse_id INTEGER NOT NULL REFERENCES warehouses(id),
+                    quantity DECIMAL(15,3) NOT NULL DEFAULT 0 CHECK(quantity >= 0),
+                    last_updated DATETIME, quantity_physical DECIMAL(15,3), quantity_reserved DECIMAL(15,3), quantity_available DECIMAL(15,3),
+                    PRIMARY KEY (item_id, warehouse_id)
+                )
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:16:13)
+
+    console.log
+      
+      ===== purchases =====
+      CREATE TABLE purchases (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          purchase_no VARCHAR(50) UNIQUE NOT NULL,
+          item_id INTEGER NOT NULL,
+          warehouse_id INTEGER NOT NULL,
+          quantity DECIMAL(15,3) NOT NULL,
+          unit_cost DECIMAL(15,2) NOT NULL,
+          total_cost DECIMAL(15,2) NOT NULL,
+          supplier_name VARCHAR(200),
+          purchase_date DATE NOT NULL,
+          invoice_no VARCHAR(100),
+          remarks TEXT,
+          created_by INTEGER NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, supplier_id INTEGER REFERENCES suppliers(id), returned_quantity DECIMAL(15,3) NOT NULL DEFAULT 0, batch_id INTEGER REFERENCES stock_batches(id), batch_no VARCHAR(50), voided_at TEXT, voided_by INTEGER REFERENCES users(id), void_reason TEXT, input_tax_amount REAL NOT NULL DEFAULT 0 CHECK (input_tax_amount >= 0),
+          FOREIGN KEY (item_id) REFERENCES items(id),
+          FOREIGN KEY (warehouse_id) REFERENCES warehouses(id),
+          FOREIGN KEY (created_by) REFERENCES users(id)
+      )
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:16:13)
+
+    console.log
+      
+      ===== expenses =====
+      CREATE TABLE expenses (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          expense_no VARCHAR(50) UNIQUE NOT NULL,
+          expense_category VARCHAR(100) NOT NULL,
+          description TEXT,
+          amount DECIMAL(15,2) NOT NULL,
+          expense_date DATE NOT NULL,
+          payment_method VARCHAR(50), -- Cash, Check, Bank Transfer, Card, Credit
+          reference_no VARCHAR(100), -- Receipt number, check number, etc.
+          vendor_name VARCHAR(200), -- Name of vendor/supplier
+          project VARCHAR(100), -- Project or department associated with expense
+          status VARCHAR(20) DEFAULT 'Draft', -- Draft, Recorded, Cancelled (TASK 25 Option A)
+          created_by INTEGER,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (created_by) REFERENCES users(id)
+      )
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:16:13)
+
+    console.log
+      
+      ===== opening_balances =====
+      CREATE TABLE opening_balances (
+          account_key TEXT PRIMARY KEY,   -- 'cash' | 'bank' | 'easypaisa' | 'jazzcash' | 'upaisa'
+          amount      DECIMAL(15,2) NOT NULL DEFAULT 0,
+          updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:16:13)
+
+    console.log
+      
+      ===== suppliers =====
+      CREATE TABLE suppliers (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          supplier_code VARCHAR(50) UNIQUE NOT NULL,
+          supplier_name VARCHAR(200) NOT NULL,
+          contact_person VARCHAR(100),
+          email VARCHAR(100),
+          phone VARCHAR(20),
+          address TEXT,
+          payment_terms VARCHAR(100), -- Net 30, Net 60, COD
+          is_active BOOLEAN DEFAULT 1,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      , current_balance DECIMAL(15,2) DEFAULT 0)
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:16:13)
+
+    console.log
+      
+      ===== customers =====
+      CREATE TABLE customers (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          customer_code VARCHAR(50) UNIQUE NOT NULL,
+          customer_name VARCHAR(200) NOT NULL,
+          contact_person VARCHAR(100),
+          email VARCHAR(100),
+          phone VARCHAR(20),
+          billing_address TEXT,
+          shipping_address TEXT,
+          payment_terms VARCHAR(100),
+          is_active BOOLEAN DEFAULT 1,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      , credit_limit DECIMAL(15,2) DEFAULT 0, current_balance DECIMAL(15,2) DEFAULT 0, opening_balance DECIMAL(15,2) DEFAULT 0, payment_terms_days INTEGER DEFAULT 14, credit_balance DECIMAL(15,2) NOT NULL DEFAULT 0, deleted_at TEXT, deleted_by INTEGER)
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:16:13)
+
+    console.log
+      
+      ===== items =====
+      CREATE TABLE items (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          item_code VARCHAR(50) UNIQUE NOT NULL,
+          item_name VARCHAR(200) NOT NULL,
+          description TEXT,
+          category VARCHAR(100),
+          unit_of_measure VARCHAR(20) DEFAULT 'Nos', -- Nos, Kg, Ltr, Box, etc.
+          current_stock DECIMAL(15,3) DEFAULT 0,
+          reorder_level DECIMAL(15,3) DEFAULT 0,
+          standard_cost DECIMAL(15,2) DEFAULT 0,
+          standard_selling_price DECIMAL(15,2) DEFAULT 0,
+          is_raw_material BOOLEAN DEFAULT 0,
+          is_finished_good BOOLEAN DEFAULT 0,
+          is_purchased BOOLEAN DEFAULT 1,
+          is_manufactured BOOLEAN DEFAULT 0,
+          is_active BOOLEAN DEFAULT 1,
+          created_by INTEGER,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, has_expiry BOOLEAN DEFAULT 0, near_expiry_threshold_days INTEGER DEFAULT 30, sale_type TEXT NOT NULL DEFAULT 'packed' CHECK(sale_type IN ('packed','loose')), qty_decimal_precision INTEGER NOT NULL DEFAULT 0, rounding_step REAL DEFAULT NULL, deleted_at TEXT, deleted_by INTEGER,
+          FOREIGN KEY (created_by) REFERENCES users(id)
+      )
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:16:13)
+
+    console.log
+      
+      ===== warehouses =====
+      CREATE TABLE warehouses (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          warehouse_code VARCHAR(50) UNIQUE NOT NULL,
+          warehouse_name VARCHAR(100) NOT NULL,
+          location TEXT,
+          is_active BOOLEAN DEFAULT 1,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      , is_system BOOLEAN NOT NULL DEFAULT 0)
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:16:13)
+
+    console.log
+      
+      ===== supplier_ledger =====
+      CREATE TABLE supplier_ledger (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          supplier_id INTEGER NOT NULL,
+          transaction_date DATE NOT NULL,
+          transaction_type VARCHAR(50), -- PURCHASE_ORDER, RECEIPT, PAYMENT, ADJUSTMENT, OPENING_BALANCE
+          reference_no VARCHAR(100),
+          debit DECIMAL(15,2) DEFAULT 0,
+          credit DECIMAL(15,2) DEFAULT 0,
+          balance DECIMAL(15,2) NOT NULL,
+          description TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, voided BOOLEAN DEFAULT 0, reversed_by INTEGER REFERENCES supplier_ledger(id),
+          FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
+      )
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:16:13)
+
+    console.log
+      
+      ===== accounting_periods =====
+      CREATE TABLE accounting_periods (
+          id              INTEGER PRIMARY KEY AUTOINCREMENT,
+          period_name     TEXT UNIQUE NOT NULL,          -- e.g. '2026-01', 'FY2026-Q2'
+          start_date      DATE NOT NULL,
+          end_date        DATE NOT NULL,
+          status          TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','closed')),
+          closed_at       TIMESTAMP,
+          closed_by       INTEGER REFERENCES users(id),
+          created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:16:13)
+
+    console.log
+      
+      ===== settings =====
+      CREATE TABLE settings (
+          key VARCHAR(50) PRIMARY KEY,
+          value TEXT,
+          description TEXT,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:16:13)
+
+    console.log
+      
+      ===== NOTNULL-without-default columns per table =====
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:18:11)
+
+    console.log
+      invoices: invoice_no, customer_id, invoice_date
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:22:13)
+
+    console.log
+      invoice_items: invoice_id, item_id, quantity, unit_price, amount
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:22:13)
+
+    console.log
+      stock_movements: movement_no, item_id, warehouse_id, movement_type, quantity, movement_date
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:22:13)
+
+    console.log
+      stock_batches: batch_no, item_id, warehouse_id, source_type, source_id, received_date
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:22:13)
+
+    console.log
+      stock_balances:
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:22:13)
+
+    console.log
+      purchases: purchase_no, item_id, warehouse_id, quantity, unit_cost, total_cost, purchase_date, created_by
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:22:13)
+
+    console.log
+      expenses: expense_no, expense_category, amount, expense_date
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:22:13)
+
+    console.log
+      opening_balances:
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:22:13)
+
+    console.log
+      suppliers: supplier_code, supplier_name
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:22:13)
+
+    console.log
+      customers: customer_code, customer_name
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:22:13)
+
+    console.log
+      items: item_code, item_name
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:22:13)
+
+    console.log
+      warehouses: warehouse_code, warehouse_name
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:22:13)
+
+    console.log
+      supplier_ledger: supplier_id, transaction_date, balance
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:22:13)
+
+    console.log
+      accounting_periods: period_name, start_date, end_date
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:22:13)
+
+    console.log
+      settings:
+
+      at Object.<anonymous> (src/__tests__/zz_scratch_probe.test.ts:22:13)
+
+PASS src/__tests__/unappliedCashReplay.test.ts (11.94 s)
+PASS src/__tests__/auditRegression8.test.ts (11.212 s)
+PASS src/__tests__/glPostingMatrix.test.ts (9.85 s)
+PASS src/__tests__/invoiceCreationMatrix.test.ts (7.97 s)
+PASS src/__tests__/headerDiscountRepairMigration.test.ts (8.633 s)
+PASS src/__tests__/controllers.test.ts (13.506 s)
+PASS src/__tests__/adminBackup.test.ts (9.915 s)
+PASS src/__tests__/auditRegression7.test.ts (10.509 s)
+PASS src/__tests__/auditRegression3Recovered.test.ts (12.128 s)
+PASS src/__tests__/payrollRecoveryLifecycle.test.ts (9.536 s)
+PASS src/__tests__/authAuthority.test.ts (9.953 s)
+PASS src/__tests__/authAsync.test.ts (8.512 s)
+PASS src/__tests__/closedPeriodImmutability.test.ts (9.906 s)
+PASS src/__tests__/accountingInvariants.test.ts (15.277 s)
+PASS src/__tests__/remainingModelAndAccountingCoverage.test.ts (9.314 s)
+PASS src/__tests__/ownerPersonalLoans.test.ts (8.475 s)
+PASS src/__tests__/paymentDeletion.test.ts (14.032 s)
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "[winston] Attempt to write logs with no transports, which can increase memory usage: {"service":"mini-erp-api","environment":"test","error":"FOREIGN KEY constraint failed","level":"error","message":"[ActivityLogger] Failed to flush logs:"}".
+
+      20 | };
+      21 |
+    > 22 | // 3. Create isolated temp database for tests (never touch production DB).
+         |                          ^
+      23 | //
+      24 | // Rooted PROJECT-LOCALLY rather than in os.tmpdir(): when the system disk
+      25 | // filled up, the shell broker could not write its own logs and EVERY command
+
+      at console.error (node_modules/@jest/console/build/index.js:124:10)
+      at console.error (src/__tests__/setup.ts:22:26)
+      at DerivedLogger._transform (node_modules/winston/lib/winston/logger.js:326:15)
+      at DerivedLogger.Transform._read (node_modules/readable-stream/lib/_stream_transform.js:166:10)
+      at DerivedLogger.Transform._write (node_modules/readable-stream/lib/_stream_transform.js:155:83)
+      at doWrite (node_modules/readable-stream/lib/_stream_writable.js:390:139)
+      at writeOrBuffer (node_modules/readable-stream/lib/_stream_writable.js:381:5)
+      at DerivedLogger.Writable.write (node_modules/readable-stream/lib/_stream_writable.js:302:11)
+      at DerivedLogger.log (node_modules/winston/lib/winston/logger.js:276:14)
+      at DerivedLogger.<computed> [as error] (node_modules/winston/lib/winston/create-logger.js:95:19)
+      at ActivityLoggerService.flush (src/services/activityLogger.ts:4150:24)
+      at Timeout._onTimeout (src/services/activityLogger.ts:3921:19)
+
+PASS src/__tests__/preferences.test.ts (7.483 s)
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "[winston] Attempt to write logs with no transports, which can increase memory usage: {"service":"mini-erp-api","environment":"test","error":"FOREIGN KEY constraint failed","level":"error","message":"[ActivityLogger] Failed to flush logs:"}".
+
+      20 | };
+      21 |
+    > 22 | // 3. Create isolated temp database for tests (never touch production DB).
+         |                          ^
+      23 | //
+      24 | // Rooted PROJECT-LOCALLY rather than in os.tmpdir(): when the system disk
+      25 | // filled up, the shell broker could not write its own logs and EVERY command
+
+      at console.error (node_modules/@jest/console/build/index.js:124:10)
+      at console.error (src/__tests__/setup.ts:22:26)
+      at DerivedLogger._transform (node_modules/winston/lib/winston/logger.js:326:15)
+      at DerivedLogger.Transform._read (node_modules/readable-stream/lib/_stream_transform.js:166:10)
+      at DerivedLogger.Transform._write (node_modules/readable-stream/lib/_stream_transform.js:155:83)
+      at doWrite (node_modules/readable-stream/lib/_stream_writable.js:390:139)
+      at writeOrBuffer (node_modules/readable-stream/lib/_stream_writable.js:381:5)
+      at DerivedLogger.Writable.write (node_modules/readable-stream/lib/_stream_writable.js:302:11)
+      at DerivedLogger.log (node_modules/winston/lib/winston/logger.js:276:14)
+      at DerivedLogger.<computed> [as error] (node_modules/winston/lib/winston/create-logger.js:95:19)
+      at ActivityLoggerService.flush (src/services/activityLogger.ts:4150:24)
+      at Timeout._onTimeout (src/services/activityLogger.ts:3921:19)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "[winston] Attempt to write logs with no transports, which can increase memory usage: {"service":"mini-erp-api","environment":"test","error":"FOREIGN KEY constraint failed","level":"error","message":"[ActivityLogger] Failed to flush logs:"}".
+
+      20 | };
+      21 |
+    > 22 | // 3. Create isolated temp database for tests (never touch production DB).
+         |                          ^
+      23 | //
+      24 | // Rooted PROJECT-LOCALLY rather than in os.tmpdir(): when the system disk
+      25 | // filled up, the shell broker could not write its own logs and EVERY command
+
+      at console.error (node_modules/@jest/console/build/index.js:124:10)
+      at console.error (src/__tests__/setup.ts:22:26)
+      at DerivedLogger._transform (node_modules/winston/lib/winston/logger.js:326:15)
+      at DerivedLogger.Transform._read (node_modules/readable-stream/lib/_stream_transform.js:166:10)
+      at DerivedLogger.Transform._write (node_modules/readable-stream/lib/_stream_transform.js:155:83)
+      at doWrite (node_modules/readable-stream/lib/_stream_writable.js:390:139)
+      at writeOrBuffer (node_modules/readable-stream/lib/_stream_writable.js:381:5)
+      at DerivedLogger.Writable.write (node_modules/readable-stream/lib/_stream_writable.js:302:11)
+      at DerivedLogger.log (node_modules/winston/lib/winston/logger.js:276:14)
+      at DerivedLogger.<computed> [as error] (node_modules/winston/lib/winston/create-logger.js:95:19)
+      at ActivityLoggerService.flush (src/services/activityLogger.ts:4150:24)
+      at Timeout._onTimeout (src/services/activityLogger.ts:3921:19)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "[winston] Attempt to write logs with no transports, which can increase memory usage: {"service":"mini-erp-api","environment":"test","error":"FOREIGN KEY constraint failed","level":"error","message":"[ActivityLogger] Failed to flush logs:"}".
+
+      20 | };
+      21 |
+    > 22 | // 3. Create isolated temp database for tests (never touch production DB).
+         |                          ^
+      23 | //
+      24 | // Rooted PROJECT-LOCALLY rather than in os.tmpdir(): when the system disk
+      25 | // filled up, the shell broker could not write its own logs and EVERY command
+
+      at console.error (node_modules/@jest/console/build/index.js:124:10)
+      at console.error (src/__tests__/setup.ts:22:26)
+      at DerivedLogger._transform (node_modules/winston/lib/winston/logger.js:326:15)
+      at DerivedLogger.Transform._read (node_modules/readable-stream/lib/_stream_transform.js:166:10)
+      at DerivedLogger.Transform._write (node_modules/readable-stream/lib/_stream_transform.js:155:83)
+      at doWrite (node_modules/readable-stream/lib/_stream_writable.js:390:139)
+      at writeOrBuffer (node_modules/readable-stream/lib/_stream_writable.js:381:5)
+      at DerivedLogger.Writable.write (node_modules/readable-stream/lib/_stream_writable.js:302:11)
+      at DerivedLogger.log (node_modules/winston/lib/winston/logger.js:276:14)
+      at DerivedLogger.<computed> [as error] (node_modules/winston/lib/winston/create-logger.js:95:19)
+      at ActivityLoggerService.flush (src/services/activityLogger.ts:4150:24)
+      at Timeout._onTimeout (src/services/activityLogger.ts:3921:19)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "[winston] Attempt to write logs with no transports, which can increase memory usage: {"service":"mini-erp-api","environment":"test","error":"FOREIGN KEY constraint failed","level":"error","message":"[ActivityLogger] Failed to flush logs:"}".
+
+      20 | };
+      21 |
+    > 22 | // 3. Create isolated temp database for tests (never touch production DB).
+         |                          ^
+      23 | //
+      24 | // Rooted PROJECT-LOCALLY rather than in os.tmpdir(): when the system disk
+      25 | // filled up, the shell broker could not write its own logs and EVERY command
+
+      at console.error (node_modules/@jest/console/build/index.js:124:10)
+      at console.error (src/__tests__/setup.ts:22:26)
+      at DerivedLogger._transform (node_modules/winston/lib/winston/logger.js:326:15)
+      at DerivedLogger.Transform._read (node_modules/readable-stream/lib/_stream_transform.js:166:10)
+      at DerivedLogger.Transform._write (node_modules/readable-stream/lib/_stream_transform.js:155:83)
+      at doWrite (node_modules/readable-stream/lib/_stream_writable.js:390:139)
+      at writeOrBuffer (node_modules/readable-stream/lib/_stream_writable.js:381:5)
+      at DerivedLogger.Writable.write (node_modules/readable-stream/lib/_stream_writable.js:302:11)
+      at DerivedLogger.log (node_modules/winston/lib/winston/logger.js:276:14)
+      at DerivedLogger.<computed> [as error] (node_modules/winston/lib/winston/create-logger.js:95:19)
+      at ActivityLoggerService.flush (src/services/activityLogger.ts:4150:24)
+      at Timeout._onTimeout (src/services/activityLogger.ts:3921:19)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "[winston] Attempt to write logs with no transports, which can increase memory usage: {"service":"mini-erp-api","environment":"test","error":"FOREIGN KEY constraint failed","level":"error","message":"[ActivityLogger] Failed to flush logs:"}".
+
+      20 | };
+      21 |
+    > 22 | // 3. Create isolated temp database for tests (never touch production DB).
+         |                          ^
+      23 | //
+      24 | // Rooted PROJECT-LOCALLY rather than in os.tmpdir(): when the system disk
+      25 | // filled up, the shell broker could not write its own logs and EVERY command
+
+      at console.error (node_modules/@jest/console/build/index.js:124:10)
+      at console.error (src/__tests__/setup.ts:22:26)
+      at DerivedLogger._transform (node_modules/winston/lib/winston/logger.js:326:15)
+      at DerivedLogger.Transform._read (node_modules/readable-stream/lib/_stream_transform.js:166:10)
+      at DerivedLogger.Transform._write (node_modules/readable-stream/lib/_stream_transform.js:155:83)
+      at doWrite (node_modules/readable-stream/lib/_stream_writable.js:390:139)
+      at writeOrBuffer (node_modules/readable-stream/lib/_stream_writable.js:381:5)
+      at DerivedLogger.Writable.write (node_modules/readable-stream/lib/_stream_writable.js:302:11)
+      at DerivedLogger.log (node_modules/winston/lib/winston/logger.js:276:14)
+      at DerivedLogger.<computed> [as error] (node_modules/winston/lib/winston/create-logger.js:95:19)
+      at ActivityLoggerService.flush (src/services/activityLogger.ts:4150:24)
+      at Timeout._onTimeout (src/services/activityLogger.ts:3921:19)
+
+PASS src/__tests__/migrationReplay.test.ts (9.124 s)
+PASS src/__tests__/settlementCashIntegrity.test.ts (13.688 s)
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "[winston] Attempt to write logs with no transports, which can increase memory usage: {"service":"mini-erp-api","environment":"test","error":"FOREIGN KEY constraint failed","level":"error","message":"[ActivityLogger] Failed to flush logs:"}".
+
+      20 | };
+      21 |
+    > 22 | // 3. Create isolated temp database for tests (never touch production DB).
+         |                          ^
+      23 | //
+      24 | // Rooted PROJECT-LOCALLY rather than in os.tmpdir(): when the system disk
+      25 | // filled up, the shell broker could not write its own logs and EVERY command
+
+      at console.error (node_modules/@jest/console/build/index.js:124:10)
+      at console.error (src/__tests__/setup.ts:22:26)
+      at DerivedLogger._transform (node_modules/winston/lib/winston/logger.js:326:15)
+      at DerivedLogger.Transform._read (node_modules/readable-stream/lib/_stream_transform.js:166:10)
+      at DerivedLogger.Transform._write (node_modules/readable-stream/lib/_stream_transform.js:155:83)
+      at doWrite (node_modules/readable-stream/lib/_stream_writable.js:390:139)
+      at writeOrBuffer (node_modules/readable-stream/lib/_stream_writable.js:381:5)
+      at DerivedLogger.Writable.write (node_modules/readable-stream/lib/_stream_writable.js:302:11)
+      at DerivedLogger.log (node_modules/winston/lib/winston/logger.js:276:14)
+      at DerivedLogger.<computed> [as error] (node_modules/winston/lib/winston/create-logger.js:95:19)
+      at ActivityLoggerService.flush (src/services/activityLogger.ts:4150:24)
+      at Timeout._onTimeout (src/services/activityLogger.ts:3921:19)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "[winston] Attempt to write logs with no transports, which can increase memory usage: {"service":"mini-erp-api","environment":"test","error":"FOREIGN KEY constraint failed","level":"error","message":"[ActivityLogger] Failed to flush logs:"}".
+
+      20 | };
+      21 |
+    > 22 | // 3. Create isolated temp database for tests (never touch production DB).
+         |                          ^
+      23 | //
+      24 | // Rooted PROJECT-LOCALLY rather than in os.tmpdir(): when the system disk
+      25 | // filled up, the shell broker could not write its own logs and EVERY command
+
+      at console.error (node_modules/@jest/console/build/index.js:124:10)
+      at console.error (src/__tests__/setup.ts:22:26)
+      at DerivedLogger._transform (node_modules/winston/lib/winston/logger.js:326:15)
+      at DerivedLogger.Transform._read (node_modules/readable-stream/lib/_stream_transform.js:166:10)
+      at DerivedLogger.Transform._write (node_modules/readable-stream/lib/_stream_transform.js:155:83)
+      at doWrite (node_modules/readable-stream/lib/_stream_writable.js:390:139)
+      at writeOrBuffer (node_modules/readable-stream/lib/_stream_writable.js:381:5)
+      at DerivedLogger.Writable.write (node_modules/readable-stream/lib/_stream_writable.js:302:11)
+      at DerivedLogger.log (node_modules/winston/lib/winston/logger.js:276:14)
+      at DerivedLogger.<computed> [as error] (node_modules/winston/lib/winston/create-logger.js:95:19)
+      at ActivityLoggerService.flush (src/services/activityLogger.ts:4150:24)
+      at Timeout._onTimeout (src/services/activityLogger.ts:3921:19)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "[winston] Attempt to write logs with no transports, which can increase memory usage: {"service":"mini-erp-api","environment":"test","error":"FOREIGN KEY constraint failed","level":"error","message":"[ActivityLogger] Failed to flush logs:"}".
+
+      20 | };
+      21 |
+    > 22 | // 3. Create isolated temp database for tests (never touch production DB).
+         |                          ^
+      23 | //
+      24 | // Rooted PROJECT-LOCALLY rather than in os.tmpdir(): when the system disk
+      25 | // filled up, the shell broker could not write its own logs and EVERY command
+
+      at console.error (node_modules/@jest/console/build/index.js:124:10)
+      at console.error (src/__tests__/setup.ts:22:26)
+      at DerivedLogger._transform (node_modules/winston/lib/winston/logger.js:326:15)
+      at DerivedLogger.Transform._read (node_modules/readable-stream/lib/_stream_transform.js:166:10)
+      at DerivedLogger.Transform._write (node_modules/readable-stream/lib/_stream_transform.js:155:83)
+      at doWrite (node_modules/readable-stream/lib/_stream_writable.js:390:139)
+      at writeOrBuffer (node_modules/readable-stream/lib/_stream_writable.js:381:5)
+      at DerivedLogger.Writable.write (node_modules/readable-stream/lib/_stream_writable.js:302:11)
+      at DerivedLogger.log (node_modules/winston/lib/winston/logger.js:276:14)
+      at DerivedLogger.<computed> [as error] (node_modules/winston/lib/winston/create-logger.js:95:19)
+      at ActivityLoggerService.flush (src/services/activityLogger.ts:4150:24)
+      at Timeout._onTimeout (src/services/activityLogger.ts:3921:19)
+
+PASS src/__tests__/writeOff.test.ts (7.579 s)
+PASS src/__tests__/supplierPrepayments.test.ts (9.461 s)
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "[winston] Attempt to write logs with no transports, which can increase memory usage: {"service":"mini-erp-api","environment":"test","error":"FOREIGN KEY constraint failed","level":"error","message":"[ActivityLogger] Failed to flush logs:"}".
+
+      20 | };
+      21 |
+    > 22 | // 3. Create isolated temp database for tests (never touch production DB).
+         |                          ^
+      23 | //
+      24 | // Rooted PROJECT-LOCALLY rather than in os.tmpdir(): when the system disk
+      25 | // filled up, the shell broker could not write its own logs and EVERY command
+
+      at console.error (node_modules/@jest/console/build/index.js:124:10)
+      at console.error (src/__tests__/setup.ts:22:26)
+      at DerivedLogger._transform (node_modules/winston/lib/winston/logger.js:326:15)
+      at DerivedLogger.Transform._read (node_modules/readable-stream/lib/_stream_transform.js:166:10)
+      at DerivedLogger.Transform._write (node_modules/readable-stream/lib/_stream_transform.js:155:83)
+      at doWrite (node_modules/readable-stream/lib/_stream_writable.js:390:139)
+      at writeOrBuffer (node_modules/readable-stream/lib/_stream_writable.js:381:5)
+      at DerivedLogger.Writable.write (node_modules/readable-stream/lib/_stream_writable.js:302:11)
+      at DerivedLogger.log (node_modules/winston/lib/winston/logger.js:276:14)
+      at DerivedLogger.<computed> [as error] (node_modules/winston/lib/winston/create-logger.js:95:19)
+      at ActivityLoggerService.flush (src/services/activityLogger.ts:4150:24)
+      at Timeout._onTimeout (src/services/activityLogger.ts:3921:19)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "[winston] Attempt to write logs with no transports, which can increase memory usage: {"service":"mini-erp-api","environment":"test","error":"FOREIGN KEY constraint failed","level":"error","message":"[ActivityLogger] Failed to flush logs:"}".
+
+      20 | };
+      21 |
+    > 22 | // 3. Create isolated temp database for tests (never touch production DB).
+         |                          ^
+      23 | //
+      24 | // Rooted PROJECT-LOCALLY rather than in os.tmpdir(): when the system disk
+      25 | // filled up, the shell broker could not write its own logs and EVERY command
+
+      at console.error (node_modules/@jest/console/build/index.js:124:10)
+      at console.error (src/__tests__/setup.ts:22:26)
+      at DerivedLogger._transform (node_modules/winston/lib/winston/logger.js:326:15)
+      at DerivedLogger.Transform._read (node_modules/readable-stream/lib/_stream_transform.js:166:10)
+      at DerivedLogger.Transform._write (node_modules/readable-stream/lib/_stream_transform.js:155:83)
+      at doWrite (node_modules/readable-stream/lib/_stream_writable.js:390:139)
+      at writeOrBuffer (node_modules/readable-stream/lib/_stream_writable.js:381:5)
+      at DerivedLogger.Writable.write (node_modules/readable-stream/lib/_stream_writable.js:302:11)
+      at DerivedLogger.log (node_modules/winston/lib/winston/logger.js:276:14)
+      at DerivedLogger.<computed> [as error] (node_modules/winston/lib/winston/create-logger.js:95:19)
+      at ActivityLoggerService.flush (src/services/activityLogger.ts:4150:24)
+      at Timeout._onTimeout (src/services/activityLogger.ts:3921:19)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "[winston] Attempt to write logs with no transports, which can increase memory usage: {"service":"mini-erp-api","environment":"test","error":"FOREIGN KEY constraint failed","level":"error","message":"[ActivityLogger] Failed to flush logs:"}".
+
+      20 | };
+      21 |
+    > 22 | // 3. Create isolated temp database for tests (never touch production DB).
+         |                          ^
+      23 | //
+      24 | // Rooted PROJECT-LOCALLY rather than in os.tmpdir(): when the system disk
+      25 | // filled up, the shell broker could not write its own logs and EVERY command
+
+      at console.error (node_modules/@jest/console/build/index.js:124:10)
+      at console.error (src/__tests__/setup.ts:22:26)
+      at DerivedLogger._transform (node_modules/winston/lib/winston/logger.js:326:15)
+      at DerivedLogger.Transform._read (node_modules/readable-stream/lib/_stream_transform.js:166:10)
+      at DerivedLogger.Transform._write (node_modules/readable-stream/lib/_stream_transform.js:155:83)
+      at doWrite (node_modules/readable-stream/lib/_stream_writable.js:390:139)
+      at writeOrBuffer (node_modules/readable-stream/lib/_stream_writable.js:381:5)
+      at DerivedLogger.Writable.write (node_modules/readable-stream/lib/_stream_writable.js:302:11)
+      at DerivedLogger.log (node_modules/winston/lib/winston/logger.js:276:14)
+      at DerivedLogger.<computed> [as error] (node_modules/winston/lib/winston/create-logger.js:95:19)
+      at ActivityLoggerService.flush (src/services/activityLogger.ts:4150:24)
+      at Timeout._onTimeout (src/services/activityLogger.ts:3921:19)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "[winston] Attempt to write logs with no transports, which can increase memory usage: {"service":"mini-erp-api","environment":"test","error":"FOREIGN KEY constraint failed","level":"error","message":"[ActivityLogger] Failed to flush logs:"}".
+
+      20 | };
+      21 |
+    > 22 | // 3. Create isolated temp database for tests (never touch production DB).
+         |                          ^
+      23 | //
+      24 | // Rooted PROJECT-LOCALLY rather than in os.tmpdir(): when the system disk
+      25 | // filled up, the shell broker could not write its own logs and EVERY command
+
+      at console.error (node_modules/@jest/console/build/index.js:124:10)
+      at console.error (src/__tests__/setup.ts:22:26)
+      at DerivedLogger._transform (node_modules/winston/lib/winston/logger.js:326:15)
+      at DerivedLogger.Transform._read (node_modules/readable-stream/lib/_stream_transform.js:166:10)
+      at DerivedLogger.Transform._write (node_modules/readable-stream/lib/_stream_transform.js:155:83)
+      at doWrite (node_modules/readable-stream/lib/_stream_writable.js:390:139)
+      at writeOrBuffer (node_modules/readable-stream/lib/_stream_writable.js:381:5)
+      at DerivedLogger.Writable.write (node_modules/readable-stream/lib/_stream_writable.js:302:11)
+      at DerivedLogger.log (node_modules/winston/lib/winston/logger.js:276:14)
+      at DerivedLogger.<computed> [as error] (node_modules/winston/lib/winston/create-logger.js:95:19)
+      at ActivityLoggerService.flush (src/services/activityLogger.ts:4150:24)
+      at Timeout._onTimeout (src/services/activityLogger.ts:3921:19)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "[winston] Attempt to write logs with no transports, which can increase memory usage: {"service":"mini-erp-api","environment":"test","error":"FOREIGN KEY constraint failed","level":"error","message":"[ActivityLogger] Failed to flush logs:"}".
+
+      20 | };
+      21 |
+    > 22 | // 3. Create isolated temp database for tests (never touch production DB).
+         |                          ^
+      23 | //
+      24 | // Rooted PROJECT-LOCALLY rather than in os.tmpdir(): when the system disk
+      25 | // filled up, the shell broker could not write its own logs and EVERY command
+
+      at console.error (node_modules/@jest/console/build/index.js:124:10)
+      at console.error (src/__tests__/setup.ts:22:26)
+      at DerivedLogger._transform (node_modules/winston/lib/winston/logger.js:326:15)
+      at DerivedLogger.Transform._read (node_modules/readable-stream/lib/_stream_transform.js:166:10)
+      at DerivedLogger.Transform._write (node_modules/readable-stream/lib/_stream_transform.js:155:83)
+      at doWrite (node_modules/readable-stream/lib/_stream_writable.js:390:139)
+      at writeOrBuffer (node_modules/readable-stream/lib/_stream_writable.js:381:5)
+      at DerivedLogger.Writable.write (node_modules/readable-stream/lib/_stream_writable.js:302:11)
+      at DerivedLogger.log (node_modules/winston/lib/winston/logger.js:276:14)
+      at DerivedLogger.<computed> [as error] (node_modules/winston/lib/winston/create-logger.js:95:19)
+      at ActivityLoggerService.flush (src/services/activityLogger.ts:4150:24)
+      at Timeout._onTimeout (src/services/activityLogger.ts:3921:19)
+
+PASS src/__tests__/moneyPaths.test.ts (9.558 s)
+PASS src/__tests__/paymentEditReposting.test.ts (11.926 s)
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "[winston] Attempt to write logs with no transports, which can increase memory usage: {"service":"mini-erp-api","environment":"test","error":"FOREIGN KEY constraint failed","level":"error","message":"[ActivityLogger] Failed to flush logs:"}".
+
+      20 | };
+      21 |
+    > 22 | // 3. Create isolated temp database for tests (never touch production DB).
+         |                          ^
+      23 | //
+      24 | // Rooted PROJECT-LOCALLY rather than in os.tmpdir(): when the system disk
+      25 | // filled up, the shell broker could not write its own logs and EVERY command
+
+      at console.error (node_modules/@jest/console/build/index.js:124:10)
+      at console.error (src/__tests__/setup.ts:22:26)
+      at DerivedLogger._transform (node_modules/winston/lib/winston/logger.js:326:15)
+      at DerivedLogger.Transform._read (node_modules/readable-stream/lib/_stream_transform.js:166:10)
+      at DerivedLogger.Transform._write (node_modules/readable-stream/lib/_stream_transform.js:155:83)
+      at doWrite (node_modules/readable-stream/lib/_stream_writable.js:390:139)
+      at writeOrBuffer (node_modules/readable-stream/lib/_stream_writable.js:381:5)
+      at DerivedLogger.Writable.write (node_modules/readable-stream/lib/_stream_writable.js:302:11)
+      at DerivedLogger.log (node_modules/winston/lib/winston/logger.js:276:14)
+      at DerivedLogger.<computed> [as error] (node_modules/winston/lib/winston/create-logger.js:95:19)
+      at ActivityLoggerService.flush (src/services/activityLogger.ts:4150:24)
+      at Timeout._onTimeout (src/services/activityLogger.ts:3921:19)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "[winston] Attempt to write logs with no transports, which can increase memory usage: {"service":"mini-erp-api","environment":"test","error":"FOREIGN KEY constraint failed","level":"error","message":"[ActivityLogger] Failed to flush logs:"}".
+
+      20 | };
+      21 |
+    > 22 | // 3. Create isolated temp database for tests (never touch production DB).
+         |                          ^
+      23 | //
+      24 | // Rooted PROJECT-LOCALLY rather than in os.tmpdir(): when the system disk
+      25 | // filled up, the shell broker could not write its own logs and EVERY command
+
+      at console.error (node_modules/@jest/console/build/index.js:124:10)
+      at console.error (src/__tests__/setup.ts:22:26)
+      at DerivedLogger._transform (node_modules/winston/lib/winston/logger.js:326:15)
+      at DerivedLogger.Transform._read (node_modules/readable-stream/lib/_stream_transform.js:166:10)
+      at DerivedLogger.Transform._write (node_modules/readable-stream/lib/_stream_transform.js:155:83)
+      at doWrite (node_modules/readable-stream/lib/_stream_writable.js:390:139)
+      at writeOrBuffer (node_modules/readable-stream/lib/_stream_writable.js:381:5)
+      at DerivedLogger.Writable.write (node_modules/readable-stream/lib/_stream_writable.js:302:11)
+      at DerivedLogger.log (node_modules/winston/lib/winston/logger.js:276:14)
+      at DerivedLogger.<computed> [as error] (node_modules/winston/lib/winston/create-logger.js:95:19)
+      at ActivityLoggerService.flush (src/services/activityLogger.ts:4150:24)
+      at Timeout._onTimeout (src/services/activityLogger.ts:3921:19)
+
+
+  ●  Cannot log after tests are done. Did you forget to wait for something async in your test?
+    Attempted to log "[winston] Attempt to write logs with no transports, which can increase memory usage: {"service":"mini-erp-api","environment":"test","error":"FOREIGN KEY constraint failed","level":"error","message":"[ActivityLogger] Failed to flush logs:"}".
+
+      20 | };
+      21 |
+    > 22 | // 3. Create isolated temp database for tests (never touch production DB).
+         |                          ^
+      23 | //
+      24 | // Rooted PROJECT-LOCALLY rather than in os.tmpdir(): when the system disk
+      25 | // filled up, the shell broker could not write its own logs and EVERY command
+
+      at console.error (node_modules/@jest/console/build/index.js:124:10)
+      at console.error (src/__tests__/setup.ts:22:26)
+      at DerivedLogger._transform (node_modules/winston/lib/winston/logger.js:326:15)
+      at DerivedLogger.Transform._read (node_modules/readable-stream/lib/_stream_transform.js:166:10)
+      at DerivedLogger.Transform._write (node_modules/readable-stream/lib/_stream_transform.js:155:83)
+      at doWrite (node_modules/readable-stream/lib/_stream_writable.js:390:139)
+      at writeOrBuffer (node_modules/readable-stream/lib/_stream_writable.js:381:5)
+      at DerivedLogger.Writable.write (node_modules/readable-stream/lib/_stream_writable.js:302:11)
+      at DerivedLogger.log (node_modules/winston/lib/winston/logger.js:276:14)
+      at DerivedLogger.<computed> [as error] (node_modules/winston/lib/winston/create-logger.js:95:19)
+      at ActivityLoggerService.flush (src/services/activityLogger.ts:4150:24)
+      at Timeout._onTimeout (src/services/activityLogger.ts:3921:19)
+
+PASS src/__tests__/invoiceReturnAcceptance.test.ts (10.232 s)
+PASS src/__tests__/auditRegression6.test.ts (11.384 s)
+PASS src/__tests__/glLifecycle.test.ts (5.828 s)
+PASS src/__tests__/auditRegression.test.ts (11.29 s)
+PASS src/__tests__/invoiceReturnVoidsAndPrint.test.ts (9.889 s)
+PASS src/__tests__/invoiceCancelReturnCollision.test.ts (10.365 s)
+PASS src/__tests__/auditRegression4.test.ts (13.749 s)
+PASS src/__tests__/unappliedCashFixture.test.ts (5.719 s)
+PASS src/__tests__/unappliedCashApi.test.ts (11.545 s)
+PASS src/__tests__/auditRegression3.test.ts (7.896 s)
+PASS src/__tests__/countCorrection.test.ts (7.824 s)
+PASS src/__tests__/goodsReceiptVoid.test.ts (8.385 s)
+PASS src/__tests__/forecastConfigInjection.test.ts (7.052 s)
+PASS src/__tests__/glPoCommitment.test.ts (8.904 s)
+PASS src/__tests__/softDelete.test.ts (6.9 s)
+PASS src/__tests__/ownerEquityLists.test.ts (9.847 s)
+PASS src/__tests__/auditTrail.test.ts (7.742 s)
+PASS src/__tests__/overAllocationGuard.test.ts (8.376 s)
+PASS src/__tests__/bomUpdateAndExpiryReport.test.ts (8.45 s)
+PASS src/__tests__/stockMovementController.test.ts (10.097 s)
+PASS src/__tests__/invoiceIdempotency.test.ts (9.365 s)
+PASS src/__tests__/passwordPolicy.test.ts (7.53 s)
+PASS src/__tests__/idempotencyRound1.test.ts (8.932 s)
+PASS src/__tests__/inventoryOpeningAndReconcileCoverage.test.ts (9.021 s)
+PASS src/__tests__/paymentRecordingMatrix.test.ts (7.67 s)
+PASS src/__tests__/dashboardWeek.test.ts
+PASS src/__tests__/stockInputTax.test.ts (8.671 s)
+PASS src/__tests__/inventoryValuation.test.ts (8.697 s)
+PASS src/__tests__/idempotencyRound2.test.ts (11.984 s)
+PASS src/__tests__/maintenance-reconciliation-cli.test.ts (8.34 s)
+PASS src/__tests__/reverseStockRestock.test.ts (11.292 s)
+PASS src/__tests__/expensePaymentMethodOptions.test.ts (11.152 s)
+PASS src/__tests__/taxGlRepairMigration.test.ts (11.45 s)
+PASS src/__tests__/headerDiscountPersistence.test.ts (15.619 s)
+PASS src/__tests__/invoiceReturnEdgeCases.test.ts (12.009 s)
+PASS src/__tests__/purchaseSummaryVoided.test.ts (10.469 s)
+PASS src/__tests__/multiOutputProduction.test.ts (12.643 s)
+PASS src/__tests__/businessErrorClassification.test.ts (9.438 s)
+PASS src/__tests__/search.test.ts (18.713 s)
+PASS src/__tests__/auditTraceReadiness.test.ts (12.648 s)
+PASS src/__tests__/customReportValidation.test.ts (12.923 s)
+PASS src/__tests__/arPartialReturn.test.ts (10.697 s)
+PASS src/__tests__/stockTransferVoid.test.ts (9.799 s)
+PASS src/__tests__/invoiceRestore.test.ts (14.584 s)
+PASS src/__tests__/poReceiptGl.test.ts (21.578 s)
+PASS src/__tests__/supplierBills.test.ts (13.539 s)
+PASS src/__tests__/activityLogCurrency.test.ts (17.792 s)
+PASS src/__tests__/ledgerIntegrity.test.ts (12.979 s)
+PASS src/__tests__/weekMath.test.ts (7.073 s)
+PASS src/__tests__/errorMessageHelpers.test.ts (8.635 s)
+PASS src/__tests__/statementControllers.test.ts (9.947 s)
+PASS src/__tests__/maintenance-stock-repair-cli.test.ts (6.481 s)
+PASS src/__tests__/expenseTransitionMatrix.test.ts (8.664 s)
+PASS src/__tests__/fabricatedStockGuard.test.ts (9.296 s)
+PASS src/__tests__/cashReconciliationController.test.ts (13.642 s)
+PASS src/__tests__/miscControllerCoverage.test.ts (7.709 s)
+PASS src/__tests__/invoiceSplitStatus.test.ts (7.777 s)
+PASS src/__tests__/invoiceDeleteCoverage.test.ts (7.327 s)
+PASS src/__tests__/cashInflowReversal.test.ts (9.923 s)
+PASS src/__tests__/taxPostingConsistency.test.ts (8.653 s)
+PASS src/__tests__/mobileReturn.test.ts (9.846 s)
+PASS src/__tests__/expiredStockSaleBlocking.test.ts (13.387 s)
+FAIL src/__tests__/inventoryQueryControllers.test.ts (9.191 s)
+  ● inventory CRAP-42 controllers › releaseReservation › restores the batch/location reserved and available quantities
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 2
+    + Received  + 2
+
+      Object {
+    -   "quantity_available": 9,
+    -   "quantity_reserved": 1,
+    +   "quantity_available": 7,
+    +   "quantity_reserved": 3,
+      }
+
+      281 |         quantity_available: number;
+      282 |       };
+    > 283 |       expect(row).toEqual({ quantity_reserved: 1, quantity_available: 9 });
+          |                   ^
+      284 |     });
+      285 |
+      286 |     it('returns a sanitized 500 when the release fails', async () => {
+
+      at Object.<anonymous> (src/__tests__/inventoryQueryControllers.test.ts:283:19)
+
+  ● inventory CRAP-42 controllers › releaseReservation › returns a sanitized 500 when the release fails
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 1
+
+      Object {
+    -   "error": "forced release failure",
+    +   "error": "Failed to release reservation",
+      }
+
+      292 |       const res = await release();
+      293 |       expect(res.status).toBe(500);
+    > 294 |       expect(res.body).toEqual({ error: 'forced release failure' });
+          |                        ^
+      295 |     });
+      296 |   });
+      297 | });
+
+      at Object.<anonymous> (src/__tests__/inventoryQueryControllers.test.ts:294:24)
+
+PASS src/__tests__/security.regression.test.ts (12.352 s)
+PASS src/__tests__/dashboardBoot.test.ts (9.481 s)
+PASS src/__tests__/controllerQueryBatch.test.ts (12.827 s)
+PASS src/__tests__/systemWarehouseGuard.test.ts (10.318 s)
+PASS src/__tests__/correctionAuthorization.test.ts (7.979 s)
+PASS src/__tests__/localNetwork.test.ts (6.115 s)
+PASS src/__tests__/productionDeleteGl.test.ts (13.339 s)
+PASS src/__tests__/ownerBorrowerUpdate.test.ts (13.14 s)
+PASS src/__tests__/creditExpenses.test.ts (12.965 s)
+PASS src/__tests__/employeeUpdateAndRepayCoverage.test.ts (14.061 s)
+PASS src/__tests__/ownerEquity.test.ts (10.445 s)
+PASS src/__tests__/glAuthority.test.ts (11.453 s)
+PASS src/__tests__/adminBackupDotfileDownload.test.ts (7.235 s)
+PASS src/__tests__/inventoryEffectiveDate.test.ts (9.566 s)
+PASS src/__tests__/userSelfRole.test.ts (7.376 s)
+PASS src/__tests__/mergeFallowCoverage.test.ts (7.442 s)
+PASS src/__tests__/auditRegression5.test.ts (11.994 s)
+PASS src/__tests__/glSoftDelete.test.ts (10.462 s)
+PASS src/__tests__/poCancelReversal.test.ts (11.203 s)
+PASS src/__tests__/clientValidationStatus.test.ts (14.6 s)
+PASS src/__tests__/bomItemsSchemaRepair.test.ts (7.502 s)
+PASS src/__tests__/creditOffsetUpdate.test.ts (22.735 s)
+PASS src/__tests__/returnMath.test.ts (7.083 s)
+PASS src/__tests__/forecastTrendData.test.ts (12.413 s)
+PASS src/__tests__/expiryHasExpiryGuard.test.ts (16.33 s)
+PASS src/__tests__/historicalDataIntegrityScanner.test.ts (8.998 s)
+PASS src/__tests__/purchaseOrderInputTax.test.ts (16.886 s)
+PASS src/__tests__/salaryAtomicDeduction.test.ts (14.593 s)
+PASS src/__tests__/dashboardLayoutRename.test.ts (15.017 s)
+PASS src/__tests__/forecastOverride.test.ts (8.067 s)
+PASS src/__tests__/reportingCoverage.test.ts (20.636 s)
+PASS src/__tests__/expenseCategoryCrud.test.ts (21.061 s)
+PASS src/__tests__/statusMachine.test.ts (21.78 s)
+PASS src/__tests__/floatingPointPrecision.test.ts (7.305 s)
+PASS src/__tests__/invoiceReturnMigration.test.ts (8.504 s)
+FAIL src/__tests__/unappliedCashReadApi.test.ts (22.515 s)
+  ● summaries are independent of receipt pagination and obey operation date and customer ownership
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 1
+
+      Object {
+    -   "total": 502,
+    +   "total": 503,
+      }
+
+      45 |   expect(result.body.data.receipts).toEqual([expect.objectContaining({ payment_id: first.body.data.paymentId, can_reverse: true })]);
+      46 |   expect(result.body.pagination).toMatchObject({ currentPage: 2, totalPages: 2, totalItems: 2, limit: 1 });
+    > 47 |   expect(db.prepare('SELECT total_changes() total').get()).toEqual({ total: changes });
+         |                                                            ^
+      48 | });
+      49 |
+      50 | test('voided receipts remain visible but cannot contribute capacity or reverse again', async () => {
+
+      at Object.<anonymous> (src/__tests__/unappliedCashReadApi.test.ts:47:60)
+
+PASS src/__tests__/glReturnTaxBalance.test.ts (15.4 s)
+PASS src/__tests__/activityLogApiCoverage.test.ts (28.093 s)
+PASS src/__tests__/expensePagination.test.ts (8.53 s)
+PASS src/__tests__/purchaseOrderSupplierSummary.test.ts (20.941 s)
+PASS src/__tests__/purchaseOrderAndWithdrawalCoverage.test.ts (14.226 s)
+PASS src/__tests__/poCancelPartialReceipt.test.ts (22.534 s)
+PASS src/__tests__/employeeLoanDelete.test.ts (18.425 s)
+PASS src/__tests__/maintenance-batches-cli.test.ts (9.983 s)
+PASS src/__tests__/auditRegression2.test.ts (31.729 s)
+PASS src/__tests__/bootIdempotency.test.ts (11.244 s)
+PASS src/__tests__/stockRepairAndReconciliationCoverage.test.ts (10.278 s)
+PASS src/__tests__/supplierListController.test.ts (31.189 s)
+PASS src/__tests__/dashboardLayoutCrud.test.ts (31.651 s)
+PASS src/__tests__/cashOpeningAndFlow.test.ts (35.54 s)
+PASS src/__tests__/supplierUpdateController.test.ts (35.503 s)
+PASS src/__tests__/dbIntegrityConstraints.test.ts (25.735 s)
+PASS src/__tests__/reportExpressionSecurity.test.ts (39.196 s)
+PASS src/__tests__/invoiceMigrationTelemetry.test.ts (34.341 s)
+PASS src/__tests__/rolesUpdateDelete.test.ts (26.614 s)
+PASS src/__tests__/ownerCapitalListModelCoverage.test.ts (14.711 s)
+PASS src/__tests__/opsControllerCoverage.test.ts (21.465 s)
+PASS src/__tests__/invoiceAndSalesOrderListCoverage.test.ts (11.359 s)
+PASS src/__tests__/dashboardKpiAndMiscCoverage.test.ts (15.717 s)
+PASS src/__tests__/maintenance-ledger-cli.test.ts (12.717 s)
+
+<--- Last few GCs --->
+
+[388261:0xc834000]  2737253 ms: Scavenge (interleaved) 2028.0 (2051.0) -> 2024.4 (2059.0) MB, pooled: 0 MB, 15.71 / 0.00 ms  (average mu = 0.172, current mu = 0.079) allocation failure; 
+[388261:0xc834000]  2744701 ms: Mark-Compact 2042.0 (2072.2) -> 2012.9 (2081.5) MB, pooled: 0 MB, 6846.69 / 0.00 ms  (average mu = 0.233, current mu = 0.296) allocation failure; scavenge might not succeed
+
+FATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed - JavaScript heap out of memory
+----- Native stack trace -----
+
+FAIL src/__tests__/ownerWithdrawalEditRoutes.test.ts
+  ● Test suite failed to run
+
+    Jest worker ran out of memory and crashed
+
+      at ChildProcessWorker._onExit (node_modules/jest-worker/build/index.js:928:26)
+
+PASS src/__tests__/bomControllerCreate.test.ts (27.907 s)
+FAIL src/__tests__/dashboardKpi.test.ts (77.015 s)
+  ● dashboard /kpi additional cards (net profit, expenses, etc.) › expenses sums non-cancelled expenses within the range
+
+    SqliteError: no such column: a.name
+
+      447 |
+      448 |   const totalExpenses = round2(opexMovement.total_debit - opexMovement.total_credit);
+    > 449 |   const otherAccounts = db.prepare(`SELECT a.code,a.name,ROUND(SUM(j.debit-j.credit),2) AS total
+          |                            ^
+      450 |     FROM journal_lines j JOIN chart_of_accounts a ON a.id=j.account_id
+      451 |     WHERE a.type='expense' AND a.code NOT IN ('5000','6000') AND j.voided=0 AND j.line_date BETWEEN ? AND ?
+      452 |     GROUP BY a.id HAVING ABS(SUM(j.debit-j.credit))>0.005 ORDER BY a.code`).all(startDate, endDate) as Array<{ code: string; name: string; total: number }>;
+
+      at Database.prepare (node_modules/better-sqlite3/lib/methods/wrappers.js:5:21)
+      at Object.prepare [as getProfitLossReport] (src/models/Reports.ts:449:28)
+      at getProfitLossReport (src/models/Dashboard.ts:518:37)
+      at Object.periodFinancialKPI [as getKPI] (src/models/Dashboard.ts:534:24)
+      at Object.<anonymous> (src/__tests__/dashboardKpi.test.ts:344:32)
+
+  ● dashboard /kpi additional cards (net profit, expenses, etc.) › net_profit = revenue − COGS − expenses (matches P&L)
+
+    SqliteError: no such column: a.name
+
+      447 |
+      448 |   const totalExpenses = round2(opexMovement.total_debit - opexMovement.total_credit);
+    > 449 |   const otherAccounts = db.prepare(`SELECT a.code,a.name,ROUND(SUM(j.debit-j.credit),2) AS total
+          |                            ^
+      450 |     FROM journal_lines j JOIN chart_of_accounts a ON a.id=j.account_id
+      451 |     WHERE a.type='expense' AND a.code NOT IN ('5000','6000') AND j.voided=0 AND j.line_date BETWEEN ? AND ?
+      452 |     GROUP BY a.id HAVING ABS(SUM(j.debit-j.credit))>0.005 ORDER BY a.code`).all(startDate, endDate) as Array<{ code: string; name: string; total: number }>;
+
+      at Database.prepare (node_modules/better-sqlite3/lib/methods/wrappers.js:5:21)
+      at Object.prepare [as getProfitLossReport] (src/models/Reports.ts:449:28)
+      at getProfitLossReport (src/models/Dashboard.ts:523:37)
+      at Object.periodFinancialKPI [as getKPI] (src/models/Dashboard.ts:534:24)
+      at Object.<anonymous> (src/__tests__/dashboardKpi.test.ts:366:35)
+
+  ● dashboard /kpi additional cards (net profit, expenses, etc.) › net_profit is range-filtered like the P&L report
+
+    SqliteError: no such column: a.name
+
+      447 |
+      448 |   const totalExpenses = round2(opexMovement.total_debit - opexMovement.total_credit);
+    > 449 |   const otherAccounts = db.prepare(`SELECT a.code,a.name,ROUND(SUM(j.debit-j.credit),2) AS total
+          |                            ^
+      450 |     FROM journal_lines j JOIN chart_of_accounts a ON a.id=j.account_id
+      451 |     WHERE a.type='expense' AND a.code NOT IN ('5000','6000') AND j.voided=0 AND j.line_date BETWEEN ? AND ?
+      452 |     GROUP BY a.id HAVING ABS(SUM(j.debit-j.credit))>0.005 ORDER BY a.code`).all(startDate, endDate) as Array<{ code: string; name: string; total: number }>;
+
+      at Database.prepare (node_modules/better-sqlite3/lib/methods/wrappers.js:5:21)
+      at Object.prepare [as getProfitLossReport] (src/models/Reports.ts:449:28)
+      at getProfitLossReport (src/models/Dashboard.ts:523:37)
+      at Object.periodFinancialKPI [as getKPI] (src/models/Dashboard.ts:534:24)
+      at Object.<anonymous> (src/__tests__/dashboardKpi.test.ts:383:32)
+
+PASS src/__tests__/purchaseOrderLineUpdate.test.ts (36.693 s)
+PASS src/services/__tests__/accountingCashLookup.test.ts (16.569 s)
+
+<--- Last few GCs --->
+
+[388262:0x32a2f000]  2841443 ms: Mark-Compact 2029.8 (2057.5) -> 2003.2 (2056.1) MB, pooled: 0 MB, 8264FAIL src/__tests__/migrationChecksumValidation.test.ts
+  ● Test suite failed to run
+
+    Jest worker ran out of memory and crashed
+
+      at ChildProcessWorker._onExit (node_modules/jest-worker/build/index.js:928:26)
+
+PASS src/__tests__/expiredStockMigration.test.ts (9.357 s)
+PASS src/__tests__/integrationsSettingsRoute.test.ts (41.452 s)
+PASS src/__tests__/dashboardKpiBatch.test.ts (22.562 s)
+PASS src/__tests__/stockAuthority.test.ts (16.653 s)
+PASS src/__tests__/stockBatchRoutes.test.ts (96.26 s)
+PASS src/__tests__/userPreferences.test.ts (15.747 s)
+PASS src/__tests__/mobileInvoiceDeprecation.test.ts (19.601 s)
+PASS src/__tests__/expressionCastCoverage.test.ts (10.382 s)
+PASS src/__tests__/strictNullChecksRegressions.test.ts (11.288 s)
+PASS src/__tests__/arHistoricalAging.test.ts (15.39 s)
+PASS src/__tests__/validation.test.ts (21.814 s)
+PASS src/__tests__/invoiceCreationService.test.ts (14.5 s)
+PASS src/__tests__/accountingPeriodRoller.test.ts (6.074 s)
+PASS src/__tests__/backupVerifySnapshot.test.ts (8.709 s)
+PASS src/__tests__/reportsControllerStatements.test.ts (8.459 s)

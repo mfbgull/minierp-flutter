@@ -1,5 +1,7 @@
 # Findings register
 
+> Current assessment, 2026-10-26: this report preserves its historical audit snapshot. See [remediation status](remediation/STATUS.md) for current source verification, fixes, tests and remaining limits.
+
 **16 confirmed defects: 2 Critical, 6 High, 7 Medium, 1 Low.** One separately observed behavior requires an accounting-policy decision and is excluded from those counts. No fix or financial repair was implemented by this audit. Severity follows proven impact; a failed request that rolls back is not described as committed corruption. Later unrelated working-tree edits are preserved; the findings state their executed snapshot and revalidation limits.
 
 | ID | Status | Severity | Proven result | Finding / reproducible evidence |

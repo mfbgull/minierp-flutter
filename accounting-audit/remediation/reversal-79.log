@@ -1,0 +1,100 @@
+
+> mini-erp-server@1.0.0 verify:reversal-rules
+> ts-node --transpile-only scripts/verify-reversal-rules.ts
+
+Phase 1 reversal-rules verification (fresh temp DB)
+C1 case 1 — cancel unpaid invoice
+  PASS  invoice posted GL lines
+  PASS  status Cancelled
+  PASS  stock restored +2 (got 2.00, want 2.00)
+  PASS  INVOICE GL lines voided
+  PASS  INVOICE_RETURN GL voided
+  PASS  voided lines retained for audit
+  PASS  ledger debit 100 (got 100.00, want 100.00)
+  PASS  ledger credit 100 (CANCELLATION) (got 100.00, want 100.00)
+  PASS  customer balance net 0 (got 0.00, want 0.00)
+  PASS  INVOICE_CANCEL movement exists
+C1 case 3 — partially-paid invoice blocked
+  PASS  guard threw InvoiceCancellationGuardError
+  PASS  status unchanged
+  PASS  GL still active
+  PASS  no reversal movement
+C4 case 5b — SO.cancel on invoiced unpaid order
+  PASS  SO cancelled
+  PASS  linked invoice cancelled
+  PASS  linked invoice GL voided
+  PASS  stock restored +1 (got 1.00, want 1.00)
+  PASS  CANCELLATION ledger row exists
+C3 case 6 — PO cancel leaves supplier ledger at net 0
+  PASS  submission posted no supplier-ledger row
+  PASS  cancel wrote no supplier-ledger rows
+  PASS  net AP effect 0 (got 0.00, want 0.00)
+  PASS  supplier balance unchanged by cancel (got 600.00, want 600.00)
+C3 case 7 — Cancelled → Submitted blocked
+  PASS  state machine rejected Cancelled → Submitted
+  PASS  no supplier-ledger rows after blocked resubmit
+C2 case 8 — production delete voids canonical GL
+  PASS  output movement linked to legacy JE
+  PASS  JE active before delete
+  PASS  JE amount 50 (8×5 + 10) (got 50.00, want 50.00)
+  PASS  JE voided after delete
+  PASS  canonical GL lines voided after delete
+  PASS  raw restored +8 (got 8.00, want 8.00)
+  PASS  output reversed -4 (got -4.00, want -4.00)
+C5 case 9 — loan void keeps row + voids GL
+  PASS  loan GL lines active before void
+  PASS  loan row retained with voided_at set
+  PASS  loan GL lines voided despite NULL link
+C5 case 10 — repayment void keeps row + restores balance
+  PASS  repayment GL lines active before void
+  PASS  repayment row retained with voided_at set
+  PASS  repayment GL lines voided despite NULL link
+  PASS  loan balance restored to 1000 (got 1000.00, want 1000.00)
+C6 case 11 — payment void keeps row + allocations
+  PASS  payment GL lines active before void
+  PASS  invoice paid_amount 100 before void (got 100.00, want 100.00)
+  PASS  payment row retained with voided_at set
+  PASS  void reason recorded
+  PASS  payment GL lines voided
+  PASS  allocation row retained with voided_at set
+  PASS  invoice paid_amount back to 0 after void (got 0.00, want 0.00)
+  PASS  invoice no longer Paid after void
+  PASS  double void rejected
+C6 case 12 — salary payment void keeps row + GL voided
+  PASS  salary GL lines active before void
+  PASS  salary row retained with voided_at set
+  PASS  salary status cancelled
+  PASS  salary GL lines voided
+C7 case 13 — advance GL failure rolls back everything
+  PASS  advance GL failure threw
+  PASS  advance row rolled back (not committed without GL)
+C8 case 14 — goods-receipt void
+  PASS  receipt added 8 to stock (got 8.00, want 8.00)
+  PASS  received_quantity 8 (got 8.00, want 8.00)
+  PASS  receipt FIFO layers hold 8 (got 8.00, want 8.00)
+  PASS  stock drawn down 8 after void (got 47.00, want 47.00)
+  PASS  received_quantity rolled back to 0 (got 0.00, want 0.00)
+  PASS  receipt batch layers zeroed (retained for audit) (got 0.00, want 0.00)
+  PASS  GOODS_RECEIPT_VOID movement appended
+  PASS  receipt stamped voided_at
+  PASS  double GRN void rejected
+C8 case 15 — stock-transfer void
+  PASS  source lost 5 on transfer (got 42.00, want 42.00)
+  PASS  destination gained 5 on transfer (got 5.00, want 5.00)
+  PASS  source restored after void (got 47.00, want 47.00)
+  PASS  destination drained after void (got 0.00, want 0.00)
+  PASS  batches match balances after transfer void
+  PASS  TRANSFER_VOID pair appended
+  PASS  double transfer void rejected
+C8 case 16 — physical-count correction
+  PASS  shortage posted: stock -3 (got 44.00, want 44.00)
+  PASS  original ADJUSTMENT movement exists
+  PASS  shortage GL posted at actual cost
+  PASS  corrected: stock at system-1 (got 46.00, want 46.00)
+  PASS  count item updated to corrected qty (got 46.00, want 46.00)
+  PASS  correction stamp handled
+  PASS  batches match balances after correction (no costing drift)
+  PASS  double correction rejected
+  PASS  stock unchanged after rejected double correction (got 46.00, want 46.00)
+
+Result: 79 passed, 0 failed

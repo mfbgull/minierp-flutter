@@ -1,5 +1,7 @@
 # F-020 — Salary advance consumed by the next payroll remains an asset
 
+> Current assessment, 2026-10-26: this report preserves its historical audit snapshot. See [remediation status](../../remediation/STATUS.md) for current source verification, fixes, tests and remaining limits.
+
 **Status:** CONFIRMED, current logic, fresh isolated fixture. **Severity:** High. **Category:** recognition/valuation/report propagation. **Owner:** backend-controls. No fix applied.
 
 ## Economic rule and independent expected accounting

@@ -1,5 +1,11 @@
 # Audit Coverage Ledger
 
+The separate 2026-10-26/27 accounting revalidation (F-001–F-073) is tracked in
+[the remediation status ledger](../accounting-audit/remediation/STATUS.md), with
+current working-tree evidence and explicit remaining limits. Full suites and
+unchanged gates passed, with scoped independent approval; this does not rewrite
+the canonical audit rows below or certify every financial workflow.
+
 One row per canonical finding from Part 0 of `audit/prompts.md` (65 rows), plus
 five IDs that appear in Part 3 or the CONSOLIDATED remediation table without
 their own Part 0 row: DB-004, DB-005/006/007/008, SALES-020, PRET-001, RET-008.

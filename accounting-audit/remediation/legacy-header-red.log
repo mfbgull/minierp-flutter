@@ -1,0 +1,42 @@
+
+> mini-erp-server@1.0.0 test
+> jest --runInBand auditReservationHeaders.test.ts --testNamePattern legacy return void
+
+FAIL src/__tests__/auditReservationHeaders.test.ts (49.253 s)
+  reservation and journal audit invariants
+    ✕ F-060 legacy return void synchronizes its owning header (54 ms)
+    ○ skipped F-071/F-072 reserve replay and release apply one location delta (line=1)
+    ○ skipped F-071/F-072 reserve replay and release apply one location delta (line=undefined)
+    ○ skipped F-060 voids header only after all its children are void and preserves attribution
+    ○ skipped unsupported supplier return-credit allocation rejects as a client error without new cash
+    ○ skipped F-060 preserves a mixed header until its last active balanced leg is voided
+
+  ● reservation and journal audit invariants › F-060 legacy return void synchronizes its owning header
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 2
+    + Received  + 2
+
+      Object {
+    -   "void_reason": "Legacy source void",
+    -   "voided": 1,
+    +   "void_reason": null,
+    +   "voided": 0,
+      }
+
+       98 |       description: 'Legacy return fixture', created_by: 1, lines: [{ account_id: bank.id, debit: 5 }, { account_id: equity.id, credit: 5 }] });
+       99 |     AccountingService.voidOwnInvoiceReturnLines(db, 90000, { voidedBy: 1, voidReason: 'Legacy source void' });
+    > 100 |     expect(db.prepare('SELECT voided,void_reason FROM journal_entries WHERE id=?').get(entry.journal_entry_id)).toEqual({ voided: 1, void_reason: 'Legacy source void' });
+          |                                                                                                                 ^
+      101 |   });
+      102 | });
+      103 |
+
+      at Object.<anonymous> (src/__tests__/auditReservationHeaders.test.ts:100:113)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 5 skipped, 6 total
+Snapshots:   0 total
+Time:        51.488 s
+Ran all test suites matching auditReservationHeaders.test.ts with tests matching "legacy return void".

@@ -1,0 +1,16 @@
+
+> mini-erp-server@1.0.0 test
+> jest --maxWorkers=2 --workerIdleMemoryLimit=1024MB auditStockRemediation.test.ts countCorrection.test.ts physicalCountBatchSync.test.ts accountingInvariants.test.ts stockAdjustmentCostedBatch.test.ts inventoryReconciliation.test.ts
+
+PASS src/__tests__/inventoryReconciliation.test.ts (75.089 s)
+PASS src/__tests__/physicalCountBatchSync.test.ts (24.078 s)
+PASS src/__tests__/stockAdjustmentCostedBatch.test.ts (114.179 s)
+PASS src/__tests__/accountingInvariants.test.ts (27.834 s)
+PASS src/__tests__/auditStockRemediation.test.ts (13.799 s)
+PASS src/__tests__/countCorrection.test.ts (5.493 s)
+
+Test Suites: 6 passed, 6 total
+Tests:       60 passed, 60 total
+Snapshots:   0 total
+Time:        136.862 s
+Ran all test suites matching auditStockRemediation.test.ts|countCorrection.test.ts|physicalCountBatchSync.test.ts|accountingInvariants.test.ts|stockAdjustmentCostedBatch.test.ts|inventoryReconciliation.test.ts.

@@ -712,6 +712,7 @@ class BalanceSheetAssets {
     required this.accountsReceivable,
     required this.cash,
     required this.total,
+    this.other = 0,
   });
 
   factory BalanceSheetAssets.fromJson(Map<String, dynamic> json) =>
@@ -719,12 +720,14 @@ class BalanceSheetAssets {
         inventory: asNum(json['inventory']) ?? 0,
         accountsReceivable: asNum(json['accounts_receivable']) ?? 0,
         cash: asNum(json['cash']) ?? 0,
+        other: asNum(json['other']) ?? 0,
         total: asNum(json['total']) ?? 0,
       );
 
   final num inventory;
   final num accountsReceivable;
   final num cash;
+  final num other;
   final num total;
 }
 
@@ -732,15 +735,21 @@ class BalanceSheetLiabilities {
   const BalanceSheetLiabilities({
     required this.accountsPayable,
     required this.total,
+    this.taxPayable = 0,
+    this.other = 0,
   });
 
   factory BalanceSheetLiabilities.fromJson(Map<String, dynamic> json) =>
       BalanceSheetLiabilities(
         accountsPayable: asNum(json['accounts_payable']) ?? 0,
+        taxPayable: asNum(json['tax_payable']) ?? 0,
+        other: asNum(json['other']) ?? 0,
         total: asNum(json['total']) ?? 0,
       );
 
   final num accountsPayable;
+  final num taxPayable;
+  final num other;
   final num total;
 }
 

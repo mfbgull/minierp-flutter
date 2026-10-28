@@ -1,0 +1,48 @@
+
+> mini-erp-server@1.0.0 test
+> jest --runInBand auditCreditOwnership.test.ts
+
+FAIL src/__tests__/auditCreditOwnership.test.ts (31.598 s)
+  F-002 source credit cannot be regenerated after consumption
+    ✕ blocks settlement and whole-return reversal after consuming 30, even after replenishment (412 ms)
+    ✕ blocks settlement and whole-return reversal after consuming 60, even after replenishment (180 ms)
+
+  ● F-002 source credit cannot be regenerated after consumption › blocks settlement and whole-return reversal after consuming 30, even after replenishment
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 409
+    Received: 200
+
+      42 |       for (let retry = 0; retry < 2; retry++) {
+      43 |         const res = await request(app).post(url).set('Cookie', cookie).send({ reason: 'Attempt reuse' });
+    > 44 |         expect(res.status).toBe(409);
+         |                            ^
+      45 |         expect(res.body.error).toMatch(/consum/i);
+      46 |         expect(financialState()).toEqual(before);
+      47 |       }
+
+      at src/__tests__/auditCreditOwnership.test.ts:44:28
+
+  ● F-002 source credit cannot be regenerated after consumption › blocks settlement and whole-return reversal after consuming 60, even after replenishment
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 409
+    Received: 200
+
+      42 |       for (let retry = 0; retry < 2; retry++) {
+      43 |         const res = await request(app).post(url).set('Cookie', cookie).send({ reason: 'Attempt reuse' });
+    > 44 |         expect(res.status).toBe(409);
+         |                            ^
+      45 |         expect(res.body.error).toMatch(/consum/i);
+      46 |         expect(financialState()).toEqual(before);
+      47 |       }
+
+      at src/__tests__/auditCreditOwnership.test.ts:44:28
+
+Test Suites: 1 failed, 1 total
+Tests:       2 failed, 2 total
+Snapshots:   0 total
+Time:        33.119 s
+Ran all test suites matching auditCreditOwnership.test.ts.

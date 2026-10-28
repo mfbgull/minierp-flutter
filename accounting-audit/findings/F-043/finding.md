@@ -1,5 +1,7 @@
 # F-043 — P&L expense categories omit the damaged-stock loss included in total
 
+> Current assessment, 2026-10-26: this report preserves its historical audit snapshot. See [remediation status](../../remediation/STATUS.md) for current source verification, fixes, tests and remaining limits.
+
 - Severity: MEDIUM; status: FAIL, reproduced using the same disposable lifecycle API response that passes the financial oracle.
 - Root cause: `server/src/models/Reports.ts:440` builds category rows from only `expenses` plus `supplier_bills`, while line448 computes authoritative total expenses from all non-COGS expense GL accounts. Stock loss account7202 (and other non-operational-table expense postings) enters the latter but has no category row. `lib/features/reports/profit_loss_report_screen.dart:186` renders those rows under `Expenses by Category` without an unclassified/other row or incomplete-breakdown explanation.
 - Independent expected: one damaged-stock unit at cost10 plus operating expense10 produces total expenses20. The displayed breakdown must explain both10 amounts (or disclose its narrower scope).

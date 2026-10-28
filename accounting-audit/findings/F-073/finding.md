@@ -1,5 +1,7 @@
 # F-073 — Explicit zero POS cash becomes a fabricated full cash receipt
 
+> Current assessment, 2026-10-26: this report preserves its historical audit snapshot. See [remediation status](../../remediation/STATUS.md) for current source verification, fixes, tests and remaining limits.
+
 **Status: Confirmed defect. Severity: Critical.** Executed on2026-10-25 against a fresh guarded fixture; independently verified read-only during finalization. No production fix applied.
 
 ## Reproduction and independent expected result

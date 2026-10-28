@@ -1,5 +1,7 @@
 # F-022 — Joint production can create a negative-cost output and overstate inventory GL
 
+> Current assessment, 2026-10-26: this report preserves its historical audit snapshot. See [remediation status](../../remediation/STATUS.md) for current source verification, fixes, tests and remaining limits.
+
 **Status:** CONFIRMED, current mounted API, fresh DB. **Severity:** High integrity defect (minimal example is one cent). **Category:** allocation rounding / batch valuation / GL completeness. **Owner:** backend-controls. No fix applied.
 
 ## Independent expected accounting

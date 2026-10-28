@@ -6,6 +6,7 @@ import { QuotationWithWarehouse, InvoiceWithUsername } from '../types';
 import InvoiceModel from './Invoice';
 import { InvoiceCreationService } from '../services/InvoiceCreationService';
 import { SqlParam } from '../utils/sqlTypes';
+import { BusinessRuleError } from '../utils/businessRuleError';
 
 interface SalesOrder {
   id: number;
@@ -539,7 +540,7 @@ class SalesOrderModel {
     }
 
     if (salesOrder.status === 'Cancelled') {
-      throw new Error('Sales order is already cancelled');
+      throw new BusinessRuleError(409, 'Sales order is already cancelled');
     }
 
     let linkedInvoice: { id: number; invoice_no: string; status: string } | undefined;

@@ -1,0 +1,141 @@
+
+── server: typecheck
+
+> mini-erp-server@1.0.0 typecheck
+> tsc --noEmit
+
+   ok
+
+── server: lint
+
+> mini-erp-server@1.0.0 lint
+> eslint . --quiet
+
+(node:476623) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/server/eslint.config.js?mtime=1785754708785 is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/server/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+   ok
+
+── server: fallow
+loaded config: /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/.fallowrc.json
+   4.034637832s  WARN fallow: skipped 1 hidden directory that contains source files (audit/archive/.omo). Hidden directories are not traversed, so a file, export or dependency used only there can be reported as unused: add '!audit/archive/.omo/**' to ignorePatterns to analyze it, or add it to entry, ignoreExports or ignoreDependencies, or add 'audit/archive/.omo/**' to ignorePatterns to silence this. fallow --root audit/archive/.omo analyzes it on its own and does not fix this run.
+   4.034882602s  WARN fallow: 'node_modules' does not exist. Package exports and conditional exports cannot be read, framework plugins that activate on an installed package stay inactive, and dependency classification degrades, so imports and dependencies can be misreported. Run npm install / pnpm install / yarn / bun install first.
+   4.037182929s  WARN fallow: entry glob "server/scripts/*.js" no longer matches 3 files, because "*" and "?" no longer match "/". To keep the old match, use "server/scripts/**/*.js".
+   5.750519552s  WARN Graph cache decoded but not reused: resolver, entry points, or plugins changed
+Comparing against baseline: /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/audit/fallow-baselines/dead-code.json
+Comparing against duplication baseline: /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/audit/fallow-baselines/dupes.json
+Comparing against health baseline: /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/audit/fallow-baselines/health.json
+
+Audit scope: 97 changed files vs HEAD (843322e3..HEAD)
+
+── Complexity ─────────────────────────────────────
+
+■ Metrics: 22,453 LOC · dead files 0.0% · dead exports 0.0% · avg cyclomatic 3.3 · p90 cyclomatic 8 · maintainability 88.1 (good)
+  Cyclomatic units: functions 947, module scopes 4, templates 0
+  Module scope: max cyclomatic 7; included in metrics, not function findings
+
+  Function size: 53% low · 20% medium · 16% high · 11% very high  (1-15 / 16-30 / 31-60 / >60 LOC)
+  Parameters:    86% low · 10% medium · 2% high · 1% very high  (0-2 / 3-4 / 5-6 / >=7 params)
+
+● Large functions (10 shown, 108 total)
+  server/src/__tests__/posPayments.test.ts
+    :34 describe("POS sale — payment legs, discount, tax,...")  418 lines
+  server/src/models/Production.ts
+    :182 recordProduction  386 lines
+  server/src/config/database.ts
+    :1924 applyPendingMigrations  358 lines
+  server/src/models/Production.ts
+    :235 transaction  324 lines
+  server/src/__tests__/invoiceCancelReversal.test.ts
+    :32 describe("Invoice/SO cancellation reversal (C1 + C...")  288 lines
+  server/src/__tests__/inventoryQueryControllers.test.ts
+    :16 describe("inventory CRAP-42 controllers")  279 lines
+  server/src/models/PhysicalCount.ts
+    :495 correctCount  263 lines
+    :515 transaction  240 lines
+  server/src/config/database.ts
+    :2365 seedDefaultPermissions  203 lines
+  server/src/models/Production.ts
+    :728 delete  196 lines
+  Functions exceeding 60 lines of code (very high risk)
+  https://fallow.tools/docs/explanations/health/#unit-size
+  use --top 108 to see all
+
+● High complexity functions (3 shown, 4 total)
+  server/src/models/PhysicalCount.ts
+    :613 postCorrectedCountItem
+          15   cyclomatic   17 ! cognitive  118 lines
+    :318 postCountAdjustment
+          13   cyclomatic   16 ! cognitive  120 lines
+    :538 reverseCountStockVariance
+           9   cyclomatic   19 ! cognitive   38 lines
+  Functions exceeding cyclomatic, cognitive, or CRAP thresholds; ! marks the
+  dimension that breached
+  https://fallow.tools/docs/explanations/health/#complexity-metrics
+  To suppress: // fallow-ignore-next-line complexity
+  use --top 4 to see all
+
+✗ 4 above threshold · 947 analyzed (3.76s)
+note: skipped 261 files matching default duplicates ignores
+  (--explain-skipped for the list)
+note: hid 31 clone groups below minOccurrences
+  (lower duplicates.minOccurrences from 3 to see them)
+✗ complexity: 3 findings · 97 changed files (21.07s)
+   FAILED: server: fallow
+
+── flutter: analyze
+Resolving dependencies...
+Downloading packages...
+  archive 4.0.9 (4.5.2 available)
+  code_assets 2.0.0 (2.1.0 available)
+  cross_file 0.3.5+5 (0.4.0 available)
+  crypto 3.0.7 (3.0.8 available)
+  cupertino_icons 1.0.9 (2.0.0 available)
+  dbus 0.7.15 (0.8.0 available)
+  equatable 2.1.0 (3.0.0 available)
+  file_picker 11.0.3 (13.3.0 available)
+  fl_chart 1.2.0 (1.3.0 available)
+  flutter_riverpod 2.6.1 (3.4.3 available)
+  flutter_secure_storage 10.3.3 (11.2.0 available)
+  flutter_secure_storage_darwin 0.3.2 (0.4.3 available)
+  flutter_secure_storage_platform_interface 2.1.0 (2.1.1 available)
+  flutter_secure_storage_windows 4.1.0 (4.2.2 available)
+  go_router 17.5.0 (18.1.1 available)
+  image 4.9.2 (4.12.0 available)
+  jni 1.0.3 (1.1.0 available)
+  jni_flutter 1.0.3 (1.0.4+1 available)
+  material_color_utilities 0.13.0 (0.13.1 available)
+  objective_c 9.6.0 (9.6.2 available)
+  pdf 3.13.0 (3.13.1 available)
+  petitparser 7.0.2 (7.1.0 available)
+  posix 6.5.2 (6.5.3 available)
+  printing 5.15.0 (5.15.1 available)
+  qr 3.0.2 (4.0.0 available)
+  riverpod 2.6.1 (3.4.3 available)
+  screen_retriever 0.2.2 (0.3.0 available)
+  shared_preferences 2.5.5 (2.5.6 available)
+  shared_preferences_android 2.4.28 (2.5.3 available)
+  shared_preferences_foundation 2.5.7 (2.6.1 available)
+  test_api 0.7.12 (0.7.15 available)
+  vector_math 2.4.2 (2.4.4 available)
+  vm_service 15.3.0 (15.4.0 available)
+  web 1.1.1 (1.1.2 available)
+  win32 5.15.0 (6.4.0 available)
+  xml 7.0.1 (7.1.0 available)
+Got dependencies!
+36 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+Analyzing minierp-flutter...                                    
+No issues found! (ran in 53.3s)
+   ok
+
+── flutter: l10n drift
+en.arb: 2232 keys
+ur.arb: 2177 keys
+fallback gap (missing in ur): 55
+orphaned (in ur, not in en): 0
+gap within cap (60)
+   ok
+
+FAILED: server: fallow

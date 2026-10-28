@@ -1,0 +1,36 @@
+
+> mini-erp-server@1.0.0 test
+> jest --runInBand --coverage --coverageReporters=json --coverageReporters=text-summary
+
+PASS src/__tests__/auditCreditOwnership.test.ts (209.667 s)
+PASS src/__tests__/posPayments.test.ts (11.223 s)
+PASS src/__tests__/auditPayrollChronology.test.ts (14.544 s)
+PASS src/__tests__/unappliedCashGl.test.ts (283.143 s)
+PASS src/__tests__/journalBalanceCommit.test.ts (200.652 s)
+FAIL src/__tests__/purchaseReturn.test.ts (113.544 s)
+  ● PurchaseReturnModel › create — PO receipt source › rejects when the return exceeds net received quantity
+
+    expect(received).toThrow(expected)
+
+    Expected pattern: /exceeds net received quantity/
+    Received message: "Return quantity exceeds goods received as of the return date"
+
+          267 |     WHERE i.po_item_id=? AND r.voided_at IS NULL AND r.receipt_date<=?`).get(poItem.id, returnDate) as { quantity: number };
+          268 |   if (roundQty(agg.quantity + returned) > roundQty(eligible.quantity)) {
+        > 269 |     throw new BusinessRuleError(400, 'Return quantity exceeds goods received as of the return date');
+              |           ^
+          270 |   }
+          271 |   const netReceived = roundQty((poItem.received_quantity || 0) - returned);
+          272 |   const returnQty = roundQty(agg.quantity);
+
+      at validatePurchaseOrderSourceLine (src/models/PurchaseReturn.ts:269:11)
+      at validatePurchaseOrderSourceLine (src/models/PurchaseReturn.ts:592:13)
+      at sqliteTransaction (node_modules/better-sqlite3/lib/methods/transaction.js:65:24)
+      at PurchaseReturnModel.transaction [as create] (src/models/PurchaseReturn.ts:761:12)
+      at src/__tests__/purchaseReturn.test.ts:413:29
+      at Object.<anonymous> (node_modules/expect/build/index.js:1824:9)
+      at Object.throwingMatcher [as toThrow] (node_modules/expect/build/index.js:2235:93)
+      at Object.<anonymous> (src/__tests__/purchaseReturn.test.ts:424:9)
+      at Object.<anonymous> (src/__tests__/purchaseReturn.test.ts:424:9)
+
+PASS src/__tests__/unappliedCashMigration.test.ts (81.689 s)

@@ -1,5 +1,7 @@
 # F-025 — Correcting one count item silently removes other items' shortages
 
+> Current assessment, 2026-10-26: this report preserves its historical audit snapshot. See [remediation status](../../remediation/STATUS.md) for current source verification, fixes, tests and remaining limits.
+
 **Status:** CONFIRMED current mounted API, fresh fixture. **Severity:** High. **Category:** partial update/reversal scope/inventory and expense integrity. **Owner:** backend-controls. No fix applied.
 
 ## Independent expectation

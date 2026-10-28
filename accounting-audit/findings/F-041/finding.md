@@ -1,5 +1,7 @@
 # F-041 — Balance-sheet CSV splits currency amounts into extra columns
 
+> Current assessment, 2026-10-26: this report preserves its historical audit snapshot. See [remediation status](../../remediation/STATUS.md) for current source verification, fixes, tests and remaining limits.
+
 - Severity: MEDIUM; status: FAIL, reproduced.
 - Scope: balance-sheet CSV export.
 - Root cause: `lib/core/utils/csv_export.dart:403`–`:453` interpolates currency/date text directly into comma-separated rows. Unlike the shared `buildGridCsv` path used by other reports, these rows do not escape commas. The exact cash path is line 410.

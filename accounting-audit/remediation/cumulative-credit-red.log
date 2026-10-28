@@ -1,0 +1,34 @@
+
+> mini-erp-server@1.0.0 test
+> jest --runInBand auditCreditOwnership.test.ts --testNamePattern same invoice credit
+
+FAIL src/__tests__/auditCreditOwnership.test.ts (34.954 s)
+  F-002 source credit cannot be regenerated after consumption
+    ✕ locks another return that supports the same invoice credit entitlement (661 ms)
+    ○ skipped blocks consumed 30 credit with [[Object]] after replenishment
+    ○ skipped blocks consumed 60 credit with [[Object]] after replenishment
+    ○ skipped blocks consumed 60 credit with [[Object], [Object]] after replenishment
+    ○ skipped cannot settle or void an unsettled return after its ledger credit funded another invoice
+
+  ● F-002 source credit cannot be regenerated after consumption › locks another return that supports the same invoice credit entitlement
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 409
+    Received: 200
+
+       98 |     expect(applied.status).toBe(201);
+       99 |     const before = financialState();
+    > 100 |     expect((await request(app).post(`/api/invoice-returns/${second.returnId}/void`).set('Cookie', cookie)).status).toBe(409);
+          |                                                                                                                    ^
+      101 |     expect(financialState()).toEqual(before);
+      102 |   });
+      103 | });
+
+      at Object.<anonymous> (src/__tests__/auditCreditOwnership.test.ts:100:116)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 4 skipped, 5 total
+Snapshots:   0 total
+Time:        36.642 s, estimated 65 s
+Ran all test suites matching auditCreditOwnership.test.ts with tests matching "same invoice credit".

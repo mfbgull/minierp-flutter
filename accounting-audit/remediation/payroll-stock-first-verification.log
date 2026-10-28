@@ -1,0 +1,28 @@
+
+> mini-erp-server@1.0.0 test
+> jest --runInBand auditPayrollChronology.test.ts auditStockRemediation.test.ts
+
+PASS src/__tests__/auditPayrollChronology.test.ts (71.888 s)
+FAIL src/__tests__/auditStockRemediation.test.ts (8.101 s)
+  ● audited count and production economics › F-024 restores exact 5@10 + 3@20 layers (locations=true)
+
+    expect(received).toBeUndefined()
+
+    Received: "Layers true: sellable stock 0, requested 8 (expired, halted, or location-blocked batches are excluded from sale)"
+
+      28 |     }
+      29 |     const completed = await post(`/api/inventory/physical-counts/${created.body.id}/complete`, {});
+    > 30 |     expect(completed.body.error).toBeUndefined();
+         |                                  ^
+      31 |     expect(completed.status).toBe(200);
+      32 |     return created.body.id as number;
+      33 |   }
+
+      at count (src/__tests__/auditStockRemediation.test.ts:30:34)
+      at src/__tests__/auditStockRemediation.test.ts:60:16
+
+Test Suites: 1 failed, 1 passed, 2 total
+Tests:       1 failed, 8 passed, 9 total
+Snapshots:   0 total
+Time:        83.225 s
+Ran all test suites matching auditPayrollChronology.test.ts|auditStockRemediation.test.ts.

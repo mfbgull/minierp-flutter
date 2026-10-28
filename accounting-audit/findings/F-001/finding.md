@@ -1,5 +1,7 @@
 # F-001 — Sales and supplier returns can precede their source transactions
 
+> Current assessment, 2026-10-26: this report preserves its historical audit snapshot. See [remediation status](../../remediation/STATUS.md) for current source verification, fixes, tests and remaining limits.
+
 **Status:** CONFIRMED current logic, disposable fresh database. **Severity:** High. **Category:** transaction chronology / historical reporting. **Owner:** financial-oracle. No production fix applied.
 
 ## Independent rule

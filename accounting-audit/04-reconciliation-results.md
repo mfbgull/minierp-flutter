@@ -1,5 +1,7 @@
 # Independent accounting reconciliations
 
+> Current assessment, 2026-10-26: this report preserves its historical audit snapshot. See [remediation status](remediation/STATUS.md) for current source verification, fixes, tests and remaining limits.
+
 The independent oracle derives expected amounts from economic events in integer paise. These tables present rupees for readability. Debit/credit signs in raw evidence are retained separately; payable and sales amounts below use normal financial-statement presentation.
 
 ## Specified retail lifecycle: verified bounded scenario

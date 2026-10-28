@@ -1,0 +1,15 @@
+
+> mini-erp-server@1.0.0 test
+> jest --runInBand auditCreditOwnership.test.ts
+
+PASS src/__tests__/auditCreditOwnership.test.ts (65.894 s)
+  F-002 source credit cannot be regenerated after consumption
+    ✓ blocks consumed 30 credit with [[Object]] after replenishment (838 ms)
+    ✓ blocks consumed 60 credit with [[Object]] after replenishment (1026 ms)
+    ✓ blocks consumed 60 credit with [[Object], [Object]] after replenishment (680 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       3 passed, 3 total
+Snapshots:   0 total
+Time:        70.066 s
+Ran all test suites matching auditCreditOwnership.test.ts.

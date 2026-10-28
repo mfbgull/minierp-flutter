@@ -1,0 +1,12 @@
+00:00 +0: loading /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/test/features/accounting_report_regressions_test.dart
+00:00 +0: (setUpAll)
+00:00 +0: F-042 salary remaining counts carryover only once
+00:07 +1: F-040 balance sheet displays all nonzero API categories
+00:09 +2: fully covered salary submits zero cash through the dialog
+00:10 +3: F-041 balance sheet CSV preserves monetary values in one cell
+00:10 +4: balance sheet 390 light refreshes and scrolls
+00:11 +5: balance sheet 390 dark refreshes and scrolls
+00:12 +6: balance sheet 1440 light refreshes and scrolls
+00:14 +7: balance sheet 1440 dark refreshes and scrolls
+00:16 +8: (tearDownAll)
+00:16 +8: All tests passed!

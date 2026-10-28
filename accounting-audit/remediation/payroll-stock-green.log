@@ -1,0 +1,12 @@
+
+> mini-erp-server@1.0.0 test
+> jest --runInBand auditPayrollChronology.test.ts auditStockRemediation.test.ts
+
+PASS src/__tests__/auditStockRemediation.test.ts (54.895 s)
+PASS src/__tests__/auditPayrollChronology.test.ts (8.093 s)
+
+Test Suites: 2 passed, 2 total
+Tests:       12 passed, 12 total
+Snapshots:   0 total
+Time:        64.689 s, estimated 100 s
+Ran all test suites matching auditPayrollChronology.test.ts|auditStockRemediation.test.ts.

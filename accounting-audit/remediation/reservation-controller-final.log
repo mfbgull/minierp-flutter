@@ -1,0 +1,12 @@
+
+> mini-erp-server@1.0.0 test
+> jest --runInBand inventoryQueryControllers.test.ts auditReservationHeaders.test.ts
+
+PASS src/__tests__/auditReservationHeaders.test.ts (61.962 s)
+PASS src/__tests__/inventoryQueryControllers.test.ts (28.413 s)
+
+Test Suites: 2 passed, 2 total
+Tests:       18 passed, 18 total
+Snapshots:   0 total
+Time:        95.097 s
+Ran all test suites matching inventoryQueryControllers.test.ts|auditReservationHeaders.test.ts.

@@ -1,5 +1,7 @@
 # F-024 — Multi-batch shortage corrections fail because all stock is restored to one batch
 
+> Current assessment, 2026-10-26: this report preserves its historical audit snapshot. See [remediation status](../../remediation/STATUS.md) for current source verification, fixes, tests and remaining limits.
+
 **Status:** CONFIRMED current mounted API, fresh fixture. **Severity:** High workflow/inventory-correction failure. **Category:** batch provenance/reversal. **Owner:** backend-controls. No fix applied.
 
 ## Scenario and independent expected accounting

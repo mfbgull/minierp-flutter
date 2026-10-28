@@ -1,0 +1,100 @@
+
+> mini-erp-server@1.0.0 test
+> jest --runInBand auditStockRemediation.test.ts
+
+FAIL src/__tests__/auditStockRemediation.test.ts (106.997 s)
+  audited count and production economics
+    ✕ F-025 partial correction preserves omitted shortage and its journal (1248 ms)
+    ✕ F-024 restores exact 5@10 + 3@20 layers (locations=false) (377 ms)
+    ✕ F-024 restores exact 5@10 + 3@20 layers (locations=true) (186 ms)
+    ✕ F-022 two cents across four outputs stays nonnegative and clears exactly (175 ms)
+
+  ● audited count and production economics › F-025 partial correction preserves omitted shortage and its journal
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 1
+
+      Object {
+    -   "quantity": 8,
+    +   "quantity": 10,
+      }
+
+      37 |     const res = await post(`/api/inventory/physical-counts/${id}/correct`, { corrections: [{ item_id: a, counted_quantity: 2 }] });
+      38 |     expect(res.status).toBe(200);
+    > 39 |     expect(db.prepare('SELECT quantity FROM stock_balances WHERE item_id=? AND warehouse_id=?').get(b, warehouse)).toEqual({ quantity: 8 });
+         |                                                                                                                    ^
+      40 |     expect(db.prepare('SELECT * FROM physical_count_items WHERE count_id=? AND item_id=?').get(id, b)).toEqual(original);
+      41 |     expect(net('1200') - before).toBe(2000);
+      42 |   });
+
+      at Object.<anonymous> (src/__tests__/auditStockRemediation.test.ts:39:116)
+
+  ● audited count and production economics › F-024 restores exact 5@10 + 3@20 layers (locations=false)
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 200
+    Received: 500
+
+      49 |     const before = net('1200');
+      50 |     const res = await post(`/api/inventory/physical-counts/${id}/correct`, { corrections: [{ item_id: item, counted_quantity: 8 }] });
+    > 51 |     expect(res.status).toBe(200);
+         |                        ^
+      52 |     expect(db.prepare('SELECT quantity_remaining,unit_cost FROM stock_batches WHERE item_id=? ORDER BY id').all(item))
+      53 |       .toEqual([{ quantity_remaining: 3, unit_cost: 10 }, { quantity_remaining: 5, unit_cost: 20 }]);
+      54 |     expect(net('1200') - before).toBe(9000);
+
+      at src/__tests__/auditStockRemediation.test.ts:51:24
+
+  ● audited count and production economics › F-024 restores exact 5@10 + 3@20 layers (locations=true)
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,8 +1,8 @@
+      Array [
+        Object {
+    -     "quantity_remaining": 3,
+    +     "quantity_remaining": 5,
+          "unit_cost": 10,
+        },
+        Object {
+          "quantity_remaining": 5,
+          "unit_cost": 20,
+
+      51 |     expect(res.status).toBe(200);
+      52 |     expect(db.prepare('SELECT quantity_remaining,unit_cost FROM stock_batches WHERE item_id=? ORDER BY id').all(item))
+    > 53 |       .toEqual([{ quantity_remaining: 3, unit_cost: 10 }, { quantity_remaining: 5, unit_cost: 20 }]);
+         |        ^
+      54 |     expect(net('1200') - before).toBe(9000);
+      55 |     if (locations) {
+      56 |       expect((db.prepare(`SELECT SUM(b.quantity_physical) AS n FROM batch_stock_by_location b JOIN stock_batches s ON s.id=b.batch_id WHERE s.item_id=?`).get(item) as { n: number }).n).toBe(8);
+
+      at src/__tests__/auditStockRemediation.test.ts:53:8
+
+  ● audited count and production economics › F-022 two cents across four outputs stays nonnegative and clears exactly
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 2
+    Received: 0
+
+      72 |     const costs = db.prepare('SELECT allocated_cost FROM production_outputs ORDER BY id').all() as Array<{ allocated_cost: number }>;
+      73 |     expect(costs.every(row => row.allocated_cost >= 0)).toBe(true);
+    > 74 |     expect(costs.reduce((sum, row) => sum + Math.round(row.allocated_cost * 100), 0)).toBe(2);
+         |                                                                                       ^
+      75 |     expect(net('1200')).toBe(before);
+      76 |     expect(net('7000')).toBe(0);
+      77 |   });
+
+      at Object.<anonymous> (src/__tests__/auditStockRemediation.test.ts:74:87)
+
+Test Suites: 1 failed, 1 total
+Tests:       4 failed, 4 total
+Snapshots:   0 total
+Time:        109.185 s
+Ran all test suites matching auditStockRemediation.test.ts.

@@ -1,0 +1,14 @@
+loaded config: /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/.fallowrc.json
+   7.536530583s  WARN fallow: skipped 1 hidden directory that contains source files (audit/archive/.omo). Hidden directories are not traversed, so a file, export or dependency used only there can be reported as unused: add '!audit/archive/.omo/**' to ignorePatterns to analyze it, or add it to entry, ignoreExports or ignoreDependencies, or add 'audit/archive/.omo/**' to ignorePatterns to silence this. fallow --root audit/archive/.omo analyzes it on its own and does not fix this run.
+   7.537284253s  WARN fallow: 'node_modules' does not exist. Package exports and conditional exports cannot be read, framework plugins that activate on an installed package stay inactive, and dependency classification degrades, so imports and dependencies can be misreported. Run npm install / pnpm install / yarn / bun install first.
+   7.539802582s  WARN fallow: entry glob "server/scripts/*.js" no longer matches 3 files, because "*" and "?" no longer match "/". To keep the old match, use "server/scripts/**/*.js".
+Comparing against baseline: /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/audit/fallow-baselines/dead-code.json
+Comparing against duplication baseline: /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/audit/fallow-baselines/dupes.json
+Comparing against health baseline: /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/audit/fallow-baselines/health.json
+
+Audit scope: 97 changed files vs HEAD (843322e3..HEAD)
+note: skipped 261 files matching default duplicates ignores
+  (--explain-skipped for the list)
+note: hid 31 clone groups below minOccurrences
+  (lower duplicates.minOccurrences from 3 to see them)
+✓ No issues in 97 changed files (32.04s)

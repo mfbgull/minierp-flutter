@@ -1,5 +1,7 @@
 # F-071 — Reservation replay reserves the same quantity twice at the location
 
+> Current assessment, 2026-10-26: this report preserves its historical audit snapshot. See [remediation status](../../remediation/STATUS.md) for current source verification, fixes, tests and remaining limits.
+
 **Status: Confirmed defect. Severity: Medium.** Proven operational stock-availability corruption; no inventory asset/COGS/cash misstatement demonstrated.
 
 ## Reproduction / expected / actual

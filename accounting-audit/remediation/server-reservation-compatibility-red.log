@@ -1,0 +1,69 @@
+
+> mini-erp-server@1.0.0 test
+> jest --maxWorkers=2 --coverage --coverageReporters=json --coverageReporters=text-summary
+
+PASS src/__tests__/auditReservationHeaders.test.ts (136.479 s)
+PASS src/__tests__/auditCreditOwnership.test.ts (138.173 s)
+PASS src/__tests__/posPayments.test.ts (17.511 s)
+PASS src/__tests__/auditPayrollChronology.test.ts (13.05 s)
+PASS src/__tests__/journalBalanceCommit.test.ts (251.109 s)
+PASS src/__tests__/unappliedCashGl.test.ts (399.481 s)
+PASS src/__tests__/purchaseReturn.test.ts (198.917 s)
+PASS src/__tests__/unappliedCashMigration.test.ts (152.001 s)
+PASS src/__tests__/auditStockRemediation.test.ts (15.128 s)
+FAIL src/__tests__/batchLocations.test.ts (143.5 s)
+  ● 7.2 reservation create/release/consume idempotency › create is idempotent per reference line; release sets RELEASED; re-create reactivates
+
+    BusinessRuleError: Reservation exceeds location availability or stock identity is invalid
+
+      107 |         AND EXISTS(SELECT 1 FROM locations l WHERE l.id=location_id AND l.warehouse_id=?)`)
+      108 |       .run(delta, row.batch_id ?? null, row.location_id ?? null, delta, delta, row.item_id, row.warehouse_id);
+    > 109 |     if (changed.changes !== 1) throw new BusinessRuleError(409, 'Reservation exceeds location availability or stock identity is invalid');
+          |                                      ^
+      110 |   }
+      111 |
+      112 |   static release(data: {
+
+      at StockReservationModel.changeLocationReserved (src/models/StockReservation.ts:109:38)
+      at changeLocationReserved (src/models/StockReservation.ts:96:10)
+      at sqliteTransaction (node_modules/better-sqlite3/lib/methods/transaction.js:65:24)
+      at StockReservationModel.create (src/models/StockReservation.ts:98:7)
+      at Object.<anonymous> (src/__tests__/batchLocations.test.ts:128:38)
+
+  ● 7.2 reservation create/release/consume idempotency › consume marks CONSUMED; release after consume returns undefined
+
+    BusinessRuleError: Reservation exceeds location availability or stock identity is invalid
+
+      107 |         AND EXISTS(SELECT 1 FROM locations l WHERE l.id=location_id AND l.warehouse_id=?)`)
+      108 |       .run(delta, row.batch_id ?? null, row.location_id ?? null, delta, delta, row.item_id, row.warehouse_id);
+    > 109 |     if (changed.changes !== 1) throw new BusinessRuleError(409, 'Reservation exceeds location availability or stock identity is invalid');
+          |                                      ^
+      110 |   }
+      111 |
+      112 |   static release(data: {
+
+      at StockReservationModel.changeLocationReserved (src/models/StockReservation.ts:109:38)
+      at changeLocationReserved (src/models/StockReservation.ts:96:10)
+      at sqliteTransaction (node_modules/better-sqlite3/lib/methods/transaction.js:65:24)
+      at StockReservationModel.create (src/models/StockReservation.ts:98:7)
+      at Object.<anonymous> (src/__tests__/batchLocations.test.ts:169:27)
+
+  ● 7.10 feature flag off vs on behavior › flag on: consumption goes through batch_stock_by_location; reservations work
+
+    BusinessRuleError: Reservation exceeds location availability or stock identity is invalid
+
+      107 |         AND EXISTS(SELECT 1 FROM locations l WHERE l.id=location_id AND l.warehouse_id=?)`)
+      108 |       .run(delta, row.batch_id ?? null, row.location_id ?? null, delta, delta, row.item_id, row.warehouse_id);
+    > 109 |     if (changed.changes !== 1) throw new BusinessRuleError(409, 'Reservation exceeds location availability or stock identity is invalid');
+          |                                      ^
+      110 |   }
+      111 |
+      112 |   static release(data: {
+
+      at StockReservationModel.changeLocationReserved (src/models/StockReservation.ts:109:38)
+      at changeLocationReserved (src/models/StockReservation.ts:96:10)
+      at sqliteTransaction (node_modules/better-sqlite3/lib/methods/transaction.js:65:24)
+      at StockReservationModel.create (src/models/StockReservation.ts:98:7)
+      at Object.<anonymous> (src/__tests__/batchLocations.test.ts:383:37)
+
+PASS src/__tests__/stockAdjustmentCostedBatch.test.ts (96.674 s)
