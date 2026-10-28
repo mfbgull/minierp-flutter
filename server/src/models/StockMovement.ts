@@ -8,6 +8,7 @@ import { SellableStockUnavailableError } from '../types';
 import { roundQty, qtyEpsilon, qtyLessThan, qtyPositive } from '../utils/quantity';
 import { roundCurrency } from '../utils/currency';
 import { SqlParam } from '../utils/sqlTypes';
+import { recordBatchSources } from '../utils/batchSuppliers';
 
 interface StockMovement {
   id: number;
@@ -1268,6 +1269,8 @@ class StockMovementModel {
       `).run(batchNo, data.item_id, data.to_warehouse_id, out.id, qty, qty, avgCost, today);
       const mirrorBatchId = mirrorBatch.lastInsertRowid as number;
 
+      recordBatchSources(db, mirrorBatchId, consumption);
+
       // New path: seed batch_stock_by_location for the mirrored batch at destination
       this.syncBatchStockByLocationForNewBatch(mirrorBatchId, data.to_warehouse_id, qty, db);
 
@@ -1400,6 +1403,7 @@ class StockMovementModel {
       const mirrorBatchId = mirrorBatch.lastInsertRowid as number;
 
       // Seed the mirror batch's location layer before the IN leg resync.
+      recordBatchSources(db, mirrorBatchId, [{ batchId: batch.id, consumed: qty }]);
       this.syncBatchStockByLocationForNewBatch(mirrorBatchId, data.toWarehouseId, qty, db);
 
       // 5. IN leg (positive) at the destination, back-referencing the OUT leg.
@@ -1502,6 +1506,7 @@ class StockMovementModel {
       );
       const mirrorBatchId = mirrorBatch.lastInsertRowid as number;
 
+      recordBatchSources(db, mirrorBatchId, [{ batchId: batch.id, consumed: qty }]);
       this.syncBatchStockByLocationForNewBatch(mirrorBatchId, data.toWarehouseId, qty, db);
 
       const into = this.recordMovement({

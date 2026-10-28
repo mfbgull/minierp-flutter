@@ -104,6 +104,7 @@ export const STOCK_MOVEMENT_SORT_COLUMNS = [
 export const ITEM_SORT_COLUMNS = [
   'item_code',
   'item_name',
+  'manufacturer_name',
   'category',
   'current_stock',
   'reorder_level'

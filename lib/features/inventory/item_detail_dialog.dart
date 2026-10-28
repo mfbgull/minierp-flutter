@@ -135,6 +135,7 @@ class _DetailBody extends ConsumerWidget {
                 DetailInfoRows(
                   labelWidth: 140,
                   rows: [
+                    (l10n.inventoryManufacturer, item.manufacturerName ?? '—'),
                     (l10n.inventoryCategory, item.category ?? '—'),
                     (l10n.inventoryUom, item.unitOfMeasure),
                     (l10n.inventoryRack, item.rackNo ?? '—'),
