@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/models/auth_user.dart' show AuthUser;
@@ -15,11 +13,13 @@ import '../utils/recoverable_failure.dart';
 /// Boot: `restoreSession()` reads the stored JWT and calls `GET /auth/me`.
 /// The router gates on `AuthStatus` (splash → login or shell), so this
 /// notifier is the single source of truth for the whole app.
+///
+/// Restoring is triggered by the splash screen once the packaged backend is
+/// ready: the server may be on an ephemeral port, so no request can run
+/// before the supervisor has set the API base URL.
 class AuthNotifier extends StateNotifier<AuthState> {
   AuthNotifier(this._repo, this._storage)
-    : super(const AuthState(status: AuthStatus.unknown)) {
-    unawaited(restoreSession());
-  }
+    : super(const AuthState(status: AuthStatus.unknown));
 
   final AuthRepository _repo;
   final TokenStorage _storage;

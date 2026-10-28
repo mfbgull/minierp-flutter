@@ -57,7 +57,7 @@ if (process.env.NODE_ENV === 'test' && !process.env.DATABASE_PATH) {
 
 // Database file path - use DATABASE_PATH env var if set (Electron), otherwise default
 export const dbDir = process.env.DATABASE_PATH || defaultDbDir();
-const dbPath = path.join(dbDir, 'erp.db');
+export const dbPath = path.join(dbDir, 'erp.db');
 
 // Ensure database directory exists
 if (!fs.existsSync(dbDir)) {
@@ -2236,6 +2236,7 @@ export function applyPendingMigrations(): void {
   runLedgered('119_salary_advance_recognition.sql');
   runLedgered('120_journal_header_void_attribution.sql');
   runLedgered('121_count_snapshot_cost.sql');
+  runLedgered('122_item_manufacturer_batch_sources.sql');
   // Boot-time guard (spec §4.1): the restocking-fee posting resolves 4150 at
   // return time — a legacy COA predating GL foundation must fail the boot
   // with a clear error, never mis-post.

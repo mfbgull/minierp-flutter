@@ -21,7 +21,7 @@ import {
 
 import { errorMessage, errorCode } from '../utils/errorMessage';
 import { roundCurrency } from '../utils/currency';
-import { defaultUploadsDir } from '../utils/serverRoot';
+import { resolveUploadsDir } from '../utils/serverRoot';
 import { BusinessRuleError, handleBusinessError } from '../utils/businessRuleError';
 import { assertCashTimeline } from '../services/cashBalanceGuard';
 import { recognizeSalaryAdvances } from '../models/salaryAdvanceRecognition';
@@ -763,7 +763,7 @@ function removeEmployeeDocument(req: Request, res: Response): void {
     }
     // Delete the file only if it really lives inside the upload folder.
     if (doc.file_path) {
-      const docsRoot = path.join(defaultUploadsDir(), 'employees');
+      const docsRoot = path.join(resolveUploadsDir(), 'employees');
       const filePath = path.resolve(docsRoot, doc.file_path);
       if (filePath.startsWith(docsRoot + path.sep) && fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);

@@ -1,10 +1,10 @@
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { defaultUploadsDir } from '../utils/serverRoot';
+import { resolveUploadsDir } from '../utils/serverRoot';
 
 // Ensure upload directories exist
-const uploadDir = defaultUploadsDir();
+const uploadDir = resolveUploadsDir();
 const employeeDocsDir = path.join(uploadDir, 'employees');
 
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });

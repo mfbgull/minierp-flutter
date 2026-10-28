@@ -2,7 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>com.apple.security.app-sandbox</key>
-	<true/>
+	<!-- App Sandbox is intentionally disabled: the app spawns the bundled Node
+	     server as a child process and must read/write it from its own bundle
+	     while keeping user data outside the app bundle. -->
 </dict>
 </plist>

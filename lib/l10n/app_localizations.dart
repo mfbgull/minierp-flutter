@@ -98,6 +98,24 @@ abstract class AppLocalizations {
     Locale('ur'),
   ];
 
+  /// No description provided for @inventoryManufacturer.
+  ///
+  /// In en, this message translates to:
+  /// **'Manufacturer / Brand'**
+  String get inventoryManufacturer;
+
+  /// No description provided for @inventoryCompany.
+  ///
+  /// In en, this message translates to:
+  /// **'Company'**
+  String get inventoryCompany;
+
+  /// No description provided for @inventorySupplierNotRecorded.
+  ///
+  /// In en, this message translates to:
+  /// **'Not recorded'**
+  String get inventorySupplierNotRecorded;
+
   /// No description provided for @supplierAdvances.
   ///
   /// In en, this message translates to:
@@ -8756,6 +8774,24 @@ abstract class AppLocalizations {
   /// **'Already paid this month'**
   String get employeesAlreadyPaid;
 
+  /// No description provided for @reportsOtherAssets.
+  ///
+  /// In en, this message translates to:
+  /// **'Other Assets'**
+  String get reportsOtherAssets;
+
+  /// No description provided for @reportsTaxPayable.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax Payable'**
+  String get reportsTaxPayable;
+
+  /// No description provided for @reportsOtherLiabilities.
+  ///
+  /// In en, this message translates to:
+  /// **'Other Liabilities'**
+  String get reportsOtherLiabilities;
+
   /// No description provided for @employeesAdvanceFromPrevious.
   ///
   /// In en, this message translates to:
@@ -9479,7 +9515,7 @@ abstract class AppLocalizations {
   /// No description provided for @loginServerUnreachable.
   ///
   /// In en, this message translates to:
-  /// **'Cannot reach the server. Is it running on port 3011?'**
+  /// **'Cannot reach the server. Make sure MiniERP is running.'**
   String get loginServerUnreachable;
 
   /// No description provided for @loginSigningIn.
@@ -13479,6 +13515,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No response from the server in time. This operation may already have completed — press Retry to confirm; retrying is safe and will not create a duplicate.'**
   String get errorsOutcomeUnknown;
+
+  /// No description provided for @firstRunTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up MiniERP'**
+  String get firstRunTitle;
+
+  /// No description provided for @firstRunIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the administrator password for this computer. It is never sent anywhere.'**
+  String get firstRunIntro;
+
+  /// No description provided for @firstRunPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Administrator password'**
+  String get firstRunPassword;
+
+  /// No description provided for @firstRunConfirmPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm password'**
+  String get firstRunConfirmPassword;
+
+  /// No description provided for @firstRunPasswordHint.
+  ///
+  /// In en, this message translates to:
+  /// **'At least 12 characters'**
+  String get firstRunPasswordHint;
+
+  /// No description provided for @firstRunPasswordMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'The passwords do not match.'**
+  String get firstRunPasswordMismatch;
+
+  /// No description provided for @firstRunPasswordTooShort.
+  ///
+  /// In en, this message translates to:
+  /// **'The password must be at least 12 characters long.'**
+  String get firstRunPasswordTooShort;
+
+  /// No description provided for @firstRunStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start MiniERP'**
+  String get firstRunStart;
+
+  /// No description provided for @backendStarting.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting the local server...'**
+  String get backendStarting;
+
+  /// No description provided for @backendFailedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'MiniERP could not start'**
+  String get backendFailedTitle;
+
+  /// No description provided for @backendFailedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The local server did not start. Check the log file for details, then retry.'**
+  String get backendFailedBody;
+
+  /// No description provided for @backendAlreadyRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'MiniERP is already running in another window.'**
+  String get backendAlreadyRunning;
+
+  /// No description provided for @backendStopped.
+  ///
+  /// In en, this message translates to:
+  /// **'The local server stopped unexpectedly. Retry to restart it.'**
+  String get backendStopped;
+
+  /// No description provided for @backendLogsAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Log file: {path}'**
+  String backendLogsAt(String path);
+
+  /// No description provided for @retry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get retry;
 }
 
 class _AppLocalizationsDelegate

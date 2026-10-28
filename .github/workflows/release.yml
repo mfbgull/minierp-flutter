@@ -1,13 +1,77 @@
 name: Desktop Release
+
+# Every artifact is a complete application: the Flutter client, the compiled
+# server, its production node_modules and a pinned Node runtime. The client
+# supervises the server itself, so no platform needs a separate Node or server
+# install. Native modules (better-sqlite3, bcrypt) are built on the target OS
+# by tool/stage-server.mjs, so each job stages its own payload.
 on:
   push:
     tags:
       - "v*.*.*"
 
+env:
+  FLUTTER_VERSION: 3.47.2
+  NODE_VERSION: 24
+
 jobs:
+  # dist is platform-independent, but server/package.json's build script uses
+  # POSIX tools, so it is built once on Linux and shared as an artifact.
+  build-server:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Derive version from tag
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          PUBSPEC_VERSION=$(sed -n 's/^version: \(.*\)$/\1/p' pubspec.yaml | cut -d'+' -f1)
+          if [ "$VERSION" != "$PUBSPEC_VERSION" ]; then
+            echo "Tag version $VERSION != pubspec version $PUBSPEC_VERSION" >&2
+            exit 1
+          fi
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install server dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Build server
+        working-directory: server
+        run: npm run build
+
+      - name: Stage compiled server artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf server-build
+          mkdir -p server-build
+          cp -a server/dist server-build/dist
+          cp server/package.json server/package-lock.json server-build/
+          test -f server-build/dist/server.js
+          # The runtime reads migrations from dist/src/migrations; a missing
+          # directory means the server cannot migrate the database on boot.
+          test -d server-build/dist/src/migrations
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: server-dist
+          path: server-build
+
   build-linux:
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
+    needs: build-server
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
 
@@ -27,21 +91,29 @@ jobs:
           pkg-config --modversion libsecret-1
           pkg-config --cflags --libs libsecret-1
 
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: 3.47.2
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
 
       - name: Derive version from tag
+        id: version
         shell: bash
         run: |
+          set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
-          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           PUBSPEC_VERSION=$(sed -n 's/^version: \(.*\)$/\1/p' pubspec.yaml | cut -d'+' -f1)
           if [ "$VERSION" != "$PUBSPEC_VERSION" ]; then
             echo "Tag version $VERSION != pubspec version $PUBSPEC_VERSION" >&2
             exit 1
           fi
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Fetch Flutter dependencies
         run: flutter pub get
@@ -49,89 +121,44 @@ jobs:
       - name: Build Linux release
         run: flutter build linux --release
 
-      - name: Build server and create .run installer
+      - uses: actions/download-artifact@v7
+        with:
+          name: server-dist
+          path: server-dist
+
+      - name: Stage bundled server payload
         shell: bash
-        run: |
-          cd server && npm run build && cd ..
-          ./tool/make_linux_setup.sh --no-build --out "dist/MiniERP-${VERSION}-linux-x64.run"
+        run: node tool/stage-server.mjs --dist server-dist/dist --out build/server-payload
 
-      # H13 / task 40: the .deb, AppImage, Windows and macOS artifacts are
-      # client-only, so the documented "install the server separately" path was
-      # not satisfiable from the release page — it told users to clone the repo.
-      # Ship a server bundle so that path works from the download alone.
-      # node_modules is deliberately NOT included: better-sqlite3 is a native
-      # module and must be compiled on the target platform, so the bundle
-      # carries the lockfile and the user installs with `npm ci --omit=dev`.
-      - name: Package server bundle for separate-install platforms
+      - name: Smoke-test the bundled server
         shell: bash
-        run: |
-          set -euo pipefail
-          VERSION="${{ env.VERSION }}"
-          STAGE="dist/server-bundle"
-          rm -rf "$STAGE"
-          mkdir -p "$STAGE/server"
-          cp -a server/dist "$STAGE/server/dist"
-          find "$STAGE/server/dist" \( -name '*.map' -o -name '*.ts' \) -delete
-          cp server/package.json server/package-lock.json "$STAGE/server/"
-          mkdir -p "$STAGE/server/uploads" "$STAGE/server/logs"
-          cat > "$STAGE/INSTALL.txt" <<'EOF'
-          MiniERP server — separate-install bundle
-          ==========================================
-          This is the backend for the client-only Desktop, AppImage and macOS
-          builds. It is not required for the Linux .run installer, which already
-          bundles and launches the server for you.
+        run: node tool/smoke-server.mjs --server build/server-payload
 
-          Requirements: Node.js 18 or newer.
-
-          Install and run:
-            cd server
-            npm ci --omit=dev
-            npm start
-
-          Required environment variables (these guards are intentional):
-            JWT_SECRET             openssl rand -base64 64
-            DEFAULT_ADMIN_PASSWORD the initial admin login password
-            ALLOWED_ORIGINS        comma-separated origins, e.g.
-                                    http://localhost:3011,http://127.0.0.1:3011
-            NODE_ENV=production    optional, recommended
-            PORT / HOST            optional, default 3011 / 0.0.0.0
-
-          ALLOWED_ORIGINS is the one that surprises people: without it the
-          server still starts and logs "Server Started", but every request
-          fails with HTTP 500. Set it before first run.
-
-          The database is created and migrated automatically on first start and
-          lives in server/database/erp.db. Back it up from the Dashboard
-          (Database -> Backup) or copy that file while the server is stopped.
-
-          The client connects to http://localhost:3011 by default. Override it
-          with API_BASE_URL at build time, or change PORT/HOST in the
-          environment before starting the server.
-          EOF
-          (cd "$STAGE" && zip -qr "../MiniERP-${VERSION}-server.zip" .)
-          rm -rf "$STAGE"
-
-      - name: Verify server bundle contents
+      - name: Build .run installer
         shell: bash
         run: |
           set -euo pipefail
-          unzip -l "dist/MiniERP-${VERSION}-server.zip" > /dev/null
-          unzip -l "dist/MiniERP-${VERSION}-server.zip" | grep -q "server/package-lock.json"
-          unzip -l "dist/MiniERP-${VERSION}-server.zip" | grep -q "INSTALL.txt"
-          test -d server/dist/migrations
+          rm -rf server/dist
+          cp -a server-dist/dist server/dist
+          mkdir -p dist
+          ./tool/make_linux_setup.sh --no-build --fresh \
+            --out "dist/MiniERP-${{ steps.version.outputs.value }}-linux-x64.run"
+          test -x "dist/MiniERP-${{ steps.version.outputs.value }}-linux-x64.run"
 
       - name: Package Debian
         shell: bash
         run: |
           set -euo pipefail
-          VERSION="${{ env.VERSION }}"
-          mkdir -p dist \
-            pkg/DEBIAN \
+          ASSET="MiniERP-${{ steps.version.outputs.value }}-linux-x64.deb"
+          rm -rf pkg
+          mkdir -p pkg/DEBIAN \
             pkg/usr/lib/minierp_app \
             pkg/usr/share/applications \
             pkg/usr/share/icons/hicolor/512x512/apps \
             pkg/usr/bin
           cp -r build/linux/x64/release/bundle/{minierp_app,lib,data} pkg/usr/lib/minierp_app/
+          # The client looks for <exeDir>/server next to minierp_app.
+          cp -a build/server-payload pkg/usr/lib/minierp_app/server
           ln -sf ../lib/minierp_app/minierp_app pkg/usr/bin/minierp_app
           install -m 644 macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_512.png pkg/usr/share/icons/hicolor/512x512/apps/minierp_app.png
           cat > pkg/usr/share/applications/com.example.minierp_app.desktop <<'EOF'
@@ -145,25 +172,33 @@ jobs:
           EOF
           cat > pkg/DEBIAN/control <<EOF
           Package: minierp-app
-          Version: $VERSION
+          Version: ${{ steps.version.outputs.value }}
           Section: utils
           Priority: optional
           Architecture: amd64
           Maintainer: MiniERP <noreply@example.com>
           Depends: libgtk-3-0, libsecret-1-0
-          Description: MiniERP desktop client
+          Description: MiniERP desktop application (client and bundled server)
           EOF
-          dpkg-deb --build --root-owner-group pkg "dist/MiniERP-${VERSION}-linux-x64.deb"
-          test -f "dist/MiniERP-${VERSION}-linux-x64.deb"
+          dpkg-deb --build --root-owner-group pkg "dist/$ASSET"
+          dpkg-deb -c "dist/$ASSET" | grep -q 'lib/minierp_app/server/dist/server.js'
+          dpkg-deb -c "dist/$ASSET" | grep -q 'lib/minierp_app/server/runtime/node'
+          test -f "dist/$ASSET"
 
       - name: Verify Debian install
         shell: bash
         run: |
-          sudo apt-get install -y ./dist/MiniERP-${VERSION}-linux-x64.deb
+          set -euo pipefail
+          DEB="dist/MiniERP-${{ steps.version.outputs.value }}-linux-x64.deb"
+          sudo apt-get install -y "./$DEB"
           dpkg -s minierp-app | grep -q 'Status: install ok installed'
           test -x /usr/bin/minierp_app
           test -f /usr/share/applications/com.example.minierp_app.desktop
           test -f /usr/share/icons/hicolor/512x512/apps/minierp_app.png
+          test -f /usr/lib/minierp_app/server/dist/server.js
+          test -x /usr/lib/minierp_app/server/runtime/node
+          # The installed payload must boot with its own runtime, not the CI Node.
+          /usr/lib/minierp_app/server/runtime/node --version
 
       - name: Package AppImage
         shell: bash
@@ -172,9 +207,11 @@ jobs:
           APPIMAGE_EXTRACT_AND_RUN: "1"
         run: |
           set -euo pipefail
-          VERSION="${{ env.VERSION }}"
+          ASSET="MiniERP-${{ steps.version.outputs.value }}-linux-x64.AppImage"
+          rm -rf AppDir
           mkdir -p AppDir/usr/bin AppDir/usr/lib/minierp_app AppDir/usr/share/icons/hicolor/512x512/apps
           cp -r build/linux/x64/release/bundle/{minierp_app,lib,data} AppDir/usr/lib/minierp_app/
+          cp -a build/server-payload AppDir/usr/lib/minierp_app/server
           cat > AppDir/usr/bin/minierp_app <<'EOF'
           #!/bin/sh
           exec "$APPDIR/usr/lib/minierp_app/minierp_app" "$@"
@@ -195,37 +232,34 @@ jobs:
           wget -q -O linuxdeploy.AppImage https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
           chmod +x linuxdeploy.AppImage
           ./linuxdeploy.AppImage --appdir AppDir --output appimage
-          mv MiniERP-*.AppImage "MiniERP-${VERSION}-linux-x64.AppImage"
-          ./"MiniERP-${VERSION}-linux-x64.AppImage" --appimage-extract
+          mv MiniERP-*.AppImage "$ASSET"
+          ./"$ASSET" --appimage-extract
           test -f squashfs-root/usr/lib/minierp_app/minierp_app
           test -f squashfs-root/usr/lib/minierp_app/lib/libflutter_linux_gtk.so
+          test -f squashfs-root/usr/lib/minierp_app/server/dist/server.js
+          test -x squashfs-root/usr/lib/minierp_app/server/runtime/node
           rm -rf squashfs-root
 
       - name: Upload Debian artifact
         uses: actions/upload-artifact@v6
         with:
           name: minierp-linux-deb
-          path: dist/MiniERP-${{ env.VERSION }}-linux-x64.deb
+          path: dist/MiniERP-${{ steps.version.outputs.value }}-linux-x64.deb
 
       - name: Upload AppImage artifact
         uses: actions/upload-artifact@v6
         with:
           name: minierp-linux-appimage
-          path: MiniERP-${{ env.VERSION }}-linux-x64.AppImage
+          path: MiniERP-${{ steps.version.outputs.value }}-linux-x64.AppImage
 
       - name: Upload .run installer artifact
         uses: actions/upload-artifact@v6
         with:
           name: minierp-linux-run
-          path: dist/MiniERP-${{ env.VERSION }}-linux-x64.run
-
-      - name: Upload server bundle artifact
-        uses: actions/upload-artifact@v6
-        with:
-          name: minierp-server-bundle
-          path: dist/MiniERP-${{ env.VERSION }}-server.zip
+          path: dist/MiniERP-${{ steps.version.outputs.value }}-linux-x64.run
 
   build-windows:
+    needs: build-server
     runs-on: windows-latest
     timeout-minutes: 60
     defaults:
@@ -234,20 +268,28 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
       - name: Derive version from tag
+        id: version
         shell: bash
         run: |
+          set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
-          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           PUBSPEC_VERSION=$(sed -n 's/^version: \(.*\)$/\1/p' pubspec.yaml | cut -d'+' -f1)
           if [ "$VERSION" != "$PUBSPEC_VERSION" ]; then
             echo "Tag version $VERSION != pubspec version $PUBSPEC_VERSION" >&2
             exit 1
           fi
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: 3.47.2
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
 
       - name: Fetch Flutter dependencies
@@ -256,8 +298,18 @@ jobs:
       - name: Build Windows release
         run: flutter build windows --release
 
+      - uses: actions/download-artifact@v7
+        with:
+          name: server-dist
+          path: server-dist
+
+      - name: Stage bundled server payload
+        run: node tool/stage-server.mjs --dist server-dist/dist --out build/windows/x64/runner/Release/server
+
+      - name: Smoke-test the bundled server
+        run: node tool/smoke-server.mjs --server build/windows/x64/runner/Release/server
+
       - name: Install Inno Setup
-        shell: pwsh
         run: |
           winget install --id JRSoftware.InnoSetup -e --accept-source-agreements --accept-package-agreements --disable-interactivity
           $iscc = (Get-ChildItem -Path 'C:\Program Files (x86)\Inno Setup*\ISCC.exe','C:\Program Files\Inno Setup*\ISCC.exe' -ErrorAction SilentlyContinue | Select-Object -First 1).FullName
@@ -266,69 +318,107 @@ jobs:
 
       - name: Create Inno Setup script
         shell: bash
+        env:
+          APP_VERSION: ${{ steps.version.outputs.value }}
         run: |
           mkdir -p dist
-          cat > installer.iss <<EOFISS
+          cat > installer.iss <<'EOFISS'
           #define MyAppName "MiniERP"
-          #define MyAppVersion "$VERSION"
+          #define MyAppVersion "__VERSION__"
           #define MyAppExeName "minierp_app.exe"
           [Setup]
           AppId=com.example.minierpApp
           AppName={#MyAppName}
           AppVersion={#MyAppVersion}
           AppVerName={#MyAppName} {#MyAppVersion}
-          DefaultDirName={autopf}\MiniERP
+          ; Per-user install: no admin prompt, no UAC elevation.
+          PrivilegesRequired=lowest
+          DefaultDirName={localappdata}\Programs\MiniERP
           DefaultGroupName=MiniERP
           OutputDir=dist
-          OutputBaseFilename=MiniERP-{#MyAppVersion}-windows-x64
+          OutputBaseFilename=MiniERP-__VERSION__-windows-x64
           SetupIconFile=windows\runner\resources\app_icon.ico
           Compression=lzma2/max
           SolidCompression=yes
-          ArchitecturesInstallIn64BitMode=x64compatible
-          PrivilegesRequired=admin
-          UninstallDisplayName={#MyAppName}
           WizardStyle=modern
+          UninstallDisplayName={#MyAppName}
           [Files]
+          ; Release\* includes server\ (dist, node_modules, runtime\node.exe).
           Source: "build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
           [Icons]
-          Name: "{group}\MiniERP"; Filename: "{app}\minierp_app.exe"
-          Name: "{commondesktop}\MiniERP"; Filename: "{app}\minierp_app.exe"; Tasks: desktopicon
+          Name: "{userprograms}\MiniERP"; Filename: "{app}\minierp_app.exe"
+          Name: "{userdesktop}\MiniERP"; Filename: "{app}\minierp_app.exe"; Tasks: desktopicon
           [Tasks]
           Name: "desktopicon"; Description: "Create a &desktop icon"; GroupDescription: "Additional icons:"; Flags: unchecked
           EOFISS
+          sed -i "s/__VERSION__/${APP_VERSION}/g" installer.iss
 
       - name: Compile installer
-        shell: pwsh
         run: |
           & "$env:ISCC" installer.iss
-          if (-not (Test-Path "dist\MiniERP-$env:VERSION-windows-x64.exe")) { throw 'Windows installer not produced' }
+          if (-not (Test-Path "dist\MiniERP-${{ steps.version.outputs.value }}-windows-x64.exe")) { throw 'Windows installer not produced' }
+
+      - name: Verify per-user install
+        env:
+          APP_VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          $install = Join-Path $env:RUNNER_TEMP 'minierp-install'
+          Remove-Item -Recurse -Force $install -ErrorAction SilentlyContinue
+          Start-Process -FilePath "dist\MiniERP-$env:APP_VERSION-windows-x64.exe" `
+            -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', ('/DIR=' + $install) -Wait
+          if (-not (Test-Path (Join-Path $install 'minierp_app.exe'))) { throw 'client missing after install' }
+          if (-not (Test-Path (Join-Path $install 'server\runtime\node.exe'))) { throw 'bundled Node runtime missing after install' }
+          if (-not (Test-Path (Join-Path $install 'server\dist\server.js'))) { throw 'server entry missing after install' }
+          node tool/smoke-server.mjs --server (Join-Path $install 'server')
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v6
         with:
           name: minierp-windows-installer
-          path: dist/MiniERP-${{ env.VERSION }}-windows-x64.exe
+          path: dist/MiniERP-${{ steps.version.outputs.value }}-windows-x64.exe
 
   build-macos:
-    runs-on: macos-latest
-    timeout-minutes: 45
+    needs: build-server
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          # Intel runners are still x64; the server's native modules and the
+          # bundled Node runtime must be built for the same architecture.
+          - runner: macos-15-intel
+            arch: x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    # The app must run on macOS 11+, which is also the floor for Node 24.
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
     steps:
       - uses: actions/checkout@v7
 
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
       - name: Derive version from tag
+        id: version
         shell: bash
         run: |
+          set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
-          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           PUBSPEC_VERSION=$(sed -n 's/^version: \(.*\)$/\1/p' pubspec.yaml | cut -d'+' -f1)
           if [ "$VERSION" != "$PUBSPEC_VERSION" ]; then
             echo "Tag version $VERSION != pubspec version $PUBSPEC_VERSION" >&2
             exit 1
           fi
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: 3.47.2
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
 
       - name: Fetch Flutter dependencies
@@ -337,22 +427,67 @@ jobs:
       - name: Build macOS release
         run: flutter build macos --release
 
+      - uses: actions/download-artifact@v7
+        with:
+          name: server-dist
+          path: server-dist
+
+      - name: Stage bundled server payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP="build/macos/Build/Products/Release/minierp_app.app"
+          test -d "$APP"
+          node tool/stage-server.mjs --dist server-dist/dist --out "$APP/Contents/Resources/server"
+
+      - name: Smoke-test the bundled server
+        shell: bash
+        run: |
+          node tool/smoke-server.mjs \
+            --server "build/macos/Build/Products/Release/minierp_app.app/Contents/Resources/server"
+
+      - name: Ad-hoc sign the app and bundled runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP="build/macos/Build/Products/Release/minierp_app.app"
+          # The Node runtime is code inside the bundle; it must be signed
+          # before the enclosing app or --strict verification fails.
+          codesign --force --sign - --timestamp=none "$APP/Contents/Resources/server/runtime/node"
+          codesign --force --deep --sign - --timestamp=none "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+
       - name: Package DMG
         shell: bash
         run: |
           set -euo pipefail
-          VERSION="${{ env.VERSION }}"
+          ASSET="MiniERP-${{ steps.version.outputs.value }}-macos-${{ matrix.arch }}.dmg"
+          rm -rf dmg_root
           mkdir -p dmg_root
           cp -R build/macos/Build/Products/Release/minierp_app.app dmg_root/
           ln -s /Applications dmg_root/Applications
-          hdiutil create -volname "MiniERP" -srcfolder dmg_root -ov -format UDZO "MiniERP-${VERSION}-macos.dmg"
-          test -f "MiniERP-${VERSION}-macos.dmg"
+          hdiutil create -volname "MiniERP" -srcfolder dmg_root -ov -format UDZO "$ASSET"
+          test -f "$ASSET"
+
+      - name: Verify DMG contents
+        shell: bash
+        run: |
+          set -euo pipefail
+          ASSET="MiniERP-${{ steps.version.outputs.value }}-macos-${{ matrix.arch }}.dmg"
+          MOUNT="$(mktemp -d)"
+          hdiutil attach "$ASSET" -nobrowse -readonly -mountpoint "$MOUNT"
+          trap 'hdiutil detach "$MOUNT" -quiet || true' EXIT
+          APP="$MOUNT/minierp_app.app"
+          test -x "$APP/Contents/MacOS/minierp_app"
+          test -f "$APP/Contents/Resources/server/dist/server.js"
+          test -x "$APP/Contents/Resources/server/runtime/node"
+          codesign --verify --deep --strict "$APP"
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v6
         with:
-          name: minierp-macos-dmg
-          path: MiniERP-${{ env.VERSION }}-macos.dmg
+          name: minierp-macos-${{ matrix.arch }}
+          path: MiniERP-${{ steps.version.outputs.value }}-macos-${{ matrix.arch }}.dmg
 
   release:
     needs: [build-linux, build-windows, build-macos]
@@ -367,13 +502,30 @@ jobs:
           merge-multiple: true
           path: release-assets
 
-      - name: Assert six release assets
+      - name: Assert the six release assets
         shell: bash
         run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          expected=(
+            "MiniERP-${VERSION}-linux-x64.deb"
+            "MiniERP-${VERSION}-linux-x64.AppImage"
+            "MiniERP-${VERSION}-linux-x64.run"
+            "MiniERP-${VERSION}-windows-x64.exe"
+            "MiniERP-${VERSION}-macos-arm64.dmg"
+            "MiniERP-${VERSION}-macos-x64.dmg"
+          )
+          for name in "${expected[@]}"; do
+            if [ ! -f "release-assets/$name" ]; then
+              echo "Missing release asset: $name" >&2
+              find release-assets -maxdepth 1 -type f -printf '%f\n' | sort >&2
+              exit 1
+            fi
+          done
           count=$(find release-assets -maxdepth 1 -type f | wc -l)
           if [ "$count" -ne 6 ]; then
             echo "Expected 6 release assets, found $count" >&2
-            find release-assets -maxdepth 1 -type f -printf '%f\n' | sort
+            find release-assets -maxdepth 1 -type f -printf '%f\n' | sort >&2
             exit 1
           fi
 

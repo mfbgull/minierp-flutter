@@ -9,6 +9,15 @@ class AppLocalizationsUr extends AppLocalizations {
   AppLocalizationsUr([String locale = 'ur']) : super(locale);
 
   @override
+  String get inventoryManufacturer => 'بنانے والی کمپنی / برانڈ';
+
+  @override
+  String get inventoryCompany => 'کمپنی';
+
+  @override
+  String get inventorySupplierNotRecorded => 'درج نہیں ہے';
+
+  @override
   String get supplierAdvances => 'سپلائر کو پیشگی ادائیگیاں';
 
   @override
@@ -4488,6 +4497,15 @@ class AppLocalizationsUr extends AppLocalizations {
   String get employeesAlreadyPaid => 'اس مہینے پہلے سے ادا ہو چکا';
 
   @override
+  String get reportsOtherAssets => 'دیگر اثاثے';
+
+  @override
+  String get reportsTaxPayable => 'قابل ادا ٹیکس';
+
+  @override
+  String get reportsOtherLiabilities => 'دیگر واجبات';
+
+  @override
   String get employeesAdvanceFromPrevious => 'پچھلے مہینے سے پیشگی';
 
   @override
@@ -4856,7 +4874,7 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get loginServerUnreachable =>
-      'سرور سے رابطہ ممکن نہیں۔ کیا سرور پورٹ 3011 پر چل رہا ہے؟';
+      'سرور سے رابطہ ممکن نہیں۔ یقینی بنائیں کہ MiniERP چل رہا ہے۔';
 
   @override
   String get loginSigningIn => 'سائن ان ہو رہا ہے...';
@@ -6965,4 +6983,56 @@ class AppLocalizationsUr extends AppLocalizations {
   @override
   String get errorsOutcomeUnknown =>
       'سرور کا جواب در مت نہیں آیا؛ ہوسا انجام ہو چکا ہے — دوبارہ کوشش دبائیں، یہ محفوظ ہے اور کوئی نقل نہیں بنے گی۔';
+
+  @override
+  String get firstRunTitle => 'MiniERP کی ترتیب';
+
+  @override
+  String get firstRunIntro =>
+      'اس کمپیوٹر کے لیے منتظم کا پاس ورڈ منتخب کریں۔ یہ کہیں نہیں بھیجا جاتا۔';
+
+  @override
+  String get firstRunPassword => 'منتظم کا پاس ورڈ';
+
+  @override
+  String get firstRunConfirmPassword => 'پاس ورڈ کی تصدیق';
+
+  @override
+  String get firstRunPasswordHint => 'کم از کم 12 حروف';
+
+  @override
+  String get firstRunPasswordMismatch => 'پاس ورڈ ایک جیسے نہیں ہیں۔';
+
+  @override
+  String get firstRunPasswordTooShort =>
+      'پاس ورڈ کم از کم 12 حروف کا ہونا چاہیے۔';
+
+  @override
+  String get firstRunStart => 'MiniERP شروع کریں';
+
+  @override
+  String get backendStarting => 'مقامی سرور شروع ہو رہا ہے...';
+
+  @override
+  String get backendFailedTitle => 'MiniERP شروع نہیں ہو سکا';
+
+  @override
+  String get backendFailedBody =>
+      'مقامی سرور شروع نہیں ہوا۔ تفصیل کے لیے لاگ فائل دیکھیں، پھر دوبارہ کوشش کریں۔';
+
+  @override
+  String get backendAlreadyRunning =>
+      'MiniERP پہلے سے کسی دوسری ونڈو میں چل رہا ہے۔';
+
+  @override
+  String get backendStopped =>
+      'مقامی سرور غیر متوقع طور پر رک گیا۔ دوبارہ شروع کرنے کے لیے کوشش کریں۔';
+
+  @override
+  String backendLogsAt(String path) {
+    return 'لاگ فائل: $path';
+  }
+
+  @override
+  String get retry => 'دوبارہ کوشش کریں';
 }

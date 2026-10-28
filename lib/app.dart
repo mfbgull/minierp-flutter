@@ -1,3 +1,5 @@
+import 'dart:ui' show AppExitResponse;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,6 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import 'core/auth/auth_notifier.dart';
 import 'core/auth/session_events.dart';
+import 'core/backend/backend_providers.dart';
 import 'core/i18n/locale_provider.dart';
 import 'core/utils/formatters.dart';
 import 'core/router/module_registry.dart'
@@ -94,11 +97,37 @@ String? _authRedirect(Ref ref, String location) {
   }
 }
 
-class MiniErpApp extends ConsumerWidget {
+class MiniErpApp extends ConsumerStatefulWidget {
   const MiniErpApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MiniErpApp> createState() => _MiniErpAppState();
+}
+
+class _MiniErpAppState extends ConsumerState<MiniErpApp> {
+  late final AppLifecycleListener _lifecycleListener;
+
+  @override
+  void initState() {
+    super.initState();
+    // Packaged builds bundle the backend; stop the child when the window is
+    // closed so quitting the app never leaves an orphaned server behind.
+    _lifecycleListener = AppLifecycleListener(
+      onExitRequested: () async {
+        await ref.read(backendSupervisorProvider.notifier).shutdown();
+        return AppExitResponse.exit;
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _lifecycleListener.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     // Re-evaluate the router redirect when the auth status changes.
     ref.listen(authProvider, (previous, next) {
       if (previous?.status != next.status) {

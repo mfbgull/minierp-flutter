@@ -14,7 +14,13 @@
  */
 import fs from 'fs';
 import path from 'path';
-import { findServerRoot, defaultDbDir, defaultUploadsDir } from '../utils/serverRoot';
+import {
+  findServerRoot,
+  defaultDbDir,
+  defaultUploadsDir,
+  resolveUploadsDir,
+  resolveLogDir,
+} from '../utils/serverRoot';
 
 function nearestPackageRoot(from: string): string {
   let dir = from;
@@ -52,5 +58,29 @@ describe('server path resolution', () => {
   it('cannot select a repo-root database/ directory', () => {
     // <repo-root>/database — the stale copy the old '../../../database' hit.
     expect(defaultDbDir()).not.toBe(path.resolve(serverRoot, '..', 'database'));
+  });
+
+  it('honors UPLOADS_DIR for installed packages with a read-only server tree', () => {
+    const previous = process.env.UPLOADS_DIR;
+    try {
+      process.env.UPLOADS_DIR = '/tmp/minierp-user/uploads';
+      expect(resolveUploadsDir()).toBe('/tmp/minierp-user/uploads');
+    } finally {
+      if (previous === undefined) delete process.env.UPLOADS_DIR;
+      else process.env.UPLOADS_DIR = previous;
+    }
+  });
+
+  it('defaults logs to <cwd>/logs and honors LOG_DIR', () => {
+    const previous = process.env.LOG_DIR;
+    try {
+      delete process.env.LOG_DIR;
+      expect(resolveLogDir()).toBe(path.join(process.cwd(), 'logs'));
+      process.env.LOG_DIR = '/tmp/minierp-user/logs';
+      expect(resolveLogDir()).toBe('/tmp/minierp-user/logs');
+    } finally {
+      if (previous === undefined) delete process.env.LOG_DIR;
+      else process.env.LOG_DIR = previous;
+    }
   });
 });
