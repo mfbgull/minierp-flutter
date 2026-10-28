@@ -1,0 +1,54 @@
+
+> mini-erp-server@1.0.0 test
+> jest --runInBand posPayments.test.ts --coverage --coverageDirectory=/tmp/minierp-fixture-benchmark-coverage --coverageReporters=text-summary
+
+PASS src/__tests__/posPayments.test.ts (92.012 s)
+  POS sale — payment legs, discount, tax, closed period
+    R1/R2 — legacy payload is unchanged
+      ✓ F-073 rejects real tender 0 without committing a sale (45 ms)
+      ✓ F-073 rejects real tender -1 without committing a sale (10 ms)
+      ✓ F-073 rejects real tender 99.99 without committing a sale (20 ms)
+      ✓ full cash sale with no new fields posts one Cash leg and marks it Paid (114 ms)
+      ✓ still refuses cash below the total on the legacy payload (45 ms)
+    R3/R4 — single leg by method
+      ✓ accepts an Easypaisa leg and debits the mobile-wallet account (42 ms)
+    R5/R6 — split legs
+      ✓ records one GL entry per leg and leaves AR at zero (43 ms)
+      ✓ handles three legs summing to the total (70 ms)
+    R7/R8 — overpayment and bad legs are refused before any write
+      ✓ rejects legs summing above the total and writes nothing (42 ms)
+      ✓ rejects an unknown payment method (18 ms)
+    R9/R10 — credit and partial sales
+      ✓ records a credit sale with payments: [] as Unpaid, AR untouched by cash (60 ms)
+      ✓ records a partial settlement with the remainder outstanding (48 ms)
+    R11/R12 — header discount
+      ✓ applies an invoice-scope percentage discount without a total mismatch (21 ms)
+      ✓ clamps a discount larger than the line grosses (20 ms)
+    R13 — tax
+      ✓ posts tax to 2100 and revenue net of tax to 4000 (31 ms)
+    R17 — closed period (H6)
+      ✓ refuses a sale dated inside a closed period with 409 and writes nothing (10 ms)
+      ✓ refuses a credit sale in a closed period too (8 ms)
+      ✓ names the closed period the way assertPeriodNotClosed does (1 ms)
+    R19/R20 — idempotent replay
+      ✓ replays a split discounted sale with the same legs and line totals (43 ms)
+      ✓ reports line_total from the stored amount, not quantity times price (48 ms)
+    R16 — walk-in customer
+      ✓ reuses a single WALK-IN row when no customer is sent (66 ms)
+    R21 — client total disagreement
+      ✓ rejects a wrong total_amount with 400 (14 ms)
+    R25 — status is server-derived
+      ✓ ignores a client-sent status and derives its own (25 ms)
+
+
+=============================== Coverage summary ===============================
+Statements   : 23.01% ( 4035/17534 )
+Branches     : 9.16% ( 901/9830 )
+Functions    : 16.49% ( 364/2207 )
+Lines        : 24.2% ( 3937/16265 )
+================================================================================
+Test Suites: 1 passed, 1 total
+Tests:       23 passed, 23 total
+Snapshots:   0 total
+Time:        95.384 s
+Ran all test suites matching posPayments.test.ts.

@@ -1,0 +1,87 @@
+00:00 +0: loading /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/test/features/accounting_report_regressions_test.dart
+00:00 +0: (setUpAll)
+00:00 +0: F-042 salary remaining counts carryover only once
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly one matching candidate
+  Actual: _TextContainingWidgetFinder:<Found 0 widgets with text containing Remaining Balance: Rs.
+800.00: []>
+   Which: means none were found but one was expected
+The server total_paid already includes carryover; it must not be deducted twice.
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/test/features/accounting_report_regressions_test.dart:165:5)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1953:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/test/features/accounting_report_regressions_test.dart line 165
+The test description was:
+  F-042 salary remaining counts carryover only once
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:07 +0 -1: F-042 salary remaining counts carryover only once [E]
+  Test failed. See exception logs above.
+  The test description was: F-042 salary remaining counts carryover only once
+  
+00:07 +0 -1: F-040 balance sheet displays all nonzero API categories
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly one matching candidate
+  Actual: _TextWidgetFinder:<Found 0 widgets with text "Rs. 400.00": []>
+   Which: means none were found but one was expected
+Other assets supplied by the API must remain visible to reconcile the asset total.
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/test/features/accounting_report_regressions_test.dart:232:5)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1953:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/test/features/accounting_report_regressions_test.dart line 232
+The test description was:
+  F-040 balance sheet displays all nonzero API categories
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:11 +0 -2: F-040 balance sheet displays all nonzero API categories [E]
+  Test failed. See exception logs above.
+  The test description was: F-040 balance sheet displays all nonzero API categories
+  
+00:11 +0 -2: F-041 balance sheet CSV preserves monetary values in one cell
+00:11 +0 -3: F-041 balance sheet CSV preserves monetary values in one cell [E]
+  Expected: ['Cash', '', 'Rs. 1,000.00']
+    Actual: ['Cash', '', 'Rs. 1', '000.00']
+     Which: at location [2] is 'Rs. 1' instead of 'Rs. 1,000.00'
+  Thousands separators must be quoted to prevent splitting currency into extra columns.
+  
+  package:matcher                                               expect
+  package:flutter_test/src/widget_tester.dart 473:18            expect
+  test/features/accounting_report_regressions_test.dart 276:5   main.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                    _CustomZone.registerUnaryCallback
+  test/features/accounting_report_regressions_test.dart 243:18  main.<fn>
+  
+  Expected: ['Cash', '', 'Rs. 1,000.00']
+    Actual: ['Cash', '', 'Rs. 1', '000.00']
+     Which: at location [2] is 'Rs. 1' instead of 'Rs. 1,000.00'
+  Thousands separators must be quoted to prevent splitting currency into extra columns.
+  
+  package:matcher                                              expect
+  package:flutter_test/src/widget_tester.dart 473:18           expect
+  test/features/accounting_report_regressions_test.dart 276:5  main.<fn>
+  
+00:11 +0 -3: (tearDownAll)
+00:11 +0 -3: Some tests failed.
+
+Failing tests:
+  /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/test/features/accounting_report_regressions_test.dart: F-040 balance sheet displays all nonzero API categories
+  /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/test/features/accounting_report_regressions_test.dart: F-041 balance sheet CSV preserves monetary values in one cell
+  /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/test/features/accounting_report_regressions_test.dart: F-042 salary remaining counts carryover only once

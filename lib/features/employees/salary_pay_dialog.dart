@@ -2,7 +2,7 @@
 // modal"). Posts `POST /employees/:id/salary/pay` with amount, payment
 // date, method, reference and notes; the server records the salary_payment
 // and posts the GL entry. Amount defaults to the employee's monthly salary
-// and must be positive; the payment date defaults to today.
+// or zero when a prior advance fully covers this month's earned salary.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -98,7 +98,11 @@ class _SalaryPayDialogState extends ConsumerState<SalaryPayDialog> {
   String? _validateAmount(String? value) {
     final l10n = AppLocalizations.of(context)!;
     final amount = num.tryParse(value?.trim() ?? '');
-    if (amount == null || !amount.isFinite || amount <= 0) {
+    final month = '${_paymentDate.year}-${_paymentDate.month.toString().padLeft(2, '0')}';
+    final history = ref.read(employeeSalaryHistoryProvider(widget.employee.id)).valueOrNull;
+    final coveredByAdvance = _paymentType == 'full' && (history?.any((m) =>
+        m.payPeriod == month && m.remaining == 0 && m.advanceCarryover >= widget.employee.salary && widget.employee.salary > 0) ?? false);
+    if (amount == null || !amount.isFinite || amount < 0 || (amount == 0 && !coveredByAdvance)) {
       return l10n.employeesInvalidamount;
     }
     return null;
@@ -427,7 +431,7 @@ class _RemainingBalance extends ConsumerWidget {
             ? thisMonth.first.displaySourceMonth
             : null;
         final effectiveRemaining =
-            employee.salary - totalPaid - advanceCarryover;
+            thisMonth.isNotEmpty ? thisMonth.first.remaining : employee.salary;
         if (effectiveRemaining <= 0 && advanceCarryover <= 0) {
           return const SizedBox.shrink();
         }
@@ -457,7 +461,7 @@ class _RemainingBalance extends ConsumerWidget {
           ),
           child: Text(
             advanceCarryover > 0
-                ? '${l10n.employeesAlreadyPaid}: ${Formatters.currency(totalPaid)} + $advanceLabel: ${Formatters.currency(advanceCarryover)} — ${l10n.employeesRemainingbalance}: ${Formatters.currency(effectiveRemaining)}'
+                ? '${l10n.employeesAlreadyPaid}: ${Formatters.currency(totalPaid)} ($advanceLabel: ${Formatters.currency(advanceCarryover)}) — ${l10n.employeesRemainingbalance}: ${Formatters.currency(effectiveRemaining)}'
                 : '${l10n.employeesAlreadyPaid}: ${Formatters.currency(totalPaid)} — ${l10n.employeesRemainingbalance}: ${Formatters.currency(effectiveRemaining)}',
             style: Theme.of(
               context,

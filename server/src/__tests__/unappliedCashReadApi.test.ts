@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import app from '../app';
 import db from '../config/database';
 import { getAuthCookie, createCustomer } from './helpers/invoiceReturnSpec';
+import { flushLogs } from '../services/activityLogger';
 
 let cookie: string;
 let noPermissionToken: string;
@@ -38,12 +39,15 @@ test('summaries are independent of receipt pagination and obey operation date an
   expect((await receive(other, 900, '2026-10-01')).status).toBe(201);
   db.prepare(`INSERT INTO customer_credit_sources (customer_id,kind,credited_amount,credited_at)
     VALUES (?,'RETURN_CREDIT',700,'2026-10-01')`).run(customerId);
+  // Customer setup queues audit writes; finish that earlier work before measuring this GET.
+  expect(flushLogs()).toBe(true);
   const changes = db.prepare<[], { total: number }>('SELECT total_changes() total').get()?.total;
   const result = await get(`/api/customers/${customerId}/unapplied-cash?operation_date=2026-10-02&page=2&limit=1`);
   expect(result.status).toBe(200);
   expect(result.body.data).toMatchObject({ operation_date: '2026-10-02', remaining_amount: 300, available_amount: 100, refundable_amount: 100 });
   expect(result.body.data.receipts).toEqual([expect.objectContaining({ payment_id: first.body.data.paymentId, can_reverse: true })]);
   expect(result.body.pagination).toMatchObject({ currentPage: 2, totalPages: 2, totalItems: 2, limit: 1 });
+  expect(flushLogs()).toBe(true);
   expect(db.prepare('SELECT total_changes() total').get()).toEqual({ total: changes });
 });
 

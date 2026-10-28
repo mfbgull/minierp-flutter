@@ -1,0 +1,78 @@
+
+> mini-erp-server@1.0.0 test
+> jest --runInBand auditReservationHeaders.test.ts
+
+FAIL src/__tests__/auditReservationHeaders.test.ts (60.257 s)
+  reservation and journal audit invariants
+    ✕ F-071/F-072 reserve replay and release apply one location delta (line=1) (40 ms)
+    ✕ F-071/F-072 reserve replay and release apply one location delta (line=undefined) (19 ms)
+    ✕ F-060 voids header only after all its children are void and preserves attribution (6 ms)
+
+  ● reservation and journal audit invariants › F-071/F-072 reserve replay and release apply one location delta (line=1)
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 2
+    + Received  + 2
+
+      Object {
+    -   "quantity_available": 7,
+    -   "quantity_reserved": 3,
+    +   "quantity_available": 4,
+    +   "quantity_reserved": 6,
+      }
+
+      33 |     expect(replay.body.id).toBe(first.body.id);
+      34 |     expect(db.prepare('SELECT quantity_reserved,quantity_available FROM batch_stock_by_location WHERE batch_id=? AND location_id=?').get(batch, location))
+    > 35 |       .toEqual({ quantity_reserved: 3, quantity_available: 7 });
+         |        ^
+      36 |     expect((await request(app).delete(`/api/inventory/reservations/${first.body.id}/release`).set('Cookie', cookie)).status).toBe(200);
+      37 |     expect(db.prepare('SELECT quantity_reserved,quantity_available FROM batch_stock_by_location WHERE batch_id=? AND location_id=?').get(batch, location))
+      38 |       .toEqual({ quantity_reserved: 0, quantity_available: 10 });
+
+      at src/__tests__/auditReservationHeaders.test.ts:35:8
+
+  ● reservation and journal audit invariants › F-071/F-072 reserve replay and release apply one location delta (line=undefined)
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 2
+    Received: 3
+
+      31 |     const replay = await post();
+      32 |     expect(replay.status).toBe(201);
+    > 33 |     expect(replay.body.id).toBe(first.body.id);
+         |                            ^
+      34 |     expect(db.prepare('SELECT quantity_reserved,quantity_available FROM batch_stock_by_location WHERE batch_id=? AND location_id=?').get(batch, location))
+      35 |       .toEqual({ quantity_reserved: 3, quantity_available: 7 });
+      36 |     expect((await request(app).delete(`/api/inventory/reservations/${first.body.id}/release`).set('Cookie', cookie)).status).toBe(200);
+
+      at src/__tests__/auditReservationHeaders.test.ts:33:28
+
+  ● reservation and journal audit invariants › F-060 voids header only after all its children are void and preserves attribution
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 1
+
+      Object {
+    -   "voided": 1,
+    +   "voided": 0,
+      }
+
+      45 |       description: 'Header lineage', created_by: 1, lines: [{ account_id: bank.id, debit: 10 }, { account_id: equity.id, credit: 10 }] });
+      46 |     AccountingService.voidJournalLinesByReference(db, 'AUDIT_HEADER', 73, { voidedBy: 1, voidReason: 'Audit void' });
+    > 47 |     expect(db.prepare('SELECT voided FROM journal_entries WHERE id=?').get(entry.journal_entry_id)).toEqual({ voided: 1 });
+         |                                                                                                     ^
+      48 |     expect(db.prepare('SELECT voided,voided_by,void_reason FROM journal_entries WHERE id=?').get(entry.journal_entry_id))
+      49 |       .toEqual({ voided: 1, voided_by: 1, void_reason: 'Audit void' });
+      50 |     // Mounted cash-capital void must reach the same shared invariant.
+
+      at Object.<anonymous> (src/__tests__/auditReservationHeaders.test.ts:47:101)
+
+Test Suites: 1 failed, 1 total
+Tests:       3 failed, 3 total
+Snapshots:   0 total
+Time:        61.423 s
+Ran all test suites matching auditReservationHeaders.test.ts.

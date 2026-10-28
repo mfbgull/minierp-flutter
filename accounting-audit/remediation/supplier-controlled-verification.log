@@ -1,0 +1,16 @@
+
+> mini-erp-server@1.0.0 test
+> jest --runInBand auditReservationHeaders.test.ts --testNamePattern unsupported supplier
+
+PASS src/__tests__/auditReservationHeaders.test.ts (44.294 s)
+  reservation and journal audit invariants
+    ✓ unsupported supplier return-credit allocation rejects as a client error without new cash (22 ms)
+    ○ skipped F-071/F-072 reserve replay and release apply one location delta (line=1)
+    ○ skipped F-071/F-072 reserve replay and release apply one location delta (line=undefined)
+    ○ skipped F-060 voids header only after all its children are void and preserves attribution
+
+Test Suites: 1 passed, 1 total
+Tests:       3 skipped, 1 passed, 4 total
+Snapshots:   0 total
+Time:        45.602 s
+Ran all test suites matching auditReservationHeaders.test.ts with tests matching "unsupported supplier".

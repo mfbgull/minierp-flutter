@@ -1,5 +1,7 @@
 # MiniERP accounting integrity audit
 
+> Current assessment, 2026-10-26: this report preserves its historical audit snapshot. See [remediation status](remediation/STATUS.md) for current source verification, fixes, tests and remaining limits.
+
 **Assessment: release blocked. MiniERP is not demonstrated financially trustworthy for real business use.** The audit establishes16 confirmed defects: **2 Critical,6 High,7 Medium,1 Low**, plus one accounting-policy decision. Critical issues spend the same return credit twice and fabricate a full cash receipt from explicit zero POS tender. Balanced journals and correct-looking statement totals coexist with proven economic errors.
 
 This is an evidence-based audit snapshot, not a certification that every workflow or displayed figure was executed. Discovered modules and financial surfaces have explicit statuses; broad numerical/UI verification remains partial. No production code or financial data was changed, no historical records repaired, and no fix implemented. Decision D15 is recorded as OPEN-DECISION in the existing audit decision log.

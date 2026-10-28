@@ -1,0 +1,14 @@
+
+> mini-erp-server@1.0.0 test
+> jest --runInBand auditCreditOwnership.test.ts customerStoreCredit.test.ts creditOffset.test.ts creditOffsetSubledger.test.ts
+
+PASS src/__tests__/auditCreditOwnership.test.ts (64.742 s)
+PASS src/__tests__/customerStoreCredit.test.ts (18.397 s)
+PASS src/__tests__/creditOffsetSubledger.test.ts (7.914 s)
+PASS src/__tests__/creditOffset.test.ts (6.579 s)
+
+Test Suites: 4 passed, 4 total
+Tests:       18 passed, 18 total
+Snapshots:   0 total
+Time:        101.34 s
+Ran all test suites matching auditCreditOwnership.test.ts|customerStoreCredit.test.ts|creditOffset.test.ts|creditOffsetSubledger.test.ts.

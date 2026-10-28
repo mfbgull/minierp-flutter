@@ -216,6 +216,19 @@ describe('Invoice/SO cancellation reversal (C1 + C4)', () => {
     expect(cancelMovement.c).toBe(0);
   });
 
+  it('F-070 repeated SO cancellation is a controlled conflict without mutation', async () => {
+    const so = await request(app).post('/api/sales-orders').set('Cookie', authCookie).send({
+      customer_id: customerId, so_date: '2026-08-10', status: 'Confirmed', warehouse_id: warehouseId,
+      items: [{ item_id: itemId, quantity: 1, unit_price: 100, warehouse_id: warehouseId }],
+    });
+    expect(so.status).toBe(201);
+    const url = `/api/sales-orders/${so.body.id}/cancel`;
+    expect((await request(app).post(url).set('Cookie', authCookie)).status).toBe(200);
+    const before = db.prepare('SELECT * FROM journal_lines ORDER BY id').all();
+    expect((await request(app).post(url).set('Cookie', authCookie)).status).toBe(409);
+    expect(db.prepare('SELECT * FROM journal_lines ORDER BY id').all()).toEqual(before);
+  });
+
   it('case 5a: SO.cancel on an invoiced + paid order is blocked (invoice guard propagates)', async () => {
     const so = await request(app)
       .post('/api/sales-orders')

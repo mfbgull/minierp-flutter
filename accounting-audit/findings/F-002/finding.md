@@ -1,5 +1,7 @@
 # F-002 — Consumed store credit can be voided, reissued and spent twice
 
+> Current assessment, 2026-10-26: this report preserves its historical audit snapshot. See [remediation status](../../remediation/STATUS.md) for current source verification, fixes, tests and remaining limits.
+
 **Status:** CONFIRMED in a clean dedicated fixture. **Severity:** Critical. **Category:** reusable financial entitlement / reversal integrity / receivables. **Owner:** financial-oracle. No production fix applied.
 
 ## Independent oracle

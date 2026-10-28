@@ -1,0 +1,17 @@
+const path = require('node:path');
+const fs = require('node:fs');
+const os = require('node:os');
+const sqlitePath = require.resolve(path.join(process.cwd(), 'node_modules/better-sqlite3'));
+const Sqlite = require(sqlitePath);
+require.cache[sqlitePath].exports = new Proxy(Sqlite, {
+  construct(target, args, newTarget) {
+    const run = process.env.DATABASE_PATH;
+    if (!run || typeof args[0] !== 'string') throw new Error('Explicit disposable database path required');
+    const physicalRun = fs.realpathSync(run);
+    if (!physicalRun.startsWith(path.join(fs.realpathSync(os.tmpdir()), 'minierp-verify-')) ||
+        path.resolve(args[0]) !== path.join(physicalRun, 'erp.db')) {
+      throw new Error('Refusing SQLite access outside the verifier fixture');
+    }
+    return Reflect.construct(target, args, newTarget);
+  },
+});

@@ -185,6 +185,9 @@ PlutoColumn bulkSelectColumn(GridBulkSelection bulk) => PlutoColumn(
   titlePadding: const EdgeInsets.symmetric(horizontal: 2),
   readOnly: true,
   enableRowChecked: true,
+  // A fixed checkbox column needs no resize icon; Pluto reserves its
+  // space in RTL headers, which otherwise overflows this narrow column.
+  enableDropToResize: false,
   enableSorting: false,
   enableContextMenu: false,
   enableFilterMenuItem: false,

@@ -1,0 +1,12 @@
+
+> mini-erp-server@1.0.0 test
+> jest --runInBand auditReservationHeaders.test.ts invoiceCancelReversal.test.ts invoiceReturnVoidNeutrality.test.ts
+
+PASS src/__tests__/auditReservationHeaders.test.ts (126.908 s)
+PASS src/__tests__/invoiceCancelReversal.test.ts (14.72 s)
+
+Test Suites: 2 passed, 2 total
+Tests:       12 passed, 12 total
+Snapshots:   0 total
+Time:        143.804 s
+Ran all test suites matching auditReservationHeaders.test.ts|invoiceCancelReversal.test.ts|invoiceReturnVoidNeutrality.test.ts.

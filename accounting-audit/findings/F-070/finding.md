@@ -1,5 +1,7 @@
 # F-070 — Repeated sales-order cancellation is reported as a server failure
 
+> Current assessment, 2026-10-26: this report preserves its historical audit snapshot. See [remediation status](../../remediation/STATUS.md) for current source verification, fixes, tests and remaining limits.
+
 **Status: Confirmed defect. Severity: Low.** API error classification only; no second financial effect demonstrated.
 
 In the fresh quotation→confirmed SO→invoice lifecycle, POST `/api/sales-orders/1/cancel` succeeds200 and economically reverses the invoice. Repeat the same request. Expected controlled invalid-state4xx under the documented reversal rules; actual500 with `Sales order is already cancelled`. Before/after economic hashes are identical on the second request. Do not describe this as duplicate money or stock restoration.

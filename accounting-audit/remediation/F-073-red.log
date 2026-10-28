@@ -1,0 +1,64 @@
+
+> mini-erp-server@1.0.0 test
+> jest --runInBand posPayments.test.ts
+
+FAIL src/__tests__/posPayments.test.ts (29.135 s)
+  POS sale — payment legs, discount, tax, closed period
+    R1/R2 — legacy payload is unchanged
+      ✕ F-073 rejects real tender 0 without committing a sale (97 ms)
+      ✓ F-073 rejects real tender -1 without committing a sale (29 ms)
+      ✓ F-073 rejects real tender 99.99 without committing a sale (21 ms)
+      ✓ full cash sale with no new fields posts one Cash leg and marks it Paid (107 ms)
+      ✓ still refuses cash below the total on the legacy payload (10 ms)
+    R3/R4 — single leg by method
+      ✓ accepts an Easypaisa leg and debits the mobile-wallet account (48 ms)
+    R5/R6 — split legs
+      ✓ records one GL entry per leg and leaves AR at zero (81 ms)
+      ✓ handles three legs summing to the total (97 ms)
+    R7/R8 — overpayment and bad legs are refused before any write
+      ✓ rejects legs summing above the total and writes nothing (7 ms)
+      ✓ rejects an unknown payment method (6 ms)
+    R9/R10 — credit and partial sales
+      ✓ records a credit sale with payments: [] as Unpaid, AR untouched by cash (36 ms)
+      ✓ records a partial settlement with the remainder outstanding (28 ms)
+    R11/R12 — header discount
+      ✓ applies an invoice-scope percentage discount without a total mismatch (39 ms)
+      ✓ clamps a discount larger than the line grosses (29 ms)
+    R13 — tax
+      ✓ posts tax to 2100 and revenue net of tax to 4000 (45 ms)
+    R17 — closed period (H6)
+      ✓ refuses a sale dated inside a closed period with 409 and writes nothing (7 ms)
+      ✓ refuses a credit sale in a closed period too (7 ms)
+      ✓ names the closed period the way assertPeriodNotClosed does (1 ms)
+    R19/R20 — idempotent replay
+      ✓ replays a split discounted sale with the same legs and line totals (98 ms)
+      ✓ reports line_total from the stored amount, not quantity times price (39 ms)
+    R16 — walk-in customer
+      ✓ reuses a single WALK-IN row when no customer is sent (69 ms)
+    R21 — client total disagreement
+      ✓ rejects a wrong total_amount with 400 (7 ms)
+    R25 — status is server-derived
+      ✓ ignores a client-sent status and derives its own (38 ms)
+
+  ● POS sale — payment legs, discount, tax, closed period › R1/R2 — legacy payload is unchanged › F-073 rejects real tender 0 without committing a sale
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 400
+    Received: 201
+
+      123 |         .set('Idempotency-Key', `audit-pos-tender-${cash}`)
+      124 |         .send(basePayload({ cash_received: cash }));
+    > 125 |       expect(res.status).toBe(400);
+          |                          ^
+      126 |       expect(['invoices', 'payments', 'journal_lines', 'stock_movements', 'stock_batches']
+      127 |         .map(table => db.prepare(`SELECT * FROM ${table} ORDER BY id`).all())).toEqual(before);
+      128 |     });
+
+      at src/__tests__/posPayments.test.ts:125:26
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 22 passed, 23 total
+Snapshots:   0 total
+Time:        30.54 s
+Ran all test suites matching posPayments.test.ts.

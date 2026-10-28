@@ -1,0 +1,210 @@
+{
+  "baseline": "843322e3c01adcfa13f7d40669487c77f04c532e",
+  "state": "final post-extraction source and tests for complete backend coverage verification",
+  "changes_since_previous": [
+    "server/src/models/PhysicalCount.ts",
+    "server/src/models/physicalCountLayers.ts"
+  ],
+  "files": [
+    {
+      "path": "lib/core/utils/csv_export.dart",
+      "sha256": "480edcfc11fbd3febb1c2219f28d217b313b963e236793bc657141670ec22805"
+    },
+    {
+      "path": "lib/data/models/report.dart",
+      "sha256": "f9135bf7c6ff97638e733874d5b6c7948cd11ff73df62e5c321283c6488e84ba"
+    },
+    {
+      "path": "lib/features/employees/salary_pay_dialog.dart",
+      "sha256": "befcfc28b3062ee25102c3ce92fc65eac0b6a069601b58e3df841d5a94dc3516"
+    },
+    {
+      "path": "lib/features/reports/balance_sheet_report_screen.dart",
+      "sha256": "ce266235f0f3305657f4c0a379b2cb7d128616636cc09722afeabe4c8250bec2"
+    },
+    {
+      "path": "lib/l10n/app_localizations.dart",
+      "sha256": "249c71a067b45ce8e0f55712dbf53c4dee06e40386f8804ac224a5c27d8e9c81"
+    },
+    {
+      "path": "lib/l10n/app_localizations_en.dart",
+      "sha256": "d96ef3d5a8dda1de492f422db65bb8dba27df0e0051b4b7cc30baecfe757f7cf"
+    },
+    {
+      "path": "lib/l10n/app_localizations_ur.dart",
+      "sha256": "660e37db4101aae9d10a39dd7314bcb3d1c23e71adfe30fcb93ab3bc0309d7c1"
+    },
+    {
+      "path": "lib/l10n/en.arb",
+      "sha256": "f55f10d26306f3a8b197c32e279fb6c5d19b77d0805e32b4f536241b80d1b94c"
+    },
+    {
+      "path": "lib/l10n/ur.arb",
+      "sha256": "26140b5b9bc96bd87c403f365f11d81a320b8dc43fc98babd2198e290e27180e"
+    },
+    {
+      "path": "server/src/__tests__/auditCreditOwnership.test.ts",
+      "sha256": "dc20f168374f3ef04c1cd1dfe5c8c2f20ada6baee7fe96b1c6c41ad2d8d95740"
+    },
+    {
+      "path": "server/src/__tests__/auditPayrollChronology.test.ts",
+      "sha256": "46d09f7bbbfb1f9169cdbce940a413e41a6eb9aca8c4346230bbaa15c84c7e8e"
+    },
+    {
+      "path": "server/src/__tests__/auditReservationHeaders.test.ts",
+      "sha256": "61fa9f5d81b5ec35123d59f4128dd2816d3ebeea0d1a7594228ea9b6201e82e1"
+    },
+    {
+      "path": "server/src/__tests__/auditStockRemediation.test.ts",
+      "sha256": "19bb409da8d84844dd8de1f25e9c5f69321af3f70e8398deb45be41970847113"
+    },
+    {
+      "path": "server/src/__tests__/auditTestLifecycle.test.ts",
+      "sha256": "7d1328c141bd397386ad9bf5018982f217647c634fe8e25181fff1b6efc60913"
+    },
+    {
+      "path": "server/src/__tests__/batchLocations.test.ts",
+      "sha256": "932b5e313db32b523d5b989fcd93cae3413cf8184c31553f109b1ba2e38b8b8e"
+    },
+    {
+      "path": "server/src/__tests__/dashboardKpi.test.ts",
+      "sha256": "a1a6a49143b1e781b9f5662e909442b17983cbe67be8aa41c3d845bdd6992e59"
+    },
+    {
+      "path": "server/src/__tests__/inventoryQueryControllers.test.ts",
+      "sha256": "3cc98dd0b79982961606eb1ea1fe461453234ee857194665836193f760348106"
+    },
+    {
+      "path": "server/src/__tests__/invoiceCancelReversal.test.ts",
+      "sha256": "b679d3b56a8c9d5c249bc59bbfa654558e2ca99fe07a9f7dbc19bf5a932483a0"
+    },
+    {
+      "path": "server/src/__tests__/posPayments.test.ts",
+      "sha256": "ba77a5a5d203363d1577b6fbade316c786bf8103b18ed411ab63bf7d4398d6a6"
+    },
+    {
+      "path": "server/src/__tests__/setup.ts",
+      "sha256": "1242d22971c4c0c18055a9570132768cd93fdc74f779c42db3c42cea2fc030a2"
+    },
+    {
+      "path": "server/src/__tests__/unappliedCashReadApi.test.ts",
+      "sha256": "f9c3a1e0f21d0ca47ede7a2ab69ebff8cc2b526fe1c0d68f13eb69eb14afac42"
+    },
+    {
+      "path": "server/src/config/database.ts",
+      "sha256": "fc1a12fe4d989b62f0ae125ae967607ae8fcfcaa4984ffae7e9273e432ae0dfc"
+    },
+    {
+      "path": "server/src/controllers/employeeController.ts",
+      "sha256": "4c128c1ff071e1351ffb8c50554826cbb1b02776480a78f6ef6b08adfdc66e93"
+    },
+    {
+      "path": "server/src/controllers/inventoryController.ts",
+      "sha256": "b7300766c2b1505db98e8203b7c2a5cd18c09874016b449165faa5a28be967cb"
+    },
+    {
+      "path": "server/src/controllers/posController.ts",
+      "sha256": "616f3f614283506e9bbe8938daf8243096b6b5c9f8689d90749d3fc1864f78e0"
+    },
+    {
+      "path": "server/src/controllers/salesController.ts",
+      "sha256": "551d61a5b9e9414bae27fd9e2e4b05004a0866bf1a3b6a68ede01bf1b885bae7"
+    },
+    {
+      "path": "server/src/migrations/117_store_credit_draws.sql",
+      "sha256": "2f6a0118393868d1b488b3917596ade402d6204af56e864403ad48eb85339b15"
+    },
+    {
+      "path": "server/src/migrations/118_count_cost_layers.sql",
+      "sha256": "332bc242b0cc788084ae918aa66d799143d33a53dbe59019e4f04ea65aa0482b"
+    },
+    {
+      "path": "server/src/migrations/119_salary_advance_recognition.sql",
+      "sha256": "8026015e79011e24c93c058b2adf33633a5fa718bf4b12befe50fad66dade0c2"
+    },
+    {
+      "path": "server/src/migrations/120_journal_header_void_attribution.sql",
+      "sha256": "d7dde4e3f0cd3d07727faf72521e5140c3e94cef80380f1efd504ea7bcfbeec9"
+    },
+    {
+      "path": "server/src/migrations/121_count_snapshot_cost.sql",
+      "sha256": "236ccaa4e799037567deef43d85fb99cafa01d6fff2c0ad805543b16cc6b47cf"
+    },
+    {
+      "path": "server/src/models/Employee.ts",
+      "sha256": "393ec8394b2962c9a49af2ad38172f9e25c900150bbbfdd5742822221e4983bf"
+    },
+    {
+      "path": "server/src/models/EmployeeLoan.ts",
+      "sha256": "029d5462d1f372faee02fbb036c0a3273d66b7eea6c6f5be71b83a03e7af5bbe"
+    },
+    {
+      "path": "server/src/models/ExpensePayment.ts",
+      "sha256": "397b70f69be4696a82aa0487ef3f5fa48aa137bd82967106f0599b7f76feeb64"
+    },
+    {
+      "path": "server/src/models/Payment.ts",
+      "sha256": "52138ca71414f234de9e038e5b7ffcd96aca243bb7a0d6aa0005f2171a79f7e3"
+    },
+    {
+      "path": "server/src/models/PhysicalCount.ts",
+      "sha256": "0d7f0a1c582e836ac32e21d8203299e0a53e48c2978d44c66563d435d456027f"
+    },
+    {
+      "path": "server/src/models/Production.ts",
+      "sha256": "4a0f6b805621fbaa91761e0ed7565cbe45cb87ca18c0aa498ea886d260dbb4aa"
+    },
+    {
+      "path": "server/src/models/PurchaseReturn.ts",
+      "sha256": "46a2aead9e69951d28bb5bb585ad443dc9a18afcfe29b66e9022ea501ce81fef"
+    },
+    {
+      "path": "server/src/models/Reports.ts",
+      "sha256": "da3de0c3fe16cc909eb1628af891cd7e8368fd257c353246160daa3cd6e22c03"
+    },
+    {
+      "path": "server/src/models/SalesOrder.ts",
+      "sha256": "5febb5f91df194594f55c04e7819ecab0c50351c46a9593128f5e6af162c92ce"
+    },
+    {
+      "path": "server/src/models/StockMovement.ts",
+      "sha256": "6f900b62d0b76aa6390028b15f98a10be3f8aee168c36b4b83d29bbf16e5b954"
+    },
+    {
+      "path": "server/src/models/StockReservation.ts",
+      "sha256": "6b05ef1224cb6354175bc4ca49eac100f3dde1c3dabaa4d264f3261111129c78"
+    },
+    {
+      "path": "server/src/models/physicalCountLayers.ts",
+      "sha256": "39e5d761597ae7205e2a2bdc41e1f287d999bd940fc45877763384ad2f7aa895"
+    },
+    {
+      "path": "server/src/models/salaryAdvanceRecognition.ts",
+      "sha256": "5255ad17c2c7c9169e54e277a17be1a37f96bd1c90ab89181afa9f5c67101e0f"
+    },
+    {
+      "path": "server/src/services/InvoiceCreationService.ts",
+      "sha256": "88e12c9f0414ffec34c41ffc868d75f1ce619a8cd0766dc1f7eec18de4f47b39"
+    },
+    {
+      "path": "server/src/services/accountingService.ts",
+      "sha256": "8da3f860130411667c6858d8d4702fe8a947bb68f269323874867c4792db5d40"
+    },
+    {
+      "path": "server/src/services/invoiceReturnService.ts",
+      "sha256": "80ba35fb58e2811d3d7260d6363094d5838b1bf99b12283cb4877a29fa4cd7c5"
+    },
+    {
+      "path": "server/src/services/paymentValidation.ts",
+      "sha256": "d9075a46ffcd9a3a6a5b26f97efad765c7f22cb60656741448f5a1e64bc2443c"
+    },
+    {
+      "path": "server/src/services/storeCreditOwnership.ts",
+      "sha256": "95784bc1713ba6fd2b8bf1e135f1ea0c527f667951886602797533e5df4e1250"
+    },
+    {
+      "path": "test/features/accounting_report_regressions_test.dart",
+      "sha256": "29333af98456e288c5e4087d7e82498d7eb88aae6efb2997b7b9690af9135c31"
+    }
+  ]
+}

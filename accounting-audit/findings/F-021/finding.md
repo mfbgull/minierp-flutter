@@ -1,5 +1,7 @@
 # F-021 — Employee loan repayments can precede the disbursement
 
+> Current assessment, 2026-10-26: this report preserves its historical audit snapshot. See [remediation status](../../remediation/STATUS.md) for current source verification, fixes, tests and remaining limits.
+
 **Status:** CONFIRMED, fresh current-logic API reproduction. **Severity:** High: a dated GL asset balance is demonstrably misstated. **Category:** transaction chronology/historical balances. **Owner:** backend-controls. No fix applied.
 
 A repayment of a particular loan cannot extinguish its receivable before that loan exists. Reject a repayment before disbursement, or model any genuinely earlier cash as a separate unapplied receipt.

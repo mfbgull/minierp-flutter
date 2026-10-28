@@ -1,0 +1,42 @@
+
+> mini-erp-server@1.0.0 test
+> jest --runInBand auditStockRemediation.test.ts --testNamePattern surplus completion
+
+FAIL src/__tests__/auditStockRemediation.test.ts (70.78 s)
+  audited count and production economics
+    ✕ F-024 location surplus completion and reversal keep master and bins equal (517 ms)
+    ○ skipped F-025 partial correction preserves omitted shortage and its journal
+    ○ skipped F-024 restores exact 5@10 + 3@20 layers (locations=false)
+    ○ skipped F-024 restores exact 5@10 + 3@20 layers (locations=true)
+    ○ skipped F-022 two cents across four outputs stays nonnegative and clears exactly
+
+  ● audited count and production economics › F-024 location surplus completion and reversal keep master and bins equal
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 1
+
+      Object {
+    -   "physical": 3,
+    +   "physical": 2,
+      }
+
+      101 |       WHERE b.item_id=? AND l.location_code='DEFAULT'`).run(item);
+      102 |     db.prepare('UPDATE stock_balances SET quantity_physical=quantity,quantity_available=quantity,quantity_reserved=0 WHERE item_id=?').run(item);
+    > 103 |     const id = await count([[item, 3]]);
+          |                        ^
+      104 |     const quantity = () => db.prepare(`SELECT SUM(l.quantity_physical) AS physical FROM batch_stock_by_location l JOIN stock_batches b ON b.id=l.batch_id WHERE b.item_id=?`).get(item);
+      105 |     expect(quantity()).toEqual({ physical: 3 });
+      106 |     expect((await post(`/api/inventory/physical-counts/${id}/correct`, { corrections: [{ item_id: item, counted_quantity: 2 }] })).status).toBe(200);
+
+      at Object.<anonymous> (src/__tests__/auditStockRemediation.test.ts:103:24)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 4 skipped, 5 total
+Snapshots:   0 total
+Time:        76.785 s
+Ran all test suites matching auditStockRemediation.test.ts with tests matching "surplus completion".
+Jest did not exit one second after the test run has completed.
+
+'This usually means that there are asynchronous operations that weren't stopped in your tests. Consider running Jest with `--detectOpenHandles` to troubleshoot this issue.

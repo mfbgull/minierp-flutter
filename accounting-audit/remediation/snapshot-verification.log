@@ -1,0 +1,18 @@
+
+> mini-erp-server@1.0.0 test
+> jest --runInBand auditStockRemediation.test.ts --testNamePattern original surplus valuation
+
+PASS src/__tests__/auditStockRemediation.test.ts (73.85 s)
+  audited count and production economics
+    ✓ preserves original surplus valuation after a mixed-layer shortage (507 ms)
+    ○ skipped F-025 partial correction preserves omitted shortage and its journal
+    ○ skipped F-024 restores exact 5@10 + 3@20 layers (locations=false)
+    ○ skipped F-024 restores exact 5@10 + 3@20 layers (locations=true)
+    ○ skipped F-022 two cents across four outputs stays nonnegative and clears exactly
+    ○ skipped F-024 location surplus completion and reversal keep master and bins equal
+
+Test Suites: 1 passed, 1 total
+Tests:       5 skipped, 1 passed, 6 total
+Snapshots:   0 total
+Time:        75.027 s, estimated 78 s
+Ran all test suites matching auditStockRemediation.test.ts with tests matching "original surplus valuation".

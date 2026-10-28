@@ -1,0 +1,12 @@
+
+> mini-erp-server@1.0.0 test
+> jest --runInBand auditCreditOwnership.test.ts posPayments.test.ts --detectOpenHandles
+
+PASS src/__tests__/auditCreditOwnership.test.ts (110.167 s)
+PASS src/__tests__/posPayments.test.ts (22.445 s)
+
+Test Suites: 2 passed, 2 total
+Tests:       25 passed, 25 total
+Snapshots:   0 total
+Time:        136.413 s
+Ran all test suites matching auditCreditOwnership.test.ts|posPayments.test.ts.

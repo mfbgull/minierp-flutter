@@ -1,5 +1,7 @@
 # F-023 — Closing the accrual period blocks later settlement of unpaid expenses and bills
 
+> Current assessment, 2026-10-26: this report preserves its historical audit snapshot. See [remediation status](../../remediation/STATUS.md) for current source verification, fixes, tests and remaining limits.
+
 **Status:** Accounting-policy decision required; the rejection behavior is confirmed. **Priority:** Medium workflow/policy restriction; excluded from confirmed financial-corruption severity counts. **Category:** period controls / AP lifecycle. **Owner:** backend-controls. No fix applied.
 
 ## Rule versus policy

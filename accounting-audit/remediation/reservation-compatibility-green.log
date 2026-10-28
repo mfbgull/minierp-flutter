@@ -1,0 +1,12 @@
+
+> mini-erp-server@1.0.0 test
+> jest --runInBand batchLocations.test.ts auditReservationHeaders.test.ts
+
+PASS src/__tests__/auditReservationHeaders.test.ts (45.248 s)
+PASS src/__tests__/batchLocations.test.ts (63.507 s)
+
+Test Suites: 2 passed, 2 total
+Tests:       17 passed, 17 total
+Snapshots:   0 total
+Time:        111.244 s, estimated 129 s
+Ran all test suites matching batchLocations.test.ts|auditReservationHeaders.test.ts.

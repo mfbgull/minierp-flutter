@@ -1,5 +1,7 @@
 # F-060 — Fully voided journal lines retain active journal headers
 
+> Current assessment, 2026-10-26: this report preserves its historical audit snapshot. See [remediation status](../../remediation/STATUS.md) for current source verification, fixes, tests and remaining limits.
+
 **Status: Confirmed defect. Severity: Medium.** Audit-store/lineage inconsistency; no additional cash/GL effect demonstrated in these scenarios.
 
 ## Independent expectation and actual executed result

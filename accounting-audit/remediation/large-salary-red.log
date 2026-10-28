@@ -1,0 +1,36 @@
+
+> mini-erp-server@1.0.0 test
+> jest --runInBand auditPayrollChronology.test.ts --testNamePattern large advance
+
+FAIL src/__tests__/auditPayrollChronology.test.ts (31.128 s)
+  salary recognition, chronology and D15
+    ✕ F-020 recognizes a large advance over two months, including a zero-cash payroll (38 ms)
+    ○ skipped F-020 earns the advance once and reverses recognition before releasing its source
+    ○ skipped F-043 explains all salary expense in report category rows
+    ○ skipped F-021 rejects a repayment before disbursement without a historical loan credit
+    ○ skipped F-001 rejects a sales return dated before its source invoice
+    ○ skipped F-001 rejects a purchase return dated before its source purchase
+    ○ skipped F-023 settles closed July liabilities in October without rewriting July
+
+  ● salary recognition, chronology and D15 › F-020 recognizes a large advance over two months, including a zero-cash payroll
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 201
+    Received: 422
+
+      58 |     expect((await post(`/api/employees/${id}/salary/pay`, { amount: 2500, payment_date: '2026-08-20', payment_method: 'Bank', payment_type: 'partial' })).status).toBe(201);
+      59 |     const september = await post(`/api/employees/${id}/salary/pay`, { amount: 0, payment_date: '2026-09-20', payment_method: 'Bank', payment_type: 'full' });
+    > 60 |     expect(september.status).toBe(201);
+         |                              ^
+      61 |     expect(net('6100') - wages).toBe(200000);
+      62 |     expect(net('1310')).toBe(50000);
+      63 |     expect(net('1010') - bank).toBe(-250000);
+
+      at Object.<anonymous> (src/__tests__/auditPayrollChronology.test.ts:60:30)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 6 skipped, 7 total
+Snapshots:   0 total
+Time:        32.555 s
+Ran all test suites matching auditPayrollChronology.test.ts with tests matching "large advance".

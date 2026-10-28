@@ -93,15 +93,20 @@ beforeAll(async () => {
 // 6. Clean up rate limiter intervals and logger after all tests in this worker
 import { shutdownRateLimiters } from '../middleware/rateLimiter';
 import logger from '../utils/logger';
+import { disposeLogger } from '../services/activityLogger';
 
 afterAll(async () => {
-  // Runs first and swallows its own errors, so the temp DB is always removed
-  // even if a later teardown step throws.
-  cleanupTestDb();
+  // Finish queued audit writes and stop their timer while the database and
+  // logging transports are still available. Always remove the fixture files.
   try {
-    shutdownRateLimiters();
-    logger.close();
-  } catch {
-    // Ignore cleanup errors
+    disposeLogger();
+  } finally {
+    cleanupTestDb();
+    try {
+      shutdownRateLimiters();
+      logger.close();
+    } catch {
+      // Ignore cleanup errors
+    }
   }
 });

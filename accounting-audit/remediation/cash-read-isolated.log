@@ -1,0 +1,22 @@
+
+> mini-erp-server@1.0.0 test
+> jest --runInBand unappliedCashReadApi.test.ts
+
+PASS src/__tests__/unappliedCashReadApi.test.ts (90.678 s)
+  ✓ summaries are independent of receipt pagination and obey operation date and customer ownership (1003 ms)
+  ✓ voided receipts remain visible but cannot contribute capacity or reverse again (398 ms)
+  ✓ activity is paginated and date-filtered while capacity stays independent (1367 ms)
+  ✓ rejects malformed cash read queries ?page=0 (99 ms)
+  ✓ rejects malformed cash read queries ?limit=0 (102 ms)
+  ✓ rejects malformed cash read queries ?limit=101 (63 ms)
+  ✓ rejects malformed cash read queries ?page=9007199254740992 (73 ms)
+  ✓ rejects malformed cash read queries ?operation_date=2026-02-30 (42 ms)
+  ✓ rejects malformed cash read queries /activity?fromDate=2026-10-03&toDate=2026-10-01 (83 ms)
+  ✓ rejects malformed cash read queries /activity?fromDate=2026-02-30 (225 ms)
+  ✓ empty and missing customers are distinct; cash reads and capability require authentication (136 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       11 passed, 11 total
+Snapshots:   0 total
+Time:        96.928 s, estimated 103 s
+Ran all test suites matching unappliedCashReadApi.test.ts.

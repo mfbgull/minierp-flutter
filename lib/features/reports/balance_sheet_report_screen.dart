@@ -125,6 +125,8 @@ class BalanceSheetReportScreen extends ConsumerWidget {
             data.assets.cash,
             Icons.account_balance_wallet_outlined,
           ),
+          if (data.assets.other != 0)
+            _metricCard(context, l10n.reportsOtherAssets, data.assets.other, Icons.account_balance_outlined),
           _totalRow(context, l10n.commonTotal, data.assets.total, scheme.primary),
           const SizedBox(height: 24),
 
@@ -137,6 +139,10 @@ class BalanceSheetReportScreen extends ConsumerWidget {
             data.liabilities.accountsPayable,
             Icons.shopping_cart_outlined,
           ),
+          if (data.liabilities.taxPayable != 0)
+            _metricCard(context, l10n.reportsTaxPayable, data.liabilities.taxPayable, Icons.receipt_outlined),
+          if (data.liabilities.other != 0)
+            _metricCard(context, l10n.reportsOtherLiabilities, data.liabilities.other, Icons.account_balance_outlined),
           _totalRow(
             context,
             l10n.commonTotal,

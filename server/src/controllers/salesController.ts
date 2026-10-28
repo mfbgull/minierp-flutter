@@ -9,6 +9,7 @@ import db from '../config/database';
 import logger from '../utils/logger';
 import { getQueryInteger, getQueryParam } from '../utils/queryUtils';
 import { errorMessage } from '../utils/errorMessage';
+import { handleBusinessError } from '../utils/businessRuleError';
 
 function parseIdParam(req: Request, res: Response): number | null {
   const id = Number(req.params.id);
@@ -323,7 +324,7 @@ function cancelSalesOrder(req: AuthRequest, res: Response): void {
       return;
     }
     logger.error('Cancel sales order error:', error);
-    res.status(500).json({ error: errorMessage(error) || 'Failed to cancel sales order' });
+    handleBusinessError(res, error, 'Cancel sales order', 'Failed to cancel sales order');
   }
 }
 
