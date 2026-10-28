@@ -44,6 +44,7 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
 
   late final TextEditingController _codeController;
   late final TextEditingController _nameController;
+  late final TextEditingController _manufacturerController;
   late final TextEditingController _descriptionController;
   late final TextEditingController _reorderController;
   late final TextEditingController _costController;
@@ -70,6 +71,9 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
     final item = widget.item;
     _codeController = TextEditingController(text: item?.itemCode ?? '');
     _nameController = TextEditingController(text: item?.itemName ?? '');
+    _manufacturerController = TextEditingController(
+      text: item?.manufacturerName ?? '',
+    );
     _descriptionController = TextEditingController(
       text: item?.description ?? '',
     );
@@ -99,6 +103,7 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
   void dispose() {
     _codeController.dispose();
     _nameController.dispose();
+    _manufacturerController.dispose();
     _descriptionController.dispose();
     _reorderController.dispose();
     _costController.dispose();
@@ -118,6 +123,7 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
     return {
       if (!_isEdit) 'item_code': _codeController.text.trim(),
       'item_name': _nameController.text.trim(),
+      'manufacturer_name': _manufacturerController.text.trim(),
       if (_descriptionController.text.trim().isNotEmpty)
         'description': _descriptionController.text.trim(),
       if (_category != null && _category!.isNotEmpty) 'category': _category,
@@ -250,6 +256,18 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
                             v,
                             l10n.inventoryErrorNameRequired,
                           ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      FormFieldShell(
+                        label: l10n.inventoryManufacturer,
+                        child: TextFormField(
+                          key: const ValueKey('item-manufacturer'),
+                          controller: _manufacturerController,
+                          enabled: !_submitting,
+                          maxLength: 200,
+                          decoration: formInputDecoration(),
+                          onFieldSubmitted: submitOnEnter(_submit),
                         ),
                       ),
                       const SizedBox(height: 10),

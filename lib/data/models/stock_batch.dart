@@ -38,6 +38,7 @@ class StockBatch {
     this.warehouseCode,
     this.warehouseName,
     this.sourceNo,
+    this.suppliers = const [],
     this.locations,
     this.effectiveStatus,
   });
@@ -61,6 +62,10 @@ class StockBatch {
     warehouseCode: asString(json['warehouse_code']),
     warehouseName: asString(json['warehouse_name']),
     sourceNo: asString(json['source_no']),
+    suppliers: json['suppliers'] is List
+        ? [for (final supplier in json['suppliers'] as List)
+            if (supplier is Map<String, dynamic>) BatchSupplier.fromJson(supplier)]
+        : const [],
     locations: json['locations'] is List
         ? (json['locations'] as List).map((e) => BatchLocation.fromJson(e as Map<String, dynamic>)).toList()
         : null,
@@ -105,6 +110,7 @@ class StockBatch {
   final String? warehouseCode;
   final String? warehouseName;
   final String? sourceNo;
+  final List<BatchSupplier> suppliers;
   final List<BatchLocation>? locations;
   final String? effectiveStatus;
 
@@ -127,8 +133,26 @@ class StockBatch {
     if (warehouseCode != null) 'warehouse_code': warehouseCode,
     if (warehouseName != null) 'warehouse_name': warehouseName,
     if (sourceNo != null) 'source_no': sourceNo,
+    if (suppliers.isNotEmpty) 'suppliers': suppliers.map((s) => s.toJson()).toList(),
     if (locations != null) 'locations': locations!.map((e) => e.toJson()).toList(),
     if (effectiveStatus != null) 'effective_status': effectiveStatus,
+  };
+}
+
+class BatchSupplier {
+  const BatchSupplier({this.supplierId, this.supplierName});
+
+  factory BatchSupplier.fromJson(Map<String, dynamic> json) => BatchSupplier(
+    supplierId: asInt(json['supplier_id']),
+    supplierName: asString(json['supplier_name']),
+  );
+
+  final int? supplierId;
+  final String? supplierName;
+
+  Map<String, dynamic> toJson() => {
+    'supplier_id': supplierId,
+    'supplier_name': supplierName,
   };
 }
 

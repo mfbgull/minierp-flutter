@@ -8,6 +8,7 @@ interface Item {
   id: number;
   item_code: string;
   item_name: string;
+  manufacturer_name?: string | null;
   description?: string;
   category?: string;
   unit_of_measure: string;
@@ -34,6 +35,7 @@ interface Item {
 interface CreateItemDTO {
   item_code: string;
   item_name: string;
+  manufacturer_name?: string | null;
   description?: string;
   category?: string;
   unit_of_measure?: string;
@@ -64,6 +66,7 @@ function itemSupplyFlags(data: CreateItemDTO): number[] {
 
 interface UpdateItemDTO {
   item_name: string;
+  manufacturer_name?: string | null;
   description?: string;
   category?: string;
   unit_of_measure: string;
@@ -132,10 +135,10 @@ class ItemModel {
 
     if (filters.search) {
       conditions.push(
-        '(i.item_code LIKE ? OR i.item_name LIKE ? OR i.description LIKE ?)'
+        '(i.item_code LIKE ? OR i.item_name LIKE ? OR i.description LIKE ? OR i.manufacturer_name LIKE ?)'
       );
       const searchTerm = `%${filters.search}%`;
-      params.push(searchTerm, searchTerm, searchTerm);
+      params.push(searchTerm, searchTerm, searchTerm, searchTerm);
     }
 
     if (filters.is_raw_material !== undefined) {
@@ -204,8 +207,8 @@ class ItemModel {
         is_raw_material, is_finished_good, is_purchased, is_manufactured,
         sale_type, qty_decimal_precision, rounding_step,
         has_expiry, near_expiry_threshold_days,
-        created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        created_by, manufacturer_name
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
@@ -223,7 +226,8 @@ class ItemModel {
       data.rounding_step ?? null,
       data.has_expiry ? 1 : 0,
       data.near_expiry_threshold_days ?? 30,
-      userId
+      userId,
+      normalizeManufacturerName(data.manufacturer_name)
     );
 
     return result.lastInsertRowid as number;
@@ -248,6 +252,7 @@ class ItemModel {
           rounding_step = ?,
           has_expiry = ?,
           near_expiry_threshold_days = ?,
+          manufacturer_name = CASE WHEN ? THEN ? ELSE manufacturer_name END,
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `);
@@ -269,6 +274,8 @@ class ItemModel {
       data.rounding_step ?? null,
       data.has_expiry ? 1 : 0,
       data.near_expiry_threshold_days ?? 30,
+      Number(data.manufacturer_name !== undefined),
+      normalizeManufacturerName(data.manufacturer_name),
       id
     );
   }
@@ -383,6 +390,10 @@ class ItemModel {
     }
     return requested || null;
   }
+}
+
+function normalizeManufacturerName(value: string | null | undefined): string | null {
+  return value?.trim() || null;
 }
 
 export default ItemModel;

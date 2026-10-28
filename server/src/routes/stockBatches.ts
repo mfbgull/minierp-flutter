@@ -9,6 +9,7 @@ import { isFeatureEnabled } from '../utils/featureFlags';
 import { getEffectiveBatchStatus, type BatchStatus } from '../utils/batchStatus';
 import ItemModel from '../models/Item';
 import { SqlParam, SqlRow } from '../utils/sqlTypes';
+import { batchSuppliers, type BatchSupplier } from '../utils/batchSuppliers';
 
 const router = Router();
 type BatchLocationRow = {
@@ -31,6 +32,7 @@ type BatchListRow = SqlRow & {
   warehouse_name: string | null;
   effective_status?: BatchStatus;
   locations?: BatchLocationRow[];
+  suppliers?: BatchSupplier[];
 };
 
 router.use(authenticateToken);
@@ -61,6 +63,11 @@ function attachBatchLocations(batches: BatchListRow[]): void {
   }
 }
 
+function attachSuppliers(batches: BatchListRow[]): void {
+  const suppliers = batchSuppliers(db, batches.map(batch => batch.id));
+  for (const batch of batches) batch.suppliers = suppliers.get(batch.id);
+}
+
 /**
  * GET /api/inventory/stock-batches
  * List batches with optional filters
@@ -80,7 +87,7 @@ router.get('/stock-batches', requirePermission('inventory', 'read'), (req, res) 
     `;
     let sql = `
       SELECT sb.*,
-        i.item_code, i.item_name,
+        i.item_code, i.item_name, i.manufacturer_name,
         w.warehouse_code, w.warehouse_name
       FROM stock_batches sb
       LEFT JOIN items i ON sb.item_id = i.id
@@ -119,12 +126,14 @@ router.get('/stock-batches', requirePermission('inventory', 'read'), (req, res) 
       sql += ' LIMIT ? OFFSET ?';
       params.push(p.limit, p.offset);
       const batches = db.prepare(sql).all(...params) as BatchListRow[];
+      attachSuppliers(batches);
       if (featureOn) {
         attachBatchLocations(batches);
       }
       res.json({ success: true, data: batches, pagination: envelope(total, p) });
     } else {
       const batches = db.prepare(sql).all(...params) as BatchListRow[];
+      attachSuppliers(batches);
       if (featureOn) {
         attachBatchLocations(batches);
       }

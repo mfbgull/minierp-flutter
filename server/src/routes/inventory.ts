@@ -11,7 +11,7 @@ router.use(authenticateToken);
 router.get('/items', requirePermission('inventory', 'read'), validateZodQuery(zodSchemas.listQuery), inventoryController.getItems);
 router.get('/items/:id', requirePermission('inventory', 'read'), inventoryController.getItem);
 router.post('/items', requirePermission('inventory', 'create'), sensitiveOperationLimiter, validateZodBody(zodBodySchemas.itemCreate), inventoryController.createItem);
-router.put('/items/:id', requirePermission('inventory', 'update'), sensitiveOperationLimiter, validateZodBody(zodBodySchemas.object), inventoryController.updateItem);
+router.put('/items/:id', requirePermission('inventory', 'update'), sensitiveOperationLimiter, validateZodBody(zodBodySchemas.itemUpdate), inventoryController.updateItem);
 router.delete('/items/:id', requirePermission('inventory', 'delete'), sensitiveOperationLimiter, inventoryController.deleteItem);
 router.post('/items/:id/restore', requirePermission('inventory', 'update'), inventoryController.restoreItem);
 

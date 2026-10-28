@@ -1,6 +1,10 @@
 # API Reference
 
-Base URL: `http://localhost:3011/api`
+Base URL: `http://localhost:3011/api` (development and manual server deploys)
+
+Packaged desktop installs expose the same API on an ephemeral loopback port:
+the app starts the bundled server on `127.0.0.1` and discovers the port from
+`<data>/server.port`, then uses `http://127.0.0.1:<port>/api`.
 
 All endpoints require authentication (JWT cookie) unless marked otherwise. Responses use JSON format.
 
@@ -239,6 +243,7 @@ Delete a supplier (fails if supplier has purchase orders).
 {
   "item_code": "ITM001",
   "item_name": "Steel Rod 10mm",
+  "manufacturer_name": "Acme Steel",
   "category": "Raw Materials",
   "unit_of_measure": "Kg",
   "reorder_level": 100,
@@ -248,6 +253,31 @@ Delete a supplier (fails if supplier has purchase orders).
   "is_purchased": true
 }
 ```
+
+### Manufacturer / Brand
+
+`manufacturer_name` on item create/update is optional, trimmed, and limited to
+200 characters. Empty text or `null` clears it; an omitted update preserves the
+saved value. Item responses include it, and item search and sorting support it.
+Manufacturer/brand describes the product, independently of its suppliers.
+
+### Batch supplier provenance
+
+`GET /inventory/stock-batches` includes a `suppliers` array on every batch:
+`[{"supplier_id": 1, "supplier_name": "ABC Traders"}]`. Both the legacy array and
+paged response shapes include this field. Direct purchases resolve through
+`purchases`; goods receipts resolve through their receipt **line**, receipt and
+purchase order. Supplier names reflect the linked supplier's current name, with
+the purchase's recorded name as a fallback for historical free-text purchases.
+
+New warehouse, expiry and damage transfers record every contributing source
+batch atomically with the transfer. Mixed batches list all contributing suppliers;
+a later transfer retains that set. This identifies contributors, not quantities
+remaining per supplier in a merged cost layer. Untraceable sources appear as
+`{"supplier_id": null, "supplier_name": null}` (displayed as "Not recorded").
+Historical general transfers are not assigned their first batch's supplier because
+they may have combined several sources. Historical batch-targeted expiry/damage
+transfers can be traced using their existing movement link.
 
 ### Warehouses
 

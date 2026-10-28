@@ -88,6 +88,7 @@ Product and material master data.
 | item_name | VARCHAR(200) | Display name |
 | description | TEXT | Detailed description |
 | category | VARCHAR(100) | Category grouping |
+| manufacturer_name | TEXT nullable | Manufacturer/brand, up to 200 trimmed characters; independent of suppliers |
 | unit_of_measure | VARCHAR(20) | Nos, Kg, Ltr, Box, etc. |
 | current_stock | DECIMAL(15,3) | Computed total across warehouses |
 | reorder_level | DECIMAL(15,3) | Low stock threshold |
@@ -99,6 +100,21 @@ Product and material master data.
 | is_manufactured | BOOLEAN | Produced internally |
 | is_active | BOOLEAN | Soft delete |
 | created_by | INTEGER FK | References users(id) |
+
+### stock_batch_sources
+
+Migration `122_item_manufacturer_batch_sources.sql` adds transfer provenance.
+Each row links a destination `batch_id` to a contributing `source_batch_id`
+and the positive `quantity` transferred from that source. A nullable source
+explicitly records unbatched/unknown contributions. Both batch columns are
+indexed foreign keys; destination deletion cascades its provenance rows.
+
+Provenance is written in the same transaction as warehouse, expiry and damage
+transfers. It does not alter batch valuation, FIFO consumption or GL postings.
+Supplier lookup follows these links to the purchase or goods-receipt line.
+Historical batch-targeted expiry/damage links are recovered; general historical
+transfers are left unknown because their original metadata may name only the
+first of several consumed batches.
 
 ### warehouses
 Storage locations.

@@ -331,7 +331,7 @@ class _BatchManagementScreenState
       configuration: plutoGridConfigurationFor(context, compact: true),
       columns: _columns(l10n),
       rows: [
-        for (final b in _batches) _toRow(b),
+        for (final b in _batches) _toRow(b, l10n),
       ],
       onLoaded: (e) {
         e.stateManager.setSelectingMode(
@@ -365,6 +365,21 @@ class _BatchManagementScreenState
       field: 'source',
       type: PlutoColumnType.text(),
       width: 120,
+    ),
+    PlutoColumn(
+      title: l10n.fieldsSupplier,
+      field: 'supplier',
+      type: PlutoColumnType.text(),
+      readOnly: true,
+      width: 220,
+      renderer: (ctx) => Tooltip(
+        message: ctx.cell.value.toString(),
+        child: Text(
+          ctx.cell.value.toString(),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
     ),
     PlutoColumn(
       title: l10n.inventoryQtyoriginal,
@@ -501,7 +516,7 @@ class _BatchManagementScreenState
     ),
   ];
 
-  PlutoRow _toRow(StockBatch b) {
+  PlutoRow _toRow(StockBatch b, AppLocalizations l10n) {
     final status = b.computeStatus(nearExpiryThresholdDays: _threshold);
     return PlutoRow(
       cells: {
@@ -509,6 +524,14 @@ class _BatchManagementScreenState
         'batchNo': PlutoCell(value: b.batchNo),
         'warehouse': PlutoCell(value: b.warehouseName ?? b.warehouseCode ?? ''),
         'source': PlutoCell(value: '${b.sourceType} #${b.sourceId}'),
+        'supplier': PlutoCell(
+          value: b.suppliers.isEmpty
+              ? l10n.inventorySupplierNotRecorded
+              : b.suppliers
+                    .map((s) => s.supplierName ?? l10n.inventorySupplierNotRecorded)
+                    .toSet()
+                    .join(', '),
+        ),
         'original': PlutoCell(value: b.quantityOriginal),
         'remaining': PlutoCell(value: b.quantityRemaining),
         'unitCost': PlutoCell(value: b.unitCost),

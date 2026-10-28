@@ -107,6 +107,7 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen>
   String? _sortColumnFor(String field) => switch (field) {
     'code' => 'item_code',
     'name' => 'item_name',
+    'manufacturer' => 'manufacturer_name',
     'category' => 'category',
     'stock' => 'current_stock',
     'reorder' => 'reorder_level',
@@ -157,6 +158,7 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen>
       'id': PlutoCell(value: item.id),
       'code': PlutoCell(value: item.itemCode),
       'name': PlutoCell(value: item.itemName),
+      'manufacturer': PlutoCell(value: item.manufacturerName ?? ''),
       'category': PlutoCell(value: item.category ?? ''),
       'unit': PlutoCell(value: item.unitOfMeasure),
       'stock': PlutoCell(value: item.currentStock),
@@ -488,6 +490,7 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen>
       ),
       textColumn('code', l10n.inventoryItemcode, 120),
       textColumn('name', l10n.inventoryItemname, 240),
+      textColumn('manufacturer', l10n.inventoryCompany, 190),
       textColumn('category', l10n.commonCategory, 130),
       textColumn('unit', l10n.fieldsUnit, 90),
       PlutoColumn(
@@ -551,6 +554,7 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen>
       PlutoColumn(
         title: l10n.commonStatus,
         field: 'active',
+        frozen: PlutoColumnFrozen.end,
         type: PlutoColumnType.text(),
         width: 110,
         readOnly: true,
