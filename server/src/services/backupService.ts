@@ -12,7 +12,7 @@ import db, { dbDir } from '../config/database';
 import logger from '../utils/logger';
 import { ActionType } from './activityLogger';
 import { pruneIdempotencyKeys } from '../utils/idempotency';
-import { defaultUploadsDir } from '../utils/serverRoot';
+import { resolveUploadsDir } from '../utils/serverRoot';
 
 // Take the resolved dir from config/database so backups always land beside the
 // erp.db this process opened, instead of re-deriving it with other arithmetic.
@@ -23,7 +23,7 @@ export const BACKUP_DIR = process.env.BACKUP_DIR || path.join(DB_DIR, 'backups')
 // D7: employee documents and other uploads live outside the database, so a
 // database-only restore recovered rows whose files were gone. Every backup now
 // carries a sibling <name>.uploads snapshot of this directory.
-export const UPLOADS_DIR = process.env.UPLOADS_DIR || defaultUploadsDir();
+export const UPLOADS_DIR = resolveUploadsDir();
 const DAILY_KEEP = 7;
 const WEEKLY_KEEP = 4;
 const INTERVAL_MS = 24 * 60 * 60 * 1000;

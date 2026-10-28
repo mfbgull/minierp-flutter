@@ -9,6 +9,15 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get inventoryManufacturer => 'Manufacturer / Brand';
+
+  @override
+  String get inventoryCompany => 'Company';
+
+  @override
+  String get inventorySupplierNotRecorded => 'Not recorded';
+
+  @override
   String get supplierAdvances => 'Supplier advances';
 
   @override
@@ -4489,6 +4498,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get employeesAlreadyPaid => 'Already paid this month';
 
   @override
+  String get reportsOtherAssets => 'Other Assets';
+
+  @override
+  String get reportsTaxPayable => 'Tax Payable';
+
+  @override
+  String get reportsOtherLiabilities => 'Other Liabilities';
+
+  @override
   String get employeesAdvanceFromPrevious => 'Advance from previous month';
 
   @override
@@ -4856,7 +4874,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get loginServerUnreachable =>
-      'Cannot reach the server. Is it running on port 3011?';
+      'Cannot reach the server. Make sure MiniERP is running.';
 
   @override
   String get loginSigningIn => 'Signing in...';
@@ -6973,4 +6991,56 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get errorsOutcomeUnknown =>
       'No response from the server in time. This operation may already have completed — press Retry to confirm; retrying is safe and will not create a duplicate.';
+
+  @override
+  String get firstRunTitle => 'Set up MiniERP';
+
+  @override
+  String get firstRunIntro =>
+      'Choose the administrator password for this computer. It is never sent anywhere.';
+
+  @override
+  String get firstRunPassword => 'Administrator password';
+
+  @override
+  String get firstRunConfirmPassword => 'Confirm password';
+
+  @override
+  String get firstRunPasswordHint => 'At least 12 characters';
+
+  @override
+  String get firstRunPasswordMismatch => 'The passwords do not match.';
+
+  @override
+  String get firstRunPasswordTooShort =>
+      'The password must be at least 12 characters long.';
+
+  @override
+  String get firstRunStart => 'Start MiniERP';
+
+  @override
+  String get backendStarting => 'Starting the local server...';
+
+  @override
+  String get backendFailedTitle => 'MiniERP could not start';
+
+  @override
+  String get backendFailedBody =>
+      'The local server did not start. Check the log file for details, then retry.';
+
+  @override
+  String get backendAlreadyRunning =>
+      'MiniERP is already running in another window.';
+
+  @override
+  String get backendStopped =>
+      'The local server stopped unexpectedly. Retry to restart it.';
+
+  @override
+  String backendLogsAt(String path) {
+    return 'Log file: $path';
+  }
+
+  @override
+  String get retry => 'Retry';
 }

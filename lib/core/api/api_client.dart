@@ -9,7 +9,8 @@ import '../utils/recoverable_failure.dart';
 /// Shared HTTP client for the MiniERP backend — PORTING.md §0/§2.
 ///
 /// - Base URL: `http://localhost:3011/api` (override with
-///   `--dart-define=API_BASE_URL=...`).
+///   `--dart-define=API_BASE_URL=...`). Packaged builds point the client at
+///   the bundled backend's ephemeral port at boot via [setBaseUrl].
 /// - 10s timeouts (matches the web client).
 /// - Request interceptor attaches `Authorization: Bearer <jwt>` from the
 ///   injected [TokenStorage].
@@ -21,6 +22,7 @@ class ApiClient {
   ApiClient({Dio? dio, TokenStorage? tokenStorage, this.sessionEvents})
     : tokenStorage = tokenStorage ?? const SecureTokenStorage(),
       dio = dio ?? Dio(_baseOptions()) {
+    _instances.add(this.dio);
     _attachInterceptors();
   }
 
@@ -32,13 +34,36 @@ class ApiClient {
   /// round-trip instead of stampeding the server.
   Future<bool>? _refreshing;
 
-  static const String baseUrl = String.fromEnvironment(
+  /// Compile-time override (`--dart-define=API_BASE_URL=...`), empty when
+  /// unset so the boot supervisor can tell the difference.
+  static const String configuredBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://localhost:3011/api',
   );
 
+  static const String defaultBaseUrl = 'http://localhost:3011/api';
+
+  static String _baseUrl = configuredBaseUrl.isEmpty
+      ? defaultBaseUrl
+      : configuredBaseUrl;
+
+  /// Every live Dio instance, so a base-URL change made after a provider was
+  /// built (the packaged backend's port is only known at boot) still applies.
+  static final Set<Dio> _instances = {};
+
+  static String get baseUrl => _baseUrl;
+
+  /// Points every existing and future client at [value]. The supervisor
+  /// calls this before the first auth request runs.
+  static void setBaseUrl(String value) {
+    if (value.isEmpty || value == _baseUrl) return;
+    _baseUrl = value;
+    for (final dio in _instances) {
+      dio.options.baseUrl = value;
+    }
+  }
+
   static BaseOptions _baseOptions() => BaseOptions(
-    baseUrl: baseUrl,
+    baseUrl: _baseUrl,
     connectTimeout: const Duration(seconds: 10),
     receiveTimeout: const Duration(seconds: 10),
     sendTimeout: const Duration(seconds: 10),

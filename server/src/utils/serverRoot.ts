@@ -29,3 +29,17 @@ export function defaultDbDir(): string {
 export function defaultUploadsDir(): string {
   return path.join(findServerRoot(), 'uploads');
 }
+
+/**
+ * Uploads directory actually used at runtime. Installed packages keep the
+ * server tree read-only (Program Files, /usr/lib, an AppImage mount), so the
+ * launcher redirects uploads into a writable per-user data directory.
+ */
+export function resolveUploadsDir(): string {
+  return process.env.UPLOADS_DIR || defaultUploadsDir();
+}
+
+/** Log directory: LOG_DIR override, else <cwd>/logs. */
+export function resolveLogDir(): string {
+  return process.env.LOG_DIR || path.join(process.cwd(), 'logs');
+}

@@ -267,7 +267,8 @@ app.use('/api/inventory', initStockBatchesRoutes(db));
 
 // Serve static files from client/dist in production
 // This MUST come AFTER API routes
-if (process.env.NODE_ENV === 'production') {
+// Desktop installers run API-only; there is no Flutter web build to serve.
+if (process.env.NODE_ENV === 'production' && process.env.SERVE_CLIENT !== 'false') {
   let clientDistPath: string;
 
   // Check if running in Electron (DATABASE_PATH is set by Electron main process)
@@ -321,7 +322,7 @@ if (process.env.NODE_ENV === 'production') {
       res.status(404).json({ error: 'Route not found', path: req.path });
     }
   });
-} else {
+} else if (process.env.SERVE_CLIENT !== 'false') {
   // In development, serve the built frontend for SPA routing
   const clientDistPath = path.join(__dirname, '..', '..', 'client', 'dist');
   const normalizedPath = path.normalize(clientDistPath);

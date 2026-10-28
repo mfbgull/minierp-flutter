@@ -10,87 +10,113 @@ Get the latest installer for your platform from the [Releases page](https://gith
 
 ## Deployment Model
 
-MiniERP is a **two-component application**:
+MiniERP is a **two-component application** — a Flutter desktop client and a
+Node.js/SQLite API server — but **every release artifact is self-contained**.
+Each installer carries the client, the compiled server, its production
+dependencies and a pinned Node runtime. You do not install Node.js, and there
+is no separate server download.
 
-1. **Flutter Desktop Client** — UI for inventory, sales, purchases, production
-2. **Node.js Server** — API backend with SQLite database
+The client starts the bundled server on launch and stops it on exit.
 
-Each release ships both halves, packaged differently:
+| Artifact | Install scope | Data directory |
+|---|---|---|
+| `MiniERP-<ver>-linux-x64.deb` | system (apt) | `~/.local/share/minierp/data` |
+| `MiniERP-<ver>-linux-x64.AppImage` | portable | `~/.local/share/minierp/data` |
+| `MiniERP-<ver>-linux-x64.run` | single file, user | `<install dir>/data` |
+| `MiniERP-<ver>-windows-x64.exe` | per-user, no admin | `%LOCALAPPDATA%\MiniERP\data` |
+| `MiniERP-<ver>-macos-arm64.dmg` | app bundle (Apple silicon) | `~/Library/Application Support/MiniERP/data` |
+| `MiniERP-<ver>-macos-x64.dmg` | app bundle (Intel) | `~/Library/Application Support/MiniERP/data` |
 
-| Artifact | Client | Server | You run |
-|---|---|---|---|
-| Linux `.run` | yes | **bundled + auto-started** | one installer |
-| Linux `.deb` / AppImage | yes | separate | installer + server bundle |
-| Windows `.exe` | yes | separate | installer + server bundle |
-| macOS `.dmg` | yes | separate | app + server bundle |
+### Linux
 
-**Only the Linux `.run` is a true one-app install** — it carries the Node
-runtime and the backend, starts the server for you and stops it on exit. Every
-other artifact needs the server installed separately from the
-`MiniERP-<version>-server.zip` attached to the same release. No accounting
-logic differs between them; they are the same build.
+- **`.deb`** (recommended for a system install):
+  `sudo apt install ./MiniERP-<ver>-linux-x64.deb`
+- **AppImage** (no installation): `chmod +x MiniERP-*.AppImage` then run it.
+- **`.run`** (installs everything into one user directory):
 
-### Linux (Recommended)
+  ```bash
+  chmod +x MiniERP-*.run
+  ./MiniERP-*.run            # add --fresh to skip shipped demo data
+  ```
 
-The Linux release includes a **self-contained .run installer** that bundles both client and server:
+  The default target is `~/.local/share/minierp`; `--dir PATH` changes it and
+  `--force` upgrades an existing install. Data in `<dir>/data` is preserved
+  across upgrades. `minierp stop` and `minierp status` control the server.
 
-```bash
-chmod +x MiniERP-*.run
-./MiniERP-*.run
-```
+### Windows
 
-This installs to `~/.local/share/minierp/` and includes:
-- Flutter desktop client
-- Node.js server
-- Bundled Node.js runtime
-- SQLite database (auto-initialized on first run)
-- Launcher script that starts server then client
+The installer is **per-user**: no administrator prompt, no UAC. It installs to
+`%LOCALAPPDATA%\Programs\MiniERP`, with Start Menu and optional desktop
+shortcuts. Uninstalling removes the program; the database in
+`%LOCALAPPDATA%\MiniERP\data` is kept so reinstalling does not lose data.
 
-**Alternative Linux packages** (client only — requires separate server):
-- `.deb` package — install with `dpkg -i`
-- `.AppImage` — portable, no installation required
+### macOS
 
-### Client-only platforms (Windows, macOS, .deb, AppImage)
+Two DMGs are published: `-macos-arm64` for Apple silicon and `-macos-x64` for
+Intel. Open the DMG and drag **MiniERP** into Applications. The build is
+ad-hoc signed, not notarized, so the first launch needs **right-click → Open**
+(or System Settings → Privacy & Security → Open Anyway).
 
-These artifacts contain the desktop client only. Download
-`MiniERP-<version>-server.zip` from the same release page — it contains the
-compiled backend, its migrations and the lockfile — and run it once:
+## First run
 
-1. Install Node.js 18 or newer (`brew install node` on macOS).
-2. Unzip `MiniERP-<version>-server.zip` and `cd server`.
-3. Install dependencies: `npm ci --omit=dev`.
-4. Set the required environment variables (below).
-5. Start it: `npm start`.
-6. Launch MiniERP — it connects to `localhost:3011`.
+On first launch MiniERP asks you to choose the administrator password
+(at least 12 characters). The password is hashed by the server and is never
+written to disk. The server then creates and migrates the database and the app
+signs in. Later launches skip this step.
 
-The database is created and migrated automatically on first start, at
-`server/database/erp.db`. It is not needed on the `.run` installer, which
-already bundles and launches the server.
+The bundled server listens on an **ephemeral loopback port** chosen at launch,
+not on a fixed 3011. The app reads the port from `<data>/server.port` and
+connects to `127.0.0.1`. One instance per data directory is enforced, and the
+server stops when the app exits.
 
-**Required environment variables.** `JWT_SECRET`, `DEFAULT_ADMIN_PASSWORD` and
-`ALLOWED_ORIGINS` are all mandatory; the server refuses to start without
-`JWT_SECRET`, and without `ALLOWED_ORIGINS` it starts but answers every request
-with HTTP 500. Copy `INSTALL.txt` from the zip for the exact list.
+### Where your data lives
+
+Everything writable is outside the install tree, in the data directory listed
+above:
+
+| Path | Contents |
+|---|---|
+| `database/erp.db` | SQLite database (plus `-wal`/`-shm`) |
+| `database/backups/` | Dashboard backups |
+| `uploads/` | Employee documents |
+| `logs/` | Server and app logs (`server-console.log`) |
+| `.env` | Generated secrets and paths (mode `0600` on Linux/macOS) |
+
+To migrate to another machine, copy the whole data directory while MiniERP is
+closed. Uninstalling the application does not delete it.
 
 ## Server Configuration
 
-The server runs on port 3011 by default. Configure via environment variables:
+Packaged installs need no configuration — the app generates the JWT secret on
+first run, passes paths and the initial admin password to the server through the
+process environment, and writes `<data>/.env` once. The admin password is never
+persisted.
+
+Running the server **manually** (development or a shared LAN deployment) still
+uses plain environment variables:
 
 ```bash
 PORT=3011
 HOST=0.0.0.0
 NODE_ENV=production
-JWT_SECRET=<auto-generated>
-DEFAULT_ADMIN_PASSWORD=replace-with-a-unique-password
-ALLOWED_ORIGINS=http://localhost:3011,http://127.0.0.1:3011,file://
+JWT_SECRET=<auto-generated, 32+ characters>
+DEFAULT_ADMIN_PASSWORD=<initial admin password, first boot only>
+ALLOWED_ORIGINS=http://localhost:3011,http://127.0.0.1:3011
+DATABASE_PATH=<directory for erp.db>
+UPLOADS_DIR=<writable uploads directory>
+LOG_DIR=<log directory>
 ```
+
+`JWT_SECRET` is required. Without `ALLOWED_ORIGINS` the server starts but
+answers every request with HTTP 500. `DEFAULT_ADMIN_PASSWORD` is only needed
+while the admin account does not exist yet.
 
 ## Development
 
 ### Prerequisites
 
 - Flutter 3.47.2+
-- Node.js 18+
+- Node.js 24 (the version shipped inside the installers)
 - npm
 
 ### Running locally
@@ -107,11 +133,27 @@ flutter pub get
 flutter run
 ```
 
-The client connects to `http://localhost:3011/api` by default. Override with:
+In development no bundled server is found, so the client does **not** start one
+and uses the compile-time default `http://localhost:3011/api`. Override it with:
 
 ```bash
 flutter run --dart-define=API_BASE_URL=http://your-server:3011/api
 ```
+
+### Building a release package
+
+```bash
+# Linux single-file installer (client + server + Node runtime)
+./tool/make_linux_setup.sh
+
+# Stage and boot-test a server payload for any platform
+node tool/stage-server.mjs --dist server/dist --out build/server-payload
+node tool/smoke-server.mjs --server build/server-payload
+```
+
+`tool/stage-server.mjs` builds the production dependencies for the current OS
+and downloads the matching Node runtime, so run it on each target platform
+(`.deb`/AppImage on Linux, the installer on Windows, each DMG on macOS).
 
 ## License
 

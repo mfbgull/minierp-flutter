@@ -1,5 +1,7 @@
-import winston from 'winston';
+import fs from 'fs';
 import path from 'path';
+import winston from 'winston';
+import { resolveLogDir } from './serverRoot';
 
 const { combine, timestamp, json, errors, printf } = winston.format;
 
@@ -12,6 +14,11 @@ const logFormat = printf(({ level, message, timestamp, ...metadata }) => {
 });
 
 const isTest = process.env.NODE_ENV === 'test';
+const logDir = resolveLogDir();
+
+// Installed packages may run with a read-only cwd; LOG_DIR keeps logs in the
+// per-user data directory instead. Winston creates the files but not the dir.
+if (!isTest) fs.mkdirSync(logDir, { recursive: true });
 
 const logger = winston.createLogger({
   level: process.env.LOG_LEVEL || 'info',
@@ -34,13 +41,13 @@ const logger = winston.createLogger({
           )
         }),
         new winston.transports.File({
-          filename: path.join(process.cwd(), 'logs', 'error.log'),
+          filename: path.join(logDir, 'error.log'),
           level: 'error',
           maxsize: 5242880,
           maxFiles: 5
         }),
         new winston.transports.File({
-          filename: path.join(process.cwd(), 'logs', 'combined.log'),
+          filename: path.join(logDir, 'combined.log'),
           maxsize: 5242880,
           maxFiles: 5
         })

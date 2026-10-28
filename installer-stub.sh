@@ -14,26 +14,38 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-# Empty on fresh installs; set to a backup dir on the upgrade path below.
-UPGRADE_TMP=""
-
-if [ -e "$DIR" ]; then
+# A previous install of the old layout (bundle/, server/, runtime/ at the top
+# level) or the current one (app/) both get replaced; <DIR>/data is preserved.
+if [ -e "$DIR/app" ] || [ -e "$DIR/bundle" ]; then
   if [ "$FORCE" != 1 ]; then
     echo "✗ $DIR already exists — re‑run with --force to overwrite." >&2; exit 1
   fi
-
-  # DR-07 (audit-remediation 7.5): upgrade path — back up existing database,
-  # uploads and .env before any removal, then restore them into the new install.
-  UPGRADE_TMP="$(mktemp -d)"
-  if [ -d "$DIR/server/database" ]; then
-    mkdir -p "$UPGRADE_TMP/database"
-    cp -a "$DIR/server/database/." "$UPGRADE_TMP/database/" 2>/dev/null || true
-  fi
-  [ -d "$DIR/server/uploads" ] && cp -a "$DIR/server/uploads" "$UPGRADE_TMP/uploads" 2>/dev/null
-  [ -f "$DIR/server/.env" ] && cp -a "$DIR/server/.env" "$UPGRADE_TMP/env" 2>/dev/null
-
-  rm -rf "$DIR";
 fi
+if [ -e "$DIR" ] && [ ! -d "$DIR" ]; then
+  echo "✗ $DIR is not a directory." >&2; exit 1
+fi
+
+# Migrate data written by the legacy layout into <DIR>/data before replacing
+# the app tree. Existing data wins over anything shipped in the package.
+mkdir -p "$DIR/data"
+if [ -d "$DIR/server/database" ] && [ ! -e "$DIR/data/database/erp.db" ]; then
+  mkdir -p "$DIR/data/database"
+  cp -a "$DIR/server/database/." "$DIR/data/database/" 2>/dev/null || true
+  echo "↩ Migrated database from the previous install"
+fi
+if [ -d "$DIR/server/uploads" ] && [ ! -d "$DIR/data/uploads" ]; then
+  cp -a "$DIR/server/uploads" "$DIR/data/uploads" 2>/dev/null || true
+fi
+# Keep the signing secret (it keys stored encryption), but never carry the
+# legacy DEFAULT_ADMIN_PASSWORD: current packages pass it only for the first
+# boot, so a persisted copy would be a stale credential on disk.
+if [ -f "$DIR/server/.env" ] && [ ! -f "$DIR/data/.env" ]; then
+  grep -v '^DEFAULT_ADMIN_PASSWORD=' "$DIR/server/.env" > "$DIR/data/.env" || true
+  chmod 600 "$DIR/data/.env" 2>/dev/null || true
+fi
+
+rm -rf "$DIR/app" "$DIR/bundle" "$DIR/runtime" "$DIR/server" \
+       "$DIR/minierp" "$DIR/minierp.desktop"
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
@@ -41,20 +53,22 @@ trap 'rm -rf "$TMP"' EXIT
 echo "📦 Extracting MiniERP…"
 MARKER_OFFSET=$(grep -abo '__PAYLOAD_BELOW__' "$0" | tail -n1 | cut -d: -f1)
 tail -c +"$((MARKER_OFFSET + 20))" "$0" | tar -xzf - -C "$TMP"
-mkdir -p "$(dirname "$DIR")"
-mv "$TMP/minierp" "$DIR"
-chmod +x "$DIR/bundle/minierp_app" "$DIR/runtime/node" "$DIR/minierp" 2>/dev/null || true
-# Restore upgraded data (7.5): user data survives the reinstall; only the
-# shipped placeholder DB is removed (including any -wal/-shm remnants).
-rm -f "$DIR/server/database/erp.db" "$DIR/server/database/erp.db-wal" "$DIR/server/database/erp.db-shm"
-if [ -n "$UPGRADE_TMP" ] && [ -d "$UPGRADE_TMP/database" ] && compgen -G "$UPGRADE_TMP/database/*" > /dev/null; then
-  mkdir -p "$DIR/server/database"
-  cp -a "$UPGRADE_TMP/database/." "$DIR/server/database/"
-  echo "↩ Restored existing database from previous install"
+mkdir -p "$DIR"
+cp -a "$TMP/minierp/app" "$DIR/app"
+cp -a "$TMP/minierp/minierp" "$DIR/minierp"
+cp -a "$TMP/minierp/minierp.desktop" "$DIR/minierp.desktop"
+
+# Shipped data is only a seed: never overwrite a database the user already has.
+if [ -d "$TMP/minierp/data" ]; then
+  (cd "$TMP/minierp/data" && find . -type f) | while read -r rel; do
+    if [ ! -e "$DIR/data/$rel" ]; then
+      mkdir -p "$DIR/data/$(dirname "$rel")"
+      cp -a "$TMP/minierp/data/$rel" "$DIR/data/$rel"
+    fi
+  done
 fi
-[ -f "$UPGRADE_TMP/env" ] && cp -a "$UPGRADE_TMP/env" "$DIR/server/.env" && echo "↩ Restored server/.env"
-[ -d "$UPGRADE_TMP/uploads" ] && cp -a "$UPGRADE_TMP/uploads" "$DIR/server/" && echo "↩ Restored uploads"
-[ -n "$UPGRADE_TMP" ] && rm -rf "$UPGRADE_TMP"
+
+chmod +x "$DIR/app/bundle/minierp_app" "$DIR/app/server/runtime/node" "$DIR/minierp" 2>/dev/null || true
 
 mkdir -p "$HOME/.local/bin"
 ln -sf "$DIR/minierp" "$HOME/.local/bin/minierp"
@@ -68,8 +82,9 @@ fi
 echo ""
 echo "✅ MiniERP installed → $DIR"
 echo "   Launch with:   minierp            (or $DIR/minierp)"
+echo "   Server status:  minierp status"
 echo "   Stop server:    minierp stop"
-echo "   View logs:      tail -f $DIR/server/logs/server.log"
+echo "   Data:           $DIR/data  (survives upgrades)"
 echo "   Remove:         rm -rf $DIR $HOME/.local/bin/minierp $HOME/.local/share/applications/minierp.desktop"
 exit 0
 : "__PAYLOAD_BELOW__"

@@ -399,3 +399,28 @@ settlement favors the first option; this audit does not select or implement it.
 
 Evidence and exact requests: [F-023](../accounting-audit/findings/F-023/finding.md).
 
+## D16 — Distribution: every artifact is a self-contained application (2026-10-28)
+
+**Status: APPROVED 2026-10-28 by Gull.**
+
+The published installers previously packaged only the Flutter client; the
+backend had to be installed separately and was published as a `server.zip`
+that only worked with a user-installed Node.js. All six release artifacts now
+carry the client, the compiled server, its production dependencies and a
+pinned Node runtime. The client starts and stops the server itself.
+
+- **macOS:** publish two DMGs, `macos-arm64` and `macos-x64`. The app bundle is
+  notarized by a follow-up release once an Apple Developer ID exists; this
+  release is ad-hoc signed, so the first launch is right-click → Open.
+- **Windows:** per-user install without administrator rights, under
+  `%LOCALAPPDATA%\Programs\MiniERP`. Uninstall keeps the database in
+  `%LOCALAPPDATA%\MiniERP\data`.
+- **First run:** the user chooses the administrator password (12+ characters)
+  on a setup screen before the server starts. The password is passed only
+  through the process environment and never written to disk.
+- **Networking:** the bundled server binds an ephemeral loopback port, not the
+  fixed 3011, so two OS users cannot attach to each other's database. A shared
+  LAN server remains a separate, manual deployment.
+
+Release assets are exactly: Linux `.deb`, AppImage, `.run`, Windows `.exe`,
+macOS arm64 DMG and macOS x64 DMG.
