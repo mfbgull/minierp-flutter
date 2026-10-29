@@ -69,6 +69,16 @@ describe('release bundle integrity (self-contained artifacts)', () => {
     expect(linux).toMatch(/linux-x64\.run/);
   });
 
+  it('frees each payload copy before the next Linux package', () => {
+    const linux = job('build-linux');
+    // Three copies of the server payload otherwise exhaust the runner disk and
+    // dpkg-deb fails with an opaque "tar: stdout: write error".
+    expect(linux).toMatch(/rm -rf build\/setup-stage build\/setup-payload\.tar\.gz/);
+    expect(linux).toMatch(/rm -rf pkg/);
+    expect(linux).toMatch(/rm -rf AppDir linuxdeploy\.AppImage/);
+    expect(linux).toMatch(/df -h/);
+  });
+
   it('installs per-user on Windows without admin rights', () => {
     const windows = job('build-windows');
     expect(windows).toMatch(/PrivilegesRequired=lowest/);
