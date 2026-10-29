@@ -71,12 +71,21 @@ describe('release bundle integrity (self-contained artifacts)', () => {
 
   it('frees each payload copy before the next Linux package', () => {
     const linux = job('build-linux');
-    // Three copies of the server payload otherwise exhaust the runner disk and
-    // dpkg-deb fails with an opaque "tar: stdout: write error".
+    // Three copies of the server payload otherwise exhaust the runner disk.
     expect(linux).toMatch(/rm -rf build\/setup-stage build\/setup-payload\.tar\.gz/);
     expect(linux).toMatch(/rm -rf pkg/);
     expect(linux).toMatch(/rm -rf AppDir linuxdeploy\.AppImage/);
     expect(linux).toMatch(/df -h/);
+  });
+
+  it('pins the Debian compressor and leaves evidence when it fails', () => {
+    const linux = job('build-linux');
+    // The image default (zstd level 19) runs in a helper that has died
+    // silently on the runner mid-stream.
+    expect(linux).toMatch(/dpkg-deb --build --root-owner-group -Zxz -z6 pkg/);
+    expect(linux).toMatch(/TMPDIR=/);
+    expect(linux).toMatch(/free -m/);
+    expect(linux).toMatch(/dmesg/);
   });
 
   it('installs per-user on Windows without admin rights', () => {

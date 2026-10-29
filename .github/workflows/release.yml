@@ -194,9 +194,23 @@ jobs:
           Depends: libgtk-3-0, libsecret-1-0
           Description: MiniERP desktop application (client and bundled server)
           EOF
-          # The whole payload is repacked here; show the headroom if it fails.
-          df -h .
-          dpkg-deb --build --root-owner-group pkg "dist/$ASSET"
+          # Pin the compressor: the image default is zstd level 19, which
+          # dpkg-deb runs in a forked helper that has died silently mid-stream
+          # on the runner (tar then reports "stdout: write error"). xz via
+          # liblzma is also what Debian itself ships, so the archive does not
+          # change shape between a local machine and CI.
+          if ! dpkg-deb --build --root-owner-group -Zxz -z6 pkg "dist/$ASSET"; then
+            echo "::error::dpkg-deb failed; runner state follows"
+            echo "TMPDIR=${TMPDIR:-<unset>}"
+            df -h "${TMPDIR:-/tmp}" || true
+            nproc
+            free -m
+            ulimit -a
+            df -h .
+            df -i .
+            sudo dmesg -T | tail -40 || true
+            exit 1
+          fi
           dpkg-deb -c "dist/$ASSET" | grep -q 'lib/minierp_app/server/dist/server.js'
           dpkg-deb -c "dist/$ASSET" | grep -q 'lib/minierp_app/server/runtime/node'
           test -f "dist/$ASSET"
