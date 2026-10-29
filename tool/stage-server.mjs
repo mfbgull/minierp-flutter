@@ -21,6 +21,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
 const TOOL_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -98,6 +99,28 @@ function installProductionDeps(outDir) {
     shell: process.platform === 'win32',
     env: process.env,
   });
+}
+
+export function pruneBcryptPrebuilds(outDir) {
+  const require = createRequire(path.join(outDir, 'package.json'));
+  const bcryptDir = path.dirname(require.resolve('bcrypt/package.json'));
+  const bcryptRequire = createRequire(path.join(bcryptDir, 'package.json'));
+  const selected = bcryptRequire('node-gyp-build').path(bcryptDir);
+  // npm ships every platform/libc variant. linuxdeploy scans even unused ELFs,
+  // so retain only the addon bcrypt's loader would actually use on this target.
+  const prebuilds = path.join(bcryptDir, 'prebuilds');
+  if (!fs.existsSync(prebuilds)) return;
+  for (const target of fs.readdirSync(prebuilds)) {
+    const targetDir = path.join(prebuilds, target);
+    if (targetDir !== path.dirname(selected)) {
+      rmrf(targetDir);
+      continue;
+    }
+    for (const file of fs.readdirSync(targetDir)) {
+      const binary = path.join(targetDir, file);
+      if (binary !== selected) rmrf(binary);
+    }
+  }
 }
 
 function runtimeArtifact(version, platform, arch) {
@@ -209,6 +232,7 @@ async function main() {
   }
 
   if (!args.skipNpm) installProductionDeps(outDir);
+  if (!args.skipNpm) pruneBcryptPrebuilds(outDir);
   if (!args.skipRuntime) await stageRuntime(outDir, args.nodeVersion);
   if (!args.skipRuntime) smokeNativeModules(outDir);
 
@@ -216,7 +240,9 @@ async function main() {
   console.log(`[stage] ready: ${outDir} (${sizeMb} MB, node ${args.nodeVersion})`);
 }
 
-main().catch((error) => {
-  console.error(`[stage] failed: ${error instanceof Error ? error.message : error}`);
-  process.exit(1);
-});
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((error) => {
+    console.error(`[stage] failed: ${error instanceof Error ? error.message : error}`);
+    process.exit(1);
+  });
+}
