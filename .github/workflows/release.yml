@@ -75,17 +75,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Free disk space
-        shell: bash
-        run: |
-          # The image preinstalls toolchains this build never uses. Linux
-          # packaging needs room for the client bundle plus three copies of the
-          # server payload (.run staging, .deb tree, AppDir), and a full disk
-          # surfaces as an opaque "tar: stdout: write error" from dpkg-deb.
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
-          sudo apt-get clean
-          df -h /
-
       - name: Install build dependencies
         run: |
           sudo apt-get update
@@ -194,49 +183,18 @@ jobs:
           Depends: libgtk-3-0, libsecret-1-0
           Description: MiniERP desktop application (client and bundled server)
           EOF
-          # Pin the compressor: the image default is zstd level 19, which
-          # dpkg-deb runs in a forked helper that has died silently mid-stream
-          # on the runner (tar then reports "stdout: write error"). xz via
-          # liblzma is also what Debian itself ships, so the archive does not
-          # change shape between a local machine and CI.
-          set +e
-          set -x
-          dpkg-deb --build --root-owner-group -Zxz -z6 pkg "dist/$ASSET"
-          deb_rc=$?
-          set +x
-          set -e
-          echo "dpkg-deb exited $deb_rc"
-          [ "$deb_rc" -eq 0 ]
-          dpkg-deb -c "dist/$ASSET" | grep -q 'lib/minierp_app/server/dist/server.js'
-          dpkg-deb -c "dist/$ASSET" | grep -q 'lib/minierp_app/server/runtime/node'
+          df -h .
+          dpkg-deb --build --root-owner-group pkg "dist/$ASSET"
+          # List the members once. Piping dpkg-deb -c into grep -q lets grep
+          # exit on the first match and close the pipe; dpkg-deb then reports
+          # its tar helper as "stdout: write error" and pipefail fails the
+          # step even though the package is complete.
+          dpkg-deb -c "dist/$ASSET" > build/deb-contents.txt
+          grep -q 'lib/minierp_app/server/dist/server.js' build/deb-contents.txt
+          grep -q 'lib/minierp_app/server/runtime/node' build/deb-contents.txt
           test -f "dist/$ASSET"
           # The tree is only an input to the .deb; free it before AppImage.
           rm -rf pkg
-
-      # A step that dies inside dpkg-deb has taken its own diagnostics with it,
-      # so the runner state is captured from a fresh shell instead.
-      - name: Debian packaging diagnostics
-        if: failure()
-        shell: bash
-        run: |
-          set +e
-          echo "TMPDIR=${TMPDIR:-<unset>}"
-          df -h "${TMPDIR:-/tmp}"; df -i "${TMPDIR:-/tmp}"
-          nproc; free -m; ulimit -a
-          df -h .; df -i .
-          ls -la dist
-          sudo dmesg -T | tail -40
-          # The same tree through a plain pipeline tells us whether the data
-          # or dpkg-deb's process orchestration is what breaks.
-          if [ -d pkg ]; then
-            tar -C pkg -cf /tmp/deb-data.tar --format=gnu \
-              --owner=root:0 --group=root:0 --mode=u+rw,go=rX \
-              --exclude=./DEBIAN .
-            echo "tar rc=$?"
-            xz -6 -c /tmp/deb-data.tar > /tmp/deb-data.tar.xz
-            echo "xz rc=$?"
-            ls -l /tmp/deb-data.tar /tmp/deb-data.tar.xz
-          fi
 
       - name: Verify Debian install
         shell: bash

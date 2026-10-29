@@ -71,21 +71,21 @@ describe('release bundle integrity (self-contained artifacts)', () => {
 
   it('frees each payload copy before the next Linux package', () => {
     const linux = job('build-linux');
-    // Three copies of the server payload otherwise exhaust the runner disk.
+    // Three copies of the server payload would otherwise sit on disk at once.
     expect(linux).toMatch(/rm -rf build\/setup-stage build\/setup-payload\.tar\.gz/);
     expect(linux).toMatch(/rm -rf pkg/);
     expect(linux).toMatch(/rm -rf AppDir linuxdeploy\.AppImage/);
     expect(linux).toMatch(/df -h/);
   });
 
-  it('pins the Debian compressor and leaves evidence when it fails', () => {
+  it('lists the Debian members before searching them', () => {
     const linux = job('build-linux');
-    // The image default (zstd level 19) runs in a helper that has died
-    // silently on the runner mid-stream.
-    expect(linux).toMatch(/dpkg-deb --build --root-owner-group -Zxz -z6 pkg/);
-    expect(linux).toMatch(/TMPDIR=/);
-    expect(linux).toMatch(/free -m/);
-    expect(linux).toMatch(/dmesg/);
+    // grep -q exits on the first match and closes the pipe; under pipefail
+    // dpkg-deb then fails with tar's "stdout: write error" even though the
+    // package was built correctly.
+    expect(linux).not.toMatch(/dpkg-deb -c[^\n]*\|/);
+    expect(linux).toMatch(/dpkg-deb -c "dist\/\$ASSET" > build\/deb-contents\.txt/);
+    expect(linux).toMatch(/grep -q '[^']+' build\/deb-contents\.txt/);
   });
 
   it('installs per-user on Windows without admin rights', () => {
