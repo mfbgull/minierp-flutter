@@ -199,23 +199,44 @@ jobs:
           # on the runner (tar then reports "stdout: write error"). xz via
           # liblzma is also what Debian itself ships, so the archive does not
           # change shape between a local machine and CI.
-          if ! dpkg-deb --build --root-owner-group -Zxz -z6 pkg "dist/$ASSET"; then
-            echo "::error::dpkg-deb failed; runner state follows"
-            echo "TMPDIR=${TMPDIR:-<unset>}"
-            df -h "${TMPDIR:-/tmp}" || true
-            nproc
-            free -m
-            ulimit -a
-            df -h .
-            df -i .
-            sudo dmesg -T | tail -40 || true
-            exit 1
-          fi
+          set +e
+          set -x
+          dpkg-deb --build --root-owner-group -Zxz -z6 pkg "dist/$ASSET"
+          deb_rc=$?
+          set +x
+          set -e
+          echo "dpkg-deb exited $deb_rc"
+          [ "$deb_rc" -eq 0 ]
           dpkg-deb -c "dist/$ASSET" | grep -q 'lib/minierp_app/server/dist/server.js'
           dpkg-deb -c "dist/$ASSET" | grep -q 'lib/minierp_app/server/runtime/node'
           test -f "dist/$ASSET"
           # The tree is only an input to the .deb; free it before AppImage.
           rm -rf pkg
+
+      # A step that dies inside dpkg-deb has taken its own diagnostics with it,
+      # so the runner state is captured from a fresh shell instead.
+      - name: Debian packaging diagnostics
+        if: failure()
+        shell: bash
+        run: |
+          set +e
+          echo "TMPDIR=${TMPDIR:-<unset>}"
+          df -h "${TMPDIR:-/tmp}"; df -i "${TMPDIR:-/tmp}"
+          nproc; free -m; ulimit -a
+          df -h .; df -i .
+          ls -la dist
+          sudo dmesg -T | tail -40
+          # The same tree through a plain pipeline tells us whether the data
+          # or dpkg-deb's process orchestration is what breaks.
+          if [ -d pkg ]; then
+            tar -C pkg -cf /tmp/deb-data.tar --format=gnu \
+              --owner=root:0 --group=root:0 --mode=u+rw,go=rX \
+              --exclude=./DEBIAN .
+            echo "tar rc=$?"
+            xz -6 -c /tmp/deb-data.tar > /tmp/deb-data.tar.xz
+            echo "xz rc=$?"
+            ls -l /tmp/deb-data.tar /tmp/deb-data.tar.xz
+          fi
 
       - name: Verify Debian install
         shell: bash
