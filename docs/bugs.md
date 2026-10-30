@@ -374,6 +374,47 @@ AppRun present, app launches.
 
 ---
 
+## BUG-008 · CI fallow gate ran without coverage — red on every push since 2026-10-26
+
+**Status:** `FIXED` (CI) — `.github/workflows/ci.yml`, fallow job
+**Found:** 2026-10-30 · **Severity:** medium (a quality gate silently dead)
+
+### Symptom
+
+Every `CI` run since 2026-10-26 failed `fallow` with
+`Error: coverage: failed to read coverage file server/coverage/coverage-final.json`,
+while `server` and `flutter` jobs passed. Because the whole workflow shows red,
+the gate looked like it was guarding code; it was actually reporting its own
+plumbing failure, and no fallow findings were detected in that window.
+
+### Root cause
+
+`fallowrc.json` declares `health.coverage: server/coverage/coverage-final.json`:
+health/CRAP metrics are measured against Istanbul coverage, which is **not
+committed**. Locally, `scripts/check.sh` had only ever passed because a stale
+coverage file remained on disk from the 2026-10-22 CRAP cleanup. CI checked out
+a fresh tree and never executed the suite, so the file did not exist and the
+audit aborted with exit 2. Local `--base HEAD` audits could also scope to zero
+changed files and skip the read — masking the defect further (caught only once
+CI used a real base, or when locally auditing `--base HEAD~1`).
+
+### Fix
+
+- The CI fallow job now runs `npm test -- --silent --coverage` first, writing
+  the coverage file the audit reads. The server job's command stays
+  `npm test`, so `scripts/check.sh` remains byte-identical to it.
+- `scripts/check.sh` runs the tests before the fallow audit (full mode only);
+  in `--quick` mode the audit still consumes whatever coverage file is on
+  disk, documented as stale in the script comment.
+
+### Verification
+
+Red reproduced locally: coverage file hidden → `fallow audit --base HEAD~1`
+aborted with the identical CI error. Green: full server suite re-run with
+coverage, then the same audit command passed with fresh measured coverage.
+
+---
+
 ## Not bugs — deliberate decisions, recorded so they are not re-litigated
 
 - **PUR-016** — the two live `PURCHASE_ORDER` commitment rows (3,000 supplier 1 /

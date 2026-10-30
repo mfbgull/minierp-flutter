@@ -49,6 +49,15 @@ jobs:
       - name: Install server dependencies
         working-directory: server
         run: npm ci
+      # fallow's health/CRAP metrics are measured against Istanbul coverage,
+      # and coverage is not committed — the audit aborts without it. Generate
+      # it here from the server suite, exactly where the audit will read it
+      # (fallowrc health.coverage: server/coverage/coverage-final.json).
+      # Runs in this job so the server job's command stays byte-identical
+      # to scripts/check.sh.
+      - name: Server test coverage (fallow health input)
+        working-directory: server
+        run: npm test -- --silent --coverage
       # Fails only on findings NEW relative to the base ref, measured against
       # the committed baselines in audit/fallow-baselines/ — the legacy
       # backlog is baselined, not hidden. The version is pinned because the
