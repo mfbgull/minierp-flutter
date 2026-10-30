@@ -33,6 +33,7 @@ final Map<String, String Function(AppLocalizations)> reportTitles = {
   'tax-summary': (l) => l.reportsTabsTax_summary,
   'batch-traceability': (l) => l.reportsTabsBatch_traceability,
   'expiry': (l) => l.expiryReport,
+  'company': (l) => l.reportsCompanyreport,
 };
 
 class _ReportEntry {
@@ -85,6 +86,7 @@ final List<_ReportCategory> _reportCategories = [
     (l) => l.reportsCategoryInventory,
     Icons.inventory_2_outlined,
     const [
+      _ReportEntry('company', Icons.business_outlined),
       _ReportEntry('batch-traceability', Icons.bug_report_outlined),
       _ReportEntry('expiry', Icons.event_busy_outlined),
     ],
