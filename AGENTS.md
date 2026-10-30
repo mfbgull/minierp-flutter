@@ -11,6 +11,26 @@ Flutter desktop client + Node/Express/SQLite backend in one repo.
 
 ---
 
+## Communication and Documentation Style
+
+Use ASD-STE100-inspired Simplified Technical English for explanations, reports, and documentation.
+
+Rules:
+1. Use clear, direct English.
+2. Prefer short sentences (20–25 words maximum when practical).
+3. Use active voice.
+4. Explain one main idea per sentence.
+5. Use consistent technical and accounting terminology.
+6. Avoid unnecessary jargon. Explain essential jargon when first used.
+7. Explain complex problems with concrete examples.
+8. For bug reports, describe the problem, cause, impact, and fix.
+9. Keep responses concise without omitting important information.
+10. Do not apply these language restrictions to source code, identifiers, SQL, APIs, or commands.
+11. Preserve technical accuracy over sentence-length and vocabulary restrictions.
+12. Do not perform a separate language-compliance review unless requested.
+
+These rules are inspired by ASD-STE100. They do not require formal compliance with the standard.
+
 ## Dummy historical data
 
 For non-production test/dummy records only, treat existing accounting gaps as known legacy noise. Do not repair or repeatedly re-audit them unless explicitly requested. They are not implementation blockers. However, do not weaken integrity checks or tests. Instead, isolate legacy gaps using clean fixtures, fresh test databases, or an explicit allowlist. Ensure all new transactions satisfy accounting invariants and add regression tests. If a gap can be reproduced by current logic, or if any record may be real, stop and investigate.
