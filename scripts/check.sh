@@ -44,14 +44,19 @@ step() {
 if [[ $RUN_SERVER -eq 1 ]]; then
   step "server: typecheck"  bash -c "cd '$ROOT/server' && npm run typecheck"
   step "server: lint"       bash -c "cd '$ROOT/server' && npm run lint"
-  # Same command CI runs, minus the base ref: locally the tree is compared
-  # against HEAD, in CI against the push/PR base. The version is pinned
-  # because the baselines in audit/fallow-baselines/ are only comparable
-  # against the analyzer that produced them.
-  step "server: fallow"     bash -c "cd '$ROOT' && npx --yes fallow@3.34.1 audit --base HEAD"
   if [[ $QUICK -eq 0 ]]; then
-    step "server: test"     bash -c "cd '$ROOT/server' && npm test -- --silent"
+    # Coverage first: fallow's health/CRAP metrics need measured Istanbul
+    # coverage (CI's fallow job does the same), and the audit aborts
+    # without it.
+    step "server: test"     bash -c "cd '$ROOT/server' && npm test -- --silent --coverage"
   fi
+  # Same command CI runs: locally the tree is compared against HEAD, in CI
+  # against the push/PR base. The version is pinned because the baselines in
+  # audit/fallow-baselines/ are only comparable against the analyzer that
+  # produced them. Note: in --quick mode the audit consumes whatever
+  # coverage file is already on disk — CI or a previous full run — so its
+  # health results are only as fresh as that file.
+  step "server: fallow"     bash -c "cd '$ROOT' && npx --yes fallow@3.34.1 audit --base HEAD"
 fi
 
 if [[ $RUN_FLUTTER -eq 1 ]]; then
