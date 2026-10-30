@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/auth/auth_notifier.dart';
 import '../../l10n/app_localizations.dart';
+import '../../widgets/app_logo.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Login screen — PORTING.md §3.
@@ -79,11 +80,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Icon(
-                        Icons.inventory_2_outlined,
-                        size: 48,
-                        color: scheme.primary,
-                      ),
+                      const AppLogo(size: 48),
                       const SizedBox(height: 12),
                       Text(
                         'MiniERP',
