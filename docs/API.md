@@ -235,6 +235,18 @@ Delete a supplier (fails if supplier has purchase orders).
 | PUT | /inventory/items/:id | Update item |
 | DELETE | /inventory/items/:id | Delete item |
 | GET | /inventory/items-categories | List distinct categories |
+| GET | /inventory/item-companies | List companies (search, status, paged) |
+| POST | /inventory/item-companies | Create a company by name |
+| GET | /inventory/item-companies/:id | Get one company |
+| PUT | /inventory/item-companies/:id | Rename a company |
+| POST | /inventory/item-companies/:id/archive | Archive an assigned company |
+| POST | /inventory/item-companies/:id/restore | Restore an archived company |
+| DELETE | /inventory/item-companies/:id | Delete an unused company |
+| GET | /inventory/item-companies/:id/products | List the company's products |
+| GET | /inventory/item-companies/:id/suppliers | List linked and purchasing suppliers |
+| GET | /inventory/item-companies/:id/suppliers/:supplierId/products | List one supplier's products for the company |
+| POST | /inventory/item-companies/:id/suppliers/:supplierId | Link a supplier manually |
+| DELETE | /inventory/item-companies/:id/suppliers/:supplierId | Remove a manual supplier link |
 | GET | /inventory/items-low-stock | List items below reorder level |
 | GET | /inventory/items-uom | List units of measure |
 
@@ -243,7 +255,7 @@ Delete a supplier (fails if supplier has purchase orders).
 {
   "item_code": "ITM001",
   "item_name": "Steel Rod 10mm",
-  "manufacturer_name": "Acme Steel",
+  "company_id": 3,
   "category": "Raw Materials",
   "unit_of_measure": "Kg",
   "reorder_level": 100,
@@ -254,12 +266,40 @@ Delete a supplier (fails if supplier has purchase orders).
 }
 ```
 
-### Manufacturer / Brand
+### Companies and manufacturer identity
 
-`manufacturer_name` on item create/update is optional, trimmed, and limited to
-200 characters. Empty text or `null` clears it; an omitted update preserves the
-saved value. Item responses include it, and item search and sorting support it.
-Manufacturer/brand describes the product, independently of its suppliers.
+`item_companies` is the canonical company identity. Item responses expose
+`company_id`, `company_is_active` and the canonical name in `manufacturer_name`.
+`company_id` is authoritative when it is present. A create or update that sends
+only the legacy `manufacturer_name` resolves or creates the matching active
+company in the same transaction. A new assignment to an archived company is
+rejected; unrelated edits to a product that already belongs to an archived
+company are allowed.
+
+`GET /inventory/item-companies` accepts `search`, `status` (`active`,
+`archived`, `all`), `page` and `limit` (maximum 200). It returns
+`{success, data, pagination}` where each row is
+`{id, company_name, is_active, product_count}`. Company names are trimmed,
+limited to 200 characters, and unique without regard to case. It requires
+inventory read permission.
+
+Create, detail, rename, archive and restore return the company object directly.
+Rename propagates the new name to assigned products. A duplicate name returns
+409. `DELETE` succeeds only when no product, including an inactive or
+soft-deleted product, references the company; a referenced delete returns 409
+and asks for archive instead. Deleting an unused company also removes its manual
+supplier links; supplier records remain. Create, rename, archive/restore and
+delete use inventory create, update, update and delete permissions.
+
+Company supplier rows combine two independent facts: a manual link
+(`item_company_suppliers`) and purchase history derived from valid posted
+purchases and goods receipts for the company's products. `POST` and `DELETE`
+on `/inventory/item-companies/:id/suppliers/:supplierId` change only the manual
+link. Removing the link does not remove purchase history. Supplier responses
+require inventory read plus suppliers read, and link changes require inventory
+update plus suppliers read. Archived companies and sold-out products remain
+queryable. Supplier rows carry `linked`, `purchased`, contact fields, product
+count and the last valid purchase date.
 
 ### Batch supplier provenance
 
@@ -887,8 +927,46 @@ All report endpoints require authentication. Financial reports are additionally 
 | GET | /reports/production-summary | No | Production summary |
 | GET | /reports/bom-usage | No | BOM usage |
 | GET | /reports/expenses | Yes | Expenses report |
+| GET | /reports/company/stock | Yes | Current company stock and value |
+| GET | /reports/company/sales | Yes | Company sales by product for a period |
+| GET | /reports/company/purchases | Yes | Company purchases by product for a period |
 
 Most reports accept `from` and `to` date query parameters.
+
+### Company reports
+
+All three endpoints require reports read permission plus the permission for the
+viewed entity: inventory read for stock, invoices read for sales, and purchases
+read for purchases. An archived `company_id` is valid because reports use the
+stable company ID and do not depend on the company's current status.
+
+`GET /reports/company/stock?company_id=...&page=...&limit=...` returns
+`{company_id, as_of, valuation_basis, rows, totals, pagination}`. It has no date
+parameters and always reports current stock. `as_of` is an ISO timestamp.
+`valuation_basis` is `remaining_batch_cost`. Each row is
+`{item_id, item_code, item_name, unit_of_measure, quantity, stock_value}`.
+`totals` is `{stock_value, quantities_by_uom}`; `quantities_by_uom` maps each
+unit to a number. Stock uses the same buckets as inventory valuation:
+sellable minus reserved, plus expired and damaged physical stock. It does not
+treat reserved stock as additive.
+
+`GET /reports/company/sales` and `GET /reports/company/purchases` require
+ordered `startDate` and `endDate` values in `YYYY-MM-DD` form. Both dates are
+inclusive. They return `{company_id, view, startDate, endDate, amount_basis,
+rows, totals, pagination}`. `view` is `sales` or `purchases`;
+`amount_basis` is
+`tax_inclusive_after_discounts_before_restocking_fees`.
+
+Each product row carries `gross_quantity`, `return_quantity`, `net_quantity`,
+`gross_value`, `return_value`, `net_value` and a `transactions` array. Returns
+are separate columns and already reduce the net values. Returns are counted by
+their own transaction date, including a return whose original document is older
+than the period. Cancelled and voided documents and voided returns are
+excluded. A document with several item lines or supplier joins is counted once.
+`totals.quantities_by_uom` maps each unit to `{gross, returns, net}`. Products
+are grouped by unit of measure and are never summed across different units.
+`pagination.total` is the product count before the page slice. Double-tapping a
+row in the desktop client opens its transaction list.
 
 ---
 

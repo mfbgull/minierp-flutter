@@ -147,10 +147,12 @@ export const zodBodySchemas = {
     item_code: z.string().min(1),
     item_name: z.string().min(1),
     manufacturer_name: z.string().trim().max(200).nullable().optional(),
+    company_id: z.number().int().positive().nullable().optional(),
   }).passthrough(),
 
   itemUpdate: z.object({
     manufacturer_name: z.string().trim().max(200).nullable().optional(),
+    company_id: z.number().int().positive().nullable().optional(),
   }).passthrough(),
 
   invoiceCreate: z.object({

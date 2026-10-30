@@ -210,6 +210,10 @@ function createItem(req: AuthRequest, res: Response): void {
     const newItem = ItemModel.getById(itemId, db);
     res.status(201).json(newItem);
   } catch (error) {
+    if (error instanceof BusinessRuleError) {
+      handleBusinessError(res, error, 'Create item');
+      return;
+    }
     logger.error('Create item error:', error);
     res.status(500).json({ error: 'Failed to create item' });
   }
@@ -236,6 +240,10 @@ function updateItem(req: AuthRequest, res: Response): void {
     const updatedItem = ItemModel.getById(itemId, db);
     res.json(updatedItem);
   } catch (error) {
+    if (error instanceof BusinessRuleError) {
+      handleBusinessError(res, error, 'Update item');
+      return;
+    }
     logger.error('Update item error:', error);
     res.status(500).json({ error: 'Failed to update item' });
   }

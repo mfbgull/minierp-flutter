@@ -1,6 +1,8 @@
 import express from 'express';
 const router = express.Router();
 import inventoryController from '../controllers/inventoryController';
+import * as itemCompanies from '../controllers/itemCompanyController';
+import * as companySuppliers from '../controllers/companySuppliersController';
 import { authenticateToken } from '../middleware/auth';
 import { requirePermission } from '../middleware/requirePermission';
 import { sensitiveOperationLimiter } from '../middleware/rateLimiter';
@@ -16,6 +18,18 @@ router.delete('/items/:id', requirePermission('inventory', 'delete'), sensitiveO
 router.post('/items/:id/restore', requirePermission('inventory', 'update'), inventoryController.restoreItem);
 
 router.get('/items-categories', requirePermission('inventory', 'read'), inventoryController.getCategories);
+router.get('/item-companies', requirePermission('inventory', 'read'), validateZodQuery(itemCompanies.companyListSchema), itemCompanies.listCompanies);
+router.post('/item-companies', requirePermission('inventory', 'create'), sensitiveOperationLimiter, validateZodBody(itemCompanies.companyNameSchema), itemCompanies.createCompany);
+router.get('/item-companies/:id', requirePermission('inventory', 'read'), itemCompanies.getCompany);
+router.get('/item-companies/:id/suppliers', requirePermission('inventory', 'read'), requirePermission('suppliers', 'read'), validateZodQuery(itemCompanies.companyListSchema), companySuppliers.listCompanySuppliers);
+router.get('/item-companies/:id/suppliers/:supplierId/products', requirePermission('inventory', 'read'), requirePermission('suppliers', 'read'), validateZodQuery(itemCompanies.companyListSchema), companySuppliers.companySupplierProducts);
+router.post('/item-companies/:id/suppliers/:supplierId', requirePermission('inventory', 'update'), requirePermission('suppliers', 'read'), sensitiveOperationLimiter, companySuppliers.setCompanySupplierLink);
+router.delete('/item-companies/:id/suppliers/:supplierId', requirePermission('inventory', 'update'), requirePermission('suppliers', 'read'), sensitiveOperationLimiter, companySuppliers.setCompanySupplierLink);
+router.get('/item-companies/:id/products', requirePermission('inventory', 'read'), validateZodQuery(itemCompanies.companyListSchema), itemCompanies.companyProducts);
+router.put('/item-companies/:id', requirePermission('inventory', 'update'), sensitiveOperationLimiter, validateZodBody(itemCompanies.companyNameSchema), itemCompanies.renameCompany);
+router.post('/item-companies/:id/archive', requirePermission('inventory', 'update'), sensitiveOperationLimiter, itemCompanies.archiveCompany);
+router.post('/item-companies/:id/restore', requirePermission('inventory', 'update'), sensitiveOperationLimiter, itemCompanies.restoreCompany);
+router.delete('/item-companies/:id', requirePermission('inventory', 'delete'), sensitiveOperationLimiter, itemCompanies.deleteCompany);
 router.get('/items-low-stock', requirePermission('inventory', 'read'), inventoryController.getLowStock);
 router.get('/items-uom', requirePermission('inventory', 'read'), inventoryController.getUnitsOfMeasure);
 

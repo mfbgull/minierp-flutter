@@ -424,3 +424,36 @@ pinned Node runtime. The client starts and stops the server itself.
 
 Release assets are exactly: Linux `.deb`, AppImage, `.run`, Windows `.exe`,
 macOS arm64 DMG and macOS x64 DMG.
+
+## D17 — Company management and company reports (2026-10-30)
+
+**Status: APPROVED by Gull for implementation.**
+
+Companies are maintained as name-only records with a stable ID. The accepted
+scope is:
+
+- A company can be created inline from the product form without losing product
+  edits. Company creation persists immediately; cancelling the product form
+  does not delete the company.
+- The Manage Companies dialog supports search, paging, active/archived/all
+  filtering, rename, delete of unused companies, archive of assigned companies,
+  and restore.
+- Company details show Products and Suppliers. A supplier row is the union of a
+  manual link and purchase history. The two facts stay separate: unlinking
+  removes only the manual association.
+- The Company Report provides Stock, Sales and Purchases views. Stock is
+  explicitly current stock and ignores the date range. Sales and Purchases use
+  inclusive business dates and show gross, returns and net values separately.
+- Reports classify transactions by the product's current company assignment.
+  No historical company snapshot is introduced, and no transaction amount is
+  rewritten.
+
+Related implementation rules:
+
+- Deleting a company that any product references is rejected with a 409 that
+  asks for archive instead.
+- Archived companies remain selectable in historical reports by stable ID.
+- Quantities are grouped by unit of measure. Reports never add quantities from
+  different units.
+- Supplier purchase history comes from valid posted purchasing records, not
+  from remaining stock batches.

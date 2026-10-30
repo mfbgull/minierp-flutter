@@ -3,12 +3,15 @@ import { sanitizeSortParams, ITEM_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import StockMovementModel from './StockMovement';
 import logger from '../utils/logger';
 import { SqlParam } from '../utils/sqlTypes';
+import { BusinessRuleError } from '../utils/businessRuleError';
 
 interface Item {
   id: number;
   item_code: string;
   item_name: string;
   manufacturer_name?: string | null;
+  company_id?: number | null;
+  company_is_active?: number;
   description?: string;
   category?: string;
   unit_of_measure: string;
@@ -36,6 +39,7 @@ interface CreateItemDTO {
   item_code: string;
   item_name: string;
   manufacturer_name?: string | null;
+  company_id?: number | null;
   description?: string;
   category?: string;
   unit_of_measure?: string;
@@ -64,9 +68,55 @@ function itemSupplyFlags(data: CreateItemDTO): number[] {
   ];
 }
 
+function pushBooleanFilter(
+  conditions: string[],
+  params: SqlParam[],
+  condition: string,
+  value: boolean | undefined,
+): void {
+  if (value === undefined) return;
+  conditions.push(condition);
+  params.push(value ? 1 : 0);
+}
+
+function itemFilterSql(filters: ItemFilters): { where: string; params: SqlParam[] } {
+  // The low-stock rule mirrors the old `getLowStock` predicates:
+  // at/below the reorder level with a positive threshold. `reorder_level 0`
+  // (or null) means no reorder threshold.
+  const conditions: string[] = ['i.is_active = 1', 'i.deleted_at IS NULL'];
+  const params: SqlParam[] = [];
+
+  if (filters.category) {
+    conditions.push('i.category = ?');
+    params.push(filters.category);
+  }
+
+  if (filters.search) {
+    conditions.push(
+      '(i.item_code LIKE ? OR i.item_name LIKE ? OR i.description LIKE ? OR i.manufacturer_name LIKE ?)'
+    );
+    const searchTerm = `%${filters.search}%`;
+    params.push(searchTerm, searchTerm, searchTerm, searchTerm);
+  }
+
+  pushBooleanFilter(conditions, params, 'i.is_raw_material = ?', filters.is_raw_material);
+  pushBooleanFilter(conditions, params, 'i.is_finished_good = ?', filters.is_finished_good);
+
+  if (filters.lowStock) {
+    conditions.push('i.current_stock < i.reorder_level AND i.reorder_level > 0');
+  }
+
+  if (filters.sellableOnly) {
+    conditions.push('COALESCE(sa.sellable_qty, 0) > 0');
+  }
+
+  return { where: `WHERE ${conditions.join(' AND ')}`, params };
+}
+
 interface UpdateItemDTO {
   item_name: string;
   manufacturer_name?: string | null;
+  company_id?: number | null;
   description?: string;
   category?: string;
   unit_of_measure: string;
@@ -121,45 +171,7 @@ class ItemModel {
   static getAll(filters: ItemFilters = {}, db: Database.Database): PaginatedItems {
     const pageNum = filters.page || 1;
     const limitNum = filters.limit || 10;
-
-    // The low-stock rule mirrors the old `getLowStock` predicates:
-    // at/below the reorder level with a positive threshold. `reorder_level 0`
-    // (or null) means no reorder threshold.
-    const conditions: string[] = ['i.is_active = 1', 'i.deleted_at IS NULL'];
-    const params: SqlParam[] = [];
-
-    if (filters.category) {
-      conditions.push('i.category = ?');
-      params.push(filters.category);
-    }
-
-    if (filters.search) {
-      conditions.push(
-        '(i.item_code LIKE ? OR i.item_name LIKE ? OR i.description LIKE ? OR i.manufacturer_name LIKE ?)'
-      );
-      const searchTerm = `%${filters.search}%`;
-      params.push(searchTerm, searchTerm, searchTerm, searchTerm);
-    }
-
-    if (filters.is_raw_material !== undefined) {
-      conditions.push('i.is_raw_material = ?');
-      params.push(filters.is_raw_material ? 1 : 0);
-    }
-
-    if (filters.is_finished_good !== undefined) {
-      conditions.push('i.is_finished_good = ?');
-      params.push(filters.is_finished_good ? 1 : 0);
-    }
-
-    if (filters.lowStock) {
-      conditions.push('i.current_stock < i.reorder_level AND i.reorder_level > 0');
-    }
-
-    if (filters.sellableOnly) {
-      conditions.push('COALESCE(sa.sellable_qty, 0) > 0');
-    }
-
-    const where = `WHERE ${conditions.join(' AND ')}`;
+    const { where, params } = itemFilterSql(filters);
 
     // Sort — whitelisted via sqlSanitizer (default matches the
     // pre-paging behavior: alphabetical by item name).
@@ -181,18 +193,28 @@ class ItemModel {
 
     const offset = (pageNum - 1) * limitNum;
     const rows = db
-      .prepare(`SELECT i.*, COALESCE(sa.sellable_qty, 0) AS sellable_qty FROM items i ${sellableJoin} ${where} ORDER BY ${qualifiedColumn} ${order} LIMIT ? OFFSET ?`)
-      .all(...params, limitNum, offset) as Item[];
+      .prepare(`SELECT i.*, COALESCE(sa.sellable_qty, 0) AS sellable_qty,
+        COALESCE(c.company_name, i.manufacturer_name) AS display_manufacturer_name,
+        COALESCE(c.is_active, 1) AS company_is_active
+        FROM items i ${sellableJoin}
+        LEFT JOIN item_companies c ON c.id = i.company_id
+        ${where} ORDER BY ${qualifiedColumn} ${order} LIMIT ? OFFSET ?`)
+      .all(...params, limitNum, offset) as ItemWithCompany[];
 
     const countRow = db
       .prepare(`SELECT COUNT(*) as total FROM items i ${sellableJoin} ${where}`)
       .get(...params) as { total: number };
 
-    return { rows, total: countRow.total, pageNum, limitNum };
+    return { rows: rows.map(withCompanyFields), total: countRow.total, pageNum, limitNum };
   }
 
   static getById(id: number, db: Database.Database): Item | undefined {
-    return db.prepare('SELECT * FROM items WHERE id = ?').get(id) as Item | undefined;
+    const row = db.prepare(`SELECT i.*,
+        COALESCE(c.company_name, i.manufacturer_name) AS display_manufacturer_name,
+        COALESCE(c.is_active, 1) AS company_is_active
+      FROM items i LEFT JOIN item_companies c ON c.id = i.company_id
+      WHERE i.id = ?`).get(id) as ItemWithCompany | undefined;
+    return row ? withCompanyFields(row) : undefined;
   }
 
   static getByCode(code: string, db: Database.Database): Item | undefined {
@@ -200,84 +222,62 @@ class ItemModel {
   }
 
   static create(data: CreateItemDTO, userId: number, db: Database.Database): number {
-    const stmt = db.prepare(`
-      INSERT INTO items (
-        item_code, item_name, description, category,
-        unit_of_measure, reorder_level, standard_cost, standard_selling_price,
-        is_raw_material, is_finished_good, is_purchased, is_manufactured,
-        sale_type, qty_decimal_precision, rounding_step,
-        has_expiry, near_expiry_threshold_days,
-        created_by, manufacturer_name
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
+    return db.transaction(() => {
+      const company = resolveCompanyForWrite(data, null, db);
+      const stmt = db.prepare(`
+        INSERT INTO items (
+          item_code, item_name, description, category,
+          unit_of_measure, reorder_level, standard_cost, standard_selling_price,
+          is_raw_material, is_finished_good, is_purchased, is_manufactured,
+          sale_type, qty_decimal_precision, rounding_step,
+          has_expiry, near_expiry_threshold_days,
+          created_by, manufacturer_name, company_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
 
-    const result = stmt.run(
-      data.item_code,
-      data.item_name,
-      data.description || null,
-      data.category || null,
-      data.unit_of_measure || 'Nos',
-      data.reorder_level || 0,
-      data.standard_cost || 0,
-      data.standard_selling_price || 0,
-      ...itemSupplyFlags(data),
-      data.sale_type === 'loose' ? 'loose' : 'packed',
-      data.qty_decimal_precision || 0,
-      data.rounding_step ?? null,
-      data.has_expiry ? 1 : 0,
-      data.near_expiry_threshold_days ?? 30,
-      userId,
-      normalizeManufacturerName(data.manufacturer_name)
-    );
+      const result = stmt.run(
+        ...itemCreateParams(data, company, userId)
+      );
 
-    return result.lastInsertRowid as number;
+      return result.lastInsertRowid as number;
+    })();
   }
 
   static update(id: number, data: UpdateItemDTO, db: Database.Database): Database.RunResult {
-    const stmt = db.prepare(`
-      UPDATE items
-      SET item_name = ?,
-          description = ?,
-          category = ?,
-          unit_of_measure = ?,
-          reorder_level = ?,
-          standard_cost = ?,
-          standard_selling_price = ?,
-          is_raw_material = ?,
-          is_finished_good = ?,
-          is_purchased = ?,
-          is_manufactured = ?,
-          sale_type = ?,
-          qty_decimal_precision = ?,
-          rounding_step = ?,
-          has_expiry = ?,
-          near_expiry_threshold_days = ?,
-          manufacturer_name = CASE WHEN ? THEN ? ELSE manufacturer_name END,
-          updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `);
+    return db.transaction(() => {
+      const current = db.prepare('SELECT company_id FROM items WHERE id = ?').get(id) as
+        { company_id: number | null } | undefined;
+      const company = resolveCompanyForWrite(data, current?.company_id ?? null, db);
+      const companyChanged = Number(company !== null);
 
-    return stmt.run(
-      data.item_name,
-      data.description || null,
-      data.category || null,
-      data.unit_of_measure,
-      data.reorder_level || 0,
-      data.standard_cost || 0,
-      data.standard_selling_price || 0,
-      data.is_raw_material ? 1 : 0,
-      data.is_finished_good ? 1 : 0,
-      data.is_purchased ? 1 : 0,
-      data.is_manufactured ? 1 : 0,
-      data.sale_type === 'loose' ? 'loose' : 'packed',
-      data.qty_decimal_precision || 0,
-      data.rounding_step ?? null,
-      data.has_expiry ? 1 : 0,
-      data.near_expiry_threshold_days ?? 30,
-      Number(data.manufacturer_name !== undefined),
-      normalizeManufacturerName(data.manufacturer_name),
-      id
-    );
+      const stmt = db.prepare(`
+        UPDATE items
+        SET item_name = ?,
+            description = ?,
+            category = ?,
+            unit_of_measure = ?,
+            reorder_level = ?,
+            standard_cost = ?,
+            standard_selling_price = ?,
+            is_raw_material = ?,
+            is_finished_good = ?,
+            is_purchased = ?,
+            is_manufactured = ?,
+            sale_type = ?,
+            qty_decimal_precision = ?,
+            rounding_step = ?,
+            has_expiry = ?,
+            near_expiry_threshold_days = ?,
+            manufacturer_name = CASE WHEN ? THEN ? ELSE manufacturer_name END,
+            company_id = CASE WHEN ? THEN ? ELSE company_id END,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `);
+
+      return stmt.run(
+        ...itemUpdateParams(data, company, companyChanged, id)
+      );
+    })();
   }
 
   /// Soft-delete (SHORTCOMINGS-FIX 4.2): stamps `deleted_at`/`deleted_by`
@@ -394,6 +394,211 @@ class ItemModel {
 
 function normalizeManufacturerName(value: string | null | undefined): string | null {
   return value?.trim() || null;
+}
+
+type ItemWithCompany = Item & { display_manufacturer_name?: string | null };
+
+function withCompanyFields(row: ItemWithCompany): Item {
+  const { display_manufacturer_name, ...rest } = row;
+  return {
+    ...rest,
+    manufacturer_name: display_manufacturer_name ?? rest.manufacturer_name ?? null,
+    company_id: rest.company_id ?? null,
+    company_is_active: rest.company_is_active ?? 1,
+  };
+}
+
+interface CompanyRow {
+  id: number;
+  company_name: string;
+  is_active: number;
+}
+
+interface CompanyResolution {
+  companyId: number | null;
+  manufacturerName: string | null;
+}
+
+function itemCoreParams(data: CreateItemDTO): SqlParam[] {
+  return [
+    data.item_code,
+    data.item_name,
+    data.description || null,
+    data.category || null,
+    data.unit_of_measure || 'Nos',
+    data.reorder_level || 0,
+    data.standard_cost || 0,
+    data.standard_selling_price || 0,
+  ];
+}
+
+function itemBehaviorParams(data: CreateItemDTO): SqlParam[] {
+  return [
+    ...itemSupplyFlags(data),
+    data.sale_type === 'loose' ? 'loose' : 'packed',
+    data.qty_decimal_precision || 0,
+    data.rounding_step ?? null,
+    data.has_expiry ? 1 : 0,
+    data.near_expiry_threshold_days ?? 30,
+  ];
+}
+
+function companyWriteParams(company: CompanyResolution | null): SqlParam[] {
+  return [company?.manufacturerName ?? null, company?.companyId ?? null];
+}
+
+function itemCreateParams(
+  data: CreateItemDTO,
+  company: CompanyResolution | null,
+  userId: number,
+): SqlParam[] {
+  return [
+    ...itemCoreParams(data),
+    ...itemBehaviorParams(data),
+    userId,
+    ...companyWriteParams(company),
+  ];
+}
+
+function flag(value: boolean): number {
+  return value ? 1 : 0;
+}
+
+function itemUpdateTextParams(data: UpdateItemDTO): SqlParam[] {
+  return [
+    data.item_name,
+    data.description || null,
+    data.category || null,
+    data.unit_of_measure,
+  ];
+}
+
+function itemUpdatePriceParams(data: UpdateItemDTO): SqlParam[] {
+  return [
+    data.reorder_level || 0,
+    data.standard_cost || 0,
+    data.standard_selling_price || 0,
+    flag(data.is_raw_material),
+    flag(data.is_finished_good),
+    flag(data.is_purchased),
+    flag(data.is_manufactured),
+  ];
+}
+
+function itemUpdateSaleParams(data: UpdateItemDTO): SqlParam[] {
+  return [
+    data.sale_type === 'loose' ? 'loose' : 'packed',
+    data.qty_decimal_precision || 0,
+    data.rounding_step ?? null,
+  ];
+}
+
+function itemUpdateExpiryParams(data: UpdateItemDTO): SqlParam[] {
+  return [
+    data.has_expiry ? 1 : 0,
+    data.near_expiry_threshold_days ?? 30,
+  ];
+}
+
+function itemUpdateCoreParams(data: UpdateItemDTO): SqlParam[] {
+  return [...itemUpdateTextParams(data), ...itemUpdatePriceParams(data)];
+}
+
+function itemUpdateTailParams(
+  data: UpdateItemDTO,
+  company: CompanyResolution | null,
+  companyChanged: number,
+  id: number,
+): SqlParam[] {
+  const [manufacturerName, companyId] = companyWriteParams(company);
+  return [
+    ...itemUpdateSaleParams(data),
+    ...itemUpdateExpiryParams(data),
+    companyChanged,
+    manufacturerName,
+    companyChanged,
+    companyId,
+    id,
+  ];
+}
+
+function itemUpdateParams(
+  data: UpdateItemDTO,
+  company: CompanyResolution | null,
+  companyChanged: number,
+  id: number,
+): SqlParam[] {
+  return [
+    ...itemUpdateCoreParams(data),
+    ...itemUpdateTailParams(data, company, companyChanged, id),
+  ];
+}
+
+function findCompanyByName(name: string, db: Database.Database): CompanyRow | undefined {
+  return db.prepare(
+    'SELECT id, company_name, is_active FROM item_companies WHERE company_name = ? COLLATE NOCASE',
+  ).get(name) as CompanyRow | undefined;
+}
+
+function assertAssignable(company: CompanyRow, currentCompanyId: number | null): void {
+  if (company.is_active !== 1 && company.id !== currentCompanyId) {
+    throw new BusinessRuleError(400, 'Cannot assign an archived company to a product');
+  }
+}
+
+function resolveExplicitCompany(
+  companyId: number,
+  currentCompanyId: number | null,
+  db: Database.Database,
+): CompanyResolution {
+  const company = db.prepare(
+    'SELECT id, company_name, is_active FROM item_companies WHERE id = ?',
+  ).get(companyId) as CompanyRow | undefined;
+  if (!company) {
+    throw new BusinessRuleError(400, 'company_id must reference an existing company');
+  }
+  assertAssignable(company, currentCompanyId);
+  return { companyId: company.id, manufacturerName: company.company_name };
+}
+
+function resolveCompanyByName(
+  name: string,
+  currentCompanyId: number | null,
+  db: Database.Database,
+): CompanyResolution {
+  const existing = findCompanyByName(name, db);
+  if (existing) {
+    assertAssignable(existing, currentCompanyId);
+    return { companyId: existing.id, manufacturerName: existing.company_name };
+  }
+  db.prepare(
+    'INSERT INTO item_companies (company_name) VALUES (?) ON CONFLICT(company_name) DO NOTHING',
+  ).run(name);
+  const created = findCompanyByName(name, db);
+  if (!created) {
+    throw new Error('Company lookup failed after insert');
+  }
+  return { companyId: created.id, manufacturerName: created.company_name };
+}
+
+function resolveCompanyForWrite(
+  data: { company_id?: number | null; manufacturer_name?: string | null },
+  currentCompanyId: number | null,
+  db: Database.Database,
+): CompanyResolution | null {
+  if (data.company_id !== undefined) {
+    return data.company_id === null
+      ? { companyId: null, manufacturerName: null }
+      : resolveExplicitCompany(data.company_id, currentCompanyId, db);
+  }
+  if (data.manufacturer_name === undefined) {
+    return null;
+  }
+  const name = normalizeManufacturerName(data.manufacturer_name);
+  if (!name) {
+    return { companyId: null, manufacturerName: null };
+  }
+  return resolveCompanyByName(name, currentCompanyId, db);
 }
 
 export default ItemModel;
