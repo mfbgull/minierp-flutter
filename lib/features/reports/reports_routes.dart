@@ -11,6 +11,7 @@ import 'balance_sheet_report_screen.dart';
 import 'batch_traceability_report_screen.dart';
 import 'cash_flow_report_screen.dart';
 import 'cash_reconciliation_screen.dart';
+import 'company_report_screen.dart';
 import 'customer_statements_report_screen.dart';
 import 'dso_report_screen.dart';
 import 'expiry_report_screen.dart';
@@ -59,6 +60,7 @@ class ReportsRoutes extends ModuleRoutes {
               'profit-loss' => const ProfitLossReportScreen(),
               'top-debtors' => const TopDebtorsReportScreen(),
               'customer-statements' => const CustomerStatementsReportScreen(),
+              'company' => const CompanyReportScreen(),
               _ => ModulePlaceholderScreen(
                 title:
                     reportTitles[slug]?.call(

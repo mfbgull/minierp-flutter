@@ -27,6 +27,8 @@ import '../../data/models/report.dart'
         TaxSummaryReport,
         TopDebtorRow,
         TrialBalanceReport;
+import '../../data/models/company_report.dart'
+    show CompanyPeriodReport, CompanyStockReport;
 import 'api_result.dart';
 import 'repository_client.dart';
 
@@ -279,6 +281,77 @@ class ReportRepository {
         parse: (Object? json) =>
             InventoryValuationReport.fromJson(json as Map<String, dynamic>),
       );
+
+  /// GET /reports/company/stock — current stock and batch-cost value for
+  /// one company. Ignore date filters: the endpoint has no date inputs.
+  Future<ApiResult<CompanyStockReport>> companyStock({
+    required int companyId,
+    required int page,
+    required int limit,
+  }) => _api.get(
+    ApiEndpoints.reportCompanyStock,
+    queryParameters: <String, dynamic>{
+      'company_id': companyId,
+      'page': page,
+      'limit': limit,
+    },
+    parse: (Object? json) =>
+        CompanyStockReport.fromJson(json as Map<String, dynamic>),
+  );
+
+  /// GET /reports/company/sales — period sales by product, including
+  /// returns dated inside the period.
+  Future<ApiResult<CompanyPeriodReport>> companySales({
+    required int companyId,
+    required String startDate,
+    required String endDate,
+    required int page,
+    required int limit,
+  }) => _companyPeriod(
+    ApiEndpoints.reportCompanySales,
+    companyId: companyId,
+    startDate: startDate,
+    endDate: endDate,
+    page: page,
+    limit: limit,
+  );
+
+  /// GET /reports/company/purchases — period purchases by product,
+  /// including returns dated inside the period.
+  Future<ApiResult<CompanyPeriodReport>> companyPurchases({
+    required int companyId,
+    required String startDate,
+    required String endDate,
+    required int page,
+    required int limit,
+  }) => _companyPeriod(
+    ApiEndpoints.reportCompanyPurchases,
+    companyId: companyId,
+    startDate: startDate,
+    endDate: endDate,
+    page: page,
+    limit: limit,
+  );
+
+  Future<ApiResult<CompanyPeriodReport>> _companyPeriod(
+    String path, {
+    required int companyId,
+    required String startDate,
+    required String endDate,
+    required int page,
+    required int limit,
+  }) => _api.get(
+    path,
+    queryParameters: <String, dynamic>{
+      'company_id': companyId,
+      'startDate': startDate,
+      'endDate': endDate,
+      'page': page,
+      'limit': limit,
+    },
+    parse: (Object? json) =>
+        CompanyPeriodReport.fromJson(json as Map<String, dynamic>),
+  );
 }
 
 final reportRepositoryProvider = Provider<ReportRepository>(

@@ -6,6 +6,9 @@ import '../../core/utils/date_utils.dart' show isoDate;
 import '../activity_log/activity_log_providers.dart'
     show activityLogFromDateProvider, activityLogToDateProvider;
 import '../../data/models/customer.dart' show Customer;
+import '../../data/models/company_report.dart'
+    show CompanyPeriodReport, CompanyStockReport;
+import '../../data/models/item.dart' show ItemCompany;
 import '../../data/models/report.dart'
     show
         ApAgingReport,
@@ -28,6 +31,8 @@ import '../../data/models/report.dart'
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
 import '../../data/repositories/customer_repository.dart'
     show customerRepositoryProvider;
+import '../../data/repositories/inventory_repository.dart'
+    show inventoryRepositoryProvider;
 import '../../data/repositories/paged_request.dart'
     show PagedRequest;
 import '../../data/repositories/report_repository.dart'
@@ -262,6 +267,110 @@ final balanceSheetProvider = FutureProvider<BalanceSheetReport>((ref) async {
   };
 });
 
+// ── Company report ─────────────────────────────────────────────────
+
+/// The three company report views. Stock ignores the date range.
+enum CompanyReportView { stock, sales, purchases }
+
+/// Selected company for the company report (null = first available).
+final companyReportCompanyIdProvider = StateProvider<int?>((ref) => null);
+
+/// Active company report view.
+final companyReportViewProvider = StateProvider<CompanyReportView>(
+  (ref) => CompanyReportView.stock,
+);
+
+/// Page for the active company report view.
+final companyReportPageProvider = StateProvider<int>((ref) => 1);
+
+/// Rows per page for the active company report view.
+final companyReportLimitProvider = StateProvider<int>((ref) => 25);
+
+/// Date range for the sales and purchases views.
+final companyReportFromDateProvider = StateProvider<DateTime?>(
+  (ref) => initialRange(ref).from,
+);
+final companyReportToDateProvider = StateProvider<DateTime?>(
+  (ref) => initialRange(ref).to,
+);
+
+/// All companies, including archived ones, for the report selector.
+/// The report endpoints accept archived company IDs.
+final reportCompaniesProvider =
+    FutureProvider.autoDispose<List<ItemCompany>>((ref) async {
+  final repo = ref.watch(inventoryRepositoryProvider);
+  final companies = <ItemCompany>[];
+  var page = 1;
+  while (true) {
+    final result = await repo.companies(
+      PagedRequest(page: page, limit: 200, extra: const {'status': 'all'}),
+    );
+    switch (result) {
+      case ApiSuccess(:final data):
+        companies.addAll(data.items);
+        if (!data.hasNext || page >= data.totalPages) return companies;
+      case ApiFailure(:final error):
+        throw error;
+    }
+    page++;
+  }
+});
+
+typedef CompanyStockRequest = ({int companyId, int page, int limit});
+
+typedef CompanyPeriodRequest = ({
+  int companyId,
+  CompanyReportView view,
+  int page,
+  int limit,
+  String startDate,
+  String endDate,
+});
+
+/// Loads GET /reports/company/stock for one company page.
+final companyStockReportProvider = FutureProvider.autoDispose
+    .family<CompanyStockReport, CompanyStockRequest>((ref, request) async {
+  final result = await ref
+      .watch(reportRepositoryProvider)
+      .companyStock(
+        companyId: request.companyId,
+        page: request.page,
+        limit: request.limit,
+      );
+  return switch (result) {
+    ApiSuccess(:final data) => data,
+    ApiFailure(:final error) => throw error,
+  };
+});
+
+/// Loads GET /reports/company/sales or /purchases for one company page.
+final companyPeriodReportProvider = FutureProvider.autoDispose
+    .family<CompanyPeriodReport, CompanyPeriodRequest>((ref, request) async {
+  if (request.view == CompanyReportView.stock) {
+    throw ArgumentError('Period report view must be sales or purchases');
+  }
+  final repo = ref.watch(reportRepositoryProvider);
+  final result = request.view == CompanyReportView.sales
+      ? await repo.companySales(
+          companyId: request.companyId,
+          startDate: request.startDate,
+          endDate: request.endDate,
+          page: request.page,
+          limit: request.limit,
+        )
+      : await repo.companyPurchases(
+          companyId: request.companyId,
+          startDate: request.startDate,
+          endDate: request.endDate,
+          page: request.page,
+          limit: request.limit,
+        );
+  return switch (result) {
+    ApiSuccess(:final data) => data,
+    ApiFailure(:final error) => throw error,
+  };
+});
+
 // ── Global report date range ───────────────────────────────────────
 
 /// App-wide default From/To range, set from the dashboard's date-range picker.
@@ -425,6 +534,7 @@ final List<(StateProvider<DateTime?>, StateProvider<DateTime?>)>
       (reportGeneralLedgerFromDateProvider, reportGeneralLedgerToDateProvider),
       (reportIncomeStatementFromDateProvider, reportIncomeStatementToDateProvider),
       (reportTaxSummaryFromDateProvider, reportTaxSummaryToDateProvider),
+      (companyReportFromDateProvider, companyReportToDateProvider),
     ];
 
 /// Applies [from]..[to] to every report page's range providers.
