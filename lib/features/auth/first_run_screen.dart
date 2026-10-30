@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/backend/backend_config.dart';
 import '../../l10n/app_localizations.dart';
+import '../../widgets/app_logo.dart';
 
 /// First-launch setup for a packaged install: the administrator password is
 /// chosen here and passed to the bundled server only through its process
@@ -67,11 +68,7 @@ class _FirstRunScreenState extends State<FirstRunScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Icon(
-                  Icons.inventory_2_outlined,
-                  size: 64,
-                  color: theme.colorScheme.primary,
-                ),
+                const AppLogo(size: 64),
                 const SizedBox(height: 16),
                 Text(
                   l10n.firstRunTitle,

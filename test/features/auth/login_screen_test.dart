@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:minierp_app/features/auth/login_screen.dart';
+import 'package:minierp_app/widgets/app_logo.dart';
 
 import '../../test_helpers.dart';
 
@@ -15,6 +16,10 @@ void main() {
 
     expect(find.textContaining('admin123'), findsNothing);
     expect(find.textContaining('Default login'), findsNothing);
+    // Branding: the login card must show the app logo, not a generic
+    // Material glyph (app_logo regression net for the login brand slot).
+    expect(find.byType(AppLogo), findsOneWidget);
+    expect(tester.widget<AppLogo>(find.byType(AppLogo)).size, 48);
   });
 
   testWidgets('password visibility can be toggled', (tester) async {

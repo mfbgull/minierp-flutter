@@ -7,6 +7,7 @@ import '../../core/auth/auth_notifier.dart';
 import '../../core/backend/backend_providers.dart';
 import '../../core/backend/backend_supervisor.dart';
 import '../../l10n/app_localizations.dart';
+import '../../widgets/app_logo.dart';
 import 'first_run_screen.dart';
 
 /// Boot screen. Starts the bundled backend (packaged builds), then resolves
@@ -77,7 +78,6 @@ class _SplashBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final scheme = Theme.of(context).colorScheme;
     final starting =
         backend.status == BackendStatus.starting ||
         backend.status == BackendStatus.idle;
@@ -86,7 +86,7 @@ class _SplashBody extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.inventory_2_outlined, size: 64, color: scheme.primary),
+            const AppLogo(size: 64),
             const SizedBox(height: 16),
             Text('MiniERP', style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 24),
