@@ -10,6 +10,7 @@ import '../../core/router/module_registry.dart' show shellDestinations;
 import '../../core/router/shell_destination.dart' show ShellDestination;
 import '../../core/theme/breakpoints.dart' show Breakpoints;
 import '../../core/theme/theme_mode_provider.dart';
+import '../../widgets/app_logo.dart';
 import '../../features/search/global_search_dialog.dart'
     show showGlobalSearchDialog;
 import '../../l10n/app_localizations.dart';
@@ -140,7 +141,7 @@ class _NavRail extends StatelessWidget {
             ? Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.inventory_2, color: scheme.primary),
+                  const AppLogo(size: 32),
                   const SizedBox(width: 10),
                   Text(
                     'MiniERP',
@@ -148,7 +149,7 @@ class _NavRail extends StatelessWidget {
                   ),
                 ],
               )
-            : Icon(Icons.inventory_2, color: scheme.primary),
+            : const AppLogo(size: 32),
       ),
       destinations: [
         for (final dest in destinations)
