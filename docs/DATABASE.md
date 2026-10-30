@@ -418,6 +418,35 @@ Performance indexes are defined in `server/src/migrations/add-performance-indexe
 
 ---
 
+## Company management (migration 123)
+
+Migration `123_item_company_management.sql` gives companies a stable identity:
+
+- `item_companies.is_active INTEGER NOT NULL DEFAULT 1` with a `0/1` check.
+  Archived companies keep their products and history but cannot receive new
+  product assignments.
+- `items.company_id INTEGER REFERENCES item_companies(id)` with index
+  `idx_items_company_id`. The ID is authoritative for reports; renames do not
+  detach history.
+- `item_company_suppliers(company_id, supplier_id)` with a composite primary
+  key and an index on `supplier_id`. This table stores manual links only.
+  Purchased-from rows are derived from posted purchases and goods receipts and
+  are never stored here.
+
+The migration backfills one company row per distinct, nonempty
+`manufacturer_name` (case-insensitive), then assigns `items.company_id` from
+the matching name. Blank manufacturer values remain unassigned. Product IDs,
+amounts and legacy display values are unchanged. The migration is safe to
+re-run: the insert uses `ON CONFLICT DO NOTHING`.
+
+A company can be deleted only when no product references it, including
+inactive or soft-deleted products. Deleting an unused company removes its
+manual supplier links through `ON DELETE CASCADE`; supplier records remain.
+Company names are trimmed, limited to 200 characters, and unique without regard
+to case at the database level.
+
+---
+
 ## Document Number Generation
 
 All document numbers use atomic generation via `INSERT ... ON CONFLICT DO UPDATE` to prevent race conditions:

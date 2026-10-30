@@ -2237,6 +2237,19 @@ export function applyPendingMigrations(): void {
   runLedgered('120_journal_header_void_attribution.sql');
   runLedgered('121_count_snapshot_cost.sql');
   runLedgered('122_item_manufacturer_batch_sources.sql');
+  runLedgered('fn.runItemCompaniesMigration', () => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS item_companies (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      INSERT OR IGNORE INTO item_companies (company_name)
+      SELECT DISTINCT TRIM(manufacturer_name) FROM items
+      WHERE manufacturer_name IS NOT NULL AND TRIM(manufacturer_name) <> '';
+    `);
+  });
+  runLedgered('123_item_company_management.sql');
   // Boot-time guard (spec §4.1): the restocking-fee posting resolves 4150 at
   // return time — a legacy COA predating GL foundation must fail the boot
   // with a clear error, never mis-post.

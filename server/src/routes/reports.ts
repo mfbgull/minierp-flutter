@@ -1,6 +1,7 @@
 import express from 'express';
 const router = express.Router();
 import reportsController from '../controllers/reportsController';
+import { companyStockReport, companySalesReport, companyPurchasesReport } from '../controllers/companyReportController';
 import { authenticateToken } from '../middleware/auth';
 import { requirePermission } from '../middleware/requirePermission';
 import { sensitiveOperationLimiter } from '../middleware/rateLimiter';
@@ -8,6 +9,9 @@ import { validateZodQuery, zodSchemas } from '../middleware/validation';
 
 // All report routes require authentication
 router.use(authenticateToken);
+router.get('/company/stock', requirePermission('reports', 'read'), requirePermission('inventory', 'read'), sensitiveOperationLimiter, companyStockReport);
+router.get('/company/sales', requirePermission('reports', 'read'), requirePermission('invoices', 'read'), sensitiveOperationLimiter, companySalesReport);
+router.get('/company/purchases', requirePermission('reports', 'read'), requirePermission('purchases', 'read'), sensitiveOperationLimiter, companyPurchasesReport);
 
 router.get('/ar-aging', requirePermission('reports', 'read'), sensitiveOperationLimiter, reportsController.getARAgingReport);
 router.get('/ap-aging', requirePermission('reports', 'read'), sensitiveOperationLimiter, reportsController.getAPAgingReport);

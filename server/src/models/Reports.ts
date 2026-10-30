@@ -759,7 +759,7 @@ function getExpiryAlerts(db: Database.Database, days: number): Array<{
 }
 
 /** Guarded column probe for optional schema additions (halted). */
-function columnExistsSafe(db: Database.Database, table: string, column: string): boolean {
+export function columnExistsSafe(db: Database.Database, table: string, column: string): boolean {
   return (db.pragma(`table_info('${table}')`) as Array<{ name: string }>).some(c => c.name === column);
 }
 
