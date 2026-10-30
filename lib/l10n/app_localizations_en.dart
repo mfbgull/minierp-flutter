@@ -7043,4 +7043,201 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get retry => 'Retry';
+
+  @override
+  String get inventoryManageCompanies => 'Manage Companies';
+
+  @override
+  String get inventoryCompanies => 'companies';
+
+  @override
+  String get inventoryCompanyName => 'Company name';
+
+  @override
+  String get inventoryCompanyAdd => 'Add Company';
+
+  @override
+  String get inventoryCompanyEdit => 'Edit Company';
+
+  @override
+  String get inventoryCompanyDelete => 'Delete Company';
+
+  @override
+  String get inventoryCompanyArchive => 'Archive Company';
+
+  @override
+  String get inventoryCompanyRestore => 'Restore Company';
+
+  @override
+  String get inventoryCompanyArchived => 'Archived';
+
+  @override
+  String get inventoryCompanyActive => 'Active';
+
+  @override
+  String get inventoryCompanyAll => 'All';
+
+  @override
+  String get inventoryCompanySearchHint => 'Search companies';
+
+  @override
+  String get inventoryCompanyNoCompanies => 'No companies found.';
+
+  @override
+  String inventoryCompanyProductCount(int count) {
+    return '$count products';
+  }
+
+  @override
+  String get inventoryCompanyProducts => 'Products';
+
+  @override
+  String get inventoryCompanySuppliers => 'Suppliers';
+
+  @override
+  String get inventoryCompanyAddSupplier => 'Add supplier';
+
+  @override
+  String get inventoryCompanyNoProducts => 'No products for this company.';
+
+  @override
+  String get inventoryCompanyNoSuppliers => 'No suppliers for this company.';
+
+  @override
+  String inventoryCompanyDeleteConfirm(String name) {
+    return 'Delete $name? This cannot be undone.';
+  }
+
+  @override
+  String get inventoryCompanyDeleted => 'Company deleted';
+
+  @override
+  String get inventoryCompanyArchivedToast => 'Company archived';
+
+  @override
+  String get inventoryCompanyRestored => 'Company restored';
+
+  @override
+  String get inventoryCompanyLinked => 'Linked';
+
+  @override
+  String get inventoryCompanyPurchased => 'Purchased';
+
+  @override
+  String get inventoryCompanyLink => 'Link supplier';
+
+  @override
+  String get inventoryCompanyUnlink => 'Unlink supplier';
+
+  @override
+  String inventoryCompanyUnlinkConfirm(String name) {
+    return 'Unlink $name? Purchase history stays.';
+  }
+
+  @override
+  String inventoryCompanyLastPurchase(String date) {
+    return 'Last purchase $date';
+  }
+
+  @override
+  String get inventoryCompanyOpenSupplier => 'Open supplier';
+
+  @override
+  String get inventoryCompanySelectSupplier => 'Select supplier';
+
+  @override
+  String get inventoryCompanySearchSuppliers => 'Search suppliers';
+
+  @override
+  String get inventoryCompanySupplierLinkedToast => 'Supplier linked';
+
+  @override
+  String get inventoryCompanySupplierUnlinkedToast => 'Supplier unlinked';
+
+  @override
+  String get reportsCompanyreport => 'Company Report';
+
+  @override
+  String get reportsCompanyLabel => 'Company';
+
+  @override
+  String get reportsCompanySelect => 'Select a company';
+
+  @override
+  String get reportsCompanyNoCompanies =>
+      'No companies yet. Add a company from Inventory.';
+
+  @override
+  String get reportsCompanyLoadfailed => 'Failed to load companies';
+
+  @override
+  String get reportsCompanyArchived => 'Archived';
+
+  @override
+  String get reportsCompanyStock => 'Stock';
+
+  @override
+  String get reportsCompanySales => 'Sales';
+
+  @override
+  String get reportsCompanyPurchases => 'Purchases';
+
+  @override
+  String get reportsCompanyCurrentStockNote =>
+      'Current stock shows the latest values. The date range does not change it.';
+
+  @override
+  String get reportsCompanyProduct => 'Product';
+
+  @override
+  String get reportsCompanyCode => 'Code';
+
+  @override
+  String get reportsCompanyUom => 'Unit';
+
+  @override
+  String get reportsCompanyStockValue => 'Stock value';
+
+  @override
+  String get reportsCompanyGrossQty => 'Gross qty';
+
+  @override
+  String get reportsCompanyReturnQty => 'Return qty';
+
+  @override
+  String get reportsCompanyNetQty => 'Net qty';
+
+  @override
+  String get reportsCompanyGrossValue => 'Gross value';
+
+  @override
+  String get reportsCompanyReturnValue => 'Return value';
+
+  @override
+  String get reportsCompanyNetValue => 'Net value';
+
+  @override
+  String get reportsCompanyPeriodEmpty => 'No transactions in this period.';
+
+  @override
+  String get reportsCompanyStockEmpty => 'No products for this company.';
+
+  @override
+  String get reportsCompanyNoTransactions =>
+      'No transactions for this product.';
+
+  @override
+  String get reportsCompanyInvoice => 'Invoice';
+
+  @override
+  String get reportsCompanyInvoiceReturn => 'Invoice return';
+
+  @override
+  String get reportsCompanyPurchaseDoc => 'Purchase';
+
+  @override
+  String get reportsCompanyGoodsReceipt => 'Goods receipt';
+
+  @override
+  String get reportsCompanyPurchaseReturn => 'Purchase return';
 }

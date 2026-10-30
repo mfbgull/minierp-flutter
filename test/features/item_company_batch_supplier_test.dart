@@ -41,6 +41,28 @@ class _Repository extends InventoryRepository {
   Future<ApiResult<List<String>>> unitsOfMeasure() async =>
       const ApiSuccess(['Ltr']);
   @override
+  Future<ApiResult<PagedResponse<ItemCompany>>> companies(
+    PagedRequest request,
+  ) async => ApiSuccess(
+    PagedResponse(
+      items: const [ItemCompany(id: 2, name: 'Acme')],
+      totalItems: 1,
+      currentPage: 1,
+      totalPages: 1,
+      hasNext: false,
+      hasPrev: false,
+    ),
+  );
+  @override
+  Future<ApiResult<ItemCompany>> company(int id) async => ApiSuccess(
+    id == 7
+        ? const ItemCompany(id: 7, name: 'Nestlé')
+        : const ItemCompany(id: 2, name: 'Acme'),
+  );
+  @override
+  Future<ApiResult<ItemCompany>> addCompany(String name) async =>
+      ApiSuccess(ItemCompany(id: 7, name: name));
+  @override
   Future<ApiResult<ItemDetail>> itemDetail(int id) async =>
       ApiSuccess(ItemDetail(item: _item, stockByWarehouse: const []));
   @override
@@ -284,7 +306,15 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField).at(0), 'MILK-NEW');
     await tester.enterText(find.byType(TextFormField).at(1), 'Milk 1L');
-    await tester.enterText(find.byKey(const ValueKey('item-manufacturer')), 'Nestlé');
+    await tester.tap(find.byKey(const ValueKey('item-company-add-toggle')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('item-company-name')),
+      'Nestlé',
+    );
+    await tester.tap(find.byKey(const ValueKey('item-company-save')));
+    await tester.pumpAndSettle();
+    expect(find.text('Nestlé'), findsOneWidget);
     await tester.tap(find.byType(SearchableSelect<String>).at(1));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Ltr').last);
@@ -292,6 +322,7 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'Save'));
     await tester.pumpAndSettle();
     expect(repo.submitted?['manufacturer_name'], 'Nestlé');
+    expect(repo.submitted?['company_id'], 7);
   });
 
   testWidgets('editing submits and clears manufacturer through the form', (
@@ -311,15 +342,26 @@ void main() {
         ),
       ),
     );
-    for (final manufacturer in ['Acme', '']) {
-      await tester.tap(find.text('Open'));
-      await tester.pumpAndSettle();
-      final field = find.byKey(const ValueKey('item-manufacturer'));
-      expect(tester.widget<TextFormField>(field).controller!.text, 'Nestlé');
-      await tester.enterText(field, manufacturer);
-      await tester.tap(find.widgetWithText(FilledButton, 'Save'));
-      await tester.pumpAndSettle();
-      expect(repo.submitted?['manufacturer_name'], manufacturer);
-    }
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    expect(find.text('Nestlé'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('item-manufacturer')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Acme').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
+    expect(repo.submitted?['manufacturer_name'], 'Acme');
+    expect(repo.submitted?['company_id'], 2);
+
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    expect(find.text('Nestlé'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('item-company-clear')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
+    expect(repo.submitted?['manufacturer_name'], '');
+    expect(repo.submitted?['company_id'], isNull);
   });
 }
