@@ -322,6 +322,58 @@ into any behaviour-only change.
 
 ---
 
+## BUG-007 · Released AppImage had no AppRun — `execv error: No such file or directory` on launch
+
+**Status:** `FIXED` (pipeline) — `.github/workflows/release.yml`, "Package AppImage" step
+**Found:** 2026-10-30 · **Severity:** high (shipped asset does not launch at all)
+
+### Symptom
+
+`MiniERP-0.2.0-alpha.1-linux-x64.AppImage` failed to launch with
+`execv error: No such file or directory`. Extracting the squashfs layer
+(`--appimage-extract`) showed only the desktop entry, icon and `usr/`;
+`AppRun` — the entry point the AppImage bootloader executes — was absent.
+The payload itself (Flutter bundle, libraries, embedded Node server) was intact.
+
+### Root cause
+
+The CI step handed the AppDir to `linuxdeploy --output appimage` and relied on
+linuxdeploy's AppRun generation. No AppRun appeared in the built image. The
+exact linuxdeploy behaviour that dropped it was not established (the step pins
+the *continuous* release, so a moving target); the fix removes the dependence
+rather than chase that mystery.
+
+### Fix
+
+- The step now writes an explicit custom `AppRun` script into the AppDir root
+  before invoking linuxdeploy. linuxdeploy deploys a custom AppRun as-is
+  (documented first-class behaviour), so the image no longer depends on
+  linuxdeploy's generation step. The script resolves its own directory,
+  defaults `APPDIR` if unset, and execs `usr/bin/minierp_app`.
+- The post-build `--appimage-extract` verification now includes
+  `test -x squashfs-root/AppRun` — the check the original packaging lacked.
+
+### Verification
+
+Reproduced locally with the CI steps mirrored against the release bundle:
+
+- squashfs built without AppRun → the new check fails (red), matching the
+  shipped 0.2.0-alpha.1 defect.
+- Fixed flow with linuxdeploy → `squashfs-root/AppRun` present and executable;
+  all checks pass. Executing the packaged AppRun launched the Flutter binary
+  (Impeller initialised) — the exact chain that previously died with `execv`.
+
+The broken 0.2.0-alpha.1 asset was replaced locally by a repaired build; the
+first asset picked up by this workflow fix will not need that repair.
+
+Follow-up hardening (same day): the step previously pulled the *continuous*
+linuxdeploy build. It is now pinned to stable release `1-alpha-20251107-1`
+with an embedded SHA-256 check, so a bad upstream build cannot silently reach
+the pipeline again. Re-verified locally with the pinned binary: checksum OK,
+AppRun present, app launches.
+
+---
+
 ## Not bugs — deliberate decisions, recorded so they are not re-litigated
 
 - **PUR-016** — the two live `PURCHASE_ORDER` commitment rows (3,000 supplier 1 /

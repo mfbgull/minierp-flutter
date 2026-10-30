@@ -240,7 +240,24 @@ jobs:
           Categories=Office;Utility;
           EOF
           ln -sf usr/share/icons/hicolor/512x512/apps/minierp_app.png AppDir/.DirIcon
-          wget -q -O linuxdeploy.AppImage https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          # Ship an explicit AppRun (see docs/bugs.md BUG-007). linuxdeploy keeps
+          # a custom AppRun found in the AppDir root as-is, so the image no
+          # longer depends on linuxdeploy's own AppRun generation step, which
+          # silently produced no AppRun for 0.2.0-alpha.1.
+          cat > AppDir/AppRun <<'EOF'
+          #!/bin/sh
+          # AppImage entry point. The bootloader sets APPDIR to the mount root.
+          HERE="$(readlink -f "$0")"
+          HERE="${HERE%/*}"
+          export APPDIR="${APPDIR:-$HERE}"
+          exec "$HERE/usr/bin/minierp_app" "$@"
+          EOF
+          chmod +x AppDir/AppRun
+          # Pinned stable release with SHA-256 checksum. Do not bump silently:
+          # BUG-007 shipped because the continuous build silently produced an
+          # image without AppRun.
+          wget -q -O linuxdeploy.AppImage https://github.com/linuxdeploy/linuxdeploy/releases/download/1-alpha-20251107-1/linuxdeploy-x86_64.AppImage
+          echo "c20cd71e3a4e3b80c3483cef793cda3f4e990aca14014d23c544ca3ce1270b4d  linuxdeploy.AppImage" | sha256sum -c -
           chmod +x linuxdeploy.AppImage
           ./linuxdeploy.AppImage --appdir AppDir --output appimage
           mv MiniERP-*.AppImage "$ASSET"
@@ -253,6 +270,9 @@ jobs:
           test -f squashfs-root/usr/lib/minierp_app/lib/libflutter_linux_gtk.so
           test -f squashfs-root/usr/lib/minierp_app/server/dist/server.js
           test -x squashfs-root/usr/lib/minierp_app/server/runtime/node
+          # BUG-007 regression guard: without an executable AppRun the
+          # bootloader fails with "execv error: No such file or directory".
+          test -x squashfs-root/AppRun
           rm -rf squashfs-root
 
       - name: Upload Debian artifact
