@@ -13605,6 +13605,378 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Retry'**
   String get retry;
+
+  /// No description provided for @inventoryManageCompanies.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Companies'**
+  String get inventoryManageCompanies;
+
+  /// No description provided for @inventoryCompanies.
+  ///
+  /// In en, this message translates to:
+  /// **'companies'**
+  String get inventoryCompanies;
+
+  /// No description provided for @inventoryCompanyName.
+  ///
+  /// In en, this message translates to:
+  /// **'Company name'**
+  String get inventoryCompanyName;
+
+  /// No description provided for @inventoryCompanyAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Company'**
+  String get inventoryCompanyAdd;
+
+  /// No description provided for @inventoryCompanyEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Company'**
+  String get inventoryCompanyEdit;
+
+  /// No description provided for @inventoryCompanyDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Company'**
+  String get inventoryCompanyDelete;
+
+  /// No description provided for @inventoryCompanyArchive.
+  ///
+  /// In en, this message translates to:
+  /// **'Archive Company'**
+  String get inventoryCompanyArchive;
+
+  /// No description provided for @inventoryCompanyRestore.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore Company'**
+  String get inventoryCompanyRestore;
+
+  /// No description provided for @inventoryCompanyArchived.
+  ///
+  /// In en, this message translates to:
+  /// **'Archived'**
+  String get inventoryCompanyArchived;
+
+  /// No description provided for @inventoryCompanyActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get inventoryCompanyActive;
+
+  /// No description provided for @inventoryCompanyAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get inventoryCompanyAll;
+
+  /// No description provided for @inventoryCompanySearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search companies'**
+  String get inventoryCompanySearchHint;
+
+  /// No description provided for @inventoryCompanyNoCompanies.
+  ///
+  /// In en, this message translates to:
+  /// **'No companies found.'**
+  String get inventoryCompanyNoCompanies;
+
+  /// No description provided for @inventoryCompanyProductCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} products'**
+  String inventoryCompanyProductCount(int count);
+
+  /// No description provided for @inventoryCompanyProducts.
+  ///
+  /// In en, this message translates to:
+  /// **'Products'**
+  String get inventoryCompanyProducts;
+
+  /// No description provided for @inventoryCompanySuppliers.
+  ///
+  /// In en, this message translates to:
+  /// **'Suppliers'**
+  String get inventoryCompanySuppliers;
+
+  /// No description provided for @inventoryCompanyAddSupplier.
+  ///
+  /// In en, this message translates to:
+  /// **'Add supplier'**
+  String get inventoryCompanyAddSupplier;
+
+  /// No description provided for @inventoryCompanyNoProducts.
+  ///
+  /// In en, this message translates to:
+  /// **'No products for this company.'**
+  String get inventoryCompanyNoProducts;
+
+  /// No description provided for @inventoryCompanyNoSuppliers.
+  ///
+  /// In en, this message translates to:
+  /// **'No suppliers for this company.'**
+  String get inventoryCompanyNoSuppliers;
+
+  /// No description provided for @inventoryCompanyDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {name}? This cannot be undone.'**
+  String inventoryCompanyDeleteConfirm(String name);
+
+  /// No description provided for @inventoryCompanyDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Company deleted'**
+  String get inventoryCompanyDeleted;
+
+  /// No description provided for @inventoryCompanyArchivedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Company archived'**
+  String get inventoryCompanyArchivedToast;
+
+  /// No description provided for @inventoryCompanyRestored.
+  ///
+  /// In en, this message translates to:
+  /// **'Company restored'**
+  String get inventoryCompanyRestored;
+
+  /// No description provided for @inventoryCompanyLinked.
+  ///
+  /// In en, this message translates to:
+  /// **'Linked'**
+  String get inventoryCompanyLinked;
+
+  /// No description provided for @inventoryCompanyPurchased.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchased'**
+  String get inventoryCompanyPurchased;
+
+  /// No description provided for @inventoryCompanyLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Link supplier'**
+  String get inventoryCompanyLink;
+
+  /// No description provided for @inventoryCompanyUnlink.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlink supplier'**
+  String get inventoryCompanyUnlink;
+
+  /// No description provided for @inventoryCompanyUnlinkConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlink {name}? Purchase history stays.'**
+  String inventoryCompanyUnlinkConfirm(String name);
+
+  /// No description provided for @inventoryCompanyLastPurchase.
+  ///
+  /// In en, this message translates to:
+  /// **'Last purchase {date}'**
+  String inventoryCompanyLastPurchase(String date);
+
+  /// No description provided for @inventoryCompanyOpenSupplier.
+  ///
+  /// In en, this message translates to:
+  /// **'Open supplier'**
+  String get inventoryCompanyOpenSupplier;
+
+  /// No description provided for @inventoryCompanySelectSupplier.
+  ///
+  /// In en, this message translates to:
+  /// **'Select supplier'**
+  String get inventoryCompanySelectSupplier;
+
+  /// No description provided for @inventoryCompanySearchSuppliers.
+  ///
+  /// In en, this message translates to:
+  /// **'Search suppliers'**
+  String get inventoryCompanySearchSuppliers;
+
+  /// No description provided for @inventoryCompanySupplierLinkedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplier linked'**
+  String get inventoryCompanySupplierLinkedToast;
+
+  /// No description provided for @inventoryCompanySupplierUnlinkedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplier unlinked'**
+  String get inventoryCompanySupplierUnlinkedToast;
+
+  /// No description provided for @reportsCompanyreport.
+  ///
+  /// In en, this message translates to:
+  /// **'Company Report'**
+  String get reportsCompanyreport;
+
+  /// No description provided for @reportsCompanyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Company'**
+  String get reportsCompanyLabel;
+
+  /// No description provided for @reportsCompanySelect.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a company'**
+  String get reportsCompanySelect;
+
+  /// No description provided for @reportsCompanyNoCompanies.
+  ///
+  /// In en, this message translates to:
+  /// **'No companies yet. Add a company from Inventory.'**
+  String get reportsCompanyNoCompanies;
+
+  /// No description provided for @reportsCompanyLoadfailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load companies'**
+  String get reportsCompanyLoadfailed;
+
+  /// No description provided for @reportsCompanyArchived.
+  ///
+  /// In en, this message translates to:
+  /// **'Archived'**
+  String get reportsCompanyArchived;
+
+  /// No description provided for @reportsCompanyStock.
+  ///
+  /// In en, this message translates to:
+  /// **'Stock'**
+  String get reportsCompanyStock;
+
+  /// No description provided for @reportsCompanySales.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales'**
+  String get reportsCompanySales;
+
+  /// No description provided for @reportsCompanyPurchases.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchases'**
+  String get reportsCompanyPurchases;
+
+  /// No description provided for @reportsCompanyCurrentStockNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Current stock shows the latest values. The date range does not change it.'**
+  String get reportsCompanyCurrentStockNote;
+
+  /// No description provided for @reportsCompanyProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Product'**
+  String get reportsCompanyProduct;
+
+  /// No description provided for @reportsCompanyCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Code'**
+  String get reportsCompanyCode;
+
+  /// No description provided for @reportsCompanyUom.
+  ///
+  /// In en, this message translates to:
+  /// **'Unit'**
+  String get reportsCompanyUom;
+
+  /// No description provided for @reportsCompanyStockValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Stock value'**
+  String get reportsCompanyStockValue;
+
+  /// No description provided for @reportsCompanyGrossQty.
+  ///
+  /// In en, this message translates to:
+  /// **'Gross qty'**
+  String get reportsCompanyGrossQty;
+
+  /// No description provided for @reportsCompanyReturnQty.
+  ///
+  /// In en, this message translates to:
+  /// **'Return qty'**
+  String get reportsCompanyReturnQty;
+
+  /// No description provided for @reportsCompanyNetQty.
+  ///
+  /// In en, this message translates to:
+  /// **'Net qty'**
+  String get reportsCompanyNetQty;
+
+  /// No description provided for @reportsCompanyGrossValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Gross value'**
+  String get reportsCompanyGrossValue;
+
+  /// No description provided for @reportsCompanyReturnValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Return value'**
+  String get reportsCompanyReturnValue;
+
+  /// No description provided for @reportsCompanyNetValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Net value'**
+  String get reportsCompanyNetValue;
+
+  /// No description provided for @reportsCompanyPeriodEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No transactions in this period.'**
+  String get reportsCompanyPeriodEmpty;
+
+  /// No description provided for @reportsCompanyStockEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No products for this company.'**
+  String get reportsCompanyStockEmpty;
+
+  /// No description provided for @reportsCompanyNoTransactions.
+  ///
+  /// In en, this message translates to:
+  /// **'No transactions for this product.'**
+  String get reportsCompanyNoTransactions;
+
+  /// No description provided for @reportsCompanyInvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice'**
+  String get reportsCompanyInvoice;
+
+  /// No description provided for @reportsCompanyInvoiceReturn.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice return'**
+  String get reportsCompanyInvoiceReturn;
+
+  /// No description provided for @reportsCompanyPurchaseDoc.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase'**
+  String get reportsCompanyPurchaseDoc;
+
+  /// No description provided for @reportsCompanyGoodsReceipt.
+  ///
+  /// In en, this message translates to:
+  /// **'Goods receipt'**
+  String get reportsCompanyGoodsReceipt;
+
+  /// No description provided for @reportsCompanyPurchaseReturn.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase return'**
+  String get reportsCompanyPurchaseReturn;
 }
 
 class _AppLocalizationsDelegate

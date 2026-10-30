@@ -10,8 +10,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../data/models/item.dart' show Item, SaleType;
-import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
+import '../../data/models/item.dart' show Item, ItemCompany, SaleType;
+import '../../data/repositories/api_result.dart' show ApiError, ApiFailure, ApiSuccess;
 import '../../data/repositories/inventory_repository.dart'
     show inventoryRepositoryProvider;
 import '../../l10n/app_localizations.dart';
@@ -45,6 +45,11 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
   late final TextEditingController _codeController;
   late final TextEditingController _nameController;
   late final TextEditingController _manufacturerController;
+  final _companyNameController = TextEditingController();
+  ItemCompany? _selectedCompany;
+  bool _showAddCompany = false;
+  bool _savingCompany = false;
+  String? _companyError;
   late final TextEditingController _descriptionController;
   late final TextEditingController _reorderController;
   late final TextEditingController _costController;
@@ -74,6 +79,12 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
     _manufacturerController = TextEditingController(
       text: item?.manufacturerName ?? '',
     );
+    if (item?.companyId != null) {
+      _selectedCompany = ItemCompany(
+        id: item!.companyId!, name: item.manufacturerName ?? '',
+        isActive: item.companyIsActive,
+      );
+    }
     _descriptionController = TextEditingController(
       text: item?.description ?? '',
     );
@@ -104,6 +115,7 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
     _codeController.dispose();
     _nameController.dispose();
     _manufacturerController.dispose();
+    _companyNameController.dispose();
     _descriptionController.dispose();
     _reorderController.dispose();
     _costController.dispose();
@@ -119,11 +131,44 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
     return [...loaded, current];
   }
 
+  Future<void> _addCompany() async {
+    if (_savingCompany) return;
+    final l10n = AppLocalizations.of(context)!;
+    final name = _companyNameController.text.trim();
+    if (name.isEmpty) {
+      setState(() => _companyError = l10n.commonRequired);
+      return;
+    }
+    setState(() { _savingCompany = true; _companyError = null; });
+    try {
+      final result = await ref.read(inventoryRepositoryProvider).addCompany(name);
+      if (!mounted) return;
+      switch (result) {
+        case ApiSuccess(:final data):
+          ref.invalidate(itemCompaniesProvider);
+          ref.invalidate(itemCompanyProvider(data.id));
+          setState(() {
+            _selectedCompany = data;
+            _manufacturerController.text = data.name;
+            _showAddCompany = false;
+            _companyNameController.clear();
+          });
+        case ApiFailure(:final error):
+          setState(() => _companyError = error.message);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _companyError = l10n.messagesSavederror);
+    } finally {
+      if (mounted) setState(() => _savingCompany = false);
+    }
+  }
+
   Map<String, dynamic> _buildBody() {
     return {
       if (!_isEdit) 'item_code': _codeController.text.trim(),
       'item_name': _nameController.text.trim(),
       'manufacturer_name': _manufacturerController.text.trim(),
+      'company_id': _selectedCompany?.id,
       if (_descriptionController.text.trim().isNotEmpty)
         'description': _descriptionController.text.trim(),
       if (_category != null && _category!.isNotEmpty) 'category': _category,
@@ -138,8 +183,7 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
       'is_purchased': _isPurchased,
       'is_manufactured': _isManufactured,
       'sale_type': _saleType.value,
-      'qty_decimal_precision':
-          _saleType == SaleType.loose ? 3 : 0,
+      'qty_decimal_precision': _saleType == SaleType.loose ? 3 : 0,
       'has_expiry': _hasExpiry,
       if (_hasExpiry && _thresholdController.text.isNotEmpty)
         'near_expiry_threshold_days': int.parse(_thresholdController.text),
@@ -147,6 +191,7 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
   }
 
   Future<void> _submit() async {
+    if (_submitting || _savingCompany || _showAddCompany) return;
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() {
       _submitting = true;
@@ -177,6 +222,7 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final categories = ref.watch(itemCategoriesProvider);
+    final companies = ref.watch(itemCompaniesProvider);
     final uoms = ref.watch(itemUomsProvider);
     String? validateNumber(String? v) => nonNegativeNumberValidator(
       v,
@@ -190,315 +236,391 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
       _category,
     );
     final uomItems = _withCurrent(uoms.valueOrNull ?? const [], _uom);
+    final selectedId = _selectedCompany?.id;
+    final currentCompany = selectedId == null ? null : ref.watch(itemCompanyProvider(selectedId));
+    final companyItems = [...?companies.valueOrNull];
+    final selectedCompany = currentCompany?.valueOrNull ?? _selectedCompany;
+    if (selectedCompany != null && !companyItems.any((company) => company.id == selectedCompany.id)) {
+      companyItems.add(selectedCompany);
+    }
 
     return MovableDialog(
       dialogId: 'item_form',
       maxWidth: 520,
       maxHeight: 680,
       child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        _isEdit
-                            ? l10n.inventoryEdititem
-                            : l10n.inventoryNewitem,
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _isEdit ? l10n.inventoryEdititem : l10n.inventoryNewitem,
+                      style: Theme.of(context).textTheme.titleLarge,
                     ),
-                    IconButton(
-                      tooltip: l10n.commonClose,
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                  ],
-                ),
+                  ),
+                  IconButton(
+                    tooltip: l10n.commonClose,
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
               ),
-              const Divider(height: 1),
-              Flexible(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (!_isEdit)
-                        FormFieldShell(
-                          label: l10n.inventoryItemcode,
-                          required: true,
-                          child: TextFormField(
-                            controller: _codeController,
-                            onFieldSubmitted: submitOnEnter(_submit),
-                            autofocus: true,
-                            enabled: !_submitting,
-                            decoration: formInputDecoration(),
-                            validator: (v) => requiredValidator(
-                              v,
-                              l10n.inventoryErrorCodeRequired,
-                            ),
-                          ),
-                        ),
+            ),
+            const Divider(height: 1),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (!_isEdit)
                       FormFieldShell(
-                        label: l10n.inventoryItemname,
+                        label: l10n.inventoryItemcode,
                         required: true,
                         child: TextFormField(
-                          controller: _nameController,
+                          controller: _codeController,
                           onFieldSubmitted: submitOnEnter(_submit),
+                          autofocus: true,
                           enabled: !_submitting,
                           decoration: formInputDecoration(),
                           validator: (v) => requiredValidator(
                             v,
-                            l10n.inventoryErrorNameRequired,
+                            l10n.inventoryErrorCodeRequired,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 10),
-                      FormFieldShell(
-                        label: l10n.inventoryManufacturer,
-                        child: TextFormField(
-                          key: const ValueKey('item-manufacturer'),
-                          controller: _manufacturerController,
-                          enabled: !_submitting,
-                          maxLength: 200,
-                          decoration: formInputDecoration(),
-                          onFieldSubmitted: submitOnEnter(_submit),
+                    FormFieldShell(
+                      label: l10n.inventoryItemname,
+                      required: true,
+                      child: TextFormField(
+                        controller: _nameController,
+                        onFieldSubmitted: submitOnEnter(_submit),
+                        enabled: !_submitting,
+                        decoration: formInputDecoration(),
+                        validator: (v) => requiredValidator(
+                          v,
+                          l10n.inventoryErrorNameRequired,
                         ),
                       ),
-                      const SizedBox(height: 10),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    ),
+                    const SizedBox(height: 10),
+                    FormFieldShell(
+                      label: l10n.inventoryManufacturer,
+                      child: Row(
                         children: [
                           Expanded(
-                            child: FormFieldShell(
-                              label: l10n.inventoryCategory,
-                              child: SearchableSelect<String>(
-                                items: categoryItems,
-                                selected: _category,
-                                labelBuilder: (v) => v,
-                                enabled: !_submitting,
-                                onChanged: (v) => setState(() => _category = v),
-                              ),
+                            child: SearchableSelect<ItemCompany>(
+                              key: const ValueKey('item-manufacturer'),
+                              items: companyItems,
+                              selected: selectedCompany,
+                              hint: _manufacturerController.text,
+                              labelBuilder: (value) => value.isActive ? value.name : '${value.name} (${l10n.statusInactive})',
+                              enabled: !_submitting && !_savingCompany && !companies.isLoading,
+                              onChanged: (value) => setState(() {
+                                _selectedCompany = value;
+                                _manufacturerController.text = value?.name ?? '';
+                              }),
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: FormFieldShell(
-                              label: l10n.inventoryUom,
-                              required: true,
-                              child: SearchableSelect<String>(
-                                items: uomItems,
-                                selected: _uom,
-                                labelBuilder: (v) => v,
-                                enabled: !_submitting,
-                                onChanged: (v) => setState(() => _uom = v),
-                                validator: (v) => requiredValidator(
-                                  v,
-                                  l10n.inventoryErrorUomRequired,
-                                ),
-                              ),
-                            ),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            key: const ValueKey('item-company-add-toggle'),
+                            tooltip: l10n.commonAdd,
+                            onPressed: _submitting || _savingCompany ? null : () => setState(() {
+                              _showAddCompany = !_showAddCompany;
+                              _companyError = null;
+                              _companyNameController.clear();
+                            }),
+                            icon: Icon(_showAddCompany ? Icons.close : Icons.add_circle_outline),
                           ),
+                          if (_manufacturerController.text.isNotEmpty)
+                            IconButton(
+                              key: const ValueKey('item-company-clear'),
+                              tooltip: l10n.commonNone,
+                              onPressed: _submitting || _savingCompany ? null : () => setState(() {
+                                _selectedCompany = null;
+                                _manufacturerController.clear();
+                              }),
+                              icon: const Icon(Icons.clear),
+                            ),
                         ],
                       ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: FormFieldShell(
-                              label: l10n.inventoryReorderlevel,
-                              child: TextFormField(
-                                controller: _reorderController,
-                                onFieldSubmitted: submitOnEnter(_submit),
-                                enabled: !_submitting,
-                                keyboardType:
-                                    const TextInputType.numberWithOptions(
-                                      decimal: true,
-                                    ),
-                                decoration: formInputDecoration(),
-                                validator: validateNumber,
-                              ),
-                            ),
+                    ),
+                    if (companies.isLoading) const LinearProgressIndicator(),
+                    if (companies.hasError) Row(children: [
+                      Expanded(child: Text(companies.error is ApiError ? (companies.error as ApiError).message : l10n.messagesFetcherror)),
+                      TextButton(onPressed: () => ref.invalidate(itemCompaniesProvider), child: Text(l10n.commonRetry)),
+                    ]),
+                    if (_showAddCompany) Card(
+                      key: const ValueKey('item-company-inline'),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                          Text('${l10n.commonAdd} ${l10n.inventoryManufacturer}'),
+                          const SizedBox(height: 8),
+                          TextField(
+                            key: const ValueKey('item-company-name'),
+                            controller: _companyNameController,
+                            autofocus: true,
+                            maxLength: 200,
+                            enabled: !_savingCompany,
+                            decoration: formInputDecoration().copyWith(errorText: _companyError),
+                            onSubmitted: (_) => _addCompany(),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: FormFieldShell(
-                              label: l10n.inventoryStandardcost,
-                              child: TextFormField(
-                                controller: _costController,
-                                onFieldSubmitted: submitOnEnter(_submit),
-                                enabled: !_submitting,
-                                keyboardType:
-                                    const TextInputType.numberWithOptions(
-                                      decimal: true,
-                                    ),
-                                decoration: formInputDecoration(),
-                                validator: validateNumber,
-                              ),
+                          Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+                            TextButton(
+                              key: const ValueKey('item-company-cancel'),
+                              onPressed: _savingCompany ? null : () => setState(() {
+                                _showAddCompany = false;
+                                _companyNameController.clear();
+                                _companyError = null;
+                              }),
+                              child: Text(l10n.commonCancel),
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: FormFieldShell(
-                              label: l10n.inventorySellingprice,
-                              child: TextFormField(
-                                controller: _priceController,
-                                onFieldSubmitted: submitOnEnter(_submit),
-                                enabled: !_submitting,
-                                keyboardType:
-                                    const TextInputType.numberWithOptions(
-                                      decimal: true,
-                                    ),
-                                decoration: formInputDecoration(),
-                                validator: validateNumber,
-                              ),
+                            FilledButton(
+                              key: const ValueKey('item-company-save'),
+                              onPressed: _savingCompany ? null : _addCompany,
+                              child: _savingCompany ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : Text(l10n.commonSave),
                             ),
-                          ),
-                        ],
+                          ]),
+                        ]),
                       ),
-                      const SizedBox(height: 10),
-                      FormFieldShell(
-                        label: l10n.inventorySaletype,
-                        child: SearchableSelect<String>(
-                          items: const ['packed', 'loose'],
-                          selected: _saleType.value,
-                          labelBuilder: (v) => v == 'packed'
-                              ? l10n.inventorySaletypePacked
-                              : l10n.inventorySaletypeLoose,
-                          enabled: !_submitting,
-                          onChanged: (v) => setState(() {
-                            _saleType = SaleType.fromString(v);
-                          }),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      FormFieldShell(
-                        label: l10n.inventoryItemtype,
-                        child: Column(
-                          children: [
-                            _flagRow(
-                              l10n.inventoryRawmaterials,
-                              _isRawMaterial,
-                              (v) => setState(() => _isRawMaterial = v),
-                              l10n.inventoryFinishedgoods,
-                              _isFinishedGood,
-                              (v) => setState(() => _isFinishedGood = v),
-                            ),
-                            const SizedBox(height: 4),
-                            _flagRow(
-                              l10n.inventoryPurchased,
-                              _isPurchased,
-                              (v) => setState(() => _isPurchased = v),
-                              l10n.inventoryManufacturedproducts,
-                              _isManufactured,
-                              (v) => setState(() => _isManufactured = v),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      FormFieldShell(
-                        label: l10n.expiryTracking,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            SwitchListTile(
-                              contentPadding: EdgeInsets.zero,
-                              dense: true,
-                              title: Text(
-                                l10n.trackExpiryDates,
-                                style: Theme.of(context).textTheme.bodyMedium,
-                              ),
-                              value: _hasExpiry,
-                              onChanged: _submitting
-                                  ? null
-                                  : (v) => setState(() => _hasExpiry = v),
-                            ),
-                            if (_hasExpiry) ...[
-                              const SizedBox(height: 8),
-                              FormFieldShell(
-                                label: l10n.nearExpiryThreshold,
-                                child: TextFormField(
-                                  controller: _thresholdController,
-                                  enabled: !_submitting,
-                                  keyboardType:
-                                      const TextInputType.numberWithOptions(
-                                    decimal: false,
-                                  ),
-                                  decoration: formInputDecoration(),
-                                  validator: (v) {
-                                    if (!_hasExpiry) return null;
-                                    final n = int.tryParse(v?.trim() ?? '');
-                                    if (n == null || n <= 0) {
-                                      return l10n.inventoryErrorNonnegative;
-                                    }
-                                    return null;
-                                  },
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      FormFieldShell(
-                        label: l10n.commonDescription,
-                        child: TextFormField(
-                          controller: _descriptionController,
-                          enabled: !_submitting,
-                          minLines: 2,
-                          maxLines: 4,
-                          decoration: formInputDecoration(),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const Divider(height: 1),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (_error != null) ...[
-                      ErrorBanner(message: _error!),
-                      const SizedBox(height: 8),
-                    ],
+                    ),
+                    const SizedBox(height: 10),
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        TextButton(
-                          onPressed: _submitting
-                              ? null
-                              : () => Navigator.of(context).pop(),
-                          child: Text(l10n.commonCancel),
+                        Expanded(
+                          child: FormFieldShell(
+                            label: l10n.inventoryCategory,
+                            child: SearchableSelect<String>(
+                              items: categoryItems,
+                              selected: _category,
+                              labelBuilder: (v) => v,
+                              enabled: !_submitting,
+                              onChanged: (v) => setState(() => _category = v),
+                            ),
+                          ),
                         ),
-                        const SizedBox(width: 8),
-                        FilledButton(
-                          onPressed: _submitting ? null : _submit,
-                          child: _submitting
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : Text(l10n.commonSave),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: FormFieldShell(
+                            label: l10n.inventoryUom,
+                            required: true,
+                            child: SearchableSelect<String>(
+                              items: uomItems,
+                              selected: _uom,
+                              labelBuilder: (v) => v,
+                              enabled: !_submitting,
+                              onChanged: (v) => setState(() => _uom = v),
+                              validator: (v) => requiredValidator(
+                                v,
+                                l10n.inventoryErrorUomRequired,
+                              ),
+                            ),
+                          ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: FormFieldShell(
+                            label: l10n.inventoryReorderlevel,
+                            child: TextFormField(
+                              controller: _reorderController,
+                              onFieldSubmitted: submitOnEnter(_submit),
+                              enabled: !_submitting,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
+                              decoration: formInputDecoration(),
+                              validator: validateNumber,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: FormFieldShell(
+                            label: l10n.inventoryStandardcost,
+                            child: TextFormField(
+                              controller: _costController,
+                              onFieldSubmitted: submitOnEnter(_submit),
+                              enabled: !_submitting,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
+                              decoration: formInputDecoration(),
+                              validator: validateNumber,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: FormFieldShell(
+                            label: l10n.inventorySellingprice,
+                            child: TextFormField(
+                              controller: _priceController,
+                              onFieldSubmitted: submitOnEnter(_submit),
+                              enabled: !_submitting,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
+                              decoration: formInputDecoration(),
+                              validator: validateNumber,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    FormFieldShell(
+                      label: l10n.inventorySaletype,
+                      child: SearchableSelect<String>(
+                        items: const ['packed', 'loose'],
+                        selected: _saleType.value,
+                        labelBuilder: (v) => v == 'packed'
+                            ? l10n.inventorySaletypePacked
+                            : l10n.inventorySaletypeLoose,
+                        enabled: !_submitting,
+                        onChanged: (v) => setState(() {
+                          _saleType = SaleType.fromString(v);
+                        }),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    FormFieldShell(
+                      label: l10n.inventoryItemtype,
+                      child: Column(
+                        children: [
+                          _flagRow(
+                            l10n.inventoryRawmaterials,
+                            _isRawMaterial,
+                            (v) => setState(() => _isRawMaterial = v),
+                            l10n.inventoryFinishedgoods,
+                            _isFinishedGood,
+                            (v) => setState(() => _isFinishedGood = v),
+                          ),
+                          const SizedBox(height: 4),
+                          _flagRow(
+                            l10n.inventoryPurchased,
+                            _isPurchased,
+                            (v) => setState(() => _isPurchased = v),
+                            l10n.inventoryManufacturedproducts,
+                            _isManufactured,
+                            (v) => setState(() => _isManufactured = v),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    FormFieldShell(
+                      label: l10n.expiryTracking,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            dense: true,
+                            title: Text(
+                              l10n.trackExpiryDates,
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                            value: _hasExpiry,
+                            onChanged: _submitting
+                                ? null
+                                : (v) => setState(() => _hasExpiry = v),
+                          ),
+                          if (_hasExpiry) ...[
+                            const SizedBox(height: 8),
+                            FormFieldShell(
+                              label: l10n.nearExpiryThreshold,
+                              child: TextFormField(
+                                controller: _thresholdController,
+                                enabled: !_submitting,
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                      decimal: false,
+                                    ),
+                                decoration: formInputDecoration(),
+                                validator: (v) {
+                                  if (!_hasExpiry) return null;
+                                  final n = int.tryParse(v?.trim() ?? '');
+                                  if (n == null || n <= 0) {
+                                    return l10n.inventoryErrorNonnegative;
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    FormFieldShell(
+                      label: l10n.commonDescription,
+                      child: TextFormField(
+                        controller: _descriptionController,
+                        enabled: !_submitting,
+                        minLines: 2,
+                        maxLines: 4,
+                        decoration: formInputDecoration(),
+                      ),
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_error != null) ...[
+                    ErrorBanner(message: _error!),
+                    const SizedBox(height: 8),
+                  ],
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: _submitting
+                            ? null
+                            : () => Navigator.of(context).pop(),
+                        child: Text(l10n.commonCancel),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton(
+                        onPressed: _submitting || _savingCompany || _showAddCompany ? null : _submit,
+                        child: _submitting
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Text(l10n.commonSave),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

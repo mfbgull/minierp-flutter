@@ -7035,4 +7035,200 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get retry => 'دوبارہ کوشش کریں';
+
+  @override
+  String get inventoryManageCompanies => 'کمپنیاں منظم کریں';
+
+  @override
+  String get inventoryCompanies => 'کمپنیاں';
+
+  @override
+  String get inventoryCompanyName => 'کمپنی کا نام';
+
+  @override
+  String get inventoryCompanyAdd => 'کمپنی شامل کریں';
+
+  @override
+  String get inventoryCompanyEdit => 'کمپنی میں ترمیم';
+
+  @override
+  String get inventoryCompanyDelete => 'کمپنی حذف کریں';
+
+  @override
+  String get inventoryCompanyArchive => 'کمپنی آرکائیو کریں';
+
+  @override
+  String get inventoryCompanyRestore => 'کمپنی بحال کریں';
+
+  @override
+  String get inventoryCompanyArchived => 'آرکائیو شدہ';
+
+  @override
+  String get inventoryCompanyActive => 'فعال';
+
+  @override
+  String get inventoryCompanyAll => 'سب';
+
+  @override
+  String get inventoryCompanySearchHint => 'کمپنیاں تلاش کریں';
+
+  @override
+  String get inventoryCompanyNoCompanies => 'کوئی کمپنی نہیں ملی۔';
+
+  @override
+  String inventoryCompanyProductCount(int count) {
+    return '$count مصنوعات';
+  }
+
+  @override
+  String get inventoryCompanyProducts => 'مصنوعات';
+
+  @override
+  String get inventoryCompanySuppliers => 'سپلائرز';
+
+  @override
+  String get inventoryCompanyAddSupplier => 'سپلائر شامل کریں';
+
+  @override
+  String get inventoryCompanyNoProducts => 'اس کمپنی کی کوئی مصنوعات نہیں۔';
+
+  @override
+  String get inventoryCompanyNoSuppliers => 'اس کمپنی کا کوئی سپلائر نہیں۔';
+
+  @override
+  String inventoryCompanyDeleteConfirm(String name) {
+    return '$name حذف کریں؟ یہ واپس نہیں ہو سکتا۔';
+  }
+
+  @override
+  String get inventoryCompanyDeleted => 'کمپنی حذف ہو گئی';
+
+  @override
+  String get inventoryCompanyArchivedToast => 'کمپنی آرکائیو ہو گئی';
+
+  @override
+  String get inventoryCompanyRestored => 'کمپنی بحال ہو گئی';
+
+  @override
+  String get inventoryCompanyLinked => 'منسلک';
+
+  @override
+  String get inventoryCompanyPurchased => 'خریدا گیا';
+
+  @override
+  String get inventoryCompanyLink => 'سپلائر منسلک کریں';
+
+  @override
+  String get inventoryCompanyUnlink => 'سپلائر غیر منسلک کریں';
+
+  @override
+  String inventoryCompanyUnlinkConfirm(String name) {
+    return '$name غیر منسلک کریں؟ خریداری کی تاریخ محفوظ رہے گی۔';
+  }
+
+  @override
+  String inventoryCompanyLastPurchase(String date) {
+    return 'آخری خریداری $date';
+  }
+
+  @override
+  String get inventoryCompanyOpenSupplier => 'سپلائر کھولیں';
+
+  @override
+  String get inventoryCompanySelectSupplier => 'سپلائر منتخب کریں';
+
+  @override
+  String get inventoryCompanySearchSuppliers => 'سپلائرز تلاش کریں';
+
+  @override
+  String get inventoryCompanySupplierLinkedToast => 'سپلائر منسلک ہو گیا';
+
+  @override
+  String get inventoryCompanySupplierUnlinkedToast => 'سپلائر غیر منسلک ہو گیا';
+
+  @override
+  String get reportsCompanyreport => 'کمپنی رپورٹ';
+
+  @override
+  String get reportsCompanyLabel => 'کمپنی';
+
+  @override
+  String get reportsCompanySelect => 'کمپنی منتخب کریں';
+
+  @override
+  String get reportsCompanyNoCompanies =>
+      'ابھی کوئی کمپنی نہیں۔ انوینٹری سے کمپنی شامل کریں۔';
+
+  @override
+  String get reportsCompanyLoadfailed => 'کمپنیاں لوڈ نہیں ہو سکیں';
+
+  @override
+  String get reportsCompanyArchived => 'آرکائیو شدہ';
+
+  @override
+  String get reportsCompanyStock => 'اسٹاک';
+
+  @override
+  String get reportsCompanySales => 'فروخت';
+
+  @override
+  String get reportsCompanyPurchases => 'خریداری';
+
+  @override
+  String get reportsCompanyCurrentStockNote =>
+      'موجودہ اسٹاک تازہ ترین اقدار دکھاتا ہے۔ تاریخ کی حد اسے تبدیل نہیں کرتی۔';
+
+  @override
+  String get reportsCompanyProduct => 'مصنوع';
+
+  @override
+  String get reportsCompanyCode => 'کوڈ';
+
+  @override
+  String get reportsCompanyUom => 'یونٹ';
+
+  @override
+  String get reportsCompanyStockValue => 'اسٹاک ویلیو';
+
+  @override
+  String get reportsCompanyGrossQty => 'کل مقدار';
+
+  @override
+  String get reportsCompanyReturnQty => 'واپسی مقدار';
+
+  @override
+  String get reportsCompanyNetQty => 'خالص مقدار';
+
+  @override
+  String get reportsCompanyGrossValue => 'کل ویلیو';
+
+  @override
+  String get reportsCompanyReturnValue => 'واپسی ویلیو';
+
+  @override
+  String get reportsCompanyNetValue => 'خالص ویلیو';
+
+  @override
+  String get reportsCompanyPeriodEmpty => 'اس مدت میں کوئی لین دین نہیں۔';
+
+  @override
+  String get reportsCompanyStockEmpty => 'اس کمپنی کی کوئی مصنوعات نہیں۔';
+
+  @override
+  String get reportsCompanyNoTransactions => 'اس مصنوع کا کوئی لین دین نہیں۔';
+
+  @override
+  String get reportsCompanyInvoice => 'انوائس';
+
+  @override
+  String get reportsCompanyInvoiceReturn => 'انوائس واپسی';
+
+  @override
+  String get reportsCompanyPurchaseDoc => 'خریداری';
+
+  @override
+  String get reportsCompanyGoodsReceipt => 'گڈز رسید';
+
+  @override
+  String get reportsCompanyPurchaseReturn => 'خریداری واپسی';
 }

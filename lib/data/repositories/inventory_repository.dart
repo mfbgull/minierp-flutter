@@ -41,7 +41,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/endpoints.dart' show ApiEndpoints;
 import '../../core/cache/cached_repository.dart'
     show cachedRepositoryClientProvider;
-import '../models/item.dart' show Item;
+import '../models/item.dart' show Item, ItemCompany;
+import '../models/company_supplier.dart' show CompanySupplier;
 import '../models/physical_count.dart' show PhysicalCount, PhysicalCountItem;
 import '../models/stock_batch.dart' show StockBatch;
 import '../models/stock_balance.dart' show StockBalance;
@@ -71,11 +72,22 @@ class StockByWarehouse {
         warehouseCode: json['warehouse_code'] as String? ?? '',
         warehouseName: json['warehouse_name'] as String? ?? '',
         quantity: (json['quantity'] as num?) ?? 0,
-        quantityPhysical: json['quantity_physical'] != null ? (json['quantity_physical'] as num) : null,
-        quantityReserved: json['quantity_reserved'] != null ? (json['quantity_reserved'] as num) : null,
-        quantityAvailable: json['quantity_available'] != null ? (json['quantity_available'] as num) : null,
+        quantityPhysical: json['quantity_physical'] != null
+            ? (json['quantity_physical'] as num)
+            : null,
+        quantityReserved: json['quantity_reserved'] != null
+            ? (json['quantity_reserved'] as num)
+            : null,
+        quantityAvailable: json['quantity_available'] != null
+            ? (json['quantity_available'] as num)
+            : null,
         locations: json['locations'] is List
-            ? (json['locations'] as List).map((e) => WarehouseLocation.fromJson(e as Map<String, dynamic>)).toList()
+            ? (json['locations'] as List)
+                  .map(
+                    (e) =>
+                        WarehouseLocation.fromJson(e as Map<String, dynamic>),
+                  )
+                  .toList()
             : null,
       );
 
@@ -102,14 +114,21 @@ class WarehouseLocation {
     this.quantityAvailable,
   });
 
-  factory WarehouseLocation.fromJson(Map<String, dynamic> json) => WarehouseLocation(
-    locationId: json['location_id'] as int? ?? 0,
-    locationCode: json['location_code'] as String? ?? '',
-    locationName: json['location_name'] as String?,
-    quantityPhysical: json['quantity_physical'] != null ? (json['quantity_physical'] as num) : null,
-    quantityReserved: json['quantity_reserved'] != null ? (json['quantity_reserved'] as num) : null,
-    quantityAvailable: json['quantity_available'] != null ? (json['quantity_available'] as num) : null,
-  );
+  factory WarehouseLocation.fromJson(Map<String, dynamic> json) =>
+      WarehouseLocation(
+        locationId: json['location_id'] as int? ?? 0,
+        locationCode: json['location_code'] as String? ?? '',
+        locationName: json['location_name'] as String?,
+        quantityPhysical: json['quantity_physical'] != null
+            ? (json['quantity_physical'] as num)
+            : null,
+        quantityReserved: json['quantity_reserved'] != null
+            ? (json['quantity_reserved'] as num)
+            : null,
+        quantityAvailable: json['quantity_available'] != null
+            ? (json['quantity_available'] as num)
+            : null,
+      );
 
   final int locationId;
   final String locationCode;
@@ -211,16 +230,90 @@ class InventoryRepository {
       _api.delete('${ApiEndpoints.items}/$id');
 
   /// `POST /inventory/items/:id/restore` — reverts a soft delete.
-  Future<ApiResult<void>> restore(int id) => _api.post(
-    '${ApiEndpoints.items}/$id/restore',
-    parse: (_) {},
-  );
+  Future<ApiResult<void>> restore(int id) =>
+      _api.post('${ApiEndpoints.items}/$id/restore', parse: (_) {});
 
   Future<ApiResult<List<String>>> categories() => _api.getRawList(
     ApiEndpoints.itemsCategories,
     parseItem: (Object? json) =>
         (json as Map<String, dynamic>)['category'] as String? ?? '',
   );
+
+  Future<ApiResult<PagedResponse<ItemCompany>>> companies(PagedRequest request) => _api.getPaged(
+    ApiEndpoints.itemCompanies,
+    queryParameters: request.toQuery(),
+    parseItem: (Object? json) =>
+        ItemCompany.fromJson(json as Map<String, dynamic>),
+  );
+
+  Future<ApiResult<ItemCompany>> addCompany(String name) => _api.postRaw(
+    ApiEndpoints.itemCompanies,
+    body: {'company_name': name},
+    parse: (Object? json) =>
+        ItemCompany.fromJson(json as Map<String, dynamic>),
+  );
+
+  Future<ApiResult<ItemCompany>> company(int id) => _api.getRaw(
+    '${ApiEndpoints.itemCompanies}/$id',
+    parse: (Object? json) => ItemCompany.fromJson(json as Map<String, dynamic>),
+  );
+
+  Future<ApiResult<ItemCompany>> updateCompany(int id, String name) => _api.putRaw(
+    '${ApiEndpoints.itemCompanies}/$id',
+    body: {'company_name': name},
+    parse: (Object? json) => ItemCompany.fromJson(json as Map<String, dynamic>),
+  );
+
+  Future<ApiResult<void>> deleteCompany(int id) => _api.delete('${ApiEndpoints.itemCompanies}/$id');
+
+  Future<ApiResult<ItemCompany>> archiveCompany(int id) => _api.postRaw(
+    '${ApiEndpoints.itemCompanies}/$id/archive',
+    parse: (Object? json) => ItemCompany.fromJson(json as Map<String, dynamic>),
+  );
+
+  Future<ApiResult<ItemCompany>> restoreCompany(int id) => _api.postRaw(
+    '${ApiEndpoints.itemCompanies}/$id/restore',
+    parse: (Object? json) => ItemCompany.fromJson(json as Map<String, dynamic>),
+  );
+
+  Future<ApiResult<PagedResponse<Item>>> companyProducts(int id, PagedRequest request) => _api.getPaged(
+    '${ApiEndpoints.itemCompanies}/$id/products',
+    queryParameters: request.toQuery(),
+    parseItem: (Object? json) => Item.fromJson(json as Map<String, dynamic>),
+  );
+
+  Future<ApiResult<PagedResponse<CompanySupplier>>> companySuppliers(
+    int companyId,
+    PagedRequest request,
+  ) => _api.getPaged(
+    '${ApiEndpoints.itemCompanies}/$companyId/suppliers',
+    queryParameters: request.toQuery(),
+    parseItem: (Object? json) =>
+        CompanySupplier.fromJson(json as Map<String, dynamic>),
+  );
+
+  Future<ApiResult<PagedResponse<Item>>> companySupplierProducts(
+    int companyId,
+    int supplierId,
+    PagedRequest request,
+  ) => _api.getPaged(
+    '${ApiEndpoints.itemCompanies}/$companyId/suppliers/$supplierId/products',
+    queryParameters: request.toQuery(),
+    parseItem: (Object? json) => Item.fromJson(json as Map<String, dynamic>),
+  );
+
+  Future<ApiResult<void>> setCompanySupplierLink(
+    int companyId,
+    int supplierId,
+    bool linked,
+  ) => linked
+      ? _api.post(
+          '${ApiEndpoints.itemCompanies}/$companyId/suppliers/$supplierId',
+          parse: (_) {},
+        )
+      : _api.delete(
+          '${ApiEndpoints.itemCompanies}/$companyId/suppliers/$supplierId',
+        );
 
   Future<ApiResult<List<String>>> unitsOfMeasure() => _api.getRawList(
     ApiEndpoints.itemsUom,
@@ -300,7 +393,8 @@ class InventoryRepository {
   ) => _api.postRaw(
     ApiEndpoints.stockTransfers,
     body: body,
-    parse: (Object? json) => (json ?? <String, dynamic>{}) as Map<String, dynamic>,
+    parse: (Object? json) =>
+        (json ?? <String, dynamic>{}) as Map<String, dynamic>,
   );
 
   /// Expired-stock plan Phase 3: write off expired batches with GL
@@ -313,7 +407,8 @@ class InventoryRepository {
   ) => _api.postRaw(
     ApiEndpoints.expiredWriteOff,
     body: body,
-    parse: (Object? json) => (json ?? <String, dynamic>{}) as Map<String, dynamic>,
+    parse: (Object? json) =>
+        (json ?? <String, dynamic>{}) as Map<String, dynamic>,
   );
 
   /// Damage transfer: move a batch to the DAMAGED warehouse
@@ -323,7 +418,8 @@ class InventoryRepository {
   ) => _api.postRaw(
     ApiEndpoints.damagedTransfer,
     body: body,
-    parse: (Object? json) => (json ?? <String, dynamic>{}) as Map<String, dynamic>,
+    parse: (Object? json) =>
+        (json ?? <String, dynamic>{}) as Map<String, dynamic>,
   );
 
   Future<ApiResult<List<dynamic>>> stockSummary() => _api.getRawList(
@@ -440,34 +536,29 @@ class InventoryRepository {
     int? warehouseId,
   }) => _api.getRawList(
     ApiEndpoints.stockBatches,
-    queryParameters: {
-      'item_id': ?itemId,
-      'warehouse_id': ?warehouseId,
-    },
+    queryParameters: {'item_id': ?itemId, 'warehouse_id': ?warehouseId},
     parseItem: (Object? json) =>
         StockBatch.fromJson(json as Map<String, dynamic>),
   );
 
   /// Patch a batch's expiry date (`PATCH /inventory/stock-batches/:id`).
-  Future<ApiResult<void>> updateBatchExpiry(
-    int batchId,
-    String? expiryDate,
-  ) => _api.patchRaw(
-    '${ApiEndpoints.stockBatches}/$batchId',
-    body: {'expiry_date': expiryDate},
-    parse: (_) {},
-  );
+  Future<ApiResult<void>> updateBatchExpiry(int batchId, String? expiryDate) =>
+      _api.patchRaw(
+        '${ApiEndpoints.stockBatches}/$batchId',
+        body: {'expiry_date': expiryDate},
+        parse: (_) {},
+      );
 
   /// Halt a batch with an optional reason
   /// (`PATCH /inventory/stock-batches/:id/halt`).
-  Future<ApiResult<void>> haltBatch(
-    int batchId, {
-    String? reason,
-  }) => _api.patchRaw(
-    '${ApiEndpoints.stockBatches}/$batchId/halt',
-    body: {if (reason != null && reason.isNotEmpty) 'halted_reason': reason},
-    parse: (_) {},
-  );
+  Future<ApiResult<void>> haltBatch(int batchId, {String? reason}) =>
+      _api.patchRaw(
+        '${ApiEndpoints.stockBatches}/$batchId/halt',
+        body: {
+          if (reason != null && reason.isNotEmpty) 'halted_reason': reason,
+        },
+        parse: (_) {},
+      );
 
   /// Unhalt a batch (`PATCH /inventory/stock-batches/:id/unhalt`).
   Future<ApiResult<void>> unhaltBatch(int batchId) => _api.patchRaw(
@@ -511,10 +602,7 @@ class InventoryRepository {
     required String statusOverride,
   }) => _api.putRaw(
     '${ApiEndpoints.batchStatus}/$batchId/status',
-    body: {
-      'location_id': locationId,
-      'status_override': statusOverride,
-    },
+    body: {'location_id': locationId, 'status_override': statusOverride},
     parse: (_) {},
   );
 
@@ -546,49 +634,49 @@ class InventoryRepository {
     parse: (json) => StockReservation.fromJson(json as Map<String, dynamic>),
   );
 
-  Future<ApiResult<void>> releaseReservation(int reservationId) => _api.deleteRaw(
-    '${ApiEndpoints.reservations}/$reservationId/release',
-  );
+  Future<ApiResult<void>> releaseReservation(int reservationId) =>
+      _api.deleteRaw('${ApiEndpoints.reservations}/$reservationId/release');
 
   Future<ApiResult<List<StockReservation>>> getReservations({
     String? doctype,
     String? docno,
   }) => _api.getRawList(
     ApiEndpoints.reservations,
-    queryParameters: {
-      'doctype': ?doctype,
-      'docno': ?docno,
-    },
-    parseItem: (json) => StockReservation.fromJson(
-      json as Map<String, dynamic>,
-    ),
+    queryParameters: {'doctype': ?doctype, 'docno': ?docno},
+    parseItem: (json) =>
+        StockReservation.fromJson(json as Map<String, dynamic>),
   );
 
   // ============================================
   // Locations (new)
   // ============================================
 
-  Future<ApiResult<List<Map<String, dynamic>>>> getLocations(int warehouseId) => _api.getRawList(
-    ApiEndpoints.locations,
-    queryParameters: {'warehouse_id': warehouseId.toString()},
-    parseItem: (json) => Map<String, dynamic>.from(json as Map),
-  );
+  Future<ApiResult<List<Map<String, dynamic>>>> getLocations(int warehouseId) =>
+      _api.getRawList(
+        ApiEndpoints.locations,
+        queryParameters: {'warehouse_id': warehouseId.toString()},
+        parseItem: (json) => Map<String, dynamic>.from(json as Map),
+      );
 
-  Future<ApiResult<Map<String, dynamic>>> createLocation(Map<String, dynamic> body) => _api.postRaw(
+  Future<ApiResult<Map<String, dynamic>>> createLocation(
+    Map<String, dynamic> body,
+  ) => _api.postRaw(
     ApiEndpoints.locations,
     body: body,
     parse: (json) => Map<String, dynamic>.from(json as Map),
   );
 
-  Future<ApiResult<void>> updateLocation(int locationId, Map<String, dynamic> body) => _api.putRaw(
+  Future<ApiResult<void>> updateLocation(
+    int locationId,
+    Map<String, dynamic> body,
+  ) => _api.putRaw(
     '${ApiEndpoints.locations}/$locationId',
     body: body,
     parse: (_) {},
   );
 
-  Future<ApiResult<void>> deleteLocation(int locationId) => _api.deleteRaw(
-    '${ApiEndpoints.locations}/$locationId',
-  );
+  Future<ApiResult<void>> deleteLocation(int locationId) =>
+      _api.deleteRaw('${ApiEndpoints.locations}/$locationId');
 }
 
 final inventoryRepositoryProvider = Provider<InventoryRepository>(

@@ -22,7 +22,8 @@ abstract final class ApiEndpoints {
   static const dashboardKpiBatch = '/dashboard/kpi-batch';
   static const dashboardArSummary = '/dashboard/ar-summary';
   static const dashboardCashPosition = '/dashboard/cash-position';
-  static const dashboardCashOpeningBalances = '/dashboard/cash-opening-balances';
+  static const dashboardCashOpeningBalances =
+      '/dashboard/cash-opening-balances';
 
   // Layout persistence (§10)
   static const dashboardLayouts = '/dashboard/layouts';
@@ -32,6 +33,7 @@ abstract final class ApiEndpoints {
   // Inventory
   static const items = '/inventory/items';
   static const itemsCategories = '/inventory/items-categories';
+  static const itemCompanies = '/inventory/item-companies';
   static const itemsLowStock = '/inventory/items-low-stock';
   static const itemsUom = '/inventory/items-uom';
   static const warehouses = '/inventory/warehouses';
@@ -45,7 +47,8 @@ abstract final class ApiEndpoints {
   static const physicalCountItems = '/inventory/physical-counts';
   static const stockBatches = '/inventory/stock-batches';
   static const batchReconciliation = '/inventory/batch-reconciliation';
-  static const batchReconciliationCorrect = '/inventory/batch-reconciliation/correct';
+  static const batchReconciliationCorrect =
+      '/inventory/batch-reconciliation/correct';
   static const batchStatus = '/inventory/batches';
   static const reservations = '/inventory/reservations';
   static const locations = '/inventory/locations';
@@ -94,6 +97,9 @@ abstract final class ApiEndpoints {
   static const reportTaxSummary = '/reports/tax-summary';
   static const reportBatchTraceability = '/reports/batch-traceability';
   static const reportInventoryValuation = '/reports/inventory-valuation';
+  static const reportCompanyStock = '/reports/company/stock';
+  static const reportCompanySales = '/reports/company/sales';
+  static const reportCompanyPurchases = '/reports/company/purchases';
 
   // Misc
   static const customers = '/customers';
@@ -106,12 +112,14 @@ abstract final class ApiEndpoints {
   static const expensesSummary = '/expenses/summary';
   static const ownerEquityCapital = '/owner-equity/capital';
   static const ownerEquityWithdrawals = '/owner-equity/withdrawals';
-  static const ownerEquityWithdrawalsQuote =
-      '/owner-equity/withdrawals/quote';
-  static const ownerEquitySummary = '/owner-equity/summary';  static const ownerEquityPaymentMethodOptions = '/owner-equity/payment-method-options';
+  static const ownerEquityWithdrawalsQuote = '/owner-equity/withdrawals/quote';
+  static const ownerEquitySummary = '/owner-equity/summary';
+  static const ownerEquityPaymentMethodOptions =
+      '/owner-equity/payment-method-options';
   // Owner personal loans (purely record-keeping, no GL impact)
   static const ownerPersonalLoans = '/owner-equity/personal-loans';
-  static const ownerPersonalLoansSummary = '/owner-equity/personal-loans/summary';
+  static const ownerPersonalLoansSummary =
+      '/owner-equity/personal-loans/summary';
   static const ownerBorrowers = '/owner-equity/borrowers';
   static const employees = '/employees';
   // Production (§Production) — note the BOM mount is `/api/boms`

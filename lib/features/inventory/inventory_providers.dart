@@ -1,15 +1,20 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/date_utils.dart' show isoDate;
-import '../../data/models/item.dart' show Item;
+import '../../data/models/company_supplier.dart' show CompanySupplier;
+import '../../data/models/item.dart' show Item, ItemCompany;
 import '../../data/models/physical_count.dart' show PhysicalCount;
 import '../../data/models/stock_balance.dart' show StockBalance;
 import '../../data/models/stock_movement.dart' show StockMovement;
+import '../../data/models/supplier.dart' show Supplier;
 import '../../data/models/warehouse.dart' show Warehouse;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
 import '../../data/repositories/inventory_repository.dart'
     show ItemDetail, PhysicalCountDetail, inventoryRepositoryProvider;
-import '../../data/repositories/paged_request.dart' show PagedRequest, PagedResponse;
+import '../../data/repositories/paged_request.dart'
+    show PagedRequest, PagedResponse;
+import '../../data/repositories/supplier_repository.dart'
+    show supplierRepositoryProvider;
 import '../preferences/preference_providers.dart' show initialRange;
 
 /// Server-side search term for the items grid (PORTING.md §2: list
@@ -67,9 +72,9 @@ final itemsProvider = FutureProvider<PagedResponse<Item>>((ref) async {
 /// full list). Watched by item-picker dialogs (transfer/adjustment/
 /// purchase) and the forecast screens' item/category filters.
 final allItemsProvider = FutureProvider<List<Item>>((ref) async {
-  final result = await ref.watch(inventoryRepositoryProvider).items(
-    PagedRequest(limit: 10000),
-  );
+  final result = await ref
+      .watch(inventoryRepositoryProvider)
+      .items(PagedRequest(limit: 10000));
   return switch (result) {
     ApiSuccess(:final data) => data.items,
     ApiFailure(:final error) => throw error,
@@ -101,6 +106,175 @@ final itemCategoriesProvider = FutureProvider<List<String>>((ref) async {
     ApiFailure(:final error) => throw error,
   };
 });
+
+final itemCompaniesProvider = FutureProvider<List<ItemCompany>>((ref) async {
+  final repository = ref.watch(inventoryRepositoryProvider);
+  final companies = <ItemCompany>[];
+  var page = 1;
+  while (true) {
+    final result = await repository.companies(PagedRequest(
+      page: page, limit: 200, extra: const {'status': 'active'},
+    ));
+    switch (result) {
+      case ApiSuccess(:final data):
+        companies.addAll(data.items);
+        if (!data.hasNext) return companies;
+        page++;
+      case ApiFailure(:final error):
+        throw error;
+    }
+  }
+});
+
+final itemCompanyProvider = FutureProvider.family<ItemCompany, int>((ref, id) async {
+  final result = await ref.watch(inventoryRepositoryProvider).company(id);
+  return switch (result) {
+    ApiSuccess(:final data) => data,
+    ApiFailure(:final error) => throw error,
+  };
+});
+
+class ManagedCompaniesArgs {
+  const ManagedCompaniesArgs({
+    required this.page,
+    required this.limit,
+    this.search = '',
+    this.status = 'active',
+  });
+
+  final int page;
+  final int limit;
+  final String search;
+  final String status;
+
+  @override
+  bool operator ==(Object other) =>
+      other is ManagedCompaniesArgs &&
+      other.page == page &&
+      other.limit == limit &&
+      other.search == search &&
+      other.status == status;
+
+  @override
+  int get hashCode => Object.hash(page, limit, search, status);
+}
+
+final managedCompaniesProvider = FutureProvider.autoDispose
+    .family<PagedResponse<ItemCompany>, ManagedCompaniesArgs>((ref, args) async {
+      final result = await ref
+          .watch(inventoryRepositoryProvider)
+          .companies(
+            PagedRequest(
+              page: args.page,
+              limit: args.limit,
+              search: args.search.isEmpty ? null : args.search,
+              extra: {'status': args.status},
+            ),
+          );
+      return switch (result) {
+        ApiSuccess(:final data) => data,
+        ApiFailure(:final error) => throw error,
+      };
+    });
+
+class CompanyProductsArgs {
+  const CompanyProductsArgs({
+    required this.companyId,
+    required this.page,
+    required this.limit,
+  });
+
+  final int companyId;
+  final int page;
+  final int limit;
+
+  @override
+  bool operator ==(Object other) =>
+      other is CompanyProductsArgs &&
+      other.companyId == companyId &&
+      other.page == page &&
+      other.limit == limit;
+
+  @override
+  int get hashCode => Object.hash(companyId, page, limit);
+}
+
+final companyProductsProvider = FutureProvider.autoDispose
+    .family<PagedResponse<Item>, CompanyProductsArgs>((ref, args) async {
+      final result = await ref
+          .watch(inventoryRepositoryProvider)
+          .companyProducts(
+            args.companyId,
+            PagedRequest(page: args.page, limit: args.limit),
+          );
+      return switch (result) {
+        ApiSuccess(:final data) => data,
+        ApiFailure(:final error) => throw error,
+      };
+    });
+
+class CompanySupplierListArgs {
+  const CompanySupplierListArgs({
+    required this.companyId,
+    required this.page,
+    required this.limit,
+  });
+
+  final int companyId;
+  final int page;
+  final int limit;
+
+  @override
+  bool operator ==(Object other) =>
+      other is CompanySupplierListArgs &&
+      other.companyId == companyId &&
+      other.page == page &&
+      other.limit == limit;
+
+  @override
+  int get hashCode => Object.hash(companyId, page, limit);
+}
+
+final companySuppliersProvider = FutureProvider.autoDispose
+    .family<PagedResponse<CompanySupplier>, CompanySupplierListArgs>((
+      ref,
+      args,
+    ) async {
+      final result = await ref
+          .watch(inventoryRepositoryProvider)
+          .companySuppliers(
+            args.companyId,
+            PagedRequest(page: args.page, limit: args.limit),
+          );
+      return switch (result) {
+        ApiSuccess(:final data) => data,
+        ApiFailure(:final error) => throw error,
+      };
+    });
+
+/// Active suppliers offered by the company detail's manual-link picker.
+/// One large page matches the other picker providers; the picker filters
+/// locally.
+final linkableSuppliersProvider = FutureProvider<List<Supplier>>((ref) async {
+  final result = await ref.watch(supplierRepositoryProvider).list(
+    PagedRequest(limit: 10000, extra: const {'status': 'active'}),
+  );
+  return switch (result) {
+    ApiSuccess(:final data) => data.items,
+    ApiFailure(:final error) => throw error,
+  };
+});
+
+/// Refreshes every company-scoped query after a company or link mutation.
+void invalidateCompanyQueries(WidgetRef ref) {
+  ref.invalidate(managedCompaniesProvider);
+  ref.invalidate(itemCompaniesProvider);
+  ref.invalidate(itemCompanyProvider);
+  ref.invalidate(itemsProvider);
+  ref.invalidate(itemDetailProvider);
+  ref.invalidate(companyProductsProvider);
+  ref.invalidate(companySuppliersProvider);
+}
 
 /// Units of measure for the item form's dropdown
 /// (`GET /inventory/items-uom`, bare `[string]`).
@@ -180,10 +354,12 @@ final stockMovementsLimitProvider = StateProvider<int>((ref) => 10);
 final stockMovementsSortProvider = StateProvider<GridSort?>((ref) => null);
 
 /// Inclusive date-range filter for stock movements.
-final stockMovementsFromDateProvider =
-    StateProvider<DateTime?>((ref) => initialRange(ref).from);
-final stockMovementsToDateProvider =
-    StateProvider<DateTime?>((ref) => initialRange(ref).to);
+final stockMovementsFromDateProvider = StateProvider<DateTime?>(
+  (ref) => initialRange(ref).from,
+);
+final stockMovementsToDateProvider = StateProvider<DateTime?>(
+  (ref) => initialRange(ref).to,
+);
 
 /// All movements (unfiltered, newest-first) for the movement-detail
 /// dialog's counterpart lookup — the grid's own provider only holds the
@@ -194,9 +370,7 @@ final stockMovementsToDateProvider =
 final allStockMovementsProvider =
     FutureProvider.autoDispose<List<StockMovement>>((ref) async {
       final repo = ref.watch(inventoryRepositoryProvider);
-      final result = await repo.stockMovements(
-        PagedRequest(limit: 10000),
-      );
+      final result = await repo.stockMovements(PagedRequest(limit: 10000));
       return switch (result) {
         ApiSuccess(:final data) => data.items,
         ApiFailure(:final error) => throw error,
@@ -209,33 +383,34 @@ final allStockMovementsProvider =
 /// when any of the paging state changes; the screen invalidates it on
 /// refresh and on the "back to All" filter switch.
 final stockMovementsProvider =
-    FutureProvider.family<PagedResponse<StockMovement>, String?>(
-      (ref, type) async {
-        final page = ref.watch(stockMovementsPageProvider);
-        final limit = ref.watch(stockMovementsLimitProvider);
-        final sort = ref.watch(stockMovementsSortProvider);
-        final fromDate = ref.watch(stockMovementsFromDateProvider);
-        final toDate = ref.watch(stockMovementsToDateProvider);
-        final repo = ref.watch(inventoryRepositoryProvider);
-        final result = await repo.stockMovements(
-          PagedRequest(
-            page: page,
-            limit: limit,
-            sortBy: sort?.column,
-            sortOrder: sort?.order ?? 'ASC',
-            extra: {
-              'movement_type': ?type,
-              if (fromDate != null) 'date_from': isoDate(fromDate),
-              if (toDate != null) 'date_to': isoDate(toDate),
-            },
-          ),
-        );
-        return switch (result) {
-          ApiSuccess(:final data) => data,
-          ApiFailure(:final error) => throw error,
-        };
-      },
-    );
+    FutureProvider.family<PagedResponse<StockMovement>, String?>((
+      ref,
+      type,
+    ) async {
+      final page = ref.watch(stockMovementsPageProvider);
+      final limit = ref.watch(stockMovementsLimitProvider);
+      final sort = ref.watch(stockMovementsSortProvider);
+      final fromDate = ref.watch(stockMovementsFromDateProvider);
+      final toDate = ref.watch(stockMovementsToDateProvider);
+      final repo = ref.watch(inventoryRepositoryProvider);
+      final result = await repo.stockMovements(
+        PagedRequest(
+          page: page,
+          limit: limit,
+          sortBy: sort?.column,
+          sortOrder: sort?.order ?? 'ASC',
+          extra: {
+            'movement_type': ?type,
+            if (fromDate != null) 'date_from': isoDate(fromDate),
+            if (toDate != null) 'date_to': isoDate(toDate),
+          },
+        ),
+      );
+      return switch (result) {
+        ApiSuccess(:final data) => data,
+        ApiFailure(:final error) => throw error,
+      };
+    });
 
 // --- Stock balance providers ---
 
@@ -259,30 +434,31 @@ final stockBalancesSortProvider = StateProvider<GridSort?>((ref) => null);
 /// One page of stock balances (`GET /inventory/stock-balances` returns a
 /// `pagination` block). Re-runs when search / warehouse filter / paging /
 /// sort change; the screen invalidates it on refresh.
-final stockBalancesProvider =
-    FutureProvider<PagedResponse<StockBalance>>((ref) async {
-      final search = ref.watch(stockBalancesSearchProvider);
-      final warehouse = ref.watch(stockBalancesWarehouseFilterProvider);
-      final page = ref.watch(stockBalancesPageProvider);
-      final limit = ref.watch(stockBalancesLimitProvider);
-      final sort = ref.watch(stockBalancesSortProvider);
-      final repo = ref.watch(inventoryRepositoryProvider);
+final stockBalancesProvider = FutureProvider<PagedResponse<StockBalance>>((
+  ref,
+) async {
+  final search = ref.watch(stockBalancesSearchProvider);
+  final warehouse = ref.watch(stockBalancesWarehouseFilterProvider);
+  final page = ref.watch(stockBalancesPageProvider);
+  final limit = ref.watch(stockBalancesLimitProvider);
+  final sort = ref.watch(stockBalancesSortProvider);
+  final repo = ref.watch(inventoryRepositoryProvider);
 
-      final result = await repo.stockBalances(
-        PagedRequest(
-          page: page,
-          limit: limit,
-          search: search.isEmpty ? null : search,
-          sortBy: sort?.column,
-          sortOrder: sort?.order ?? 'ASC',
-          extra: warehouse.isEmpty ? null : {'warehouse_code': warehouse},
-        ),
-      );
-      return switch (result) {
-        ApiSuccess(:final data) => data,
-        ApiFailure(:final error) => throw error,
-      };
-    });
+  final result = await repo.stockBalances(
+    PagedRequest(
+      page: page,
+      limit: limit,
+      search: search.isEmpty ? null : search,
+      sortBy: sort?.column,
+      sortOrder: sort?.order ?? 'ASC',
+      extra: warehouse.isEmpty ? null : {'warehouse_code': warehouse},
+    ),
+  );
+  return switch (result) {
+    ApiSuccess(:final data) => data,
+    ApiFailure(:final error) => throw error,
+  };
+});
 
 /// One item's stock ledger (`GET /inventory/stock-ledger/:itemId` — its
 /// movement history newest-first, warehouse join only). Keyed on
@@ -317,28 +493,29 @@ final physicalCountsSortProvider = StateProvider<GridSort?>((ref) => null);
 /// One page of physical counts (`GET /inventory/physical-counts` returns
 /// a `pagination` block). Re-runs when search / paging / sort change;
 /// the screen invalidates it on refresh.
-final physicalCountsProvider =
-    FutureProvider<PagedResponse<PhysicalCount>>((ref) async {
-      final search = ref.watch(physicalCountsSearchProvider);
-      final page = ref.watch(physicalCountsPageProvider);
-      final limit = ref.watch(physicalCountsLimitProvider);
-      final sort = ref.watch(physicalCountsSortProvider);
-      final repo = ref.watch(inventoryRepositoryProvider);
+final physicalCountsProvider = FutureProvider<PagedResponse<PhysicalCount>>((
+  ref,
+) async {
+  final search = ref.watch(physicalCountsSearchProvider);
+  final page = ref.watch(physicalCountsPageProvider);
+  final limit = ref.watch(physicalCountsLimitProvider);
+  final sort = ref.watch(physicalCountsSortProvider);
+  final repo = ref.watch(inventoryRepositoryProvider);
 
-      final result = await repo.physicalCounts(
-        PagedRequest(
-          page: page,
-          limit: limit,
-          search: search.isEmpty ? null : search,
-          sortBy: sort?.column,
-          sortOrder: sort?.order ?? 'ASC',
-        ),
-      );
-      return switch (result) {
-        ApiSuccess(:final data) => data,
-        ApiFailure(:final error) => throw error,
-      };
-    });
+  final result = await repo.physicalCounts(
+    PagedRequest(
+      page: page,
+      limit: limit,
+      search: search.isEmpty ? null : search,
+      sortBy: sort?.column,
+      sortOrder: sort?.order ?? 'ASC',
+    ),
+  );
+  return switch (result) {
+    ApiSuccess(:final data) => data,
+    ApiFailure(:final error) => throw error,
+  };
+});
 
 /// A single physical count's detail (`GET /inventory/physical-counts/:id`:
 /// header + item lines). autoDispose: owned by the detail dialog.

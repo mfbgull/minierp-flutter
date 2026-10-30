@@ -37,6 +37,7 @@ import '../../widgets/confirm_dialog.dart';
 import 'inventory_providers.dart';
 import 'item_detail_dialog.dart';
 import 'item_form_dialog.dart';
+import 'manage_companies_dialog.dart';
 
 /// True when a grid row is at/below its reorder level — the single
 /// low-stock rule, shared by the row tint and the stock-cell renderer.
@@ -370,6 +371,14 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen>
               onPressed: () => showItemFormDialog(context),
               icon: const Icon(Icons.add, size: 18),
               label: Text(l10n.inventoryNewitem),
+            ),
+            FilledButton.tonalIcon(
+              onPressed: () async {
+                final changed = await showManageCompaniesDialog(context);
+                if (changed == true) ref.invalidate(itemsProvider);
+              },
+              icon: const Icon(Icons.business_outlined, size: 18),
+              label: Text(l10n.inventoryManageCompanies),
             ),
           ],
         ),

@@ -25,6 +25,8 @@ class Item {
     required this.itemCode,
     required this.itemName,
     this.manufacturerName,
+    this.companyId,
+    this.companyIsActive = true,
     this.description,
     this.category,
     this.rackNo,
@@ -56,6 +58,8 @@ class Item {
     itemCode: asString(json['item_code']) ?? '',
     itemName: asString(json['item_name']) ?? '',
     manufacturerName: asString(json['manufacturer_name']),
+    companyId: asInt(json['company_id']),
+    companyIsActive: asBool(json['company_is_active'], fallback: true),
     description: asString(json['description']),
     category: asString(json['category']),
     rackNo: asString(json['rack_no']),
@@ -92,6 +96,8 @@ class Item {
   final String itemCode;
   final String itemName;
   final String? manufacturerName;
+  final int? companyId;
+  final bool companyIsActive;
   final String? description;
   final String? category;
   final String? rackNo;
@@ -126,6 +132,8 @@ class Item {
     'item_code': itemCode,
     'item_name': itemName,
     if (manufacturerName != null) 'manufacturer_name': manufacturerName,
+    if (companyId != null) 'company_id': companyId,
+    'company_is_active': companyIsActive ? 1 : 0,
     if (description != null) 'description': description,
     if (category != null) 'category': category,
     if (rackNo != null) 'rack_no': rackNo,
@@ -153,4 +161,25 @@ class Item {
     if (createdAt != null) 'created_at': createdAt,
     if (updatedAt != null) 'updated_at': updatedAt,
   };
+}
+
+class ItemCompany {
+  const ItemCompany({
+    required this.id,
+    required this.name,
+    this.isActive = true,
+    this.productCount = 0,
+  });
+
+  factory ItemCompany.fromJson(Map<String, dynamic> json) => ItemCompany(
+    id: asInt(json['id']) ?? 0,
+    name: asString(json['company_name']) ?? '',
+    isActive: asBool(json['is_active'], fallback: true),
+    productCount: asInt(json['product_count']) ?? 0,
+  );
+
+  final int id;
+  final String name;
+  final bool isActive;
+  final int productCount;
 }
