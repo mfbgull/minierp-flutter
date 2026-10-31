@@ -82,17 +82,29 @@ describe('dashboardController.getKPIBatch', () => {
     expect(spy).not.toHaveBeenCalled();
   });
 
-  it('caps a batch at twelve metrics', async () => {
+  it('caps a batch at MAX_KPI_METRICS (32)', async () => {
     const spy = jest.spyOn(DashboardModel, 'getKPI').mockReturnValue(kpi(1));
-    const metrics = Array.from({ length: 14 }, (_, index) => `m${index}`);
+    const metrics = Array.from({ length: 40 }, (_, index) => `m${index}`);
 
     const res = await get({ metrics: metrics.join(',') });
 
     expect(res.status).toBe(200);
-    expect(spy).toHaveBeenCalledTimes(12);
-    expect(Object.keys(res.body.data)).toHaveLength(12);
-    expect(res.body.data).not.toHaveProperty('m12');
-    expect(res.body.data).not.toHaveProperty('m13');
+    expect(spy).toHaveBeenCalledTimes(32);
+    expect(Object.keys(res.body.data)).toHaveLength(32);
+    expect(res.body.data).not.toHaveProperty('m32');
+    expect(res.body.data).not.toHaveProperty('m39');
+  });
+
+  it('returns every catalog metric (17) without truncation', async () => {
+    // Regression for the 12-cap: the client's 17-card catalog must all
+    // survive the batch cap — see MAX_KPI_METRICS in dashboardController.
+    const spy = jest.spyOn(DashboardModel, 'getKPI').mockReturnValue(kpi(1));
+    const metrics = Array.from({ length: 17 }, (_, index) => `m${index}`);
+
+    const res = await get({ metrics: metrics.join(',') });
+
+    expect(res.status).toBe(200);
+    expect(Object.keys(res.body.data)).toHaveLength(17);
   });
 
   it('returns null for a metric that throws without failing the batch', async () => {
