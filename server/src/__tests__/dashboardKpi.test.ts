@@ -61,6 +61,14 @@ beforeEach(() => {
       status       TEXT,
       total_amount REAL DEFAULT 0
     );
+    -- Direct purchases (the Purchases module) — the source for the
+    -- 'purchases' KPI card: goods actually bought, voided ones excluded.
+    CREATE TABLE purchases (
+      id            INTEGER PRIMARY KEY,
+      purchase_date TEXT,
+      total_cost    REAL DEFAULT 0,
+      voided_at     TEXT
+    );
     CREATE TABLE expenses (
       id            INTEGER PRIMARY KEY,
       expense_no    TEXT,
@@ -185,6 +193,17 @@ function seedPurchaseOrder(
   ).run(`PO-${Date.now()}-${Math.random()}`, date, status, amount);
 }
 
+function seedPurchase(
+  date: string,
+  amount: number,
+  voidedAt: string | null = null,
+): void {
+  db.prepare(
+    `INSERT INTO purchases (purchase_date, total_cost, voided_at)
+     VALUES (?, ?, ?)`,
+  ).run(date, amount, voidedAt);
+}
+
 /** Account ids seeded by the deterministic chart in beforeEach. */
 const GL = { cash: 1, inventory: 2, revenue: 3, cogs: 4, opex: 5 } as const;
 
@@ -260,6 +279,19 @@ describe('dashboard /kpi core metrics (Phase 1)', () => {
 
     const jan = DashboardModel.getKPI(db, 'purchase_orders', '2026-01-01', '2026-01-31');
     expect(jan.value).toBe(5000 + 2500); // 7500
+  });
+
+  test('purchases sums direct purchases within the range, voided excluded', () => {
+    seedPurchase('2026-01-05', 3000);
+    seedPurchase('2026-01-25', 1500);
+    seedPurchase('2026-01-30', 500, '2026-01-31'); // voided — excluded
+    seedPurchase('2026-02-10', 800); // outside the window
+
+    const jan = DashboardModel.getKPI(db, 'purchases', '2026-01-01', '2026-01-31');
+    expect(jan.value).toBe(3000 + 1500); // 4500
+
+    const all = DashboardModel.getKPI(db, 'purchases');
+    expect(all.value).toBe(3000 + 1500 + 800); // voided still excluded
   });
 
   test('warehouse_stock counts positive stock_balances rows', () => {

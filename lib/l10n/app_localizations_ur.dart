@@ -489,6 +489,13 @@ class AppLocalizationsUr extends AppLocalizations {
   String get dashboardcardPurchases => 'پی او';
 
   @override
+  String get dashboardcardPurchasesTotal => 'خریداری';
+
+  @override
+  String get dashboardPurchasesHint =>
+      'منتخب تاریخ کی حد میں براہِ راست خریداری کی کل مالیت';
+
+  @override
   String get dashboardcardWarehousestock => 'ڈبلیو ایچ اسٹاک';
 
   @override
@@ -4403,7 +4410,7 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get dashboardPurchaseOrdersHint =>
-      'منتخب تاریخ کی حد میں کی گئی کل خریداری';
+      'منتخب تاریخ کی حد میں کل خرید کے آرڈرز کی مالیت';
 
   @override
   String get dashboardRecentproductions => 'حالیہ پروڈکشنز';

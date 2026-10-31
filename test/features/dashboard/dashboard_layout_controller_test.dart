@@ -46,7 +46,7 @@ ResponseBody _json(Object body, {int status = 200}) =>
     );
 
 /// Total catalog size: 16 KPI cards + 6 panels + 1 cash strip.
-const int _totalBlocks = 25;
+const int _totalBlocks = 26;
 
 void main() {
   late RouteHandler handler;
@@ -78,7 +78,7 @@ void main() {
   ];
 
   group('curated default (no saved layout)', () {
-    test('shows 4 KPI cards + 3 panels + cash strip, everything else off', () async {
+    test('shows 5 KPI cards + 3 panels + cash strip, everything else off', () async {
       await settle();
       expect(
         visibleIds(),
@@ -87,6 +87,7 @@ void main() {
           'kpi_sales_revenue',
           'kpi_gross_profit',
           'kpi_purchase_orders',
+          'kpi_purchases',
           'panel_sales_purchases',
           'panel_ar_aging',
           'panel_low_stock',
@@ -181,8 +182,8 @@ void main() {
   group('KPI strip reorder', () {
     test('reorders visible KPI cards while hidden cards + panels stay put', () async {
       await settle();
-      // Default: 4 visible KPI cards in catalog order. Move the last
-      // visible (PO's) to the front.
+      // Default: 5 visible KPI cards in catalog order. Move PO's (4th
+      // visible) to the front.
       controller.reorder(3, 0);
       final visible = [
         for (final b in controller.state.blocks)
@@ -190,7 +191,7 @@ void main() {
       ];
       expect(
         visible,
-        ['kpi_purchase_orders', 'kpi_stock_value', 'kpi_sales_revenue', 'kpi_gross_profit'],
+        ['kpi_purchase_orders', 'kpi_stock_value', 'kpi_sales_revenue', 'kpi_gross_profit', 'kpi_purchases'],
       );
       // Hidden KPI cards keep their positions in the full list.
       expect(
@@ -214,8 +215,8 @@ void main() {
           'kpi_outstanding_loans',
         ],
       );
-      // Panels unaffected (first panel now sits after the 17 KPI cards).
-      expect(controller.state.blocks[17].id, 'panel_sales_purchases');
+      // Panels unaffected (first panel now sits after the 18 KPI cards).
+      expect(controller.state.blocks[18].id, 'panel_sales_purchases');
       expect(controller.state.dirty, isTrue);
     });
   });
@@ -306,7 +307,7 @@ void main() {
       await settle();
       // All KPI cards in catalog order; move the hidden AR card to the
       // front of the full list (visible strip order follows).
-      controller.reorderDialogKpis(6, 0);
+      controller.reorderDialogKpis(7, 0);
       final kpis = [
         for (final b in controller.state.blocks)
           if (b.id.startsWith('kpi_')) b.id,
@@ -432,6 +433,7 @@ void main() {
           'kpi_sales_revenue',
           'kpi_gross_profit',
           'kpi_purchase_orders',
+          'kpi_purchases',
           'panel_sales_purchases',
           'panel_ar_aging',
           'panel_low_stock',

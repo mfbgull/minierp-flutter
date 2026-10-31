@@ -962,6 +962,18 @@ abstract class AppLocalizations {
   /// **'PO\'s'**
   String get dashboardcardPurchases;
 
+  /// No description provided for @dashboardcardPurchasesTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchases'**
+  String get dashboardcardPurchasesTotal;
+
+  /// No description provided for @dashboardPurchasesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Total value of direct purchases in the selected date range'**
+  String get dashboardPurchasesHint;
+
   /// No description provided for @dashboardcardWarehousestock.
   ///
   /// In en, this message translates to:
@@ -8591,7 +8603,7 @@ abstract class AppLocalizations {
   /// No description provided for @dashboardPurchaseOrdersHint.
   ///
   /// In en, this message translates to:
-  /// **'Total value of purchases in the selected date range'**
+  /// **'Total value of purchase orders in the selected date range'**
   String get dashboardPurchaseOrdersHint;
 
   /// No description provided for @dashboardRecentproductions.

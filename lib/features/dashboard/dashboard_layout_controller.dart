@@ -121,7 +121,7 @@ class DashboardLayoutController
   /// must not clobber the user's live customizer edits.
   bool _loaded = false;
 
-  /// The curated default layout (§3) — 4 KPI cards + 3 panels + the
+  /// The curated default layout (§3) — 5 KPI cards + 3 panels + the
   /// cash strip visible, everything else available but off.
   static List<DashboardBlock> _curatedDefault() => [
     // KPI cards first (catalog/dialog order).
