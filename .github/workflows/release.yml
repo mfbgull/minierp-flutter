@@ -362,7 +362,7 @@ jobs:
           #define MyAppVersion "__VERSION__"
           #define MyAppExeName "minierp_app.exe"
           [Setup]
-          AppId=com.example.minierpApp
+          AppId=com.example.minierp
           AppName={#MyAppName}
           AppVersion={#MyAppVersion}
           AppVerName={#MyAppName} {#MyAppVersion}
