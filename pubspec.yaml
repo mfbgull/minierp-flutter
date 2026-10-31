@@ -42,6 +42,11 @@ dependencies:
   path: ^1.9.1
   flutter_secure_storage: ^10.3.1
   shared_preferences: ^2.5.5
+  # Direct deps used to relocate the Linux shared-preferences store into
+  # ~/.local/share/minierp (see lib/core/app_support_paths.dart).
+  shared_preferences_linux: ^2.4.1
+  shared_preferences_platform_interface: ^2.4.2
+  path_provider_linux: ^2.2.2
   fl_chart: ^1.2.0
   pluto_grid: ^8.1.0
   pdf: ^3.13.0
