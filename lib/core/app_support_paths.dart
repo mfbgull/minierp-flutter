@@ -20,7 +20,16 @@ import 'package:shared_preferences_platform_interface/shared_preferences_platfor
 class AppSupportPaths {
   const AppSupportPaths._();
 
-  static const String _legacyAppId = 'com.example.minierp_app';
+  /// Application ids whose plugin-default preferences folders are migrated
+  /// in on boot:
+  ///   - com.example.minierp_app: id of every install up to v0.2.0-alpha.1;
+  ///   - com.example.minierp: the renamed id; harmless belt-and-braces in
+  ///     case prefs ever land in its plugin-default folder.
+  static const List<String> _legacyAppIds = <String>[
+    'com.example.minierp_app',
+    'com.example.minierp',
+  ];
+
   static const String _prefsFileName = 'shared_preferences.json';
 
   /// XDG user data home: `$XDG_DATA_HOME` or `~/.local/share`.
@@ -43,9 +52,14 @@ class AppSupportPaths {
       p.join(baseDir(environment), _prefsFileName);
 
   /// Where shared_preferences stored the file before the override
-  /// (`<data home>/<application id>/shared_preferences.json`).
-  static String legacyPreferencesFile(Map<String, String> environment) =>
-      p.join(dataHome(environment), _legacyAppId, _prefsFileName);
+  /// (`<data home>/<application id>/shared_preferences.json`), one legacy
+  /// candidate per id in [_legacyAppIds], newest-install order first so the
+  /// first candidate seeds the target when several exist.
+  static List<String> legacyPreferencesFiles(Map<String, String> environment) =>
+      [
+        for (final id in _legacyAppIds)
+          p.join(dataHome(environment), id, _prefsFileName),
+      ];
 
   /// Moves the legacy app-id preferences file into the minierp folder.
   ///
@@ -60,7 +74,12 @@ class AppSupportPaths {
   ///     so unrelated files are never touched.
   static void migratePreferences({Map<String, String>? environment}) {
     final env = environment ?? Platform.environment;
-    final legacy = File(legacyPreferencesFile(env));
+    for (final path in legacyPreferencesFiles(env)) {
+      _migrateLegacyFile(env, File(path));
+    }
+  }
+
+  static void _migrateLegacyFile(Map<String, String> env, File legacy) {
     if (!legacy.existsSync()) return;
 
     try {

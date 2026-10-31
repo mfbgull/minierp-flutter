@@ -10,8 +10,8 @@ import 'features/preferences/preference_providers.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Linux only: point the shared_preferences store at ~/.local/share/minierp
-  // and migrate the legacy com.example.minierp_app file (docs/bugs.md
-  // BUG-009). Both must run before the first SharedPreferences access — the
+  // and migrate the legacy id folders (com.example.minierp_app from old
+  // installs, com.example.minierp from the id rename — docs/bugs.md BUG-009). Both must run before the first SharedPreferences access — the
   // PreferencesCache.load below is that first access.
   if (Platform.isLinux) {
     AppSupportPaths.installPreferencesOverride();

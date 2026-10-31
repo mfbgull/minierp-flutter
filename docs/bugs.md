@@ -454,11 +454,19 @@ Two unrelated looks, one shared cause:
 - `lib/core/app_support_paths.dart` (new): on Linux, the shared_preferences
   store is relocated to `~/.local/share/minierp/shared_preferences.json`
   (`AppSupportPaths.installPreferencesOverride`, wired in `main.dart` before
-  the first preferences access), and the legacy
-  `com.example.minierp_app/shared_preferences.json` is migrated in on boot
-  and removed (`AppSupportPaths.migratePreferences`, idempotent, leaves the
-  legacy folder untouched when it still holds unrelated files).
+  the first preferences access), and the legacy app-id folders
+  (`com.example.minierp_app` from old installs, `com.example.minierp` from
+  the id rename below) are migrated in on boot and removed
+  (`AppSupportPaths.migratePreferences`, idempotent, leaves the legacy
+  folder untouched when it still holds unrelated files).
 - Windows/macOS keep their platform-default preferences location.
+- Renamed the Linux application id to `com.example.minierp`
+  (`linux/CMakeLists.txt`) and the .desktop files built by release.yml
+  after it; the deb package, executable name, and install paths are
+  unchanged, so upgrades replace the package cleanly (dpkg removes the
+  retired `com.example.minierp_app.desktop` when the package updates).
+- Set the GTK window/header title to "MiniERP" in
+  `linux/runner/my_application.cc` (the bare "minierp_app" titlebar text).
 
 ### Verification
 
