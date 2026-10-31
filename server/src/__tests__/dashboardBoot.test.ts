@@ -69,6 +69,42 @@ describe('GET /api/dashboard/boot (composite boot payload, spec 7.1)', () => {
     expect(data.topCustomers).toEqual([]);
   });
 
+  // Regression: the client's KPI card catalog has 17 metrics and the boot
+  // request sends ALL of them. The batch cap (was 12) silently dropped the
+  // last 5 → their cards rendered '—' forever. Every requested metric must
+  // come back with a key, even if its value is null (degraded metric).
+  // Names mirror lib/features/dashboard/dashboard_kpi_catalog.dart.
+  const ALL_CATALOG_METRICS = [
+    'total_active_items',
+    'stock_value',
+    'sales_revenue',
+    'gross_profit',
+    'purchase_orders',
+    'warehouse_stock',
+    'outstanding_receivables',
+    'inventory_turnover',
+    'avg_days_to_pay',
+    'stock_health',
+    'monthly_revenue',
+    'net_profit',
+    'expenses',
+    'outstanding_payables',
+    'total_customers',
+    'low_stock_count',
+    'outstanding_loans',
+  ];
+
+  it('returns a key for every requested catalog metric (all 17 fit the batch cap)', async () => {
+    const res = await request(app)
+      .get('/api/dashboard/boot')
+      .query({ metrics: ALL_CATALOG_METRICS.join(',') })
+      .set('Cookie', authCookie);
+    expect(res.status).toBe(200);
+
+    const kpis = res.body.data.kpis as Record<string, unknown>;
+    expect(Object.keys(kpis).sort()).toEqual([...ALL_CATALOG_METRICS].sort());
+  });
+
   it('resolves the requested KPI metrics and honours the date range', async () => {
     const res = await request(app)
       .get('/api/dashboard/boot')

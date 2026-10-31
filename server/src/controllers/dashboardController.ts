@@ -14,6 +14,14 @@ import {
   syncOpeningBalancesToGl,
 } from '../services/cashService';
 
+/** Upper bound on metrics per batched KPI request (`/kpi-batch` and
+ * `/boot`). The client's KPI card catalog
+ * (lib/features/dashboard/dashboard_kpi_catalog.dart) currently holds
+ * 17 metrics and the boot request sends all of them — a tighter cap
+ * silently dropped the tail cards ('—'). 32 leaves headroom for new
+ * cards; it is a request-size guard, not a business limit. */
+const MAX_KPI_METRICS = 32;
+
 // ═══════════════════════════════════════════════════════════════
 //  EXISTING
 // ═══════════════════════════════════════════════════════════════
@@ -141,7 +149,7 @@ function getKPI(req: AuthRequest, res: Response): void {
 function getKPIBatch(req: AuthRequest, res: Response): void {
   try {
     const raw = String(req.query.metrics || '');
-    const metrics = raw.split(',').map(s => s.trim()).filter(Boolean).slice(0, 12);
+    const metrics = raw.split(',').map(s => s.trim()).filter(Boolean).slice(0, MAX_KPI_METRICS);
     const fromDate = String(getQueryParam(req.query.fromDate) || '') || undefined;
     const toDate = String(getQueryParam(req.query.toDate) || '') || undefined;
 
@@ -219,7 +227,7 @@ function getBoot(req: AuthRequest, res: Response): void {
     const fromDate = String((req.query.fromDate as string) || (req.query.from_date as string) || '') || undefined;
     const toDate = String((req.query.toDate as string) || (req.query.to_date as string) || '') || undefined;
     const rawMetrics = String(req.query.metrics || '');
-    const metrics = rawMetrics.split(',').map(s => s.trim()).filter(Boolean).slice(0, 12);
+    const metrics = rawMetrics.split(',').map(s => s.trim()).filter(Boolean).slice(0, MAX_KPI_METRICS);
 
     const kpis: Record<string, unknown> = {};
     for (const metric of metrics) {
