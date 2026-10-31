@@ -6,8 +6,8 @@
 //
 // The catalog drives both the KPI strip (visible cards, in layout
 // order) and the customizer dialog (all cards, searchable). The
-// curated default (§3) shows Stock Value · Sales Revenue · Gross
-// Profit · PO's — the four cards below with `defaultVisible: true`.
+// curated default (§3) shows Stock Value · Sales Revenue · Gross Profit ·
+// PO's · Purchases — the five cards below with `defaultVisible: true`.
 
 import 'package:flutter/material.dart';
 
@@ -51,7 +51,7 @@ class KpiCardDefinition {
   final String? hintKey;
 }
 
-/// All 11 configurable KPI cards — catalog order is the dialog order
+/// All 17 configurable KPI cards — catalog order is the dialog order
 /// and the fallback strip order when a user's layout doesn't specify one.
 const List<KpiCardDefinition> kpiCardCatalog = [
   KpiCardDefinition(
@@ -93,6 +93,15 @@ const List<KpiCardDefinition> kpiCardCatalog = [
     format: KpiCardFormat.currency,
     defaultVisible: true,
     hintKey: 'dashboardPurchaseOrdersHint',
+  ),
+  KpiCardDefinition(
+    id: 'kpi_purchases',
+    metric: 'purchases',
+    labelKey: 'dashboardcardPurchasesTotal',
+    icon: Icons.local_shipping_outlined,
+    format: KpiCardFormat.currency,
+    defaultVisible: true,
+    hintKey: 'dashboardPurchasesHint',
   ),
   KpiCardDefinition(
     id: 'kpi_wh_stock',
@@ -206,6 +215,8 @@ String kpiCardLabel(AppLocalizations l10n, String labelKey) {
       return l10n.dashboardcardGrossprofit;
     case 'dashboardcardPurchases':
       return l10n.dashboardcardPurchases;
+    case 'dashboardcardPurchasesTotal':
+      return l10n.dashboardcardPurchasesTotal;
     case 'dashboardcardWarehousestock':
       return l10n.dashboardcardWarehousestock;
     case 'dashboardcardAr':
@@ -241,6 +252,8 @@ String? kpiCardHint(AppLocalizations l10n, String? hintKey) {
   switch (hintKey) {
     case 'dashboardPurchaseOrdersHint':
       return l10n.dashboardPurchaseOrdersHint;
+    case 'dashboardPurchasesHint':
+      return l10n.dashboardPurchasesHint;
     case 'dashboardArHint':
       return l10n.dashboardArHint;
     case 'dashboardOutstandingloansHint':

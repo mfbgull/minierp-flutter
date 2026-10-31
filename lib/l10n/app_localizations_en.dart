@@ -490,6 +490,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dashboardcardPurchases => 'PO\'s';
 
   @override
+  String get dashboardcardPurchasesTotal => 'Purchases';
+
+  @override
+  String get dashboardPurchasesHint =>
+      'Total value of direct purchases in the selected date range';
+
+  @override
   String get dashboardcardWarehousestock => 'W.H Stock';
 
   @override
@@ -4404,7 +4411,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dashboardPurchaseOrdersHint =>
-      'Total value of purchases in the selected date range';
+      'Total value of purchase orders in the selected date range';
 
   @override
   String get dashboardRecentproductions => 'Recent Productions';

@@ -1057,6 +1057,7 @@ class _AuthFakeAdapter implements HttpClientAdapter {
     'sales_revenue': 890000.00,
     'gross_profit': 330000.00,
     'purchase_orders': 560000.00,
+    'purchases': 480000.00,
     'warehouse_stock': 312,
     'outstanding_receivables': 420000.00,
     'inventory_turnover': 2.5,
@@ -4961,7 +4962,7 @@ class _AuthFakeAdapter implements HttpClientAdapter {
     }
     if (options.path == '/dashboard/layout/active' && noDashboardLayout) {
       // No saved layout (404) → the dashboard renders the curated
-      // default (4 KPI cards + 3 panels + cash strip).
+      // default (5 KPI cards + 3 panels + cash strip).
       return _json({'success': true, 'data': null}, status: 404);
     }
     if (options.path == '/dashboard/layout/active') {
@@ -6791,12 +6792,13 @@ void main() {
     final adapter = _AuthFakeAdapter()..noDashboardLayout = true;
     await bootDashboard(tester, adapter);
 
-    // Curated default (§3): 4 KPI cards + 3 panels + cash strip — and
+    // Curated default (§3): 5 KPI cards + 3 panels + cash strip — and
     // the off-by-default cards (Total Items, W.H Stock, AR) absent.
     expect(find.text('Rs. 245,000.50'), findsOneWidget); // Stock Value
     expect(find.text('Rs. 890,000.00'), findsOneWidget); // Sales Revenue
     expect(find.text('Rs. 330,000.00'), findsOneWidget); // Gross Profit
     expect(find.text('Rs. 560,000.00'), findsOneWidget); // PO's
+    expect(find.text('Rs. 480,000.00'), findsOneWidget); // Purchases (new default card)
     expect(find.text('Total Items'), findsNothing);
     expect(find.text('W.H Stock'), findsNothing);
     // AR KPI card off by default → its 420,000.00 only appears once,

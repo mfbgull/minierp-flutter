@@ -513,6 +513,17 @@ function getKPI(
         return { metric, value: result.total, unit: 'currency', label: 'Purchase Orders' };
       }
 
+      // Direct purchases (the Purchases module) — goods actually bought,
+      // not approved PO commitments. Mirrors the purchase summary report:
+      // voided records are money that never moved, so they are excluded.
+      case 'purchases': {
+        const result = db.prepare(`
+          SELECT COALESCE(SUM(total_cost), 0) as total FROM purchases
+          WHERE voided_at IS NULL AND purchase_date BETWEEN ? AND ?
+        `).get(from, to) as { total: number };
+        return { metric, value: result.total, unit: 'currency', label: 'Purchases' };
+      }
+
 
       case 'expenses': {
         const report = ReportsModel.getProfitLossReport(from, to, db);
