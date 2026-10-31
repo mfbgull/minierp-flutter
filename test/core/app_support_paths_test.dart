@@ -71,6 +71,44 @@ void main() {
       expect(Directory(legacyDir).existsSync(), isFalse);
     });
 
+    test('migrates the com.example.minierp id folder as well', () {
+      final home = _tempDataHome();
+      final legacyDir = p.join(home.path, 'com.example.minierp');
+      final legacy = File(p.join(legacyDir, 'shared_preferences.json'));
+      legacy.parent.createSync(recursive: true);
+      legacy.writeAsStringSync('{"flutter.theme_name":"dark"}');
+
+      AppSupportPaths.migratePreferences(environment: _env(home));
+
+      final moved =
+          File(p.join(home.path, 'minierp', 'shared_preferences.json'));
+      expect(moved.existsSync(), isTrue);
+      expect(moved.readAsStringSync(), '{"flutter.theme_name":"dark"}');
+      expect(legacy.existsSync(), isFalse);
+      expect(Directory(legacyDir).existsSync(), isFalse);
+    });
+
+    test('migrates when both legacy id folders exist', () {
+      final home = _tempDataHome();
+      final oldDir = p.join(home.path, 'com.example.minierp_app');
+      File(p.join(oldDir, 'shared_preferences.json'))
+          ..parent.createSync(recursive: true)
+          ..writeAsStringSync('{"flutter.theme_name":"dark"}');
+      final newIdDir = p.join(home.path, 'com.example.minierp');
+      File(p.join(newIdDir, 'shared_preferences.json'))
+          ..parent.createSync(recursive: true)
+          ..writeAsStringSync('{"flutter.stale":"new-id-default"}');
+
+      AppSupportPaths.migratePreferences(environment: _env(home));
+
+      final moved =
+          File(p.join(home.path, 'minierp', 'shared_preferences.json'));
+      expect(moved.existsSync(), isTrue);
+      expect(moved.readAsStringSync(), '{"flutter.theme_name":"dark"}');
+      expect(Directory(oldDir).existsSync(), isFalse);
+      expect(Directory(newIdDir).existsSync(), isFalse);
+    });
+
     test('removes a stale legacy file when the minierp file already exists',
         () {
       final home = _tempDataHome();

@@ -164,7 +164,7 @@ jobs:
           cp -a build/server-payload pkg/usr/lib/minierp_app/server
           ln -sf ../lib/minierp_app/minierp_app pkg/usr/bin/minierp_app
           install -m 644 macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_512.png pkg/usr/share/icons/hicolor/512x512/apps/minierp_app.png
-          cat > pkg/usr/share/applications/com.example.minierp_app.desktop <<'EOF'
+          cat > pkg/usr/share/applications/com.example.minierp.desktop <<'EOF'
           [Desktop Entry]
           Type=Application
           Name=MiniERP
@@ -204,7 +204,7 @@ jobs:
           sudo apt-get install -y "./$DEB"
           dpkg -s minierp-app | grep -q 'Status: install ok installed'
           test -x /usr/bin/minierp_app
-          test -f /usr/share/applications/com.example.minierp_app.desktop
+          test -f /usr/share/applications/com.example.minierp.desktop
           test -f /usr/share/icons/hicolor/512x512/apps/minierp_app.png
           test -f /usr/lib/minierp_app/server/dist/server.js
           test -x /usr/lib/minierp_app/server/runtime/node
@@ -230,7 +230,7 @@ jobs:
           chmod +x AppDir/usr/bin/minierp_app
           install -m 644 macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_512.png AppDir/usr/share/icons/hicolor/512x512/apps/minierp_app.png
           cp macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_512.png AppDir/minierp_app.png
-          cat > AppDir/com.example.minierp_app.desktop <<'EOF'
+          cat > AppDir/com.example.minierp.desktop <<'EOF'
           [Desktop Entry]
           Type=Application
           Name=MiniERP
