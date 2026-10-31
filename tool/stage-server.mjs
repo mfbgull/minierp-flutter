@@ -227,9 +227,12 @@ async function main() {
 
   copyDist(path.resolve(args.dist), outDir);
   copyPackageFiles(outDir);
-  for (const dir of ['database', 'uploads', 'logs']) {
-    fs.mkdirSync(path.join(outDir, dir), { recursive: true });
-  }
+  // Runtime data directories (database, uploads, logs) are deliberately NOT
+  // created here: the client always launches the server with
+  // DATABASE_PATH/UPLOADS_DIR/JWT state in the per-user data directory
+  // (BackendPaths.resolveDataDir), so payload fallback dirs would be inert —
+  // and shipped empty shells invited readers to think the package carried
+  // data (docs/bugs.md BUG-009).
 
   if (!args.skipNpm) installProductionDeps(outDir);
   if (!args.skipNpm) pruneBcryptPrebuilds(outDir);

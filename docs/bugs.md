@@ -415,6 +415,62 @@ coverage, then the same audit command passed with fresh measured coverage.
 
 ---
 
+## BUG-009 · First-run confusion: shipped server shells and an app-id
+## preferences folder that looked like lost data
+
+**Status:** `FIXED` — `tool/stage-server.mjs`, `lib/core/app_support_paths.dart`, `lib/main.dart`
+**Found:** 2026-10-30 · **Severity:** low (operator confusion, no data loss)
+
+### Symptom
+
+After installing v0.2.0-alpha.1 (.deb / AppImage), an empty `database/`,
+`uploads/`, `logs/` tree sat inside the packaged server folder, and a second
+install folder `~/.local/share/com.example.minierp_app` appeared next to the
+real data home `~/.local/share/minierp`. Together this suggested the package
+was carrying its own data (or that the app's data was split/scattered), and an
+existing `erp.db` could easily be mistaken for stray "dummy data" that a
+fresh install had failed to clear.
+
+### Root cause
+
+Two unrelated looks, one shared cause:
+
+1. `tool/stage-server.mjs` created `server/{database,uploads,logs}` in the
+   payload on every release build. The client always launches the bundled
+   server with `DATABASE_PATH`/`UPLOADS_DIR`/JWT state pointed at the per-user
+   data directory (`BackendPaths.resolveDataDir` →
+   `~/.local/share/minierp/data`), so the shipped shells were never read or
+   written — they were dead weight that invited the wrong inference.
+2. `shared_preferences` on Linux derives its storage folder from the
+   application id (`path_provider_linux` → `<data home>/com.example.minierp_app`),
+   so the preferences file lived in a second `~/.local/share` folder named
+   after the build id, disconnected from the minierp data family.
+
+### Fix
+
+- Release payloads now stage only `dist/`, `package.json`, and
+  `package-lock.json`; the runtime data folders are created by the client
+  under the per-user data directory, as they always were.
+- `lib/core/app_support_paths.dart` (new): on Linux, the shared_preferences
+  store is relocated to `~/.local/share/minierp/shared_preferences.json`
+  (`AppSupportPaths.installPreferencesOverride`, wired in `main.dart` before
+  the first preferences access), and the legacy
+  `com.example.minierp_app/shared_preferences.json` is migrated in on boot
+  and removed (`AppSupportPaths.migratePreferences`, idempotent, leaves the
+  legacy folder untouched when it still holds unrelated files).
+- Windows/macOS keep their platform-default preferences location.
+
+### Verification
+
+- Staging a payload with `node tool/stage-server.mjs --skip-npm --skip-runtime`
+  yields no data-shell directories.
+- `test/core/app_support_paths_test.dart` (red first, then green): path
+  resolution, migration cases (move / stale legacy / unrelated files /
+  idempotency), and an end-to-end store write landing in a fake XDG data home.
+- `flutter analyze` clean; `flutter test test/core/` green.
+
+---
+
 ## Not bugs — deliberate decisions, recorded so they are not re-litigated
 
 - **PUR-016** — the two live `PURCHASE_ORDER` commitment rows (3,000 supplier 1 /
