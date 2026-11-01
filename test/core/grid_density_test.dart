@@ -52,7 +52,7 @@ void main() {
     expect(standard.style.rowHeight, GridDensity.standard.rowHeight);
   });
 
-  testWidgets('column resize affordance is visible', (tester) async {
+  testWidgets('column resize affordance draws no glyph', (tester) async {
     late PlutoGridConfiguration config;
 
     await tester.pumpWidget(
@@ -67,6 +67,8 @@ void main() {
       ),
     );
 
-    expect(config.style.columnResizeIcon, Icons.swap_horiz);
+    // Blank space glyph: nothing is painted, but Icon still reserves its box
+    // so PlutoGrid's resize listener keeps its hit area and drag cursor.
+    expect(config.style.columnResizeIcon, const IconData(0x20));
   });
 }

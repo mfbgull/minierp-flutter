@@ -247,9 +247,10 @@ PlutoGridConfiguration plutoGridConfigurationFor(
       activatedBorderColor: scheme.primary,
       inactivatedBorderColor: scheme.outlineVariant,
       iconColor: scheme.onSurfaceVariant,
-      // Visible resize affordance on each resizable header. The icon keeps
-      // PlutoGrid's resize hit box and drag gesture.
-      columnResizeIcon: Icons.swap_horiz,
+      // Header resize handle: PlutoGrid always paints this icon and non-null
+      // `columnResizeIcon` forces a glyph. Blank space paints nothing, and
+      // Icon still reserves its box, so the resize drag area is kept.
+      columnResizeIcon: const IconData(0x20),
       disabledIconColor: scheme.onSurface.withValues(alpha: 0.12),
       iconSize: density == GridDensity.compact ? 16 : 18,
       rowHeight: density.rowHeight,
