@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
@@ -127,6 +128,24 @@ void _defaultKill(int pidValue, {bool force = false}) {
   }
 }
 
+/// True when a `/proc/<pid>/stat` line describes a **zombie** process.
+///
+/// A zombie has exited but its parent has not reaped it yet, so it still
+/// answers `kill -0`. It cannot own a server or a lock, though: treating one
+/// as alive makes every later launch report "another instance is running" and
+/// never start the backend.
+///
+/// The second field is the executable name in parentheses and may itself
+/// contain spaces or parentheses, so the state character is read after the
+/// **last** `)` — the only unambiguous separator in the line.
+@visibleForTesting
+bool isZombieProcStat(String stat) {
+  final close = stat.lastIndexOf(')');
+  if (close < 0 || close + 1 >= stat.length) return false;
+  final rest = stat.substring(close + 1).trimLeft();
+  return rest.isNotEmpty && rest[0] == 'Z';
+}
+
 /// Cross-platform "is this pid alive" without sending a signal.
 bool _defaultPidCheck(int pidValue) {
   if (pidValue <= 0) return false;
@@ -139,7 +158,17 @@ bool _defaultPidCheck(int pidValue) {
       ]);
       return result.exitCode == 0 && '${result.stdout}'.contains('$pidValue');
     }
-    return Process.runSync('kill', ['-0', '$pidValue']).exitCode == 0;
+    if (Process.runSync('kill', ['-0', '$pidValue']).exitCode != 0) {
+      return false;
+    }
+    // `kill -0` says yes for a zombie. On Linux, read the real state and
+    // report a zombie as dead. Without procfs (other unix) keep the answer.
+    try {
+      final stat = File('/proc/$pidValue/stat').readAsStringSync();
+      return !isZombieProcStat(stat);
+    } on FileSystemException {
+      return true;
+    }
   } catch (_) {
     return false;
   }

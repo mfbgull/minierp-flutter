@@ -317,6 +317,60 @@ void main() {
     supervisor.dispose();
   });
 
+  // A crashed client leaves a zombie behind when its parent never reaps it
+  // (the desktop shell does not always). `kill -0` still succeeds for a
+  // zombie, so a lock naming one must be treated as stale — otherwise every
+  // later launch reports "alreadyRunning" and the server never starts.
+  group('zombie pids do not hold the instance lock', () {
+    test('reads the state field past a comm containing spaces and parens', () {
+      expect(
+        isZombieProcStat('130639 (minierp app (v2)) Z 1804 130639 130639 0 -1'),
+        isTrue,
+      );
+      expect(
+        isZombieProcStat('130639 (minierp_app) R 1804 130639 130639 0 -1'),
+        isFalse,
+      );
+    });
+
+    test('treats malformed stat content as alive, never as a zombie', () {
+      expect(isZombieProcStat(''), isFalse);
+      expect(isZombieProcStat('130639'), isFalse);
+      expect(isZombieProcStat('130639 (minierp_app)'), isFalse);
+    });
+
+    test('a lock naming a zombie is reclaimed, not reported as running', () async {
+      Directory(BackendPaths.databaseDir(dataDir)).createSync(recursive: true);
+      File(p.join(BackendPaths.databaseDir(dataDir), 'erp.db')).writeAsStringSync('');
+      File(BackendPaths.lockFile(dataDir)).writeAsStringSync('999');
+
+      var starts = 0;
+      final supervisor = buildSupervisor(
+        withDatabase: true,
+        // 999 answers `kill -0` (zombie) but is not a live owner.
+        pidCheck: (_) => false,
+        starter: ({
+          required executable,
+          required arguments,
+          required workingDirectory,
+          required environment,
+        }) async {
+          starts += 1;
+          return _FakeProcess(1);
+        },
+      );
+
+      await supervisor.initialize();
+      expect(
+        supervisor.state.message,
+        isNot('alreadyRunning'),
+        reason: 'a stale lock must be reclaimed so the server can start',
+      );
+      expect(starts, 1);
+      supervisor.dispose();
+    });
+  });
+
   test('refuses a data directory held by another live instance', () async {
     Directory(BackendPaths.databaseDir(dataDir)).createSync(recursive: true);
     File(p.join(BackendPaths.databaseDir(dataDir), 'erp.db')).writeAsStringSync('');

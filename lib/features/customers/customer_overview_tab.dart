@@ -1,9 +1,9 @@
 // Overview tab — web `OverviewTab` parity (customer-module-spec.md §6.4):
 // Financial Summary cards (Total Invoiced / Total Received / Outstanding /
-// Avg. Days to Pay), the Invoice Status breakdown (Paid / Pending / Overdue
-// / Total with proportional bars) and collapsible Contact Information +
-// Account Settings sections. All metrics come from the ported
-// `computeCustomerMetrics`.
+// Avg. Days to Pay) on top, then Invoice Status, Contact Information and
+// Account Settings side by side in three equal columns. Below 900px the
+// three sections stack, because a third of the width truncates the values.
+// All metrics come from the ported `computeCustomerMetrics`.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -157,20 +157,15 @@ class CustomerOverviewTab extends ConsumerWidget {
             ),
           ],
           const SizedBox(height: 20),
-          // Invoice Status — 4 tiles with proportional bars.
-          _sectionTitle(context, l10n.customersInvoicestatus),
-          const SizedBox(height: 8),
-          Card(
-            margin: EdgeInsets.zero,
-            elevation: 0,
-            color: scheme.surfaceContainerLow,
-            shape: RoundedRectangleBorder(
-              borderRadius: AppBorderRadius.mdRadius,
-              side: BorderSide(color: scheme.outlineVariant),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
+
+          // Three equal columns below the summary: Invoice Status, Contact
+          // Info, Account Settings. They stack on narrow windows so the
+          // label/value pairs keep their room.
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final status = _SectionCard(
+                icon: Icons.bar_chart_outlined,
+                title: l10n.customersInvoicestatus,
                 children: [
                   _StatusBar(
                     label: l10n.customersPaid,
@@ -200,64 +195,83 @@ class CustomerOverviewTab extends ConsumerWidget {
                     color: scheme.primary,
                   ),
                 ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          // Collapsible Contact Information.
-          _collapsible(
-            context,
-            icon: Icons.phone_outlined,
-            title: l10n.customersContactinfo,
-            children: [
-              _infoRow(context, l10n.fieldsPhone, customer.phone ?? '—'),
-              _infoRow(context, l10n.fieldsEmail, customer.email ?? '—'),
-              _infoRow(
-                context,
-                l10n.customersBillingaddress,
-                customer.billingAddress ?? '—',
-              ),
-              _infoRow(
-                context,
-                l10n.customersShippingaddress,
-                customer.shippingAddress ?? '—',
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // Collapsible Account Settings.
-          _collapsible(
-            context,
-            icon: Icons.tune_outlined,
-            title: l10n.customersAccountsettings,
-            children: [
-              _infoRow(
-                context,
-                l10n.customersPaymentterms,
-                customer.paymentTerms?.isNotEmpty == true
-                    ? customer.paymentTerms!
-                    : customer.paymentTermsDays != null
-                    ? l10n.customersDays(customer.paymentTermsDays!)
-                    : '—',
-              ),
-              _infoRow(
-                context,
-                l10n.customersCreditlimit,
-                Formatters.currency(customer.creditLimit ?? 0),
-              ),
-              _infoRow(
-                context,
-                l10n.customersOpeningbalance,
-                Formatters.currency(customer.openingBalance ?? 0),
-              ),
-              _infoRow(
-                context,
-                l10n.customersCustomersince,
-                customer.createdAt == null
-                    ? '—'
-                    : Formatters.date(customer.createdAt!),
-              ),
-            ],
+              );
+
+              final contact = _SectionCard(
+                icon: Icons.phone_outlined,
+                title: l10n.customersContactinfo,
+                children: [
+                  _infoRow(context, l10n.fieldsPhone, customer.phone ?? '—'),
+                  _infoRow(context, l10n.fieldsEmail, customer.email ?? '—'),
+                  _infoRow(
+                    context,
+                    l10n.customersBillingaddress,
+                    customer.billingAddress ?? '—',
+                  ),
+                  _infoRow(
+                    context,
+                    l10n.customersShippingaddress,
+                    customer.shippingAddress ?? '—',
+                  ),
+                ],
+              );
+
+              final account = _SectionCard(
+                icon: Icons.tune_outlined,
+                title: l10n.customersAccountsettings,
+                children: [
+                  _infoRow(
+                    context,
+                    l10n.customersPaymentterms,
+                    customer.paymentTerms?.isNotEmpty == true
+                        ? customer.paymentTerms!
+                        : customer.paymentTermsDays != null
+                        ? l10n.customersDays(customer.paymentTermsDays!)
+                        : '—',
+                  ),
+                  _infoRow(
+                    context,
+                    l10n.customersCreditlimit,
+                    Formatters.currency(customer.creditLimit ?? 0),
+                  ),
+                  _infoRow(
+                    context,
+                    l10n.customersOpeningbalance,
+                    Formatters.currency(customer.openingBalance ?? 0),
+                  ),
+                  _infoRow(
+                    context,
+                    l10n.customersCustomersince,
+                    customer.createdAt == null
+                        ? '—'
+                        : Formatters.date(customer.createdAt!),
+                  ),
+                ],
+              );
+
+              if (constraints.maxWidth < 900) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    status,
+                    const SizedBox(height: 12),
+                    contact,
+                    const SizedBox(height: 12),
+                    account,
+                  ],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: status),
+                  const SizedBox(width: 12),
+                  Expanded(child: contact),
+                  const SizedBox(width: 12),
+                  Expanded(child: account),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -272,30 +286,9 @@ class CustomerOverviewTab extends ConsumerWidget {
         ?.copyWith(fontWeight: FontWeight.w600),
   );
 
-  Widget _collapsible(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required List<Widget> children,
-  }) {
-    return Card(
-      margin: EdgeInsets.zero,
-      elevation: 0,
-      color: Theme.of(context).colorScheme.surfaceContainerLow,
-      shape: RoundedRectangleBorder(
-        borderRadius: AppBorderRadius.mdRadius,
-        side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: ExpansionTile(
-        leading: Icon(icon, size: 20),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        children: children,
-      ),
-    );
-  }
-
+  /// One of the three side-by-side sections: a titled card whose content is
+  /// always visible. Collapsing is dropped here because a collapsed card in
+  /// a column row would read as an empty box next to two full ones.
   Widget _infoRow(BuildContext context, String label, String value) {
     final scheme = Theme.of(context).colorScheme;
     return Padding(
@@ -303,17 +296,71 @@ class CustomerOverviewTab extends ConsumerWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 160,
+          // Proportional rather than fixed width: a fixed 160px label leaves
+          // too little room for the value in a third-width column.
+          Expanded(
+            flex: 2,
             child: Text(
               label,
               style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13),
             ),
           ),
+          const SizedBox(width: 8),
           Expanded(
+            flex: 3,
             child: Text(value, style: const TextStyle(fontSize: 13)),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Titled card used by the three Overview sections.
+class _SectionCard extends StatelessWidget {
+  const _SectionCard({
+    required this.icon,
+    required this.title,
+    required this.children,
+  });
+
+  final IconData icon;
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Card(
+      margin: EdgeInsets.zero,
+      elevation: 0,
+      color: scheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: AppBorderRadius.mdRadius,
+        side: BorderSide(color: scheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 18, color: scheme.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 20),
+            ...children,
+          ],
+        ),
       ),
     );
   }
