@@ -1,7 +1,8 @@
 // Overview tab — web supplier `OverviewTab` parity: Financial Summary
-// cards (Current Balance / Total PO Value / Total POs), the PO Status
-// breakdown (Draft / Submitted / Partial / Completed with proportional
-// bars) and collapsible Contact Information + Account Settings sections.
+// cards (Current Balance / Total PO Value / Total POs), then a three-
+// column row: PO Status breakdown (Draft / Submitted / Partial /
+// Completed with proportional bars) and collapsible Contact Information
+// + Account Settings sections.
 // Data comes from the detail, balance and PO-summary providers.
 
 import 'package:flutter/material.dart';
@@ -132,98 +133,151 @@ class SupplierOverviewTab extends ConsumerWidget {
             ),
           ],
           const SizedBox(height: 20),
-          // PO Status — 4 tiles with proportional bars.
-          _sectionTitle(context, l10n.suppliersPostatus),
-          const SizedBox(height: 8),
-          Card(
-            margin: EdgeInsets.zero,
-            elevation: 0,
-            color: scheme.surfaceContainerLow,
-            shape: RoundedRectangleBorder(
-              borderRadius: AppBorderRadius.mdRadius,
-              side: BorderSide(color: scheme.outlineVariant),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  _StatusBar(
-                    label: l10n.suppliersDraft,
-                    count: summary.draftPos,
-                    total: totalPos,
-                    color: scheme.tertiary,
-                  ),
-                  const SizedBox(height: 14),
-                  _StatusBar(
-                    label: l10n.suppliersSubmitted,
-                    count: summary.submittedPos,
-                    total: totalPos,
-                    color: scheme.primary,
-                  ),
-                  const SizedBox(height: 14),
-                  _StatusBar(
-                    label: l10n.suppliersPartial,
-                    count: summary.partiallyReceivedPos,
-                    total: totalPos,
-                    color: scheme.secondary,
-                  ),
-                  const SizedBox(height: 14),
-                  _StatusBar(
-                    label: l10n.suppliersCompleted,
-                    count: summary.completedPos,
-                    total: totalPos,
-                    color: scheme.primary,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          // Collapsible Contact Information.
-          _collapsible(
-            context,
-            icon: Icons.phone_outlined,
-            title: l10n.suppliersContactinfo,
+          // PO Status / Contact Info / Account Settings — three columns.
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _infoRow(
-                context,
-                l10n.suppliersContactperson,
-                supplier.contactPerson ?? '—',
+              // PO Status — 4 tiles with proportional bars.
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _sectionTitle(context, l10n.suppliersPostatus),
+                    const SizedBox(height: 8),
+                    _poStatusCard(context, summary, totalPos),
+                  ],
+                ),
               ),
-              _infoRow(context, l10n.suppliersPhone, supplier.phone ?? '—'),
-              _infoRow(context, l10n.suppliersEmail, supplier.email ?? '—'),
-              _infoRow(context, l10n.suppliersAddress, supplier.address ?? '—'),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // Collapsible Account Settings.
-          _collapsible(
-            context,
-            icon: Icons.tune_outlined,
-            title: l10n.suppliersAccountsettings,
-            children: [
-              _infoRow(
-                context,
-                l10n.suppliersPaymentterms,
-                supplier.paymentTerms?.isNotEmpty == true
-                    ? supplier.paymentTerms!
-                    : 'Net 30',
+              const SizedBox(width: 12),
+              // Collapsible Contact Information.
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _sectionTitle(context, l10n.suppliersContactinfo),
+                    const SizedBox(height: 8),
+                    _collapsible(
+                      context,
+                      icon: Icons.phone_outlined,
+                      title: l10n.suppliersContactinfo,
+                      children: [
+                        _infoRow(
+                          context,
+                          l10n.suppliersContactperson,
+                          supplier.contactPerson ?? '—',
+                        ),
+                        _infoRow(
+                          context,
+                          l10n.suppliersPhone,
+                          supplier.phone ?? '—',
+                        ),
+                        _infoRow(
+                          context,
+                          l10n.suppliersEmail,
+                          supplier.email ?? '—',
+                        ),
+                        _infoRow(
+                          context,
+                          l10n.suppliersAddress,
+                          supplier.address ?? '—',
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-              _infoRow(
-                context,
-                l10n.suppliersBalance,
-                Formatters.currency(currentBalance),
-              ),
-              _infoRow(
-                context,
-                l10n.suppliersSincesupplier,
-                supplier.createdAt == null
-                    ? '—'
-                    : Formatters.date(supplier.createdAt!),
+              const SizedBox(width: 12),
+              // Collapsible Account Settings.
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _sectionTitle(context, l10n.suppliersAccountsettings),
+                    const SizedBox(height: 8),
+                    _collapsible(
+                      context,
+                      icon: Icons.tune_outlined,
+                      title: l10n.suppliersAccountsettings,
+                      children: [
+                        _infoRow(
+                          context,
+                          l10n.suppliersPaymentterms,
+                          supplier.paymentTerms?.isNotEmpty == true
+                              ? supplier.paymentTerms!
+                              : 'Net 30',
+                        ),
+                        _infoRow(
+                          context,
+                          l10n.suppliersBalance,
+                          Formatters.currency(currentBalance),
+                        ),
+                        _infoRow(
+                          context,
+                          l10n.suppliersSincesupplier,
+                          supplier.createdAt == null
+                              ? '—'
+                              : Formatters.date(supplier.createdAt!),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _poStatusCard(
+    BuildContext context,
+    POSummary summary,
+    int totalPos,
+  ) {
+    final scheme = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    return Card(
+      margin: EdgeInsets.zero,
+      elevation: 0,
+      color: scheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: AppBorderRadius.mdRadius,
+        side: BorderSide(color: scheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            _StatusBar(
+              label: l10n.suppliersDraft,
+              count: summary.draftPos,
+              total: totalPos,
+              color: scheme.tertiary,
+            ),
+            const SizedBox(height: 14),
+            _StatusBar(
+              label: l10n.suppliersSubmitted,
+              count: summary.submittedPos,
+              total: totalPos,
+              color: scheme.primary,
+            ),
+            const SizedBox(height: 14),
+            _StatusBar(
+              label: l10n.suppliersPartial,
+              count: summary.partiallyReceivedPos,
+              total: totalPos,
+              color: scheme.secondary,
+            ),
+            const SizedBox(height: 14),
+            _StatusBar(
+              label: l10n.suppliersCompleted,
+              count: summary.completedPos,
+              total: totalPos,
+              color: scheme.primary,
+            ),
+          ],
+        ),
       ),
     );
   }
