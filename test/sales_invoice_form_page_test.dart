@@ -25,6 +25,7 @@ import 'package:minierp_app/features/sales/line_items_grid.dart'
     show GridNavController, LineColumn;
 import 'package:minierp_app/features/sales/models/sales_forms.dart'
     show DiscountScope;
+import 'package:minierp_app/features/sales/payment_panel.dart';
 import 'package:minierp_app/features/sales/sales_invoice_form_page.dart';
 import 'package:minierp_app/l10n/app_localizations.dart';
 import 'package:pluto_grid/pluto_grid.dart';
@@ -351,16 +352,25 @@ void main() {
       expect(gridRows(tester), hasLength(1));
       expect(gridRows(tester).single.cells['item']!.value, initialItem);
       expect(gridRows(tester).single.cells['qty']!.value, initialQuantity);
+      // Side-by-side layout (width >= 720, height >= 640 after the app bar):
+      // the grid is NOT inside the page scroll view, and the payment panel
+      // sits to the right of it. Otherwise the page stacks vertically.
+      final sideBySide = size.width >= 720 && size.height - 56 >= 640;
       final scrollableLayout = find.ancestor(
         of: find.byType(PlutoGrid),
         matching: find.byType(SingleChildScrollView),
       );
       expect(
         scrollableLayout,
-        size.width < 1100 || size.height < 856
-            ? findsOneWidget
-            : findsNothing,
+        sideBySide ? findsNothing : findsOneWidget,
       );
+      if (sideBySide) {
+        expect(
+          tester.getTopLeft(find.byType(PaymentPanel)).dx,
+          greaterThan(tester.getTopLeft(find.byType(PlutoGrid)).dx),
+          reason: 'payment panel sits to the right of the grid',
+        );
+      }
     }
   });
 

@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 
-/// Fixed-height two-column layout (spec §3.1): grid left, payment +
-/// error + buttons right, totals + notes under the grid.
+/// Wide (desktop) layout: line-items grid left, 275px summary column right.
+///
+/// The grid column ends with a compact three-field row (notes, tax, discount)
+/// so the space under the grid stays small. The right column stacks the totals
+/// card above the payment panel; only that pair scrolls, while the error banner
+/// and the action buttons stay pinned at the bottom of the column.
 class InvoiceFormWideLayout extends StatelessWidget {
   const InvoiceFormWideLayout({
     super.key,
@@ -9,7 +13,7 @@ class InvoiceFormWideLayout extends StatelessWidget {
     required this.heading,
     required this.grid,
     required this.totals,
-    required this.notes,
+    required this.footer,
     required this.panel,
     required this.buttons,
     required this.gridMinHeight,
@@ -20,11 +24,14 @@ class InvoiceFormWideLayout extends StatelessWidget {
   final Widget heading;
   final Widget grid;
   final Widget totals;
-  final Widget notes;
+  final Widget footer;
   final Widget panel;
   final Widget buttons;
   final Widget? errorBanner;
   final double gridMinHeight;
+
+  /// Width of the right-hand summary column.
+  static const double sidebarWidth = 275;
 
   @override
   Widget build(BuildContext context) {
@@ -50,29 +57,31 @@ class InvoiceFormWideLayout extends StatelessWidget {
                       const SizedBox(height: 8),
                       Expanded(
                         child: ConstrainedBox(
-                          constraints: BoxConstraints(
-                            minHeight: gridMinHeight,
-                          ),
+                          constraints: BoxConstraints(minHeight: gridMinHeight),
                           child: grid,
                         ),
                       ),
                       const SizedBox(height: 8),
-                      totals,
-                      const SizedBox(height: 8),
-                      notes,
+                      footer,
                     ],
                   ),
                 ),
                 const SizedBox(width: 12),
                 SizedBox(
-                  width: 250,
+                  width: sidebarWidth,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Expanded(
-                        child: Align(
-                          alignment: Alignment.topCenter,
-                          child: panel,
+                        child: SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              totals,
+                              const SizedBox(height: 8),
+                              panel,
+                            ],
+                          ),
                         ),
                       ),
                       if (errorBanner != null) ...[
@@ -93,7 +102,8 @@ class InvoiceFormWideLayout extends StatelessWidget {
   }
 }
 
-/// Stacked scrollable layout (spec §3.2) for compact windows.
+/// Stacked scrollable layout for compact windows: grid, the three-field row,
+/// then totals, payment, error banner and buttons in one downward flow.
 class InvoiceFormNarrowLayout extends StatelessWidget {
   const InvoiceFormNarrowLayout({
     super.key,
@@ -101,7 +111,7 @@ class InvoiceFormNarrowLayout extends StatelessWidget {
     required this.heading,
     required this.grid,
     required this.totals,
-    required this.notes,
+    required this.footer,
     required this.panel,
     required this.buttons,
     required this.gridMinHeight,
@@ -112,7 +122,7 @@ class InvoiceFormNarrowLayout extends StatelessWidget {
   final Widget heading;
   final Widget grid;
   final Widget totals;
-  final Widget notes;
+  final Widget footer;
   final Widget panel;
   final Widget buttons;
   final Widget? errorBanner;
@@ -131,14 +141,30 @@ class InvoiceFormNarrowLayout extends StatelessWidget {
           const SizedBox(height: 8),
           SizedBox(height: gridMinHeight, child: grid),
           const SizedBox(height: 8),
-          totals,
-          const SizedBox(height: 8),
-          notes,
+          footer,
           const SizedBox(height: 12),
-          panel,
-          if (errorBanner != null) ...[const SizedBox(height: 10), errorBanner!],
-          const SizedBox(height: 12),
-          buttons,
+          Align(
+            alignment: Alignment.centerRight,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: InvoiceFormWideLayout.sidebarWidth,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  totals,
+                  const SizedBox(height: 8),
+                  panel,
+                  if (errorBanner != null) ...[
+                    const SizedBox(height: 10),
+                    errorBanner!,
+                  ],
+                  const SizedBox(height: 12),
+                  buttons,
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );

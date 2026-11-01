@@ -1575,20 +1575,38 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
                   discount,
                   total,
                 );
-                final notes = _notesField(l10n);
+                // One compact row under the grid: Notes | Tax % | Discount %.
+                // The discount field only exists in invoice-discount scope —
+                // per-item discounts live on the grid's discount column.
+                final footerFields = Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(flex: 3, child: _notesField(l10n)),
+                    const SizedBox(width: 12),
+                    Expanded(child: _taxPercentField(l10n)),
+                    if (_scope == DiscountScope.invoice) ...[
+                      const SizedBox(width: 12),
+                      Expanded(child: _invoiceDiscountField(l10n)),
+                    ],
+                  ],
+                );
                 final panel = _buildPaymentPanel(l10n, total);
                 final errorBanner = _error == null
                     ? null
                     : _buildErrorBanner(l10n);
                 final buttons = _buildButtonsRow(l10n);
-                if (constraints.maxWidth >= 1100 &&
-                    constraints.maxHeight >= 800) {
+                // Side-by-side is the default: the totals + payment column
+                // sits to the RIGHT of the grid on any normal window. Only a
+                // narrow or very short window falls back to the stacked
+                // layout, where a 275px side column would squeeze the grid.
+                if (constraints.maxWidth >= 720 &&
+                    constraints.maxHeight >= 640) {
                   return InvoiceFormWideLayout(
                     header: header,
                     heading: heading,
                     grid: grid,
                     totals: totalsCard,
-                    notes: notes,
+                    footer: footerFields,
                     panel: panel,
                     errorBanner: errorBanner,
                     buttons: buttons,
@@ -1600,7 +1618,7 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
                   heading: heading,
                   grid: grid,
                   totals: totalsCard,
-                  notes: notes,
+                  footer: footerFields,
                   panel: panel,
                   errorBanner: errorBanner,
                   buttons: buttons,
@@ -1614,9 +1632,7 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     );
   }
 
-  /// Totals card: Subtotal / Discount (always visible) / Tax % input +
-  /// computed Tax / Grand Total; the invoice-scope discount input shows
-  /// alongside when scope is Invoice (spec §4.4).
+  /// Totals card: Subtotal / Discount / Tax / Grand Total.
   Widget _buildTotalsCard(
     AppLocalizations l10n,
     num subtotal,
@@ -1660,83 +1676,38 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
         ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: AppBorderRadius.smRadius,
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (_scope == DiscountScope.invoice) ...[
-                  TextFormField(
-                    controller: _discountController,
-                    enabled: !_submitting,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    decoration: InputDecoration(
-                      isDense: true,
-                      border: OutlineInputBorder(),
-                      labelText: l10n.fieldsDiscount,
-                    ),
-                    onChanged: (_) => setState(() {}),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-                TextFormField(
-                  controller: _taxPercentController,
-                  enabled: !_submitting,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  decoration: InputDecoration(
-                    isDense: true,
-                    border: OutlineInputBorder(),
-                    labelText: '${l10n.salesTax} %',
-                  ),
-                  onChanged: _applyTaxPercent,
-                ),
-              ],
+          totalsRow(l10n.salesSubtotal, subtotal),
+          const SizedBox(height: 4),
+          totalsRow(l10n.salesDiscount, discount),
+          const SizedBox(height: 4),
+          totalsRow(l10n.salesTax, tax),
+          const Divider(height: 10),
+          totalsRow(l10n.salesGrandtotal, total, bold: true),
+          // Credit is a *payment*, not a discount, so it deliberately
+          // stays out of the subtotal/discount/tax arithmetic above.
+          // It gets its own block so an applied offset is visible next
+          // to the grand total and cannot hide in the payment panel.
+          if (_availableCustomerCredit > 0) ...[
+            const Divider(height: 10),
+            totalsRow(
+              l10n.salesAvailablecredit,
+              _availableCustomerCredit,
             ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            flex: 2,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                totalsRow(l10n.salesSubtotal, subtotal),
-                const SizedBox(height: 4),
-                totalsRow(l10n.salesDiscount, discount),
-                const SizedBox(height: 4),
-                totalsRow(l10n.salesTax, tax),
-                const Divider(height: 10),
-                totalsRow(l10n.salesGrandtotal, total, bold: true),
-                // Credit is a *payment*, not a discount, so it deliberately
-                // stays out of the subtotal/discount/tax arithmetic above.
-                // It gets its own block so an applied offset is visible next
-                // to the grand total and cannot hide in the payment panel.
-                if (_availableCustomerCredit > 0) ...[
-                  const Divider(height: 10),
-                  totalsRow(
-                    l10n.salesAvailablecredit,
-                    _availableCustomerCredit,
-                  ),
-                  const SizedBox(height: 4),
-                  totalsRow(l10n.salesCreditoffset, _creditOffset),
-                  const SizedBox(height: 4),
-                  totalsRow(
-                    l10n.salesCreditremaining,
-                    _availableCustomerCredit - _creditOffset,
-                  ),
-                ],
-                if (_detail?.position != null) ...[
-                  const Divider(height: 10),
-                  ..._buildPositionRows(l10n, _detail!.position!, totalsRow),
-                ],
-              ],
+            const SizedBox(height: 4),
+            totalsRow(l10n.salesCreditoffset, _creditOffset),
+            const SizedBox(height: 4),
+            totalsRow(
+              l10n.salesCreditremaining,
+              _availableCustomerCredit - _creditOffset,
             ),
-          ),
+          ],
+          if (_detail?.position != null) ...[
+            const Divider(height: 10),
+            ..._buildPositionRows(l10n, _detail!.position!, totalsRow),
+          ],
         ],
       ),
     );
@@ -1784,6 +1755,35 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
         enabled: !_submitting,
         maxLines: 2,
         decoration: _decoration(),
+      ),
+    );
+  }
+
+  /// Invoice-level Tax % convenience input — writes the rate to every
+  /// filled line (spec: invoice-form-layout §4.4).
+  Widget _taxPercentField(AppLocalizations l10n) {
+    return FormFieldShell(
+      label: '${l10n.salesTax} %',
+      child: TextFormField(
+        controller: _taxPercentController,
+        enabled: !_submitting,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        decoration: _decoration(),
+        onChanged: _applyTaxPercent,
+      ),
+    );
+  }
+
+  /// Invoice-scope flat discount — applies to the whole invoice subtotal.
+  Widget _invoiceDiscountField(AppLocalizations l10n) {
+    return FormFieldShell(
+      label: l10n.fieldsDiscount,
+      child: TextFormField(
+        controller: _discountController,
+        enabled: !_submitting,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        decoration: _decoration(),
+        onChanged: (_) => setState(() {}),
       ),
     );
   }
