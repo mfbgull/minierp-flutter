@@ -1,8 +1,8 @@
 // Overview tab — web supplier `OverviewTab` parity: Financial Summary
-// cards (Current Balance / Total PO Value / Total POs), then a three-
-// column row: PO Status breakdown (Draft / Submitted / Partial /
-// Completed with proportional bars) and collapsible Contact Information
-// + Account Settings sections.
+// cards (Current Balance / Total PO Value / Total POs) on top, then PO
+// Status, Contact Information and Account Settings side by side in three
+// equal columns. Below 900px the three sections stack, because a third of
+// the width truncates the values.
 // Data comes from the detail, balance and PO-summary providers.
 
 import 'package:flutter/material.dart';
@@ -133,151 +133,115 @@ class SupplierOverviewTab extends ConsumerWidget {
             ),
           ],
           const SizedBox(height: 20),
-          // PO Status / Contact Info / Account Settings — three columns.
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // PO Status — 4 tiles with proportional bars.
-              Expanded(
-                child: Column(
+          // Three equal columns below the summary: PO Status, Contact Info,
+          // Account Settings. They stack on narrow windows so the
+          // label/value pairs keep their room.
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final status = _SectionCard(
+                icon: Icons.bar_chart_outlined,
+                title: l10n.suppliersPostatus,
+                children: [
+                  _StatusBar(
+                    label: l10n.suppliersDraft,
+                    count: summary.draftPos,
+                    total: totalPos,
+                    color: scheme.tertiary,
+                  ),
+                  const SizedBox(height: 14),
+                  _StatusBar(
+                    label: l10n.suppliersSubmitted,
+                    count: summary.submittedPos,
+                    total: totalPos,
+                    color: scheme.primary,
+                  ),
+                  const SizedBox(height: 14),
+                  _StatusBar(
+                    label: l10n.suppliersPartial,
+                    count: summary.partiallyReceivedPos,
+                    total: totalPos,
+                    color: scheme.secondary,
+                  ),
+                  const SizedBox(height: 14),
+                  _StatusBar(
+                    label: l10n.suppliersCompleted,
+                    count: summary.completedPos,
+                    total: totalPos,
+                    color: scheme.primary,
+                  ),
+                ],
+              );
+
+              final contact = _SectionCard(
+                icon: Icons.phone_outlined,
+                title: l10n.suppliersContactinfo,
+                children: [
+                  _infoRow(
+                    context,
+                    l10n.suppliersContactperson,
+                    supplier.contactPerson ?? '—',
+                  ),
+                  _infoRow(context, l10n.suppliersPhone, supplier.phone ?? '—'),
+                  _infoRow(context, l10n.suppliersEmail, supplier.email ?? '—'),
+                  _infoRow(
+                    context,
+                    l10n.suppliersAddress,
+                    supplier.address ?? '—',
+                  ),
+                ],
+              );
+
+              final account = _SectionCard(
+                icon: Icons.tune_outlined,
+                title: l10n.suppliersAccountsettings,
+                children: [
+                  _infoRow(
+                    context,
+                    l10n.suppliersPaymentterms,
+                    supplier.paymentTerms?.isNotEmpty == true
+                        ? supplier.paymentTerms!
+                        : 'Net 30',
+                  ),
+                  _infoRow(
+                    context,
+                    l10n.suppliersBalance,
+                    Formatters.currency(currentBalance),
+                  ),
+                  _infoRow(
+                    context,
+                    l10n.suppliersSincesupplier,
+                    supplier.createdAt == null
+                        ? '—'
+                        : Formatters.date(supplier.createdAt!),
+                  ),
+                ],
+              );
+
+              if (constraints.maxWidth < 900) {
+                return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _sectionTitle(context, l10n.suppliersPostatus),
-                    const SizedBox(height: 8),
-                    _poStatusCard(context, summary, totalPos),
+                    status,
+                    const SizedBox(height: 12),
+                    contact,
+                    const SizedBox(height: 12),
+                    account,
                   ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              // Collapsible Contact Information.
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _sectionTitle(context, l10n.suppliersContactinfo),
-                    const SizedBox(height: 8),
-                    _collapsible(
-                      context,
-                      icon: Icons.phone_outlined,
-                      title: l10n.suppliersContactinfo,
-                      children: [
-                        _infoRow(
-                          context,
-                          l10n.suppliersContactperson,
-                          supplier.contactPerson ?? '—',
-                        ),
-                        _infoRow(
-                          context,
-                          l10n.suppliersPhone,
-                          supplier.phone ?? '—',
-                        ),
-                        _infoRow(
-                          context,
-                          l10n.suppliersEmail,
-                          supplier.email ?? '—',
-                        ),
-                        _infoRow(
-                          context,
-                          l10n.suppliersAddress,
-                          supplier.address ?? '—',
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              // Collapsible Account Settings.
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _sectionTitle(context, l10n.suppliersAccountsettings),
-                    const SizedBox(height: 8),
-                    _collapsible(
-                      context,
-                      icon: Icons.tune_outlined,
-                      title: l10n.suppliersAccountsettings,
-                      children: [
-                        _infoRow(
-                          context,
-                          l10n.suppliersPaymentterms,
-                          supplier.paymentTerms?.isNotEmpty == true
-                              ? supplier.paymentTerms!
-                              : 'Net 30',
-                        ),
-                        _infoRow(
-                          context,
-                          l10n.suppliersBalance,
-                          Formatters.currency(currentBalance),
-                        ),
-                        _infoRow(
-                          context,
-                          l10n.suppliersSincesupplier,
-                          supplier.createdAt == null
-                              ? '—'
-                              : Formatters.date(supplier.createdAt!),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: status),
+                  const SizedBox(width: 12),
+                  Expanded(child: contact),
+                  const SizedBox(width: 12),
+                  Expanded(child: account),
+                ],
+              );
+            },
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _poStatusCard(
-    BuildContext context,
-    POSummary summary,
-    int totalPos,
-  ) {
-    final scheme = Theme.of(context).colorScheme;
-    final l10n = AppLocalizations.of(context)!;
-    return Card(
-      margin: EdgeInsets.zero,
-      elevation: 0,
-      color: scheme.surfaceContainerLow,
-      shape: RoundedRectangleBorder(
-        borderRadius: AppBorderRadius.mdRadius,
-        side: BorderSide(color: scheme.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            _StatusBar(
-              label: l10n.suppliersDraft,
-              count: summary.draftPos,
-              total: totalPos,
-              color: scheme.tertiary,
-            ),
-            const SizedBox(height: 14),
-            _StatusBar(
-              label: l10n.suppliersSubmitted,
-              count: summary.submittedPos,
-              total: totalPos,
-              color: scheme.primary,
-            ),
-            const SizedBox(height: 14),
-            _StatusBar(
-              label: l10n.suppliersPartial,
-              count: summary.partiallyReceivedPos,
-              total: totalPos,
-              color: scheme.secondary,
-            ),
-            const SizedBox(height: 14),
-            _StatusBar(
-              label: l10n.suppliersCompleted,
-              count: summary.completedPos,
-              total: totalPos,
-              color: scheme.primary,
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -290,30 +254,9 @@ class SupplierOverviewTab extends ConsumerWidget {
         ?.copyWith(fontWeight: FontWeight.w600),
   );
 
-  Widget _collapsible(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required List<Widget> children,
-  }) {
-    return Card(
-      margin: EdgeInsets.zero,
-      elevation: 0,
-      color: Theme.of(context).colorScheme.surfaceContainerLow,
-      shape: RoundedRectangleBorder(
-        borderRadius: AppBorderRadius.mdRadius,
-        side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: ExpansionTile(
-        leading: Icon(icon, size: 20),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        children: children,
-      ),
-    );
-  }
-
+  /// One row inside a section card: proportional rather than fixed width,
+  /// because a fixed 160px label leaves too little room for the value in a
+  /// third-width column.
   Widget _infoRow(BuildContext context, String label, String value) {
     final scheme = Theme.of(context).colorScheme;
     return Padding(
@@ -321,14 +264,16 @@ class SupplierOverviewTab extends ConsumerWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 160,
+          Expanded(
+            flex: 2,
             child: Text(
               label,
               style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13),
             ),
           ),
+          const SizedBox(width: 8),
           Expanded(
+            flex: 3,
             child: Text(value, style: const TextStyle(fontSize: 13)),
           ),
         ],
@@ -337,6 +282,57 @@ class SupplierOverviewTab extends ConsumerWidget {
   }
 }
 
+
+/// Titled card used by the three Overview sections. Content is always
+/// visible: a collapsed card next to two full ones reads as an empty box.
+class _SectionCard extends StatelessWidget {
+  const _SectionCard({
+    required this.icon,
+    required this.title,
+    required this.children,
+  });
+
+  final IconData icon;
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Card(
+      margin: EdgeInsets.zero,
+      elevation: 0,
+      color: scheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: AppBorderRadius.mdRadius,
+        side: BorderSide(color: scheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 18, color: scheme.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 20),
+            ...children,
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _SummaryCard extends StatelessWidget {
   const _SummaryCard({
