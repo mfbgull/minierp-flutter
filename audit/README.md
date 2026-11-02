@@ -11,6 +11,7 @@ Live documents used by development and CI:
 - `fallow-tools/` — helper scripts and captured Fallow snapshots referenced by
   the remediation ledgers.
 
-`archive/` holds historical investigation reports, dated audit packages,
-screenshots, patches and generated evidence. They are kept for reference and
-are not part of the development or CI workflow.
+`archive/` holds historical investigation reports, dated audit packages and
+patches. They are kept for reference and are not part of the development or
+CI workflow. Generated evidence (screenshots, `.omo` session artifacts) was
+moved out of git on 2026-11-02 — see `archive/README.md` for the backup.

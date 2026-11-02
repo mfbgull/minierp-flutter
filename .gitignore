@@ -106,3 +106,16 @@ audit/fallow-tools/snapshot.json
 
 # Orphaned root lockfile — the npm project lives in server/.
 /package-lock.json
+
+# ── Archived audit run artifacts (2026-11-02) ─────────────────────────
+# Backed up outside git; see audit/archive/README.md and
+# accounting-audit/EVIDENCE-ARCHIVE.md for archive locations.
+audit/archive/.omo/
+audit/archive/.codegraph/
+audit/archive/screenshots/
+audit/archive/baseline/
+accounting-audit/evidence/
+
+# Flutter web client build served by the packaged server. Regenerate with
+# `flutter build web` — see server/client/README.md.
+server/client/dist/
