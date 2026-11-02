@@ -5,8 +5,8 @@ import { authenticateToken } from '../middleware/auth';
 import { requirePermission } from '../middleware/requirePermission';
 import { validateZodQuery, validateZodParams, validateZodBody, zodSchemas, zodBodySchemas } from '../middleware/validation';
 import { z } from 'zod';
-import { receiveUnappliedCash, getUnappliedCash, getUnappliedCashActivity } from '../controllers/unappliedCashController';
-import { cashIdParams, receiveCashBody } from '../middleware/unappliedCashValidation';
+import { receiveUnappliedCash, getUnappliedCash, getUnappliedCashActivity, applyStoreCredit } from '../controllers/unappliedCashController';
+import { cashIdParams, receiveCashBody, storeCreditApplyBody } from '../middleware/unappliedCashValidation';
 import { sensitiveOperationLimiter } from '../middleware/rateLimiter';
 
 // All customer routes require authentication
@@ -25,6 +25,7 @@ router.post('/', requirePermission('customers', 'create'), validateZodBody(zodBo
 router.post('/:id/unapplied-cash', requirePermission('payments', 'create'), sensitiveOperationLimiter, validateZodParams(cashIdParams), validateZodBody(receiveCashBody), receiveUnappliedCash);
 router.get('/:id/unapplied-cash', requirePermission('payments', 'read'), getUnappliedCash);
 router.get('/:id/unapplied-cash/activity', requirePermission('payments', 'read'), getUnappliedCashActivity);
+router.post('/:id/store-credit/apply', requirePermission('payments', 'update'), sensitiveOperationLimiter, validateZodParams(cashIdParams), validateZodBody(storeCreditApplyBody), applyStoreCredit);
 router.put('/:id', requirePermission('customers', 'update'), validateZodBody(zodBodySchemas.object), customersController.updateCustomer);
 router.delete('/:id', requirePermission('customers', 'delete'), customersController.deleteCustomer);
 router.post('/:id/restore', requirePermission('customers', 'update'), customersController.restoreCustomer);

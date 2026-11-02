@@ -290,6 +290,24 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get cashCreditApply => 'Apply Store Credit to Invoices';
+
+  @override
+  String get cashCreditApplyHint =>
+      'Use this customer\'s store credit pool from returned invoices. This does not collect another payment.';
+
+  @override
+  String get cashCreditEligible => 'Store credit available on operation date';
+
+  @override
+  String get cashCreditAppliedSuccess => 'Store credit applied';
+
+  @override
+  String cashCreditAppliedDetails(String amount, String applicationId) {
+    return 'Applied $amount. Application ID: $applicationId. No new payment was collected.';
+  }
+
+  @override
   String get cashInvoiceBalance => 'Invoice balance';
 
   @override

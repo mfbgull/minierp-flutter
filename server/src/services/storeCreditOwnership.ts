@@ -4,7 +4,7 @@ import InvoiceReturnModel from '../models/InvoiceReturn';
 import { computePosition } from './returnMath';
 
 /** Called inside invoice creation's transaction; old unknown draws stay locked. */
-export function recordStoreCreditDraws(db: Database.Database, customerId: number, invoiceId: number, amount: number): void {
+export function recordStoreCreditDraws(db: Database.Database, customerId: number, invoiceId: number, amount: number, applicationId: number | null = null): void {
   let remaining = toMinorUnits(amount);
   const sources = db.prepare(`
     SELECT s.id, s.amount, COALESCE(SUM(d.amount_minor),0) AS drawn
@@ -13,10 +13,10 @@ export function recordStoreCreditDraws(db: Database.Database, customerId: number
     WHERE r.customer_id=? AND r.voided_at IS NULL AND s.voided_at IS NULL AND s.type='credit'
     GROUP BY s.id ORDER BY s.id
   `).all(customerId) as Array<{ id: number; amount: number; drawn: number }>;
-  const insert = db.prepare('INSERT INTO store_credit_draws(settlement_id,invoice_id,amount_minor) VALUES(?,?,?)');
+  const insert = db.prepare('INSERT INTO store_credit_draws(settlement_id,invoice_id,application_id,amount_minor) VALUES(?,?,?,?)');
   for (const source of sources) {
     const draw = Math.min(remaining, Math.max(0, toMinorUnits(source.amount) - source.drawn));
-    if (draw > 0) insert.run(source.id, invoiceId, draw);
+    if (draw > 0) insert.run(source.id, invoiceId, applicationId, draw);
     remaining -= draw;
     if (remaining === 0) break;
   }

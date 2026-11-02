@@ -596,6 +596,36 @@ abstract class AppLocalizations {
   /// **'Applied {amount}. Application ID: {applicationId}. No new payment was collected.'**
   String cashAppliedDetails(String amount, String applicationId);
 
+  /// No description provided for @cashCreditApply.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply Store Credit to Invoices'**
+  String get cashCreditApply;
+
+  /// No description provided for @cashCreditApplyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Use this customer\'s store credit pool from returned invoices. This does not collect another payment.'**
+  String get cashCreditApplyHint;
+
+  /// No description provided for @cashCreditEligible.
+  ///
+  /// In en, this message translates to:
+  /// **'Store credit available on operation date'**
+  String get cashCreditEligible;
+
+  /// No description provided for @cashCreditAppliedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Store credit applied'**
+  String get cashCreditAppliedSuccess;
+
+  /// No description provided for @cashCreditAppliedDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Applied {amount}. Application ID: {applicationId}. No new payment was collected.'**
+  String cashCreditAppliedDetails(String amount, String applicationId);
+
   /// No description provided for @cashInvoiceBalance.
   ///
   /// In en, this message translates to:

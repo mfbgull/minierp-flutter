@@ -5,8 +5,9 @@ import db from '../config/database';
 import PaymentModel from '../models/Payment';
 import { getReceiptReplay, saveReceiptReplay, getCashSummary, getCashActivity } from '../models/UnappliedCash';
 import { UnappliedCashService } from '../services/unappliedCashService';
+import { StoreCreditApplicationService } from '../services/storeCreditApplicationService';
 import { UnappliedCashError } from '../services/unappliedCashTypes';
-import { receiveCashBody, applyCashBody, refundCashBody, reverseCashBody, cashIdParams, cashSummaryQuery, cashActivityQuery } from '../middleware/unappliedCashValidation';
+import { receiveCashBody, applyCashBody, storeCreditApplyBody, refundCashBody, reverseCashBody, cashIdParams, cashSummaryQuery, cashActivityQuery } from '../middleware/unappliedCashValidation';
 import { normalizeIdempotencyKey, IDEMPOTENCY_KEY_HEADER, hashRequestPayload, beginIdempotentWrite, claimIdempotencyKey, IdempotencyConflictError } from '../utils/idempotency';
 import { sendSuccess, sendInternalError } from '../utils/apiResponse';
 import logger from '../utils/logger';
@@ -15,7 +16,7 @@ const service = new UnappliedCashService(db);
 
 export function getUnappliedCashCapabilities(_req: AuthRequest, res: Response): void {
   res.setHeader('Cache-Control', 'no-store');
-  sendSuccess(res, { receive: 'durable-v1', apply: 'permanent-application-v1', refund: 'permanent-application-v1', reverse: 'guarded-status-v1' });
+  sendSuccess(res, { receive: 'durable-v1', apply: 'permanent-application-v1', refund: 'permanent-application-v1', reverse: 'guarded-status-v1', storeCreditApply: 'permanent-application-v1' });
 }
 
 export function getUnappliedCash(req: AuthRequest, res: Response): void {
@@ -94,6 +95,18 @@ export function applyUnappliedCash(req: AuthRequest, res: Response): void {
   try {
     const body = applyCashBody.parse(req.body);
     const data = service.apply({ customerId: body.customer_id, date: body.operation_date, applicationKey: requiredKey(req),
+      allocations: body.allocations.map(allocation => ({ invoiceId: allocation.invoice_id, amount: allocation.amount })),
+    });
+    sendSuccess(res, data);
+  } catch (error) { respondToError(res, error); }
+}
+
+export function applyStoreCredit(req: AuthRequest, res: Response): void {
+  try {
+    const customerId = Number(cashIdParams.parse(req.params).id);
+    const body = storeCreditApplyBody.parse(req.body);
+    const data = new StoreCreditApplicationService(db).apply({
+      customerId, date: body.operation_date, applicationKey: requiredKey(req), userId: req.user?.id ?? null,
       allocations: body.allocations.map(allocation => ({ invoiceId: allocation.invoice_id, amount: allocation.amount })),
     });
     sendSuccess(res, data);

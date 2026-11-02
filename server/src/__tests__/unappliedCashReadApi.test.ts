@@ -95,7 +95,7 @@ test('empty and missing customers are distinct; cash reads and capability requir
   expect((await request(app).get('/api/unapplied-cash/capabilities')).status).toBe(401);
   const capability = await get('/api/unapplied-cash/capabilities');
   expect(capability.status).toBe(200);
-  expect(capability.body.data).toEqual({ receive: 'durable-v1', apply: 'permanent-application-v1', refund: 'permanent-application-v1', reverse: 'guarded-status-v1' });
+  expect(capability.body.data).toEqual({ receive: 'durable-v1', apply: 'permanent-application-v1', refund: 'permanent-application-v1', reverse: 'guarded-status-v1', storeCreditApply: 'permanent-application-v1' });
   const secret = process.env.JWT_SECRET;
   if (!secret) throw new Error('Missing test secret');
   const missingToken = jwt.sign({ id: 99999999, username: 'missing', role: 'user' }, secret, { issuer: 'mini-erp', audience: 'mini-erp-client' });

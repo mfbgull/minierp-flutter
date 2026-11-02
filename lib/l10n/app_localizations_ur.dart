@@ -289,6 +289,24 @@ class AppLocalizationsUr extends AppLocalizations {
   }
 
   @override
+  String get cashCreditApply => 'اسٹور کریڈٹ انوائسز پر لگائیں';
+
+  @override
+  String get cashCreditApplyHint =>
+      'ورن شدہ انوائسز سے اس کسٹمر کا اسٹور کریڈٹ پول استعمال کریں۔ یہ کوئی نئی ادائیگی وصول نہیں کرتا۔';
+
+  @override
+  String get cashCreditEligible => 'آپریشن کی تاریخ پر دستیاب اسٹور کریڈٹ';
+
+  @override
+  String get cashCreditAppliedSuccess => 'اسٹور کریڈٹ لگایا گیا';
+
+  @override
+  String cashCreditAppliedDetails(String amount, String applicationId) {
+    return '$amount استعمال ہوا۔ استعمال کا شناختی نمبر: $applicationId۔ کوئی نئی ادائیگی وصول نہیں ہوئی۔';
+  }
+
+  @override
   String get cashInvoiceBalance => 'انوائس کا بقایا';
 
   @override

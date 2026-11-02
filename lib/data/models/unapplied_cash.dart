@@ -59,7 +59,7 @@ String cashDate(Object? value) {
   return value;
 }
 
-enum CashOperation { receive, apply, refund, reverse }
+enum CashOperation { receive, apply, refund, reverse, storeCreditApply }
 
 class CashCapabilities {
   CashCapabilities(Object? json)
@@ -75,7 +75,8 @@ class CashCapabilities {
 
   static String expected(CashOperation operation) => switch (operation) {
     CashOperation.receive => 'durable-v1',
-    CashOperation.apply || CashOperation.refund => 'permanent-application-v1',
+    CashOperation.apply || CashOperation.refund ||
+    CashOperation.storeCreditApply => 'permanent-application-v1',
     CashOperation.reverse => 'guarded-status-v1',
   };
 
@@ -180,6 +181,34 @@ class CashRequest {
     });
   }
 
+  factory CashRequest.storeCreditApply({
+    required int customerId,
+    required String date,
+    required List<CashAllocation> allocations,
+  }) {
+    if (allocations.isEmpty ||
+        allocations.length > 1000 ||
+        allocations.map((line) => line.invoiceId).toSet().length !=
+            allocations.length) {
+      throw const FormatException('Invalid cash allocations');
+    }
+    final sorted = [...allocations]
+      ..sort((left, right) => left.invoiceId.compareTo(right.invoiceId));
+    final total = sorted.fold<int>(0, (total, line) => total + line.amountMinor);
+    _positiveMinor(total);
+    return CashRequest._(CashOperation.storeCreditApply, customerId, null, {
+      'operation_date': cashDate(date),
+      'allocations': List.unmodifiable(
+        sorted.map(
+          (line) => Map<String, dynamic>.unmodifiable({
+            'invoice_id': line.invoiceId,
+            'amount': line.amountMinor / 100,
+          }),
+        ),
+      ),
+    });
+  }
+
   factory CashRequest.reverse({
     required int customerId,
     required int paymentId,
@@ -229,6 +258,17 @@ class CashRequest {
         paymentId: cashId(json['payment_id']),
         reason: body['reason'] as String,
       ),
+      CashOperation.storeCreditApply => CashRequest.storeCreditApply(
+        customerId: customerId,
+        date: body['operation_date'] as String,
+        allocations: (body['allocations'] as List).map((value) {
+          final row = cashObject(value);
+          return CashAllocation(
+            invoiceId: cashId(row['invoice_id']),
+            amountMinor: cashMinor(row['amount']),
+          );
+        }).toList(),
+      ),
     };
     if (request.fingerprint != jsonEncode(json)) {
       throw const FormatException('Pending cash payload changed');
@@ -246,6 +286,8 @@ class CashRequest {
     CashOperation.apply => '/unapplied-cash/apply',
     CashOperation.refund => '/unapplied-cash/refund',
     CashOperation.reverse => '/payments/$paymentId/reverse',
+    CashOperation.storeCreditApply =>
+      '/customers/$customerId/store-credit/apply',
   };
 
   Map<String, dynamic> toJson() => {

@@ -24,6 +24,8 @@ export const applyCashBody = z.object({
   allocations: z.array(z.object({ invoice_id: positiveId, amount }).strict()).min(1).max(1000),
 }).strict();
 
+export const storeCreditApplyBody = applyCashBody.omit({ customer_id: true });
+
 export const refundCashBody = receiveCashBody.extend({ customer_id: positiveId });
 
 export const reverseCashBody = z.object({

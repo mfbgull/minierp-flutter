@@ -2250,6 +2250,7 @@ export function applyPendingMigrations(): void {
     `);
   });
   runLedgered('123_item_company_management.sql');
+  runLedgered('124_store_credit_applications.sql');
   // Boot-time guard (spec §4.1): the restocking-fee posting resolves 4150 at
   // return time — a legacy COA predating GL foundation must fail the boot
   // with a clear error, never mis-post.

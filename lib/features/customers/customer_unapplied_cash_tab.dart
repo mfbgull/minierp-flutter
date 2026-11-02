@@ -23,6 +23,7 @@ import 'customer_providers.dart';
 import 'unapplied_cash_providers.dart';
 import 'unapplied_cash_receive_dialog.dart';
 import 'unapplied_cash_apply_dialog.dart';
+import 'store_credit_apply_dialog.dart';
 import 'unapplied_cash_refund_dialog.dart';
 import 'unapplied_cash_reverse_dialog.dart';
 
@@ -143,6 +144,20 @@ class _CustomerUnappliedCashTabState
                     ),
                     icon: const Icon(Icons.account_balance_wallet_outlined),
                     label: Text(l10n.cashApply),
+                  ),
+                if (widget.customer.creditBalance > 0 &&
+                    (ref
+                            .watch(authProvider)
+                            .user
+                            ?.hasPermission('payments', 'update') ??
+                        false))
+                  OutlinedButton.icon(
+                    onPressed: () => showStoreCreditApplyDialog(
+                      context,
+                      customer: widget.customer,
+                    ),
+                    icon: const Icon(Icons.redeem_outlined),
+                    label: Text(l10n.cashCreditApply),
                   ),
                 ChoiceChip(
                   label: Text(l10n.cashActivity),
