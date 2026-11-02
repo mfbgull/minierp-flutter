@@ -178,7 +178,7 @@ appears exactly once above; every `deferred` row has a reason and a review date.
 *Updated 2026-10-10 — PRET-001 fixed and marked `landed`: `PurchaseReturn.voidReturn`
 now voids every live `supplier_refunds` row against the return's credit note before
 voiding the note itself (was untracked; surfaced by the CONSOLIDATED-AUDIT P0 table and
-`reg-test.md` defect 5). RET-008 added as `planned`. GL-004 and SALES-010 re-verified
+`docs/archive/reg-test.md` defect 5). RET-008 added as `planned`. GL-004 and SALES-010 re-verified
 against HEAD and flipped to `landed` — both had been fixed in code (postEntry's
 date-overlap closed-period guard, 8badf489) without the ledger row being updated.
 ACCT-004's residual per-customer `agingBuckets` NULL-`due_date` gap closed in

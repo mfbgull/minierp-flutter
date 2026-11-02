@@ -103,3 +103,6 @@ server/dbg-*.ts
 
 # fallow analysis snapshot (regenerable; not part of the repo).
 audit/fallow-tools/snapshot.json
+
+# Orphaned root lockfile — the npm project lives in server/.
+/package-lock.json
