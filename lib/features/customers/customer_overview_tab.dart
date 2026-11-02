@@ -100,6 +100,7 @@ class CustomerOverviewTab extends ConsumerWidget {
           Row(
             children: [
               _SummaryCard(
+                key: const Key('overview_card_invoiced'),
                 label: l10n.customersTotalinvoiced,
                 value: Formatters.currency(calculateTotalInvoiced(cohort)),
                 icon: Icons.receipt_long_outlined,
@@ -107,6 +108,7 @@ class CustomerOverviewTab extends ConsumerWidget {
               ),
               const SizedBox(width: 12),
               _SummaryCard(
+                key: const Key('overview_card_received'),
                 label: l10n.customersTotalreceived,
                 value: Formatters.currency(calculateTotalPaid(cohort)),
                 icon: Icons.savings_outlined,
@@ -368,6 +370,7 @@ class _SectionCard extends StatelessWidget {
 
 class _SummaryCard extends StatelessWidget {
   const _SummaryCard({
+    super.key,
     required this.label,
     required this.value,
     required this.icon,

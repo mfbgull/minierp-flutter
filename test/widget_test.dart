@@ -11250,7 +11250,10 @@ void main() {
     // quick stats (credit limit stat), Record Payment + the 5 tabs.
     expect(find.text('Acme Corp'), findsOneWidget);
     expect(find.text('(Jane Doe)'), findsOneWidget);
-    expect(find.text('Rs. 5,000.00'), findsOneWidget); // credit-limit stat
+    expect(
+      find.text('Rs. 5,000.00'),
+      findsNWidgets(2),
+    ); // credit-limit stat and Overview account-settings row (H9)
     expect(find.text('Record Payment'), findsOneWidget);
     expect(find.text('Overview'), findsOneWidget);
     expect(find.text('Invoices'), findsOneWidget);
@@ -11915,7 +11918,22 @@ void main() {
       // Second ‹ → Apr 2–May 1: empty cohort → both cards 0.00 + the
       // compact filtered-empty line (title only — no hint, §10.2).
       await _pillShiftPrev(tester);
-      expect(find.text('Rs. 0.00'), findsNWidgets(2));
+      // Scoped to the cohort cards: the H9 account-settings rows also
+      // render Rs. 0.00 (zero credit limit / opening balance).
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('overview_card_invoiced')),
+          matching: find.text('Rs. 0.00'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('overview_card_received')),
+          matching: find.text('Rs. 0.00'),
+        ),
+        findsOneWidget,
+      );
       expect(find.text('No records in the selected period'), findsOneWidget);
       expect(
         find.text('Try a wider date range or choose All dates'),
