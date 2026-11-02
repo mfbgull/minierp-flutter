@@ -1,7 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
-const root = path.resolve(__dirname, '../..');
+const root = path.resolve(__dirname, '../../..');
 const { createIsolatedAuditFixture, startAuditSession } = require('./lib/isolated-fixture.cjs');
 const { run, database, db, evidence } = createIsolatedAuditFixture(path.join(root, 'accounting-audit/evidence/backend-run-'));
 let cleanup;

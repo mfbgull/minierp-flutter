@@ -1,7 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
-const root = path.resolve(__dirname, '../..');
+const root = path.resolve(__dirname, '../../..');
 const run = path.join(root, 'accounting-audit/evidence/backend-run-Lbw3la');
 const data = JSON.parse(fs.readFileSync(path.join(run, 'results.json')));
 assert.equal(data.completed, true);

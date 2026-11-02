@@ -3,7 +3,7 @@
 ## Accounting audit revalidation — 2026-10-26–27
 
 The current F-001–F-073 accounting remediation is tracked in
-[accounting-audit/remediation/STATUS.md](../accounting-audit/remediation/STATUS.md).
+[accounting-audit/remediation/STATUS.md](accounting-audit/remediation/STATUS.md).
 That ledger distinguishes executed current behavior from historical audit labels.
 Gull approved D15 later open-period settlement in this remediation chat; see the
 updated decision log. No historical financial records were repaired.

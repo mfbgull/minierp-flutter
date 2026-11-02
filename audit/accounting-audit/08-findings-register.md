@@ -22,7 +22,7 @@
 | F-071 | Confirmed defect | Medium | Retrying one3-unit reservation reserves6 at location; release leaves phantom3 | [Finding](findings/F-071/finding.md), AFjr5O and positive control |
 | F-072 | Confirmed defect | Medium | Accepted reservation with optional line ID omitted cannot release; reserved2 remains | [Finding](findings/F-072/finding.md), AFjr5O |
 | F-070 | Confirmed defect | Low | Repeated SO cancel returns500, state correctly unchanged | [Finding](findings/F-070/finding.md), AFjr5O hash/status proof |
-| F-023 | Accounting-policy decision required | Medium priority; not counted as corruption | Closing accrual period blocks later open-period expense/bill settlement409; no payment posts | [Finding](findings/F-023/finding.md), decision D15 in [decision log](../audit/DECISIONS.md) |
+| F-023 | Accounting-policy decision required | Medium priority; not counted as corruption | Closing accrual period blocks later open-period expense/bill settlement409; no payment posts | [Finding](findings/F-023/finding.md), decision D15 in [decision log](../../audit/DECISIONS.md) |
 
 Each finding contains reproduction, independent expected/actual accounting, financial impact, actual source references, retained DB/API or widget/export evidence, root cause, recommended correction and regression requirements. UI-only findings do not claim a new underlying database corruption.
 

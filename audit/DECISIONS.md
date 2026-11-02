@@ -382,7 +382,7 @@ recorded in a closed period. Preserve the original closed-period accrual journal
 The new payment debits the liability and credits the actual tender account in its
 own open period. It must not precede the source, exceed the outstanding liability,
 or bypass payment-period closure. Source edits and source voids remain protected.
-See [current remediation status](../accounting-audit/remediation/STATUS.md).
+See [current remediation status](accounting-audit/remediation/STATUS.md).
 
 Historical decision context follows:
 
@@ -397,7 +397,7 @@ credits cash while preserving the original closed journal, or deliberately prohi
 that workflow and disclose the restriction before period closure. Ordinary accrual
 settlement favors the first option; this audit does not select or implement it.
 
-Evidence and exact requests: [F-023](../accounting-audit/findings/F-023/finding.md).
+Evidence and exact requests: [F-023](accounting-audit/findings/F-023/finding.md).
 
 ## D16 — Distribution: every artifact is a self-contained application (2026-10-28)
 

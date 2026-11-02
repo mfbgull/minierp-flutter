@@ -4,7 +4,7 @@ const path = require('node:path');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const { createRequire } = require('node:module');
-const root = path.resolve(__dirname, '../..');
+const root = path.resolve(__dirname, '../../..');
 const run = fs.mkdtempSync(path.join(root, 'accounting-audit/evidence/payable-cash-run-'));
 const serverRequire = createRequire(path.join(root, 'server/package.json'));
 Object.assign(process.env, { NODE_ENV: 'test', DATABASE_PATH: run, LOG_DIR: path.join(run, 'logs'), JWT_SECRET: 'isolated-payable-cash-audit-secret', DEFAULT_ADMIN_PASSWORD: 'Isolated-audit-2026!' });

@@ -1,7 +1,7 @@
 # Audit Coverage Ledger
 
 The separate 2026-10-26/27 accounting revalidation (F-001–F-073) is tracked in
-[the remediation status ledger](../accounting-audit/remediation/STATUS.md), with
+[the remediation status ledger](../audit/accounting-audit/remediation/STATUS.md), with
 current working-tree evidence and explicit remaining limits. Full suites and
 unchanged gates passed, with scoped independent approval; this does not rewrite
 the canonical audit rows below or certify every financial workflow.

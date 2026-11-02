@@ -6,7 +6,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { spawn, spawnSync } = require('node:child_process');
 
-const root = path.resolve(__dirname, '..');
+const root = path.resolve(__dirname, '../..');
 const evidence = path.join(__dirname, 'evidence');
 fs.mkdirSync(evidence, { recursive: true });
 const ignored = new Set(['.git', 'node_modules', 'build', 'dist', '.dart_tool', '.tmp-test', '.omo', 'accounting-audit', '.codebase-memory']);

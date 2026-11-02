@@ -1,7 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
-const root = path.resolve(__dirname, '../../..');
+const root = path.resolve(__dirname, '../../../..');
 
 function createIsolatedAuditFixture(runPrefix) {
   const run = fs.mkdtempSync(runPrefix);
