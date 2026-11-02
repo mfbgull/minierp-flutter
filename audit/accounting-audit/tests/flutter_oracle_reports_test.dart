@@ -9,7 +9,7 @@ import 'package:minierp_app/features/reports/profit_loss_report_screen.dart';
 import 'package:minierp_app/features/reports/report_providers.dart';
 import 'package:minierp_app/features/reports/balance_sheet_report_screen.dart';
 
-import '../../test/test_helpers.dart';
+import '../../../test/test_helpers.dart';
 
 void main() {
   final path = Platform.environment['FLUTTER_AUDIT_ORACLE'];

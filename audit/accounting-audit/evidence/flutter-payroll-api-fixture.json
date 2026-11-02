@@ -1,0 +1,17 @@
+{
+  "source_artifact": "accounting-audit/evidence/backend-run-fPHem1/results.json",
+  "source_request": "GET /api/employees/1/salary/history",
+  "source_status": 200,
+  "row": {
+    "pay_period": "2026-09",
+    "employee_salary": 1000,
+    "total_paid": 200,
+    "remaining": 800,
+    "status": "advance",
+    "payment_count": 1,
+    "advance_carryover": 200,
+    "advance_source_period": "2026-08",
+    "first_payment_date": "2026-08-20",
+    "last_payment_date": "2026-08-20"
+  }
+}

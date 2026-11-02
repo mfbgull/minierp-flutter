@@ -14,7 +14,7 @@ it('confines every audit SQLite constructor to its fresh fixture before opening 
       const path = require('node:path');
       const root = process.argv[1];
       const directory = process.argv[2];
-      const { createIsolatedAuditFixture, startAuditSession } = require(path.join(root, 'accounting-audit/tests/lib/isolated-fixture.cjs'));
+      const { createIsolatedAuditFixture, startAuditSession } = require(path.join(root, 'audit/accounting-audit/tests/lib/isolated-fixture.cjs'));
       const { run, database, db, evidence } = createIsolatedAuditFixture(path.join(directory, 'owned-run-'));
       assert.deepEqual(evidence, {
         run, guard: 'Every SQLite constructor restricted to newly created run directory', api: [], scenarios: [],

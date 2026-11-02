@@ -97,7 +97,7 @@ void main() {
     final capture =
         jsonDecode(
               File(
-                'accounting-audit/evidence/flutter-payroll-api-fixture.json',
+                'audit/accounting-audit/evidence/flutter-payroll-api-fixture.json',
               ).readAsStringSync(),
             )
             as Map<String, dynamic>;
@@ -125,7 +125,7 @@ void main() {
         .map((w) => w.data ?? w.textSpan?.toPlainText() ?? '')
         .toList();
     File(
-      'accounting-audit/remediation/flutter-salary-carryover-widget.json',
+      'audit/accounting-audit/remediation/flutter-salary-carryover-widget.json',
     ).writeAsStringSync(
       const JsonEncoder.withIndent('  ').convert({
         'fixture': {
@@ -179,7 +179,7 @@ void main() {
       final image = await boundary.toImage();
       final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
       File(
-        'accounting-audit/remediation/flutter-balance-sheet.png',
+        'audit/accounting-audit/remediation/flutter-balance-sheet.png',
       ).writeAsBytesSync(bytes!.buffer.asUint8List());
       image.dispose();
     });
@@ -188,7 +188,7 @@ void main() {
         .map((w) => w.data ?? w.textSpan?.toPlainText() ?? '')
         .toList();
     File(
-      'accounting-audit/remediation/flutter-balance-sheet-widget.json',
+      'audit/accounting-audit/remediation/flutter-balance-sheet-widget.json',
     ).writeAsStringSync(
       const JsonEncoder.withIndent('  ').convert({
         'input': fixture,
@@ -259,7 +259,7 @@ void main() {
       BalanceSheetReport.fromJson(balanceSheetFixture()),
     );
     File(
-      'accounting-audit/remediation/flutter-balance-sheet.csv',
+      'audit/accounting-audit/remediation/flutter-balance-sheet.csv',
     ).writeAsStringSync(csv);
     final cashLine = csv
         .split('\n')
@@ -268,7 +268,7 @@ void main() {
     expect(records.every((row) => row.length == 3), isTrue);
     final actualCells = records.singleWhere((row) => row.first == 'Cash');
     File(
-      'accounting-audit/remediation/flutter-csv-observation.json',
+      'audit/accounting-audit/remediation/flutter-csv-observation.json',
     ).writeAsStringSync(
       jsonEncode({
         'actual_line': cashLine,
@@ -310,7 +310,7 @@ void main() {
           await tester.runAsync(() async {
             final image = await boundary.toImage();
             final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-            File('accounting-audit/remediation/balance-${width.toInt()}-${dark ? 'dark' : 'light'}-$position.png').writeAsBytesSync(bytes!.buffer.asUint8List());
+            File('audit/accounting-audit/remediation/balance-${width.toInt()}-${dark ? 'dark' : 'light'}-$position.png').writeAsBytesSync(bytes!.buffer.asUint8List());
             image.dispose();
           });
         }

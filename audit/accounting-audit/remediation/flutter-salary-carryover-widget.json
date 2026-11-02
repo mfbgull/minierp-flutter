@@ -4,7 +4,7 @@
     "total_paid_including_advance": 200,
     "advance_carryover": 200,
     "remaining": 800,
-    "pay_period": "2026-10"
+    "pay_period": "2026-11"
   },
   "source_capture": {
     "source_artifact": "accounting-audit/evidence/backend-run-fPHem1/results.json",
@@ -29,7 +29,7 @@
     "AUDIT · Audit Fixture",
     "Amount *",
     "Payment Date *",
-    "Oct 28, 2026",
+    "Nov 2, 2026",
     "Payment Type",
     "Full",
     "Already paid this month: Rs. 200.00 (Advance from August 2026: Rs. 200.00) — Remaining Balance: Rs. 800.00",

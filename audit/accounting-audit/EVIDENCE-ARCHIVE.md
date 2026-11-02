@@ -12,4 +12,6 @@ Backup: `../../../minierp-artifact-archives/minierp-accounting-audit-evidence-20
 to resolve any cited artifact.
 
 `run-verification.cjs` recreates `evidence/` on its next run. The directory is
-gitignored; new outputs are not committed.
+gitignored; new outputs are not committed. Exception:
+`evidence/flutter-payroll-api-fixture.json` stays tracked — Flutter regression
+tests read it as a test input.
