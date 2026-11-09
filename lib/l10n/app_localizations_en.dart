@@ -9,6 +9,115 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get partyAccount => 'Customer and supplier account';
+
+  @override
+  String get partyAdjust => 'Adjust balances';
+
+  @override
+  String get partyHistory => 'Balance adjustments';
+
+  @override
+  String get partyCustomer => 'Customer';
+
+  @override
+  String get partySupplier => 'Supplier';
+
+  @override
+  String get partyTheyOwe => 'They owe you';
+
+  @override
+  String get partyYouOwe => 'You owe them';
+
+  @override
+  String get partyNetReceivable => 'Net receivable';
+
+  @override
+  String get partyNetPayable => 'Net payable';
+
+  @override
+  String get partyCredit => 'Customer store credit';
+
+  @override
+  String get partyAdvance => 'Supplier advance';
+
+  @override
+  String get partyMaximum => 'Maximum adjustment';
+
+  @override
+  String get partyNoCash =>
+      'This adjustment settles the selected documents. No cash moves.';
+
+  @override
+  String get partyInvoices => 'Select sales invoices';
+
+  @override
+  String get partyPayables => 'Select supplier liabilities';
+
+  @override
+  String get partyAllocation => 'Adjustment amount';
+
+  @override
+  String get partyInvalidAllocation =>
+      'Enter positive amounts within each balance. Both sides must have the same total.';
+
+  @override
+  String get partyAfter => 'Balances after adjustment';
+
+  @override
+  String get partyPosted => 'Adjustment posted';
+
+  @override
+  String get partyReversed => 'Adjustment reversed';
+
+  @override
+  String get partyReverse => 'Reverse adjustment';
+
+  @override
+  String get partyReverseReason => 'Reversal reason';
+
+  @override
+  String get partyLink => 'Link existing record';
+
+  @override
+  String get partyAddCustomer => 'Also a customer';
+
+  @override
+  String get partyAddSupplier => 'Also a supplier';
+
+  @override
+  String get partyLinkConfirm =>
+      'Confirm that these records represent the same person or business. Linking does not settle their balances.';
+
+  @override
+  String get partySearch => 'Search by name, code or contact';
+
+  @override
+  String get partyName => 'Name';
+
+  @override
+  String get partyCode => 'Code';
+
+  @override
+  String get partyLinked => 'Roles linked';
+
+  @override
+  String get partyRoleCreated => 'Role added';
+
+  @override
+  String get partySource => 'Source document';
+
+  @override
+  String get partyUnlink => 'Unlink roles';
+
+  @override
+  String get partyUnlinkConfirm =>
+      'Separate these customer and supplier roles? This is allowed only before any adjustment history exists.';
+
+  @override
+  String get partySettled => 'Settled';
+
+  @override
   String get inventoryManufacturer => 'Manufacturer / Brand';
 
   @override

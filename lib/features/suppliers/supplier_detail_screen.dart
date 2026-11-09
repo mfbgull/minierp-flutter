@@ -23,6 +23,7 @@ import 'supplier_pos_tab.dart';
 import 'supplier_providers.dart';
 import 'supplier_purchases_tab.dart';
 import 'supplier_statement_tab.dart';
+import '../parties/party_account.dart';
 import 'supplier_bills_tab.dart';
 import 'supplier_advances_tab.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
@@ -92,6 +93,10 @@ class _SupplierDetailScreenState extends ConsumerState<SupplierDetailScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Align(alignment: AlignmentDirectional.centerEnd, child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          child: PartyAccountButton(partyId: supplier.partyId),
+        )),
         // Page header (web SupplierHeader): back + identity + Record
         // Payment. The shell's app bar already labels the module; this
         // block carries the supplier context.

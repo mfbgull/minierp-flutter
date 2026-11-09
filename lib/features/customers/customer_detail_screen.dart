@@ -27,6 +27,7 @@ import 'customer_payment_modal.dart' show showCustomerPaymentModal;
 import 'customer_payments_tab.dart';
 import 'customer_providers.dart';
 import 'customer_statement_tab.dart';
+import '../parties/party_account.dart';
 import 'customer_unapplied_cash_tab.dart';
 import 'unapplied_cash_receive_dialog.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
@@ -190,6 +191,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
                       icon: const Icon(Icons.add, size: 18),
                       label: Text(l10n.customersRecordpayment),
                     ),
+                  PartyAccountButton(partyId: customer.partyId),
                   if (canCreatePayment)
                     OutlinedButton.icon(
                       onPressed: () => showUnappliedCashReceiveDialog(

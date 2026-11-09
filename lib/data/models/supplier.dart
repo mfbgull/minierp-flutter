@@ -4,6 +4,9 @@ import 'json_helpers.dart';
 class Supplier {
   const Supplier({
     required this.id,
+    this.partyId,
+    this.linkedCustomerId,
+    this.linkedCustomerCode,
     required this.supplierCode,
     required this.supplierName,
     this.contactPerson,
@@ -21,6 +24,9 @@ class Supplier {
 
   factory Supplier.fromJson(Map<String, dynamic> json) => Supplier(
     id: asInt(json['id']) ?? 0,
+    partyId: asInt(json['party_id']),
+    linkedCustomerId: asInt(json['linked_customer_id']),
+    linkedCustomerCode: asString(json['linked_customer_code']),
     supplierCode: asString(json['supplier_code']) ?? '',
     supplierName: asString(json['supplier_name']) ?? '',
     contactPerson: asString(json['contact_person']),
@@ -37,6 +43,9 @@ class Supplier {
   );
 
   final int id;
+  final int? partyId;
+  final int? linkedCustomerId;
+  final String? linkedCustomerCode;
   final String supplierCode;
   final String supplierName;
   final String? contactPerson;

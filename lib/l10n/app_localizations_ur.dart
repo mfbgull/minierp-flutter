@@ -9,6 +9,115 @@ class AppLocalizationsUr extends AppLocalizations {
   AppLocalizationsUr([String locale = 'ur']) : super(locale);
 
   @override
+  String get partyAccount => 'گاہک اور سپلائر کا مشترکہ کھاتہ';
+
+  @override
+  String get partyAdjust => 'بیلنس ایڈجسٹ کریں';
+
+  @override
+  String get partyHistory => 'بیلنس کی ایڈجسٹمنٹس';
+
+  @override
+  String get partyCustomer => 'گاہک';
+
+  @override
+  String get partySupplier => 'سپلائر';
+
+  @override
+  String get partyTheyOwe => 'آپ کو وصول ہونے والی رقم';
+
+  @override
+  String get partyYouOwe => 'آپ کی قابل ادا رقم';
+
+  @override
+  String get partyNetReceivable => 'خالص قابل وصول رقم';
+
+  @override
+  String get partyNetPayable => 'خالص قابل ادا رقم';
+
+  @override
+  String get partyCredit => 'گاہک کا اسٹور کریڈٹ';
+
+  @override
+  String get partyAdvance => 'سپلائر کو پیشگی رقم';
+
+  @override
+  String get partyMaximum => 'زیادہ سے زیادہ ایڈجسٹمنٹ';
+
+  @override
+  String get partyNoCash =>
+      'اس ایڈجسٹمنٹ سے منتخب دستاویزات کا حساب برابر ہوگا۔ نقد رقم کا لین دین نہیں ہوگا۔';
+
+  @override
+  String get partyInvoices => 'فروخت کی رسیدیں منتخب کریں';
+
+  @override
+  String get partyPayables => 'سپلائر کی قابل ادا رقوم منتخب کریں';
+
+  @override
+  String get partyAllocation => 'ایڈجسٹمنٹ کی رقم';
+
+  @override
+  String get partyInvalidAllocation =>
+      'ہر بیلنس کے اندر مثبت رقم درج کریں۔ دونوں طرف کی کل رقم برابر ہونی چاہیے۔';
+
+  @override
+  String get partyAfter => 'ایڈجسٹمنٹ کے بعد بیلنس';
+
+  @override
+  String get partyPosted => 'ایڈجسٹمنٹ درج ہوگئی';
+
+  @override
+  String get partyReversed => 'ایڈجسٹمنٹ واپس ہوگئی';
+
+  @override
+  String get partyReverse => 'ایڈجسٹمنٹ واپس کریں';
+
+  @override
+  String get partyReverseReason => 'واپسی کی وجہ';
+
+  @override
+  String get partyLink => 'موجودہ ریکارڈ منسلک کریں';
+
+  @override
+  String get partyAddCustomer => 'بطور گاہک بھی شامل کریں';
+
+  @override
+  String get partyAddSupplier => 'بطور سپلائر بھی شامل کریں';
+
+  @override
+  String get partyLinkConfirm =>
+      'تصدیق کریں کہ یہ ریکارڈ ایک ہی شخص یا کاروبار کے ہیں۔ منسلک کرنے سے بیلنس ایڈجسٹ نہیں ہوگا۔';
+
+  @override
+  String get partySearch => 'نام، کوڈ یا رابطے سے تلاش کریں';
+
+  @override
+  String get partyName => 'نام';
+
+  @override
+  String get partyCode => 'کوڈ';
+
+  @override
+  String get partyLinked => 'دونوں کردار منسلک ہوگئے';
+
+  @override
+  String get partyRoleCreated => 'کردار شامل ہوگیا';
+
+  @override
+  String get partySource => 'اصل دستاویز';
+
+  @override
+  String get partyUnlink => 'کردار الگ کریں';
+
+  @override
+  String get partyUnlinkConfirm =>
+      'گاہک اور سپلائر کے یہ کردار الگ کریں؟ یہ صرف کسی ایڈجسٹمنٹ کے اندراج سے پہلے ممکن ہے۔';
+
+  @override
+  String get partySettled => 'حساب برابر';
+
+  @override
   String get inventoryManufacturer => 'بنانے والی کمپنی / برانڈ';
 
   @override

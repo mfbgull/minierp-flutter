@@ -98,6 +98,216 @@ abstract class AppLocalizations {
     Locale('ur'),
   ];
 
+  /// No description provided for @partyAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer and supplier account'**
+  String get partyAccount;
+
+  /// No description provided for @partyAdjust.
+  ///
+  /// In en, this message translates to:
+  /// **'Adjust balances'**
+  String get partyAdjust;
+
+  /// No description provided for @partyHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Balance adjustments'**
+  String get partyHistory;
+
+  /// No description provided for @partyCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer'**
+  String get partyCustomer;
+
+  /// No description provided for @partySupplier.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplier'**
+  String get partySupplier;
+
+  /// No description provided for @partyTheyOwe.
+  ///
+  /// In en, this message translates to:
+  /// **'They owe you'**
+  String get partyTheyOwe;
+
+  /// No description provided for @partyYouOwe.
+  ///
+  /// In en, this message translates to:
+  /// **'You owe them'**
+  String get partyYouOwe;
+
+  /// No description provided for @partyNetReceivable.
+  ///
+  /// In en, this message translates to:
+  /// **'Net receivable'**
+  String get partyNetReceivable;
+
+  /// No description provided for @partyNetPayable.
+  ///
+  /// In en, this message translates to:
+  /// **'Net payable'**
+  String get partyNetPayable;
+
+  /// No description provided for @partyCredit.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer store credit'**
+  String get partyCredit;
+
+  /// No description provided for @partyAdvance.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplier advance'**
+  String get partyAdvance;
+
+  /// No description provided for @partyMaximum.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum adjustment'**
+  String get partyMaximum;
+
+  /// No description provided for @partyNoCash.
+  ///
+  /// In en, this message translates to:
+  /// **'This adjustment settles the selected documents. No cash moves.'**
+  String get partyNoCash;
+
+  /// No description provided for @partyInvoices.
+  ///
+  /// In en, this message translates to:
+  /// **'Select sales invoices'**
+  String get partyInvoices;
+
+  /// No description provided for @partyPayables.
+  ///
+  /// In en, this message translates to:
+  /// **'Select supplier liabilities'**
+  String get partyPayables;
+
+  /// No description provided for @partyAllocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Adjustment amount'**
+  String get partyAllocation;
+
+  /// No description provided for @partyInvalidAllocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter positive amounts within each balance. Both sides must have the same total.'**
+  String get partyInvalidAllocation;
+
+  /// No description provided for @partyAfter.
+  ///
+  /// In en, this message translates to:
+  /// **'Balances after adjustment'**
+  String get partyAfter;
+
+  /// No description provided for @partyPosted.
+  ///
+  /// In en, this message translates to:
+  /// **'Adjustment posted'**
+  String get partyPosted;
+
+  /// No description provided for @partyReversed.
+  ///
+  /// In en, this message translates to:
+  /// **'Adjustment reversed'**
+  String get partyReversed;
+
+  /// No description provided for @partyReverse.
+  ///
+  /// In en, this message translates to:
+  /// **'Reverse adjustment'**
+  String get partyReverse;
+
+  /// No description provided for @partyReverseReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Reversal reason'**
+  String get partyReverseReason;
+
+  /// No description provided for @partyLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Link existing record'**
+  String get partyLink;
+
+  /// No description provided for @partyAddCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Also a customer'**
+  String get partyAddCustomer;
+
+  /// No description provided for @partyAddSupplier.
+  ///
+  /// In en, this message translates to:
+  /// **'Also a supplier'**
+  String get partyAddSupplier;
+
+  /// No description provided for @partyLinkConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm that these records represent the same person or business. Linking does not settle their balances.'**
+  String get partyLinkConfirm;
+
+  /// No description provided for @partySearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search by name, code or contact'**
+  String get partySearch;
+
+  /// No description provided for @partyName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get partyName;
+
+  /// No description provided for @partyCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Code'**
+  String get partyCode;
+
+  /// No description provided for @partyLinked.
+  ///
+  /// In en, this message translates to:
+  /// **'Roles linked'**
+  String get partyLinked;
+
+  /// No description provided for @partyRoleCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Role added'**
+  String get partyRoleCreated;
+
+  /// No description provided for @partySource.
+  ///
+  /// In en, this message translates to:
+  /// **'Source document'**
+  String get partySource;
+
+  /// No description provided for @partyUnlink.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlink roles'**
+  String get partyUnlink;
+
+  /// No description provided for @partyUnlinkConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Separate these customer and supplier roles? This is allowed only before any adjustment history exists.'**
+  String get partyUnlinkConfirm;
+
+  /// No description provided for @partySettled.
+  ///
+  /// In en, this message translates to:
+  /// **'Settled'**
+  String get partySettled;
+
   /// No description provided for @inventoryManufacturer.
   ///
   /// In en, this message translates to:
