@@ -893,6 +893,92 @@ the report does not determine tax rates or filing eligibility.
 
 ---
 
+## Parties and noncash adjustments
+
+A Party is the shared identity behind one customer profile and one supplier
+profile. Existing customer and supplier IDs, documents, terms and accounting
+history are unchanged. Linking is explicit and never settles a balance.
+
+All routes return `{success: true, data}` and require authentication. The
+permission shown is the module/action pair. Non-Admin roles receive none of
+these permissions automatically.
+
+| Method | Path | Permission / purpose |
+|---|---|---|
+| POST | /parties/link | parties:link, customers:update, suppliers:update; link an existing customer and supplier |
+| POST | /parties/:id/unlink | parties:link, customers:update, suppliers:update; separate roles before any adjustment history |
+| POST | /parties/:id/customer | parties:link, customers:create; add the missing customer role |
+| POST | /parties/:id/supplier | parties:link, suppliers:create; add the missing supplier role |
+| GET | /parties/:id/position | parties:read; role balances, net position and eligible totals |
+| GET | /parties/:id/adjustment-targets | party_adjustments:read; eligible invoices and supplier liabilities |
+| GET | /parties/:id/adjustments | party_adjustments:read; paginated history (`page`, `limit`) |
+| GET | /parties/:id/adjustments/:adjustmentId | party_adjustments:read; header and allocations |
+| POST | /parties/:id/adjustments | party_adjustments:create; post a noncash adjustment |
+| POST | /parties/:id/adjustments/:adjustmentId/reverse | party_adjustments:reverse; reverse a posted adjustment |
+
+`POST /parties/link` accepts `{customer_id, supplier_id, confirmed: true}`.
+`confirmed` must be literal `true`; the server never infers identity from a
+name, phone number or email address. A conflicting role, an inactive profile,
+or existing adjustment history is rejected with 409.
+
+`GET /parties/:id/position` returns the shared display name, both role
+profiles, the customer and supplier ledger balances, the net position, and the
+separate credit and advance balances:
+
+```json
+{
+  "id": 7,
+  "display_name": "Ahmed Traders",
+  "customer": {"id": 2, "code": "CUST-...", "name": "Ahmed Traders", "is_active": 1},
+  "supplier": {"id": 3, "code": "SUP-...", "name": "Ahmed Traders", "is_active": 1},
+  "customer_balance": 2000,
+  "supplier_balance": 1000,
+  "net_balance": 1000,
+  "customer_credit": 0,
+  "supplier_advance": 0,
+  "eligible_receivables": 2000,
+  "eligible_payables": 1000,
+  "maximum_adjustment": 1000
+}
+```
+
+`net_balance` is `customer_balance - supplier_balance`. `customer_credit` and
+`supplier_advance` are shown separately and are never adjustable document
+balances. `maximum_adjustment` is the smaller of the eligible receivable and
+payable totals.
+
+`POST /parties/:id/adjustments` accepts:
+
+```json
+{
+  "adjustment_date": "2026-09-03",
+  "amount": 1000,
+  "notes": "Set off purchase against sale",
+  "receivables": [{"invoice_id": 10, "amount": 1000}],
+  "payables": [{"kind": "purchase", "id": 20, "amount": 1000}]
+}
+```
+
+`kind` is `purchase`, `purchase_order` or `supplier_bill`. Every allocation is
+positive, unique, and no larger than the selected document's eligible balance.
+Both allocation totals must equal `amount` in minor units. The request requires
+an `Idempotency-Key` header: an unchanged retry returns the same adjustment; the
+same key with a different body returns 409.
+
+Posting debits the payable control account resolved from each source journal
+and credits the receivable control account. It creates no cash, revenue, tax,
+stock, cost-of-goods or profit movement. The response is the adjustment detail
+with `receivables` and `payables` allocations.
+
+`POST /parties/:id/adjustments/:adjustmentId/reverse` accepts
+`{reason, reversal_date}`. It preserves the original adjustment and allocations,
+voids the canonical journal, appends opposite subledger entries, and recalculates
+both roles. A second reversal returns 409. Active adjustments block cancellation
+or voiding of their source invoice, purchase, purchase order receipt or supplier
+bill.
+
+---
+
 ## POS (Point of Sale)
 
 | Method | Path | Description |

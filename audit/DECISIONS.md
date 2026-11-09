@@ -457,3 +457,52 @@ Related implementation rules:
   different units.
 - Supplier purchase history comes from valid posted purchasing records, not
   from remaining stock batches.
+
+## D18 — Customer and supplier noncash balance adjustment (2026-11-07)
+
+**Status: APPROVED by Gull in the implementation request, 2026-11-07.**
+
+One person or business can be both a customer and a supplier. The accepted
+scope is:
+
+- A lightweight Party holds the shared identity. One Party has at most one
+  customer profile and one supplier profile. Existing customer and supplier
+  IDs, documents, terms, contacts and accounting history are unchanged.
+- Linking is explicit and never automatic. The user must confirm that both
+  profiles represent the same person or business. Names, phone numbers and
+  email addresses are never used to infer identity. Linking creates no
+  accounting entry.
+- An adjustment is explicit and noncash. It settles selected outstanding sales
+  invoices against selected recognized supplier liabilities. It never creates
+  an automatic match, automatic netting, cross-Party settlement or foreign
+  exchange settlement.
+- Only accrued liabilities qualify: posted direct purchases, recognized
+  purchase-order receipts and supplier bills. An unreceived purchase order is
+  not a liability. Opening balances, store credit, supplier advances and
+  expected refunds are excluded from document adjustment and shown separately.
+- The adjustment debits the payable control account resolved from the actual
+  source journal and credits the receivable control account. It does not change
+  cash, bank, revenue, purchases, tax, inventory, cost of goods sold or profit.
+- Posted adjustments are immutable. Correction requires reversal and a new
+  adjustment. Reversal preserves the original records, appends opposite
+  subledger entries, voids the canonical journal and recalculates both roles.
+- Active adjustments block cancellation or voiding of their source documents.
+  A later customer receipt does not block reversal. A noncash adjustment never
+  increases refundable cash.
+- Posting requires an open accounting period and an idempotency key. The
+  adjustment cannot precede a selected source document. Liabilities from a
+  closed period can be settled in a later open period under D15.
+- Formal receivable and payable reports stay separate. The Party overview
+  supplies the net position.
+
+Related implementation rules:
+
+- Every allocation is positive, unique and no larger than the selected
+  document's remaining eligible balance. Both allocation totals equal the
+  adjustment amount in normalized minor units.
+- Limits are rechecked inside the write transaction, so competing payments
+  cannot settle the same balance.
+- The shared guard `assertNoPartyAdjustment` protects every source cancellation
+  and void entry point.
+- Only the Admin role receives the new Party and adjustment permissions
+  automatically.

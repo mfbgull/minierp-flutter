@@ -447,6 +447,55 @@ to case at the database level.
 
 ---
 
+## Party identity and noncash adjustments (migration 125)
+
+Migration `125_party_adjustments.sql` adds a lightweight shared identity for a
+customer and a supplier that represent the same person or business.
+
+- `parties(id, display_name, created_at)` stores the shared name and audit
+  metadata. It does not replace either profile.
+- `customers.party_id` and `suppliers.party_id` are unique foreign keys to
+  `parties(id)`. One Party can have at most one customer profile and one
+  supplier profile.
+- The migration creates a separate Party for every existing customer and
+  supplier. Existing IDs, documents, contacts, terms and balances are unchanged.
+- `customers_create_party` and `suppliers_create_party` triggers create a Party
+  for a new profile that has no `party_id`. `PartyModel.addCustomer` and
+  `addSupplier` attach the new profile to the existing Party and remove the
+  trigger-created placeholder.
+- `party_identity_events(id, party_id, customer_id, supplier_id, action,
+  previous_party_id, created_by, created_at)` records link, unlink and add-role
+  actions with attribution. It creates no accounting entry.
+
+Adjustment records:
+
+- `party_adjustments(id, adjustment_no, party_id, customer_id, supplier_id,
+  adjustment_date, amount, notes, status, created_by, created_at, reversed_by,
+  reversed_at, reversal_date, reversal_reason)` is the immutable header.
+  `status` is `posted` or `reversed`; the check constraint requires the reversal
+  fields to agree with the status.
+- `party_adjustment_receivables(adjustment_id, invoice_id, amount)` records the
+  settled sales invoices. `(adjustment_id, invoice_id)` is unique.
+- `party_adjustment_payables(adjustment_id, purchase_id, purchase_order_id,
+  bill_id, amount)` records the settled supplier liability. A check constraint
+  requires exactly one target, and each target is unique per adjustment.
+- `invoices.adjusted_amount REAL NOT NULL DEFAULT 0` stores the active noncash
+  settlement. It is separate from `paid_amount`, which keeps its collected-cash
+  meaning.
+
+The migration recreates `direct_purchase_payables` and
+`purchase_order_payables` with `adjusted_amount` and
+`settled_amount = paid_amount + adjusted_amount`. Existing columns and
+semantics are preserved.
+
+Indexes cover Party history (`party_adjustments_party_date`), active status
+(`party_adjustments_status_date`), and each allocation target. Permissions
+`parties:read`, `parties:link`, `party_adjustments:read`,
+`party_adjustments:create` and `party_adjustments:reverse` are seeded. Only the
+Admin role receives them.
+
+---
+
 ## Document Number Generation
 
 All document numbers use atomic generation via `INSERT ... ON CONFLICT DO UPDATE` to prevent race conditions:

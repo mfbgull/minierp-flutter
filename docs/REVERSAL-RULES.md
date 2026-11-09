@@ -760,6 +760,42 @@ This includes:
 
 ---
 
+### Party adjustment reversal
+
+A posted customer-supplier adjustment is a noncash settlement. It must never be
+hard-deleted or edited. Correction uses the single primitive
+`PartyAdjustmentService.reverseAdjustment`.
+
+It must:
+
+* Require a nonempty `reason` and a `reversal_date` not before the adjustment.
+* Preserve the original `party_adjustments` header and every allocation row.
+* Mark the header `reversed`, and stamp `reversed_by`, `reversed_at`,
+  `reversal_date` and `reversal_reason`.
+* Void the canonical `PARTY_ADJUSTMENT` journal through
+  `AccountingService.voidJournalLinesByReference`.
+* Append opposite `REVERSAL:PARTY_ADJUSTMENT` rows to `customer_ledger` and
+  `supplier_ledger`, mark the original rows `voided = 1`, and let the rebuild
+  skip both the voided original and the audit-only reversal row.
+* Recalculate every affected invoice balance and status, the customer ledger
+  chain, the customer balance and the supplier balance inside the same
+  transaction.
+* Reject a second reversal with 409.
+* Follow existing period protection for the original adjustment date and the
+  reversal date.
+
+Active adjustments lock their source documents. The shared guard
+`assertNoPartyAdjustment` is called by every cancellation or void entry point:
+invoice cancel, invoice delete, invoice financial update, purchase void,
+purchase-order cancel, goods-receipt void and supplier-bill void. A later
+customer receipt does not block reversal; the rebuild restores only the
+outstanding amount that remains after the active relationships.
+
+Reversal must not create cash, revenue, tax, stock, cost-of-goods or profit
+movement. A noncash adjustment must never increase refundable cash.
+
+---
+
 ## deleteSalaryPayment
 
 Salary payments are financially touched because they affect:
