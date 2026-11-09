@@ -30,6 +30,7 @@ import type Database from 'better-sqlite3';
 import db from '../config/database';
 import { AccountingService } from './accountingService';
 import { PaymentRecordingService } from './PaymentRecordingService';
+import { invoiceAdjustmentAmount } from '../utils/partyAdjustmentBalances';
 import {
   computeReturnedLine,
   allocateHeaderDiscount,
@@ -626,6 +627,7 @@ export class InvoiceReturnService {
       const afterVoid = computePosition({ originalTotal: position.originalTotal,
         totalReturned: position.totalReturned - Number(ret.returned_amount),
         totalFees: position.totalFees - Number(ret.fee_amount), totalPaid: position.totalPaid,
+        totalAdjusted: position.totalAdjusted,
         totalSettled: position.totalSettled - ownSettlements.reduce((sum, row) => sum + Number(row.amount), 0) });
       if (afterVoid.totalSettled > afterVoid.refundCreditDue + 0.005) {
         throw new ReturnError(409, 'Cannot void a return supporting other active credit or refund settlements');
@@ -799,6 +801,7 @@ export class InvoiceReturnService {
       totalReturned: Number(invoice.returned_amount || 0),
       totalFees: Number(invoice.return_fee || 0),
       totalPaid: roundCurrency(Number(paid.p) + Number(invoice.credit_offset || 0)),
+      totalAdjusted: invoiceAdjustmentAmount(db, invoiceId),
       totalSettled: Number(settled.s),
     });
     // The spec's §4.2 API field name for `totalSettled`.

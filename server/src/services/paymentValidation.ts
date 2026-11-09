@@ -158,7 +158,10 @@ function validateSupplierAllocation(
       SELECT b.supplier_id, b.total_amount, b.bill_date,
         COALESCE((SELECT SUM(a.amount) FROM supplier_bill_allocations a
           JOIN payments p ON p.id = a.payment_id
-          WHERE a.bill_id = b.id AND a.voided_at IS NULL AND p.voided_at IS NULL), 0) AS paid_amount
+          WHERE a.bill_id = b.id AND a.voided_at IS NULL AND p.voided_at IS NULL), 0)
+        + COALESCE((SELECT SUM(a.amount) FROM party_adjustment_payables a
+          JOIN party_adjustments p ON p.id = a.adjustment_id
+          WHERE a.bill_id = b.id AND p.status = 'posted'), 0) AS paid_amount
       FROM supplier_bills b WHERE b.id = ? AND b.voided_at IS NULL
     `).get(alloc.id) as { supplier_id: number; total_amount: number; bill_date: string; paid_amount: number } | undefined;
     if (!bill || bill.supplier_id !== input.supplierId) throw new BusinessRuleError(400, 'Supplier bill not found for this supplier');
@@ -185,7 +188,7 @@ function validateSupplierAllocation(
 
 function readPurchaseOrder(db: Database.Database, poId: number): PurchaseOrderRow | undefined {
   return db.prepare(`
-    SELECT po.id, po.supplier_id, v.total_payable - v.returned_amount AS total_amount, v.paid_amount
+    SELECT po.id, po.supplier_id, v.total_payable - v.returned_amount AS total_amount, v.settled_amount AS paid_amount
     FROM purchase_orders po
     JOIN purchase_order_payables v ON v.id = po.id
     WHERE po.id = ? AND LOWER(po.status) <> 'cancelled'
@@ -194,7 +197,7 @@ function readPurchaseOrder(db: Database.Database, poId: number): PurchaseOrderRo
 
 function readPurchase(db: Database.Database, purchaseId: number): PurchaseRow | undefined {
   return db.prepare(`
-    SELECT p.id, p.supplier_id, v.total_payable - v.returned_amount AS total_cost, v.paid_amount
+    SELECT p.id, p.supplier_id, v.total_payable - v.returned_amount AS total_cost, v.settled_amount AS paid_amount
     FROM purchases p
     JOIN direct_purchase_payables v ON v.id = p.id
     WHERE p.id = ? AND p.voided_at IS NULL

@@ -24,6 +24,7 @@ import {
 import { isValidPaymentMethod } from '../services/cashService';
 import { handleBusinessError } from '../utils/businessRuleError';
 import { assertLegacyInvoiceAllocationsAllowed } from '../services/unappliedPaymentGuard';
+import { assertNoPartyAdjustment } from '../utils/partyAdjustmentBalances';
 import {
   InvoiceCreationCreditError,
   InvoiceCreationIdempotencyError,
@@ -778,6 +779,7 @@ function deleteInvoice(req: AuthRequest, res: Response): Response | void {
       const freshInvoice = InvoiceModel.getById(invoiceId, db);
       if (!freshInvoice) throw new Error('Invoice not found');
       assertLegacyInvoiceAllocationsAllowed(db, invoiceId);
+      assertNoPartyAdjustment(db, 'invoice', invoiceId);
 
       const invoiceItems = InvoiceModel.getItemsForStockReverse(invoiceId, db);
 

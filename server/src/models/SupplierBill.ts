@@ -6,6 +6,7 @@ import { roundCurrency } from '../utils/currency';
 import { claimIdempotencyKey, hashRequestPayload, startIdempotentRequest } from '../utils/idempotency';
 import ledgerUtils from '../utils/ledgerUtils';
 import SupplierLedgerModel from './SupplierLedger';
+import { assertNoPartyAdjustment } from '../utils/partyAdjustmentBalances';
 
 export interface SupplierBillInput {
   supplier_id: number;
@@ -21,6 +22,8 @@ export interface SupplierBill extends SupplierBillInput {
   supplier_name: string;
   total_amount: number;
   paid_amount: number;
+  adjusted_amount: number;
+  settled_amount: number;
   balance_amount: number;
   voided_at: string | null;
 }
@@ -30,13 +33,25 @@ interface BillPaymentInput { amount: number; payment_date: string; payment_metho
 const BILL_SELECT = `
   SELECT b.*, s.supplier_name,
     COALESCE(paid.amount, 0) AS paid_amount,
-    CASE WHEN b.voided_at IS NULL THEN ROUND(b.total_amount - COALESCE(paid.amount, 0), 2) ELSE 0 END AS balance_amount
+    COALESCE(adjusted.amount, 0) AS adjusted_amount,
+    ROUND(COALESCE(paid.amount, 0) + COALESCE(adjusted.amount, 0), 2) AS settled_amount,
+    CASE WHEN b.voided_at IS NULL AND b.total_amount - COALESCE(paid.amount, 0) - COALESCE(adjusted.amount, 0) <= 0.005
+           AND COALESCE(adjusted.amount, 0) > 0 THEN 'Settled'
+         WHEN b.voided_at IS NULL AND b.total_amount - COALESCE(paid.amount, 0) - COALESCE(adjusted.amount, 0) <= 0.005
+           AND COALESCE(paid.amount, 0) > 0 THEN 'Paid'
+         ELSE NULL END AS settlement_status,
+    CASE WHEN b.voided_at IS NULL THEN MAX(0, ROUND(b.total_amount - COALESCE(paid.amount, 0) - COALESCE(adjusted.amount, 0), 2)) ELSE 0 END AS balance_amount
   FROM supplier_bills b JOIN suppliers s ON s.id = b.supplier_id
   LEFT JOIN (
     SELECT a.bill_id, SUM(a.amount) AS amount FROM supplier_bill_allocations a
     JOIN payments p ON p.id = a.payment_id
     WHERE a.voided_at IS NULL AND p.voided_at IS NULL GROUP BY a.bill_id
   ) paid ON paid.bill_id = b.id
+  LEFT JOIN (
+    SELECT a.bill_id, SUM(a.amount) AS amount FROM party_adjustment_payables a
+    JOIN party_adjustments p ON p.id = a.adjustment_id
+    WHERE p.status = 'posted' GROUP BY a.bill_id
+  ) adjusted ON adjusted.bill_id = b.id
 `;
 
 export class SupplierBillModel {
@@ -122,6 +137,7 @@ export class SupplierBillModel {
     return this.db.transaction(() => {
       const bill = this.get(id);
       if (bill.voided_at) return bill;
+      assertNoPartyAdjustment(this.db, 'supplier_bill', id);
       if (bill.paid_amount > 0) throw new BusinessRuleError(409, 'Reverse supplier bill payments before voiding');
       AccountingService.assertPeriodNotClosed(this.db, bill.bill_date, 'Supplier bill');
       AccountingService.voidJournalLinesByReference(this.db, 'SUPPLIER_BILL', id, { voidedBy: userId, voidReason: reason });

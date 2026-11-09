@@ -11,6 +11,8 @@ import { requireSupplierForPurchase } from '../utils/purchaseValidation';
 import { assertInboundDateNotRetroactive } from '../services/inventoryEffectiveDate';
 import { roundQty, qtyEpsilon } from '../utils/quantity';
 import { BusinessRuleError } from '../utils/businessRuleError';
+import { assertNoPartyAdjustment } from '../utils/partyAdjustmentBalances';
+import { appendAdjustmentSettlements } from '../utils/partyAdjustmentDetails';
 
 interface PurchaseOrder {
   id: number;
@@ -31,6 +33,8 @@ interface PurchaseOrder {
   warehouse_code?: string;
   created_by_username?: string;
   paid_amount?: number;
+  adjusted_amount?: number;
+  settled_amount?: number;
   balance_amount?: number;
 }
 
@@ -240,7 +244,11 @@ class PurchaseOrderModel {
         w.warehouse_code,
         u.username as created_by_username,
         COALESCE(pa.total_paid, 0) as paid_amount,
-        MAX(0, ROUND(v.total_payable - v.returned_amount - v.paid_amount, 2)) as balance_amount
+        v.adjusted_amount, v.settled_amount,
+        CASE WHEN v.adjusted_amount > 0 AND v.total_payable - v.returned_amount - v.settled_amount <= 0.005 THEN 'Settled'
+          WHEN v.paid_amount > 0 AND v.total_payable - v.returned_amount - v.settled_amount <= 0.005 THEN 'Paid'
+          ELSE NULL END as settlement_status,
+        MAX(0, ROUND(v.total_payable - v.returned_amount - v.settled_amount, 2)) as balance_amount
       FROM purchase_orders po
       JOIN purchase_order_payables v ON v.id = po.id
       JOIN suppliers s ON po.supplier_id = s.id
@@ -320,7 +328,8 @@ class PurchaseOrderModel {
           w.warehouse_code,
           u.username as created_by_username,
           COALESCE(pa.total_paid, 0) as paid_amount,
-          MAX(0, ROUND(v.total_payable - v.returned_amount - v.paid_amount, 2)) as balance_amount
+          v.adjusted_amount, v.settled_amount,
+          MAX(0, ROUND(v.total_payable - v.returned_amount - v.settled_amount, 2)) as balance_amount
         FROM purchase_orders po
         JOIN purchase_order_payables v ON v.id = po.id
         JOIN suppliers s ON po.supplier_id = s.id
@@ -588,6 +597,7 @@ class PurchaseOrderModel {
     }
 
     const transaction = db.transaction(() => {
+      if (status === 'Cancelled') assertNoPartyAdjustment(db, 'purchase_order', id);
       db.prepare(`
         UPDATE purchase_orders
         SET status = ?, updated_at = CURRENT_TIMESTAMP
@@ -693,6 +703,7 @@ class PurchaseOrderModel {
       if (receipt.voided_at) {
         throw new Error(`Goods receipt ${receipt.receipt_no} is already voided`);
       }
+      assertNoPartyAdjustment(db, 'purchase_order', receipt.po_id);
 
       const items = db.prepare(`
         SELECT gri.id, gri.po_item_id, gri.item_id, gri.received_quantity,
@@ -868,7 +879,7 @@ class PurchaseOrderModel {
     id: number; payment_no: string; payment_date: string;
     payment_method: string; reference_no: string; notes: string; amount: number;
   }> {
-    return db.prepare(`
+    const rows = db.prepare(`
       SELECT p.id, p.payment_no, p.payment_date, p.payment_method,
              p.reference_no, p.notes, pa.amount
       FROM po_allocations pa JOIN payments p ON pa.payment_id = p.id
@@ -877,6 +888,8 @@ class PurchaseOrderModel {
       id: number; payment_no: string; payment_date: string;
       payment_method: string; reference_no: string; notes: string; amount: number;
     }>;
+    appendAdjustmentSettlements(db, rows, { kind: 'purchase_order', id: poId });
+    return rows;
   }
 
   static addReceipt(data: CreateGoodsReceiptDTO, userId: number, db: Database.Database): GoodsReceipt {

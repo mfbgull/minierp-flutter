@@ -3,6 +3,9 @@ import SupplierLedgerModel from './SupplierLedger';
 
 interface Supplier {
   id: number;
+  party_id: number;
+  linked_customer_id?: number | null;
+  linked_customer_code?: string | null;
   supplier_code: string;
   supplier_name: string;
   contact_person?: string;
@@ -82,7 +85,9 @@ class SupplierModel {
   static getAll(filters: SupplierFilters, sortBy: string, sortOrder: string, page: number, limit: number, db: Database.Database): PaginatedResult {
     let query = `
       SELECT
-        id, supplier_code, supplier_name, contact_person,
+        id, party_id, supplier_code, supplier_name, contact_person,
+        (SELECT c.id FROM customers c WHERE c.party_id = suppliers.party_id AND c.deleted_at IS NULL LIMIT 1) AS linked_customer_id,
+        (SELECT c.customer_code FROM customers c WHERE c.party_id = suppliers.party_id AND c.deleted_at IS NULL LIMIT 1) AS linked_customer_code,
         email, phone, address, payment_terms, is_active,
         created_at, updated_at, current_balance
       FROM suppliers

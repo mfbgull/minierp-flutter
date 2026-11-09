@@ -100,6 +100,7 @@ function createSupplier(req: Request, res: Response): void {
       success: true,
       data: {
         id,
+        party_id: SupplierModel.getById(id, db)?.party_id,
         supplier_code,
         supplier_name,
         contact_person,

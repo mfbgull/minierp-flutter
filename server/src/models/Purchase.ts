@@ -12,6 +12,8 @@ import { roundCurrency } from '../utils/currency';
 import { BusinessRuleError } from '../utils/businessRuleError';
 import { SqlParam } from '../utils/sqlTypes';
 import { assertInboundDateNotRetroactive } from '../services/inventoryEffectiveDate';
+import { assertNoPartyAdjustment } from '../utils/partyAdjustmentBalances';
+import { appendAdjustmentSettlements } from '../utils/partyAdjustmentDetails';
 
 interface Purchase {
   id: number;
@@ -34,6 +36,8 @@ interface Purchase {
   voided_by?: number;
   void_reason?: string;
   paid_amount?: number;
+  adjusted_amount?: number;
+  settled_amount?: number;
   balance_amount?: number;
   created_by: number;
   created_at?: string;
@@ -443,7 +447,11 @@ class PurchaseModel {
         u.username as created_by_username,
         COALESCE(pa.paid_amount, 0) as paid_amount,
         ROUND(p.total_cost + p.input_tax_amount, 2) AS total_payable,
-        MAX(0, ROUND(v.total_payable - v.returned_amount - v.paid_amount, 2)) as balance_amount
+        v.adjusted_amount, v.settled_amount,
+        CASE WHEN v.adjusted_amount > 0 AND v.total_payable - v.returned_amount - v.settled_amount <= 0.005 THEN 'Settled'
+          WHEN v.paid_amount > 0 AND v.total_payable - v.returned_amount - v.settled_amount <= 0.005 THEN 'Paid'
+          ELSE NULL END as settlement_status,
+        MAX(0, ROUND(v.total_payable - v.returned_amount - v.settled_amount, 2)) as balance_amount
       FROM purchases p
       JOIN direct_purchase_payables v ON v.id = p.id
       JOIN items i ON p.item_id = i.id
@@ -543,7 +551,11 @@ class PurchaseModel {
         u.username as created_by_username,
         COALESCE(pa.paid_amount, 0) as paid_amount,
         ROUND(p.total_cost + p.input_tax_amount, 2) AS total_payable,
-        MAX(0, ROUND(v.total_payable - v.returned_amount - v.paid_amount, 2)) as balance_amount
+        v.adjusted_amount, v.settled_amount,
+        CASE WHEN v.adjusted_amount > 0 AND v.total_payable - v.returned_amount - v.settled_amount <= 0.005 THEN 'Settled'
+          WHEN v.paid_amount > 0 AND v.total_payable - v.returned_amount - v.settled_amount <= 0.005 THEN 'Paid'
+          ELSE NULL END as settlement_status,
+        MAX(0, ROUND(v.total_payable - v.returned_amount - v.settled_amount, 2)) as balance_amount
       FROM purchases p
       JOIN direct_purchase_payables v ON v.id = p.id
       JOIN items i ON p.item_id = i.id
@@ -567,7 +579,7 @@ class PurchaseModel {
     id: number; payment_no: string; payment_date: string;
     payment_method: string; reference_no: string; notes: string; amount: number;
   }> {
-    return db.prepare(`
+    const rows = db.prepare(`
       SELECT p.id, p.payment_no, p.payment_date, p.payment_method,
              p.reference_no, p.notes, pa.amount
       FROM purchase_allocations pa JOIN payments p ON pa.payment_id = p.id
@@ -576,6 +588,8 @@ class PurchaseModel {
       id: number; payment_no: string; payment_date: string;
       payment_method: string; reference_no: string; notes: string; amount: number;
     }>;
+    appendAdjustmentSettlements(db, rows, { kind: 'purchase', id: purchaseId });
+    return rows;
   }
 
   static getSummaryByItem(item_id: number, db: Database.Database) {
@@ -645,6 +659,7 @@ class PurchaseModel {
 
     const transaction = db.transaction(() => {
       // Guard: a purchase with recorded payments cannot be voided —
+      assertNoPartyAdjustment(db, 'purchase', id);
       // the allocations/ledger would be orphaned. Reverse payments first.
       const paymentAlloc = db.prepare(
         'SELECT id FROM purchase_allocations WHERE purchase_id = ? AND voided_at IS NULL LIMIT 1'

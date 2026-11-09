@@ -338,6 +338,10 @@ function voidGoodsReceipt(req: AuthRequest, res: Response): void {
 
     res.json(receipt);
   } catch (error) {
+    if (error instanceof BusinessRuleError) {
+      res.status(error.status).json({ error: error.message });
+      return;
+    }
     const message = error instanceof Error ? error.message : String(error);
     if (
       message.includes('not found') ||

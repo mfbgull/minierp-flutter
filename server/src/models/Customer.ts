@@ -19,6 +19,9 @@ function safeSortBy(sortBy: string | undefined, sortOrder: string | undefined): 
 
 interface Customer {
   id: number;
+  party_id: number;
+  linked_supplier_id?: number | null;
+  linked_supplier_code?: string | null;
   customer_code: string;
   customer_name: string;
   contact_person?: string;
@@ -93,7 +96,9 @@ class CustomerModel {
   static getAll(filters: CustomerFilters, sortBy: string, sortOrder: string, page: number, limit: number, db: Database.Database): PaginatedResult {
     let query = `
       SELECT
-        id, customer_code, customer_name, contact_person, email, phone,
+        id, party_id, customer_code, customer_name, contact_person, email, phone,
+        (SELECT s.id FROM suppliers s WHERE s.party_id = customers.party_id LIMIT 1) AS linked_supplier_id,
+        (SELECT s.supplier_code FROM suppliers s WHERE s.party_id = customers.party_id LIMIT 1) AS linked_supplier_code,
         billing_address, shipping_address, payment_terms, payment_terms_days,
         credit_limit, current_balance, COALESCE(credit_balance, 0) as credit_balance,
         CASE
@@ -143,7 +148,9 @@ class CustomerModel {
     const resolvedId = Array.isArray(id) ? id[0] : id;
     return db.prepare(`
       SELECT
-        id, customer_code, customer_name, contact_person, email, phone,
+        id, party_id, customer_code, customer_name, contact_person, email, phone,
+        (SELECT s.id FROM suppliers s WHERE s.party_id = customers.party_id LIMIT 1) AS linked_supplier_id,
+        (SELECT s.supplier_code FROM suppliers s WHERE s.party_id = customers.party_id LIMIT 1) AS linked_supplier_code,
         billing_address, shipping_address, payment_terms, payment_terms_days,
         credit_limit, current_balance, opening_balance, COALESCE(credit_balance, 0) as credit_balance,
         CASE

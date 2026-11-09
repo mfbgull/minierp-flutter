@@ -1073,14 +1073,14 @@ class PurchaseReturnModel {
   ): number {
     if (sourceType === 'PURCHASE') {
       const row = db.prepare(`
-        SELECT total_payable - returned_amount AS total_cost, paid_amount AS paid
+        SELECT total_payable - returned_amount AS total_cost, settled_amount AS paid
         FROM direct_purchase_payables WHERE id = ?
       `).get(sourceId) as { total_cost: number; paid: number } | undefined;
       if (!row) throw new Error('Purchase not found');
       return Number(row.total_cost) - Number(row.paid);
     }
     const row = db.prepare(`
-      SELECT total_payable - returned_amount AS total_amount, paid_amount AS paid
+      SELECT total_payable - returned_amount AS total_amount, settled_amount AS paid
       FROM purchase_order_payables WHERE id = ?
     `).get(sourceId) as { total_amount: number; paid: number } | undefined;
     if (!row) throw new Error('Purchase Order not found');

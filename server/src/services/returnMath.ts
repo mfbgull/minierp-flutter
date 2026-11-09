@@ -211,6 +211,8 @@ export interface PositionInput {
   totalFees: number;
   /** GROSS collections: positive payment allocations + credit offsets applied. */
   totalPaid: number;
+  /** Noncash customer-supplier allocations; never refundable cash. */
+  totalAdjusted?: number;
   /** Σ settled amounts over non-voided settlements of ALL types. */
   totalSettled: number;
 }
@@ -221,6 +223,7 @@ export interface InvoicePosition {
   /** Remaining Invoice Value — goods the customer keeps (spec §3.1). */
   currentInvoiceValue: number;
   totalPaid: number;
+  totalAdjusted: number;
   totalFees: number;
   /** Net Customer Position = paid − remaining − fees. */
   netPosition: number;
@@ -245,10 +248,11 @@ export function computePosition(input: PositionInput): InvoicePosition {
   const totalReturned = roundCurrency(input.totalReturned);
   const totalFees = roundCurrency(input.totalFees);
   const totalPaid = roundCurrency(input.totalPaid);
+  const totalAdjusted = roundCurrency(input.totalAdjusted ?? 0);
   const totalSettled = roundCurrency(input.totalSettled);
 
   const currentInvoiceValue = roundCurrency(Math.max(0, originalTotal - totalReturned));
-  const netPosition = roundCurrency(totalPaid - currentInvoiceValue - totalFees);
+  const netPosition = roundCurrency(totalPaid + totalAdjusted - currentInvoiceValue - totalFees);
 
   const refundCreditDue = netPosition > 0 ? netPosition : 0;
   const balanceDue = netPosition < 0 ? roundCurrency(-netPosition) : 0;
@@ -264,6 +268,7 @@ export function computePosition(input: PositionInput): InvoicePosition {
     totalReturned,
     currentInvoiceValue,
     totalPaid,
+    totalAdjusted,
     totalFees,
     netPosition,
     refundCreditDue,

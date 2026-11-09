@@ -2,6 +2,7 @@ import db from '../config/database';
 import SupplierLedgerModel from '../models/SupplierLedger';
 import { parseCurrency, subtractCurrency, addCurrency } from './currency';
 import { todayLocal } from './reportSql';
+import { invoiceAdjustmentAmount } from './partyAdjustmentBalances';
 
 /**
  * Create a ledger entry for a customer.
@@ -164,6 +165,7 @@ function calculateInvoiceBalance(invoiceId: number, conn: typeof db = db): numbe
   const returnedAmount = parseCurrency(invoice.returned_amount || 0);
   const returnFee = parseCurrency(invoice.return_fee || 0);
   const collections = addCurrency(totalPaid, creditOffset);
+  const adjusted = invoiceAdjustmentAmount(conn, invoiceId);
 
   // Balance = what the customer still owes for the goods kept, plus the
   // fees charged, minus everything collected: (total − returned) + fee −
@@ -172,14 +174,14 @@ function calculateInvoiceBalance(invoiceId: number, conn: typeof db = db): numbe
   // refund-excluding paid base above.
   const owed = subtractCurrency(
     addCurrency(subtractCurrency(totalAmount, returnedAmount), returnFee),
-    collections
+    addCurrency(collections, adjusted)
   );
   const newBalance = owed > 0 ? owed : 0;
 
   // paid_amount stores the gross collected base (the same figure the
   // position reports as totalPaid), not the net of refunds.
-  conn.prepare('UPDATE invoices SET paid_amount = ?, balance_amount = ? WHERE id = ?')
-    .run(collections, newBalance, invoiceId);
+  conn.prepare('UPDATE invoices SET paid_amount = ?, adjusted_amount = ?, balance_amount = ? WHERE id = ?')
+    .run(collections, adjusted, newBalance, invoiceId);
 
   return newBalance;
 }
@@ -235,8 +237,8 @@ function deriveCombinedStatus(paymentStatus: string, returnStatus: string): stri
 }
 
 function updateInvoiceStatus(invoiceId: number, conn: typeof db = db): string {
-  const invoice = conn.prepare('SELECT balance_amount, total_amount, paid_amount, due_date, returned_amount, status FROM invoices WHERE id = ?')
-    .get(invoiceId) as { balance_amount: number; total_amount: number; paid_amount: number; due_date: string | null; returned_amount?: number; status?: string } | undefined;
+  const invoice = conn.prepare('SELECT balance_amount, total_amount, paid_amount, adjusted_amount, due_date, returned_amount, status FROM invoices WHERE id = ?')
+    .get(invoiceId) as { balance_amount: number; total_amount: number; paid_amount: number; adjusted_amount: number; due_date: string | null; returned_amount?: number; status?: string } | undefined;
 
   if (!invoice) {
     throw new Error(`Invoice ${invoiceId} not found`);
@@ -244,7 +246,7 @@ function updateInvoiceStatus(invoiceId: number, conn: typeof db = db): string {
 
   const balance = parseCurrency(invoice.balance_amount);
   const total = parseCurrency(invoice.total_amount);
-  const paid = parseCurrency(invoice.paid_amount || 0);
+  const paid = addCurrency(parseCurrency(invoice.paid_amount || 0), parseCurrency(invoice.adjusted_amount));
   const returned = parseCurrency(invoice.returned_amount || 0);
   const currentStatus = String(invoice.status || '');
 

@@ -3,7 +3,7 @@ import AccountingService from '../services/accountingService';
 import { CASH_ACCOUNTS, getCashAccountTotals, collectFlows, normalizeCashMethod } from '../services/cashService';
 import { netRevenueSum, NET_REVENUE_STATUS, AR_OUTSTANDING, ACTIVE_EXPENSE_STATUS, cogsForPeriod } from '../utils/reportSql';
 import { SqlParam } from '../utils/sqlTypes';
-import { computeARAging } from './arAging';
+import { computeARAging, HISTORICAL_RECEIVABLES_CTE } from './arAging';
 import { roundCurrency } from '../utils/currency';
 
 function getARAgingReport(asOfDate: string, db: Database.Database) {
@@ -79,15 +79,15 @@ function getTopDebtors(db: Database.Database, limit: number = 10, asOfDate?: str
   const dateFilter = asOfDate ? ` AND i.invoice_date <= ?` : ``;
   const params: SqlParam[] = [limit];
   if (asOfDate) params.unshift(asOfDate);
-  const rows = db.prepare(`
+  const rows = db.prepare(`${HISTORICAL_RECEIVABLES_CTE}
     SELECT c.customer_name, c.customer_code, SUM(i.balance_amount) as total_outstanding,
       SUM(i.balance_amount) as outstanding_balance,
       SUM(i.total_amount) as total_invoiced,
       COUNT(i.id) as invoice_count
-    FROM invoices i JOIN customers c ON i.customer_id = c.id
+    FROM historical i JOIN customers c ON i.customer_id = c.id
     WHERE ${AR_OUTSTANDING('i')}${dateFilter}
     GROUP BY i.customer_id ORDER BY total_outstanding DESC LIMIT ?
-  `).all(...params);
+  `).all({ asOf: asOfDate ?? '9999-12-31' }, ...params);
   return rows;
 }
 
@@ -131,11 +131,13 @@ function getReceivablesSummary(db: Database.Database, asOfDate: string = new Dat
   // The bucket math is done in SQL via julianday() so we don't have to
   // pull every invoice row into Node. The CASE expression puts the
   // invoice's balance into exactly one of the five buckets.
-  const result = db.prepare(`
+  const result = db.prepare(`${HISTORICAL_RECEIVABLES_CTE}
     SELECT
       COUNT(*) as total_invoices,
       COALESCE(SUM(balance_amount), 0) as total_outstanding,
       COALESCE(SUM(paid_amount), 0) as total_paid,
+      COALESCE(SUM(adjusted_amount), 0) as total_adjusted,
+      COALESCE(SUM(paid_amount + adjusted_amount), 0) as total_settled,
       COALESCE(SUM(total_amount), 0) as total_invoiced,
 
       -- Buckets: days past due = asOfDate - due_date. Negative or zero
@@ -189,16 +191,19 @@ function getReceivablesSummary(db: Database.Database, asOfDate: string = new Dat
       COUNT(CASE WHEN status = 'Sent' THEN 1 END) as sent_count,
       COUNT(CASE WHEN status = 'Partially Returned' THEN 1 END) as partially_returned_count,
       COUNT(CASE WHEN status = 'Returned' THEN 1 END) as returned_count
-    FROM invoices
+    FROM historical
     WHERE ${AR_OUTSTANDING()}
       AND invoice_date <= ?
   `).get(
+    { asOf: asOfDate },
     asOfDate, asOfDate, asOfDate, asOfDate, asOfDate,
     asOfDate
   ) as {
     total_invoices: number;
     total_outstanding: number;
     total_paid: number;
+    total_adjusted: number;
+    total_settled: number;
     total_invoiced: number;
     current_amount: number;
     bucket_1_30: number;
@@ -224,6 +229,8 @@ function getReceivablesSummary(db: Database.Database, asOfDate: string = new Dat
     total_invoices: result.total_invoices,
     total_outstanding: result.total_outstanding,
     total_paid: result.total_paid,
+    total_adjusted: result.total_adjusted,
+    total_settled: result.total_settled,
     total_invoiced: result.total_invoiced,
     // Aging buckets. Field names match the previous API so the
     // frontend doesn't need to change, but the values are now correct.
@@ -314,6 +321,41 @@ interface APAgingBucket {
   days_over_90: number;
 }
 
+function emptyAPBucket(row: { supplier_id: number; supplier_name: string; supplier_code: string | null }): APAgingBucket {
+  return {
+    supplier_id: row.supplier_id,
+    supplier_name: row.supplier_name,
+    supplier_code: row.supplier_code,
+    total_outstanding: 0, current_amount: 0, days_1_30: 0,
+    days_31_60: 0, days_61_90: 0, days_over_90: 0,
+  };
+}
+
+function applyTargetedAdjustment(outstanding: number, target: string | null, credits: Map<string, number>): number {
+  if (!target) return outstanding;
+  const available = credits.get(target) ?? 0;
+  const applied = Math.min(outstanding, available);
+  credits.set(target, available - applied);
+  return outstanding - applied;
+}
+
+function applySupplierCredit(outstanding: number, supplierId: number, credits: Map<number, number>): number {
+  const available = credits.get(supplierId) ?? 0;
+  if (available <= 0) return outstanding;
+  const applied = Math.min(available, outstanding);
+  credits.set(supplierId, available - applied);
+  return outstanding - applied;
+}
+
+function addToAPBucket(bucket: APAgingBucket, ageDays: number, outstanding: number): void {
+  bucket.total_outstanding += outstanding;
+  if (ageDays <= 0) bucket.current_amount += outstanding;
+  else if (ageDays <= 30) bucket.days_1_30 += outstanding;
+  else if (ageDays <= 60) bucket.days_31_60 += outstanding;
+  else if (ageDays <= 90) bucket.days_61_90 += outstanding;
+  else bucket.days_over_90 += outstanding;
+}
+
 function computeAPAging(asOfDate: string, db: Database.Database): APAgingBucket[] {
   // One exclusion rule on both sides of the net, matching invariant D and
   // SupplierLedger.rebuildBalances: a reversal row carries `reversed_by`
@@ -327,59 +369,60 @@ function computeAPAging(asOfDate: string, db: Database.Database): APAgingBucket[
   const debitRows = db.prepare(`
     SELECT sl.supplier_id, sl.transaction_date, sl.debit,
       COALESCE(s.supplier_name, '') AS supplier_name,
-      s.supplier_code
+      s.supplier_code,
+      CASE WHEN purchase.id IS NOT NULL THEN 'purchase:' || purchase.id
+        WHEN receipt.po_id IS NOT NULL THEN 'purchase_order:' || receipt.po_id
+        WHEN bill.id IS NOT NULL THEN 'supplier_bill:' || bill.id END AS adjustment_target
     FROM supplier_ledger sl
     JOIN suppliers s ON s.id = sl.supplier_id
+    LEFT JOIN purchases purchase ON sl.transaction_type = 'PURCHASE'
+      AND purchase.purchase_no = sl.reference_no AND purchase.supplier_id = sl.supplier_id
+    LEFT JOIN goods_receipts receipt ON sl.transaction_type = 'GOODS_RECEIPT'
+      AND receipt.receipt_no = sl.reference_no
+    LEFT JOIN supplier_bills bill ON sl.transaction_type = 'SUPPLIER_BILL'
+      AND sl.reference_no = 'BILL-' || bill.id AND bill.supplier_id = sl.supplier_id
     WHERE sl.voided = 0 AND sl.reversed_by IS NULL AND sl.debit > 0
+      AND sl.transaction_type NOT IN ('PARTY_ADJUSTMENT', 'REVERSAL:PARTY_ADJUSTMENT')
       AND sl.transaction_date <= ?
     ORDER BY sl.supplier_id, sl.transaction_date ASC, sl.id ASC
   `).all(asOfDate) as Array<{
     supplier_id: number; transaction_date: string;
     debit: number; supplier_name: string; supplier_code: string | null;
+    adjustment_target: string | null;
   }>;
 
   const creditTotals = new Map<number, number>();
   const creditRows = db.prepare(`
     SELECT supplier_id, SUM(credit) AS credit FROM supplier_ledger
     WHERE voided = 0 AND reversed_by IS NULL AND credit > 0
+      AND transaction_type NOT IN ('PARTY_ADJUSTMENT', 'REVERSAL:PARTY_ADJUSTMENT')
       AND transaction_date <= ?
     GROUP BY supplier_id
   `).all(asOfDate) as Array<{ supplier_id: number; credit: number }>;
   for (const r of creditRows) creditTotals.set(r.supplier_id, Number(r.credit));
+  const adjustmentCredits = db.prepare<[string, string], { target: string; amount: number }>(`
+    SELECT CASE WHEN a.purchase_id IS NOT NULL THEN 'purchase:' || a.purchase_id
+      WHEN a.purchase_order_id IS NOT NULL THEN 'purchase_order:' || a.purchase_order_id
+      ELSE 'supplier_bill:' || a.bill_id END AS target, SUM(a.amount) AS amount
+    FROM party_adjustment_payables a JOIN party_adjustments p ON p.id = a.adjustment_id
+    WHERE p.adjustment_date <= ? AND (p.reversal_date IS NULL OR p.reversal_date > ?)
+    GROUP BY target
+  `).all(asOfDate, asOfDate);
+  const targetedCredits = new Map(adjustmentCredits.map(row => [row.target, row.amount]));
 
   const buckets = new Map<number, APAgingBucket>();
   for (const row of debitRows) {
-    let b = buckets.get(row.supplier_id);
-    if (!b) {
-      b = {
-        supplier_id: row.supplier_id,
-        supplier_name: row.supplier_name,
-        supplier_code: row.supplier_code,
-        total_outstanding: 0, current_amount: 0, days_1_30: 0,
-        days_31_60: 0, days_61_90: 0, days_over_90: 0,
-      };
-      buckets.set(row.supplier_id, b);
-    }
-
-    let outstanding = Number(row.debit);
+    const bucket = buckets.get(row.supplier_id) ?? emptyAPBucket(row);
+    buckets.set(row.supplier_id, bucket);
+    let outstanding = applyTargetedAdjustment(Number(row.debit), row.adjustment_target, targetedCredits);
     // Net credits FIFO against the oldest debits first.
-    const credit = creditTotals.get(row.supplier_id) ?? 0;
-    if (credit > 0) {
-      const applied = Math.min(credit, outstanding);
-      outstanding -= applied;
-      creditTotals.set(row.supplier_id, credit - applied);
-    }
+    outstanding = applySupplierCredit(outstanding, row.supplier_id, creditTotals);
     if (outstanding <= 0.005) continue; // fully offset — not outstanding
 
     const ageDays = Math.floor(
       (new Date(asOfDate).getTime() - new Date(row.transaction_date).getTime()) / 86400000
     );
-    b.total_outstanding += outstanding;
-    if (ageDays <= 0) b.current_amount += outstanding;
-    else if (ageDays <= 30) b.days_1_30 += outstanding;
-    else if (ageDays <= 60) b.days_31_60 += outstanding;
-    else if (ageDays <= 90) b.days_61_90 += outstanding;
-    else b.days_over_90 += outstanding;
+    addToAPBucket(bucket, ageDays, outstanding);
   }
 
   return [...buckets.values()]

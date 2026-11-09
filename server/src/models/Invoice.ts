@@ -12,6 +12,8 @@ import { isFeatureEnabled } from '../utils/featureFlags';
 import { roundQty } from '../utils/quantity';
 import { SqlParam } from '../utils/sqlTypes';
 import { assertLegacyInvoiceAllocationsAllowed } from '../services/unappliedPaymentGuard';
+import { assertNoPartyAdjustment } from '../utils/partyAdjustmentBalances';
+import { appendAdjustmentSettlements } from '../utils/partyAdjustmentDetails';
 
 /**
  * Reversal-rules guard rejection (rule 4/5: paid + returned documents
@@ -64,6 +66,8 @@ interface Invoice {
   return_status: 'None' | 'Partially Returned' | 'Fully Returned';
   total_amount: number;
   paid_amount: number;
+  adjusted_amount?: number;
+  settled_amount?: number;
   balance_amount: number;
   credit_offset?: number;
   returned_amount: number;
@@ -315,6 +319,9 @@ class InvoiceModel {
     const invoice = db.prepare(`
       SELECT
         i.*,
+        ROUND(i.paid_amount + i.adjusted_amount, 2) AS settled_amount,
+        CASE WHEN i.balance_amount <= 0 AND COALESCE(i.adjusted_amount,0) > 0 THEN 'Settled'
+          WHEN i.balance_amount <= 0 AND COALESCE(i.paid_amount,0) > 0 THEN 'Paid' ELSE NULL END AS settlement_status,
         so.so_no,
         q.quotation_no,
         u.username as created_by_username
@@ -359,6 +366,9 @@ class InvoiceModel {
     const select = `
       SELECT
         i.*,
+        ROUND(i.paid_amount + i.adjusted_amount, 2) AS settled_amount,
+        CASE WHEN i.balance_amount <= 0 AND COALESCE(i.adjusted_amount,0) > 0 THEN 'Settled'
+          WHEN i.balance_amount <= 0 AND COALESCE(i.paid_amount,0) > 0 THEN 'Paid' ELSE NULL END AS settlement_status,
         COALESCE(c.customer_name, i.customer_name) as customer_name,
         so.so_no,
         q.quotation_no,
@@ -913,6 +923,7 @@ class InvoiceModel {
     terms?: string; 
   }): void {
     db.transaction(() => {
+      assertNoPartyAdjustment(db, 'invoice', invoiceId);
       const existing = db.prepare<[number], { customer_id: number }>('SELECT customer_id FROM invoices WHERE id=?').get(invoiceId);
       if (existing && data.customer_id !== undefined && Number(data.customer_id) !== existing.customer_id) {
         assertLegacyInvoiceAllocationsAllowed(db, invoiceId);
@@ -1043,6 +1054,7 @@ class InvoiceModel {
     userId: number
   ): void {
     assertLegacyInvoiceAllocationsAllowed(db, invoice.id);
+    assertNoPartyAdjustment(db, 'invoice', invoice.id);
     // ---- Guards (rule 4/5: paid + returned documents lock) ----
     if (invoice.status === 'Cancelled') {
       throw new Error('Invoice is already cancelled');
@@ -1118,6 +1130,9 @@ class InvoiceModel {
     const query = `
       SELECT
         i.*,
+        ROUND(i.paid_amount + i.adjusted_amount, 2) AS settled_amount,
+        CASE WHEN i.balance_amount <= 0 AND COALESCE(i.adjusted_amount,0) > 0 THEN 'Settled'
+          WHEN i.balance_amount <= 0 AND COALESCE(i.paid_amount,0) > 0 THEN 'Paid' ELSE NULL END AS settlement_status,
         so.so_no,
         q.quotation_no,
         u.username as created_by_username
@@ -1168,7 +1183,10 @@ class InvoiceModel {
 
   static getWithCustomer(id: number, db: Database.Database) {
     return db.prepare(`
-      SELECT i.*, c.customer_name, c.email as customer_email,
+      SELECT i.*, ROUND(i.paid_amount + i.adjusted_amount, 2) AS settled_amount,
+             CASE WHEN i.balance_amount <= 0 AND COALESCE(i.adjusted_amount,0) > 0 THEN 'Settled'
+               WHEN i.balance_amount <= 0 AND COALESCE(i.paid_amount,0) > 0 THEN 'Paid' ELSE NULL END AS settlement_status,
+             c.customer_name, c.email as customer_email,
              c.phone as customer_phone, c.billing_address as customer_address
       FROM invoices i LEFT JOIN customers c ON i.customer_id = c.id WHERE i.id = ?
     `).get(id);
@@ -1204,6 +1222,8 @@ class InvoiceModel {
       });
     }
 
+    appendAdjustmentSettlements(db, rows, { kind: 'invoice', id: invoiceId });
+
     return rows;
   }
 
@@ -1213,7 +1233,10 @@ class InvoiceModel {
 
   static getBySalesOrderId(soId: number, db: Database.Database): Invoice[] {
     return db.prepare(`
-      SELECT i.*, c.customer_name
+      SELECT i.*, ROUND(i.paid_amount + i.adjusted_amount, 2) AS settled_amount,
+             CASE WHEN i.balance_amount <= 0 AND COALESCE(i.adjusted_amount,0) > 0 THEN 'Settled'
+               WHEN i.balance_amount <= 0 AND COALESCE(i.paid_amount,0) > 0 THEN 'Paid' ELSE NULL END AS settlement_status,
+             c.customer_name
       FROM invoices i
       LEFT JOIN customers c ON i.customer_id = c.id
       WHERE i.so_id = ?

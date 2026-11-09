@@ -12,8 +12,7 @@ interface AgingBucket {
   readonly days_over_90: number;
 }
 
-export function computeARAging(asOfDate: string, db: Database.Database) {
-  const agingBuckets = db.prepare<{ asOf: string }, AgingBucket>(`
+export const HISTORICAL_RECEIVABLES_CTE = `
     WITH allocations AS (
       SELECT a.invoice_id, SUM(a.amount) AS all_paid,
         SUM(CASE WHEN p.payment_kind <> 'UNAPPLIED_RECEIPT' AND p.payment_date <= @asOf
@@ -35,21 +34,35 @@ export function computeARAging(asOfDate: string, db: Database.Database) {
         SUM(CASE WHEN return_date <= @asOf THEN returned_amount - fee_amount ELSE 0 END) AS dated_net
       FROM invoice_returns WHERE voided_at IS NULL AND status <> 'Voided'
       GROUP BY invoice_id
+    ), adjustments AS (
+      SELECT a.invoice_id, SUM(a.amount) AS amount
+      FROM party_adjustment_receivables a JOIN party_adjustments p ON p.id = a.adjustment_id
+      WHERE p.adjustment_date <= @asOf AND (p.reversal_date IS NULL OR p.reversal_date > @asOf)
+      GROUP BY a.invoice_id
     ), historical AS (
-      SELECT i.customer_id, i.due_date,
+      SELECT i.id, i.customer_id, i.due_date, i.invoice_date, i.total_amount, i.deleted_at,
+        i.status,
+        ROUND(COALESCE(i.credit_offset, 0)
+          + MAX(0, COALESCE(i.paid_amount, 0) - COALESCE(i.credit_offset, 0) - COALESCE(a.all_paid, 0))
+          + COALESCE(a.dated_paid, 0) + COALESCE(application.dated_paid, 0), 2) AS paid_amount,
+        COALESCE(adjustment.amount, 0) AS adjusted_amount,
         MAX(0, ROUND(i.total_amount - COALESCE(i.credit_offset, 0)
           - MAX(0, COALESCE(i.paid_amount, 0) - COALESCE(i.credit_offset, 0) - COALESCE(a.all_paid, 0))
           - COALESCE(a.dated_paid, 0) - COALESCE(application.dated_paid, 0)
           - MAX(0, COALESCE(i.returned_amount, 0) - COALESCE(r.all_returned, 0))
           + MAX(0, COALESCE(i.return_fee, 0) - COALESCE(r.all_fees, 0))
-          - COALESCE(r.dated_net, 0), 2)) AS balance_amount
+          - COALESCE(r.dated_net, 0) - COALESCE(adjustment.amount, 0), 2)) AS balance_amount
       FROM invoices i
       LEFT JOIN allocations a ON a.invoice_id = i.id
       LEFT JOIN applications application ON application.invoice_id = i.id
       LEFT JOIN returns r ON r.invoice_id = i.id
+      LEFT JOIN adjustments adjustment ON adjustment.invoice_id = i.id
       WHERE i.invoice_date <= @asOf AND i.deleted_at IS NULL
         AND i.status NOT IN ('Cancelled', 'Draft', 'Deleted')
-    )
+    )`;
+
+export function computeARAging(asOfDate: string, db: Database.Database) {
+  const agingBuckets = db.prepare<{ asOf: string }, AgingBucket>(`${HISTORICAL_RECEIVABLES_CTE}
     SELECT c.customer_name, c.customer_code, ROUND(SUM(i.balance_amount), 2) AS total_outstanding,
       ROUND(SUM(CASE WHEN i.due_date IS NULL OR julianday(@asOf) <= julianday(i.due_date)
         THEN i.balance_amount ELSE 0 END), 2) AS current_amount,

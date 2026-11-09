@@ -60,17 +60,18 @@ export class SupplierPrepaymentModel {
     return this.db.prepare(`
       SELECT * FROM (
         SELECT 'purchase' AS kind, p.id, p.purchase_no AS reference,
-          ROUND(v.total_payable - v.returned_amount - v.paid_amount, 2) AS balance_amount
+          ROUND(v.total_payable - v.returned_amount - v.settled_amount, 2) AS balance_amount
         FROM purchases p JOIN direct_purchase_payables v ON v.id = p.id
         WHERE p.supplier_id = ? AND p.voided_at IS NULL
         UNION ALL
         SELECT 'purchase_order', po.id, po.po_no,
-          ROUND(v.total_payable - v.returned_amount - v.paid_amount, 2)
+          ROUND(v.total_payable - v.returned_amount - v.settled_amount, 2)
         FROM purchase_orders po JOIN purchase_order_payables v ON v.id = po.id
         WHERE po.supplier_id = ? AND LOWER(po.status) <> 'cancelled'
         UNION ALL
         SELECT 'supplier_bill', b.id, b.bill_no,
-          ROUND(b.total_amount - COALESCE((SELECT SUM(a.amount) FROM supplier_bill_allocations a JOIN payments p ON p.id = a.payment_id WHERE a.bill_id = b.id AND a.voided_at IS NULL AND p.voided_at IS NULL), 0), 2)
+          ROUND(b.total_amount - COALESCE((SELECT SUM(a.amount) FROM supplier_bill_allocations a JOIN payments p ON p.id = a.payment_id WHERE a.bill_id = b.id AND a.voided_at IS NULL AND p.voided_at IS NULL), 0)
+            - COALESCE((SELECT SUM(a.amount) FROM party_adjustment_payables a JOIN party_adjustments p ON p.id = a.adjustment_id WHERE a.bill_id = b.id AND p.status = 'posted'), 0), 2)
         FROM supplier_bills b WHERE b.supplier_id = ? AND b.voided_at IS NULL
       ) WHERE balance_amount > 0 AND reference LIKE ? COLLATE NOCASE
       ORDER BY reference LIMIT 50

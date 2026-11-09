@@ -16,7 +16,7 @@ import AccountingService from '../services/accountingService';
 import db from '../config/database';
 import logger from '../utils/logger';
 import { requireSupplierForPurchase } from '../utils/purchaseValidation';
-import { handleBusinessError } from '../utils/businessRuleError';
+import { BusinessRuleError, handleBusinessError } from '../utils/businessRuleError';
 import { errorMessage } from '../utils/errorMessage';
 
 type MultiItemPurchaseLine = {
@@ -348,6 +348,10 @@ function voidPurchase(req: AuthRequest, res: Response): void {
     res.json({ success: true, message: 'Purchase voided successfully' });
   } catch (error: unknown) {
     const message = errorMessage(error) || 'Failed to void purchase';
+    if (error instanceof BusinessRuleError) {
+      res.status(error.status).json({ success: false, error: error.message });
+      return;
+    }
     // Guard rejections are client errors — surface the reason.
     const isClientError = /Cannot void|already voided|not found|reason is required/i.test(message);
     const isClosedPeriod = /inside closed accounting period/i.test(message);
