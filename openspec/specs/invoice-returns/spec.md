@@ -164,3 +164,23 @@ place, so no row is ever unguarded during the change.
 - **WHEN** a return settles exactly `net_amount`, or partially
 - **THEN** the write succeeds
 
+
+### Requirement: Return generates CR balance for credit offset
+The system SHALL generate a CR balance credit during the return process that can be used as a credit offset during invoice creation.
+
+A return's credit disposition posts type RETURN/CREDIT customer-ledger rows and
+lands in the store-credit pool (`credit_balance`), not negative AR. Credit
+ledger entries reference the source return and, where drawn, the target
+invoice; `store_credit_draws` carries `(settlement_id, invoice_id,
+application_id)` references.
+
+#### Scenario: Return creates CR balance
+- **WHEN** a user processes a return with "Credit" disposition
+- **THEN** the system creates a CR balance entry for the customer
+- **AND** the CR balance is available for credit offset during future invoice creation
+
+#### Scenario: Credit disposition tracking
+- **WHEN** a return with credit disposition is completed
+- **THEN** the CR balance entry includes reference to the original return
+- **AND** the balance amount matches the return credit value
+
