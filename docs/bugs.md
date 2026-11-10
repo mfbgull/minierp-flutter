@@ -481,7 +481,7 @@ Two unrelated looks, one shared cause:
 
 ## BUG-010 · Invoice restore re-consumes stock at today’s FIFO layers while un-voiding the original COGS line
 
-**Status:** `OPEN` — **Severity:** medium (reporting distortion, no data loss ·  found
+**Status:** `FIXED` — **Severity:** medium (reporting distortion, no data loss ·  found
 2026-11-09 during the `period-protection-primitive` change)
 
 The department can delete a paid invoice and later restore it
@@ -509,13 +509,25 @@ closed period”) requires the opposite: restore SHALL NOT “re-consume stock a
 today’s FIFO layers while un-voiding the original COGS line, and SHALL
 re-post COGS consistent with the batches it restores.”
 
-Why still open: the change’s task 1.3 was only the period guard (which works —
+Why it stayed open for a while: the change’s task 1.3 was only the period
+guard (which works —
 closed-period restore returns 409 and changes nothing; regression green in
 `server/src/__tests__/closedPeriodImmutability.test.ts`). Making COGS
-batch-faithful on restore means redesigning the delete/restore stock pairing
-(per-batch reversal records), which is separate work. Decision D-plan 4 in
-`.omo/plans/period-protection-primitive-2026-11-09.md` — record it here
-instead of silently rewriting the spec sentence.
+batch-faithful on restore meant redesigning the delete/restore stock pairing.
+
+**Fix (2026-11-10).** The delete side already records the exact batches it
+returns: `reverseStockForItems` credits each original SALE movement's batch
+back by its own quantity (ratio 1 for a full reversal). Restore now replays
+those exact batches at their ORIGINAL unit cost —
+`InvoiceModel.reconsumeRestoredInvoiceItems(db, invoiceId, invoiceNo, date, userId)`
+— instead of re-running generic FIFO (`consumeFromOldestBatches`). So the
+restored SALE movements carry the same cost the un-voided COGS lines show.
+If another sale consumed the returned batch in the delete→restore window,
+re-consumption finds insufficient batch stock and the restore FAILS (the
+invoice stays deleted) rather than silently consuming a later, differently
+costed layer. Regression:
+`server/src/__tests__/invoiceRestoreBatchFaithful.test.ts` (both cases — the
+cost-faithful success and the refuse-on-consumed case — fail on the old code).
 
 ---
 

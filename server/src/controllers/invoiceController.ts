@@ -883,50 +883,18 @@ function restoreInvoice(req: AuthRequest, res: Response): Response | void {
     );
 
     const transaction = db.transaction(() => {
-      const items = InvoiceModel.getItemsForStockReverse(invoiceId, db);
-
-      // 1. Re-consume stock — mirror the create flow: FIFO/FEFO consumption
-      //    from the oldest batches, one SALE movement per consumed batch.
-      for (const item of items) {
-        // The warehouse the sale was dispatched from (same source the
-        // delete's reverseStockForItems reads); fall back to any
-        // warehouse with stock.
-        const saleMovement = db.prepare(`
-          SELECT warehouse_id
-          FROM stock_movements
-          WHERE item_id = ? AND reference_docno = ? AND movement_type = 'SALE'
-          ORDER BY id
-          LIMIT 1
-        `).get(item.item_id, invoice.invoice_no) as { warehouse_id: number } | undefined;
-        const warehouseId = saleMovement?.warehouse_id ??
-          InvoiceModel.findWarehouseForItem(db, item.item_id, item.quantity);
-
-        const consumption = InvoiceModel.consumeFromOldestBatches(
-          item.item_id,
-          warehouseId,
-          item.quantity,
-          db
-        );
-        for (const entry of consumption) {
-          const batchLabel = entry.batchId ? `(batch ${entry.batchId})` : '(legacy stock)';
-          StockMovementModel.recordMovement(
-            {
-              item_id: item.item_id,
-              warehouse_id: warehouseId,
-              movement_type: 'SALE',
-              quantity: -entry.consumed,
-              unit_cost: entry.unitCost,
-              reference_doctype: 'INVOICE',
-              reference_docno: invoice.invoice_no,
-              remarks: `Sold via Invoice ${invoice.invoice_no} (restored) ${batchLabel}`,
-              movement_date: invoice.invoice_date.slice(0, 10),
-              batch_id: entry.batchId ?? undefined,
-            },
-            userId,
-            db
-          );
-        }
-      }
+      // 1. Re-consume stock — BUG-010: batch-faithful, not today's FIFO.
+      //    Re-use the exact batches and unit costs the invoice's original
+      //    SALE movements used, so the stock ledger agrees with the COGS
+      //    lines that step 2 un-voids. The delete's reverseStockForItems
+      //    credited those same batches back, so they are re-available.
+      InvoiceModel.reconsumeRestoredInvoiceItems(
+        db,
+        invoiceId,
+        invoice.invoice_no,
+        invoice.invoice_date.slice(0, 10),
+        userId
+      );
 
       // 2. Un-void the journal lines the delete voided (GL is restored to
       //    its pre-delete state — no new posting, no double counting).

@@ -3,7 +3,6 @@ import request from 'supertest';
 import app from '../app';
 import db from '../config/database';
 import InvoiceModel from '../models/Invoice';
-import StockMovementModel from '../models/StockMovement';
 import AccountingService from '../services/accountingService';
 import ledgerUtils from '../utils/ledgerUtils';
 import logger from '../utils/logger';
@@ -16,7 +15,6 @@ import { getAuthCookie } from './helpers/invoiceReturnSpec';
  */
 
 type ReversedItem = { item_id: number; quantity: number };
-type Consumption = { batchId: number | null; consumed: number; unitCost: number };
 
 let cookie = '';
 let customerId = 0;
@@ -58,31 +56,21 @@ function insertInvoice(opts: {
 
 function mockRestoreCollaborators(opts: {
   items?: ReversedItem[];
-  consumption?: Consumption[];
   restored?: Record<string, unknown> | undefined;
 } = {}): {
-  recordMovement: jest.SpiedFunction<typeof StockMovementModel.recordMovement>;
-  findWarehouse: jest.SpiedFunction<typeof InvoiceModel.findWarehouseForItem>;
+  reconsume: jest.SpiedFunction<typeof InvoiceModel.reconsumeRestoredInvoiceItems>;
 } {
   jest
     .spyOn(InvoiceModel, 'getItemsForStockReverse')
     .mockReturnValue((opts.items ?? [{ item_id: 1, quantity: 3 }]) as ReturnType<
       typeof InvoiceModel.getItemsForStockReverse
     >);
-  const findWarehouse = jest
-    .spyOn(InvoiceModel, 'findWarehouseForItem')
-    .mockReturnValue(2);
-  jest
-    .spyOn(InvoiceModel, 'consumeFromOldestBatches')
-    .mockReturnValue(
-      (opts.consumption ?? [
-        { batchId: 5, consumed: 1, unitCost: 10 },
-        { batchId: null, consumed: 2, unitCost: 8 },
-      ]) as ReturnType<typeof InvoiceModel.consumeFromOldestBatches>
-    );
-  const recordMovement = jest
-    .spyOn(StockMovementModel, 'recordMovement')
-    .mockReturnValue({ id: 1 } as ReturnType<typeof StockMovementModel.recordMovement>);
+  // BUG-010: restore is now batch-faithful — the controller delegates the
+  // whole stock re-consume to InvoiceModel.reconsumeRestoredInvoiceItems
+  // (the model test covers its real behaviour).
+  const reconsume = jest
+    .spyOn(InvoiceModel, 'reconsumeRestoredInvoiceItems')
+    .mockImplementation(() => {});
   jest.spyOn(AccountingService, 'restoreJournalLinesByReference').mockReturnValue(0);
   jest.spyOn(ledgerUtils, 'rebuildLedgerBalances').mockImplementation(() => {});
   jest.spyOn(ledgerUtils, 'recalcCustomerBalanceFromLedger').mockReturnValue(0);
@@ -91,7 +79,7 @@ function mockRestoreCollaborators(opts: {
       .spyOn(InvoiceModel, 'getById')
       .mockReturnValue(opts.restored as ReturnType<typeof InvoiceModel.getById>);
   }
-  return { recordMovement, findWarehouse };
+  return { reconsume };
 }
 
 describe('invoice restore controller', () => {
@@ -160,7 +148,7 @@ describe('invoice restore controller', () => {
        ) VALUES (?, '2026-01-01', 'INVOICE', ?, 50, 0, 50, 'invoice', 1)`
     ).run(customerId, invoice.invoice_no);
 
-    const { recordMovement, findWarehouse } = mockRestoreCollaborators({
+    const { reconsume } = mockRestoreCollaborators({
       restored: { ...invoice, deleted_at: null },
     });
 
@@ -168,13 +156,13 @@ describe('invoice restore controller', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
-    expect(findWarehouse).not.toHaveBeenCalled();
-    expect(recordMovement).toHaveBeenCalledTimes(2);
-    const remarks = recordMovement.mock.calls.map(
-      call => (call[0] as { remarks: string }).remarks
+    expect(reconsume).toHaveBeenCalledWith(
+      db,
+      invoice.id,
+      invoice.invoice_no,
+      '2026-01-01',
+      1
     );
-    expect(remarks[0]).toContain('(batch 5)');
-    expect(remarks[1]).toContain('(legacy stock)');
 
     const row = db
       .prepare(
@@ -208,16 +196,14 @@ describe('invoice restore controller', () => {
 
   it('derives Unpaid when deleted_from_status is absent and returns the raw invoice if the read-back misses', async () => {
     const invoice = insertInvoice({ deleted: true, total: 50 });
-    const { findWarehouse } = mockRestoreCollaborators({
+    mockRestoreCollaborators({
       items: [{ item_id: 9, quantity: 2 }],
-      consumption: [],
       restored: undefined,
     });
 
     const res = await restore(invoice.id);
 
     expect(res.status).toBe(200);
-    expect(findWarehouse).toHaveBeenCalledWith(db, 9, 2);
     expect(res.body.data.invoice_no).toBe(invoice.invoice_no);
     const row = db
       .prepare('SELECT status, payment_status, return_status FROM invoices WHERE id = ?')
@@ -231,7 +217,7 @@ describe('invoice restore controller', () => {
 
   it('derives Draft for a zero-value invoice with no stored status', async () => {
     const invoice = insertInvoice({ deleted: true, total: 0 });
-    mockRestoreCollaborators({ items: [], consumption: [], restored: undefined });
+    mockRestoreCollaborators({ items: [], restored: undefined });
 
     expect((await restore(invoice.id)).status).toBe(200);
 
@@ -245,7 +231,7 @@ describe('invoice restore controller', () => {
     jest.spyOn(logger, 'error').mockImplementation(() => logger);
     const invoice = insertInvoice({ deleted: true });
     mockRestoreCollaborators();
-    jest.spyOn(InvoiceModel, 'consumeFromOldestBatches').mockImplementation(() => {
+    jest.spyOn(InvoiceModel, 'reconsumeRestoredInvoiceItems').mockImplementation(() => {
       throw new Error('forced consume failure');
     });
 

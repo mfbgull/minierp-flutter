@@ -752,6 +752,115 @@ class InvoiceModel {
   }
 
   /**
+   * BUG-010: re-consume the stock a deleted invoice returned, using the
+   * EXACT batches and per-batch unit costs its original SALE movements
+   * used — never today's oldest FIFO layers.
+   *
+   * The delete side (reverseStockForItems) credits each original
+   * batch's quantity back (per-batch, ratio 1 for a full reversal), so
+   * the same batches are guaranteed re-available here. Re-consuming
+   * them at the original cost makes the stock ledger agree with the
+   * un-voided COGS lines. A generic FIFO re-consume would instead
+   * take whatever layer is oldest at restore time, so a sale in the
+   * delete→restore window could pull differently-costed stock and the
+   * GL and stock ledger would disagree (see docs/bugs.md BUG-010).
+   *
+   * Movements are recorded exactly like the original SALE rows so the
+   * ADJUSTMENT 'RETURN' tracking and later reversals stay consistent.
+   */
+  static reconsumeRestoredInvoiceItems(
+    db: Database.Database,
+    invoiceId: number,
+    invoiceNo: string,
+    movementDate: string,
+    userId: number
+  ): void {
+    const items = this.getItemsForStockReverse(invoiceId, db);
+    const findSaleMovements = db.prepare(`
+      SELECT warehouse_id, quantity, unit_cost, batch_id
+      FROM stock_movements
+      WHERE item_id = ? AND reference_docno = ? AND movement_type = 'SALE'
+      ORDER BY id
+    `);
+
+    const consumeBatch = (
+      itemId: number,
+      warehouseId: number,
+      batchId: number,
+      qty: number
+    ): void => {
+      if (isFeatureEnabled(db, 'feature_batch_locations')) {
+        const locRow = db.prepare(`
+          SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
+        `).get(warehouseId) as { id: number } | undefined;
+        if (locRow) {
+          const avail = db.prepare(`
+            SELECT quantity_available FROM batch_stock_by_location
+            WHERE batch_id = ? AND location_id = ?
+          `).get(batchId, locRow.id) as { quantity_available: number } | undefined;
+          if (!avail || roundQty(avail.quantity_available) < qty) {
+            throw new Error(
+              `restore invoice ${invoiceNo}: batch ${batchId} has insufficient location stock ` +
+              `(need ${qty}, have ${avail?.quantity_available ?? 0}) — the returned stock was consumed after the delete`
+            );
+          }
+          db.prepare(`
+            UPDATE batch_stock_by_location
+            SET quantity_physical = quantity_physical - ?
+            WHERE batch_id = ? AND location_id = ?
+          `).run(qty, batchId, locRow.id);
+        }
+      }
+      const batchRow = db.prepare(`SELECT quantity_remaining FROM stock_batches WHERE id = ?`)
+        .get(batchId) as { quantity_remaining: number } | undefined;
+      if (!batchRow || roundQty(batchRow.quantity_remaining) < qty) {
+        throw new Error(
+          `restore invoice ${invoiceNo}: batch ${batchId} has insufficient stock ` +
+          `(need ${qty}, have ${batchRow?.quantity_remaining ?? 0}) — the returned stock was consumed after the delete`
+        );
+      }
+      db.prepare(`UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?`)
+        .run(qty, batchId);
+    };
+
+    for (const item of items) {
+      type SaleRow = { warehouse_id: number; quantity: number; unit_cost: number; batch_id: number | null };
+      const saleMovements = findSaleMovements.all(item.item_id, invoiceNo) as SaleRow[];
+      if (saleMovements.length === 0) {
+        throw new Error(
+          `restore invoice ${invoiceNo}: no SALE movements for item ${item.item_id}; cannot re-consume its stock batch-faithfully`
+        );
+      }
+      const warehouseId = saleMovements[0].warehouse_id;
+      for (const sale of saleMovements) {
+        const qty = roundQty(Math.abs(sale.quantity));
+        if (qty <= 0) continue;
+        if (sale.batch_id !== null) {
+          consumeBatch(item.item_id, warehouseId, sale.batch_id, qty);
+        }
+        StockMovementModel.recordMovement(
+          {
+            item_id: item.item_id,
+            warehouse_id: warehouseId,
+            movement_type: 'SALE',
+            quantity: -qty,
+            unit_cost: sale.unit_cost,
+            reference_doctype: 'INVOICE',
+            reference_docno: invoiceNo,
+            remarks: `Sold via Invoice ${invoiceNo} (restored)` +
+              (sale.batch_id !== null ? ` (batch ${sale.batch_id})` : ' (legacy stock)'),
+            movement_date: movementDate,
+            batch_id: sale.batch_id ?? undefined,
+            skipBatchCreation: true,
+          },
+          userId,
+          db
+        );
+      }
+    }
+  }
+
+  /**
    * Create a new invoice
    */
   static createInvoice(db: Database.Database, data: CreateInvoiceDTO, userId: number): number {
