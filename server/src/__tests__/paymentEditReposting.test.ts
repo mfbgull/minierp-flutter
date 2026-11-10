@@ -257,13 +257,13 @@ describe('H8 payment date/method edit reposting', () => {
   it('customer payment method edit reposts the GL onto the new cash account', async () => {
     const customerId = await createCustomer('H8 Cust Method', token);
     const inv = await createInvoice(
-      { customerId, itemId, lines: [{ quantity: 10, unitPrice: 20 }], invoiceDate: '2026-12-05', payment: null },
+      { customerId, itemId, lines: [{ quantity: 10, unitPrice: 20 }], invoiceDate: '2026-10-05', payment: null },
       token,
     );
-    const paymentId = await recordCustomerPayment(customerId, inv.invoiceId, 200, '2026-12-05', 'Cash');
+    const paymentId = await recordCustomerPayment(customerId, inv.invoiceId, 200, '2026-10-05', 'Cash');
 
-    const cashBefore = glBalance('1000', '2026-12-31');
-    const bankBefore = glBalance('1010', '2026-12-31');
+    const cashBefore = glBalance('1000', '2026-10-31');
+    const bankBefore = glBalance('1010', '2026-10-31');
 
     const res = await api('put', `/api/payments/${paymentId}`, { payment_method: 'Bank' });
     expect(res.status).toBe(200);
@@ -277,12 +277,12 @@ describe('H8 payment date/method edit reposting', () => {
 
     // a customer payment DEBITS cash, so the leg leaving Cash restores it
     // and lands on Bank instead
-    expect(glBalance('1000', '2026-12-31')).toBeCloseTo(cashBefore - 200, 2);
-    expect(glBalance('1010', '2026-12-31')).toBeCloseTo(bankBefore + 200, 2);
+    expect(glBalance('1000', '2026-10-31')).toBeCloseTo(cashBefore - 200, 2);
+    expect(glBalance('1010', '2026-10-31')).toBeCloseTo(bankBefore + 200, 2);
 
     // cash-by-method reconciliation still ties: the day's flow for Bank is
     // the payment and Cash is flat, with no GL/flow variance either way
-    const totals = getCashAccountTotals(db, '2026-12-05');
+    const totals = getCashAccountTotals(db, '2026-10-05');
     const bank = totals.find((t) => t.key === 'bank');
     const cash = totals.find((t) => t.key === 'cash');
     expect(bank?.inflow).toBeCloseTo(200, 2);
@@ -295,7 +295,7 @@ describe('H8 payment date/method edit reposting', () => {
     const paymentRows = activeLedger('customer_ledger', paymentNo).filter((r) => r.transaction_type === 'PAYMENT');
     expect(paymentRows).toHaveLength(1);
     expect(paymentRows[0].credit).toBe(200);
-    expect(paymentRows[0].transaction_date).toBe('2026-12-05');
+    expect(paymentRows[0].transaction_date).toBe('2026-10-05');
   });
 
   it('supplier payment method edit reposts the GL onto the new cash account (regression: used to be skipped)', async () => {

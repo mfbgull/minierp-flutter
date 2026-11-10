@@ -8,6 +8,7 @@ import PhysicalCountModel from '../models/PhysicalCount';
 import { StockReservationModel, type StockReservation } from '../models/StockReservation';
 import { AuthRequest } from '../types';
 import { logCRUD, ActionType } from '../services/activityLogger';
+import AccountingService from '../services/accountingService';
 import db from '../config/database';
 import logger from '../utils/logger';
 import { errorMessage } from '../utils/errorMessage';
@@ -594,11 +595,16 @@ function getStockMovement(req: Request, res: Response): void {
 
 function createStockMovement(req: AuthRequest, res: Response): void {
   try {
-    const { item_id, warehouse_id, quantity, movement_type } = req.body;
+    const { item_id, warehouse_id, quantity, movement_type, movement_date } = req.body;
 
     if (!item_id || !warehouse_id || !quantity || !movement_type) {
       res.status(400).json({ error: 'Item, warehouse, quantity, and movement type are required' });
       return;
+    }
+
+    // A movement date selects a period; it may not silently open a future one (PUR-005)
+    if (movement_date !== undefined) {
+      AccountingService.assertDocumentDateNotFuture(String(movement_date), 'Stock movement');
     }
 
     // Negative Stock Validation for Outgoing Movements
@@ -650,6 +656,15 @@ function createStockMovement(req: AuthRequest, res: Response): void {
     const firstMovement = StockMovementModel.getById(primaryResult.id, db);
     res.status(201).json(firstMovement);
   } catch (error) {
+    if (error instanceof BusinessRuleError) {
+      res.status(error.status).json({ error: error.message });
+      return;
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes('inside closed accounting period')) {
+      res.status(409).json({ error: message });
+      return;
+    }
     logger.error('Create stock movement error:', error);
     res.status(500).json({ error: 'Failed to create stock movement' });
   }

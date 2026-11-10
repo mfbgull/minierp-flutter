@@ -1055,6 +1055,16 @@ class InvoiceModel {
   ): void {
     assertLegacyInvoiceAllocationsAllowed(db, invoice.id);
     assertNoPartyAdjustment(db, 'invoice', invoice.id);
+
+    // Model-layer period guard (CODE-001): the controller check is not a
+    // guard — any internal caller reaches this path. Assert on the document
+    // date before any write.
+    AccountingService.assertPeriodNotClosed(
+      db,
+      invoice.invoice_date,
+      `Invoice ${invoice.invoice_no} cancellation`
+    );
+
     // ---- Guards (rule 4/5: paid + returned documents lock) ----
     if (invoice.status === 'Cancelled') {
       throw new Error('Invoice is already cancelled');

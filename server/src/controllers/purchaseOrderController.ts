@@ -343,6 +343,10 @@ function voidGoodsReceipt(req: AuthRequest, res: Response): void {
       return;
     }
     const message = error instanceof Error ? error.message : String(error);
+    if (message.includes('inside closed accounting period')) {
+      res.status(409).json({ error: message });
+      return;
+    }
     if (
       message.includes('not found') ||
       message.includes('already voided') ||

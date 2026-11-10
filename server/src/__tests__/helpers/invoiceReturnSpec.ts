@@ -83,20 +83,27 @@ export async function createItem(name: string, authCookie: string): Promise<numb
  */
 let stockSupplierId: number | undefined;
 
+// The id cache must be re-validated against the DB: suites that isolate cases
+// with SAVEPOINT/ROLLBACK revert supplier rows while this module-level cache
+// survives, which would hand every later case a dangling supplier_id.
+async function ensureStockSupplier(authCookie: string): Promise<number> {
+  const existing = db.prepare(
+    `SELECT id FROM suppliers WHERE supplier_code = 'RET-FIX-SUPPLIER' LIMIT 1`
+  ).get() as { id: number } | undefined;
+  if (existing) return existing.id;
+  const res = await request(app).post('/api/suppliers')
+    .set('Cookie', authCookie)
+    .send({ supplier_code: 'RET-FIX-SUPPLIER', supplier_name: 'Return Spec Supplier' });
+  const id = res.body?.data?.id;
+  if (!id) throw new Error(`ensureStockSupplier failed: ${res.status} ${JSON.stringify(res.body)}`);
+  return id;
+}
+
 export async function purchaseStock(
   itemId: number, warehouseId: number, quantity: number, unitCost: number, authCookie: string,
   purchaseDate = '2026-09-01',
 ): Promise<void> {
-  if (stockSupplierId === undefined) {
-    const existing = db.prepare(
-      `SELECT id FROM suppliers WHERE supplier_code = 'RET-FIX-SUPPLIER' LIMIT 1`
-    ).get() as { id: number } | undefined;
-    stockSupplierId = existing?.id ?? (
-      await request(app).post('/api/suppliers')
-        .set('Cookie', authCookie)
-        .send({ supplier_code: 'RET-FIX-SUPPLIER', supplier_name: 'Return Spec Supplier' })
-    ).body?.data?.id;
-  }
+  stockSupplierId = await ensureStockSupplier(authCookie);
   const res = await request(app).post('/api/purchases')
     .set('Cookie', authCookie)
     .send({
@@ -126,7 +133,13 @@ export async function resolveSupplierByName(
   authCookie: string,
 ): Promise<number> {
   const cached = namedSupplierIds.get(supplierName);
-  if (cached !== undefined) return cached;
+  // Rollback-safety: a savepoint-isolated case may have created the supplier
+  // and been rolled back, leaving only this stale cached id behind.
+  if (cached !== undefined &&
+    db.prepare('SELECT id FROM suppliers WHERE id = ?').get(cached)) {
+    return cached;
+  }
+  namedSupplierIds.delete(supplierName);
   const existing = db.prepare(
     'SELECT id FROM suppliers WHERE supplier_name = ? LIMIT 1'
   ).get(supplierName) as { id: number } | undefined;

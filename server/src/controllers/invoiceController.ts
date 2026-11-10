@@ -873,6 +873,15 @@ function restoreInvoice(req: AuthRequest, res: Response): Response | void {
       return res.status(400).json({ error: 'Invoice is not deleted' });
     }
 
+    // Period guard (task 1.3): restoring un-voids GL lines, restores the
+    // customer-ledger entry and re-consumes stock. A closed-period invoice
+    // must stay deleted; its history is immutable.
+    AccountingService.assertPeriodNotClosed(
+      db,
+      invoice.invoice_date,
+      `Invoice ${invoice.invoice_no} restore`
+    );
+
     const transaction = db.transaction(() => {
       const items = InvoiceModel.getItemsForStockReverse(invoiceId, db);
 

@@ -479,6 +479,46 @@ Two unrelated looks, one shared cause:
 
 ---
 
+## BUG-010 · Invoice restore re-consumes stock at today’s FIFO layers while un-voiding the original COGS line
+
+**Status:** `OPEN` — **Severity:** medium (reporting distortion, no data loss ·  found
+2026-11-09 during the `period-protection-primitive` change)
+
+The department can delete a paid invoice and later restore it
+(`POST /api/invoices/:id/restore`). The restore does two things that do not
+agree:
+
+1. Stock comes back from TODAY’s oldest FIFO layers —
+   `InvoiceModel.consumeFromOldestBatches(item_id, warehouse, qty, db)` in
+   `server/src/controllers/invoiceController.ts` (`restoreInvoice`, step 1)
+   takes no date and picks whatever the layers look like at restore time.
+2. The GL keeps the ORIGINAL COGS — `restoreJournalLinesByReference` un-voids
+   the lines the delete voided; no delta posting reconciles the difference.
+
+When another sale consumes the returned stock between the delete and the
+restore, the re-consumption must use a later, differently-costed layer.
+Example: buy 10 @ 100 (batch A); sell 10 (COGS 1000); delete (10 returns to
+batch A); sell the 10 again (batch A now empty); buy 10 @ 50 (batch B);
+restore — stock is consumed from batch B at 50, but COGS still shows 1000.
+The stock ledger and the GL then disagree by 500 and no report can explain the
+difference.
+
+The delta spec of `period-protection-primitive`
+(`specs/closed-period-immutability/spec.md`, “Invoice restore honours the
+closed period”) requires the opposite: restore SHALL NOT “re-consume stock at
+today’s FIFO layers while un-voiding the original COGS line, and SHALL
+re-post COGS consistent with the batches it restores.”
+
+Why still open: the change’s task 1.3 was only the period guard (which works —
+closed-period restore returns 409 and changes nothing; regression green in
+`server/src/__tests__/closedPeriodImmutability.test.ts`). Making COGS
+batch-faithful on restore means redesigning the delete/restore stock pairing
+(per-batch reversal records), which is separate work. Decision D-plan 4 in
+`.omo/plans/period-protection-primitive-2026-11-09.md` — record it here
+instead of silently rewriting the spec sentence.
+
+---
+
 ## Not bugs — deliberate decisions, recorded so they are not re-litigated
 
 - **PUR-016** — the two live `PURCHASE_ORDER` commitment rows (3,000 supplier 1 /

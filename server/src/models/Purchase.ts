@@ -657,6 +657,15 @@ class PurchaseModel {
       throw new Error(`Purchase ${purchase.purchase_no} is already voided`);
     }
 
+    // Model-layer period guard (CODE-001): the controller check is not a
+    // guard — any internal caller reaches this path. Assert on the document
+    // date before the write transaction opens.
+    AccountingService.assertPeriodNotClosed(
+      db,
+      purchase.purchase_date,
+      `Purchase ${purchase.purchase_no} void`
+    );
+
     const transaction = db.transaction(() => {
       // Guard: a purchase with recorded payments cannot be voided —
       assertNoPartyAdjustment(db, 'purchase', id);

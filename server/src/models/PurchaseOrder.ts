@@ -705,6 +705,14 @@ class PurchaseOrderModel {
       }
       assertNoPartyAdjustment(db, 'purchase_order', receipt.po_id);
 
+      // Period guard (PUR-003): voiding un-posts GL 1200/2000 and the stock
+      // reversal — refused when the receipt is dated in a closed period.
+      AccountingService.assertPeriodNotClosed(
+        db,
+        receipt.receipt_date,
+        `Goods receipt ${receipt.receipt_no} void`
+      );
+
       const items = db.prepare(`
         SELECT gri.id, gri.po_item_id, gri.item_id, gri.received_quantity,
                poi.unit_price

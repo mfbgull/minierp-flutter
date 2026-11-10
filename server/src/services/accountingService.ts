@@ -25,6 +25,7 @@
 import Database from 'better-sqlite3';
 import logger from '../utils/logger';
 import { roundCurrency, toMinorUnits } from '../utils/currency';
+import { BusinessRuleError } from '../utils/businessRuleError';
 import activityLogger, { ActionType, LogLevel } from './activityLogger';
 
 /** First line with a positive debit — used for the legacy header's debit_account column. */
@@ -331,6 +332,12 @@ export class AccountingService {
     `).get(input.entry_date, input.entry_date) as { id: number; period_name: string } | undefined;
 
     if (!openPeriod) {
+      // PUR-005: a future-dated entry without an explicitly opened period is
+      // refused — auto-create is for dates up to today only.
+      AccountingService.assertDocumentDateNotFuture(
+        input.entry_date,
+        input.description || 'Journal entry'
+      );
       const periodName = input.entry_date.slice(0, 7);
       const startDate = `${periodName}-01`;
       const endDate = AccountingService.monthEndDate(periodName);
@@ -1050,6 +1057,26 @@ export class AccountingService {
   }
 
   /**
+   * A document date selects a period; it never creates one (PUR-005). A date
+   * later than today may not silently open a future accounting period, so
+   * every document-creating path rejects it with 400. An explicitly opened
+   * (administrative) future period keeps future-dated postings possible.
+   */
+  static todayUTC(): string {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  static assertDocumentDateNotFuture(date: string, what: string): void {
+    const today = AccountingService.todayUTC();
+    if (date > today) {
+      throw new BusinessRuleError(
+        400,
+        `${what} ${date} is later than today (${today}) — future-dated documents are rejected`
+      );
+    }
+  }
+
+  /**
    * Reject cash-out postings that would drive the account's book balance
    * negative as of the transaction's effective date. Built on
    * getAccountBalance (GL-derived, voided lines excluded) — the same
@@ -1437,6 +1464,26 @@ export class AccountingService {
     attribution?: { voidedBy?: number | null; voidReason?: string | null }
   ): number {
     return db.transaction(() => {
+    // Period guard inside the primitive (CODE-001): every journal line void is
+    // a closed-period mutation if the underlying entry is closed. Assert on
+    // each affected entry's own date BEFORE any write, so a caller that forgot
+    // its own guard cannot un-post history. better-sqlite3 is synchronous, so
+    // a throw before the first UPDATE leaves the database unchanged.
+    const affectedEntries = db.prepare(`SELECT DISTINCT je.id AS entry_id, je.entry_date AS entry_date
+      FROM journal_lines jl
+      JOIN journal_entries je ON je.id = jl.journal_entry_id
+      WHERE jl.reference_type=? AND jl.reference_id=? AND jl.voided=0`).all(referenceType, referenceId) as Array<{ entry_id: number; entry_date: string }>;
+    const guardedDates = new Set<string>();
+    for (const entry of affectedEntries) {
+      if (guardedDates.has(entry.entry_date)) continue;
+      guardedDates.add(entry.entry_date);
+      AccountingService.assertPeriodNotClosed(
+        db,
+        entry.entry_date,
+        `Journal void of ${referenceType} ${referenceId} (entry ${entry.entry_id})`
+      );
+    }
+
     const affected = db.prepare(`SELECT DISTINCT journal_entry_id AS id FROM journal_lines
       WHERE reference_type=? AND reference_id=? AND voided=0`).all(referenceType, referenceId) as Array<{ id: number }>;
     const result = db.prepare(`

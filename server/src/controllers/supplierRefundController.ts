@@ -138,6 +138,10 @@ function voidSupplierRefund(req: AuthRequest, res: Response): Response | void {
     });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    if (errorMessage.includes('inside closed accounting period')) {
+      res.status(409).json({ error: errorMessage });
+      return;
+    }
     logger.error('Void supplier refund error:', { error: errorMessage });
     res.status(400).json({ error: errorMessage });
   }

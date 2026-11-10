@@ -112,6 +112,45 @@ function seedReturn(db: Database.Database, opts: { cash?: number; disposition?: 
 }
 
 describe('SupplierRefundModel', () => {
+  test('ACCT-013: a refund whose period later closes cannot be voided', () => {
+    const db = setupDb();
+    const { creditNoteId, total } = seedReturn(db, { cash: 1000, disposition: 'credit_on_account' });
+
+    // Seed the refund while July is open.
+    const refund = SupplierRefundModel.create(
+      {
+        refund_date: '2026-07-03',
+        credit_note_id: creditNoteId,
+        amount: total,
+        payment_method: 'cash',
+      },
+      1,
+      db
+    );
+    expect(refund.status).toBe('POSTED');
+
+    const ledgerBefore = db.prepare(
+      `SELECT id, voided FROM supplier_ledger ORDER BY id`
+    ).all();
+
+    // Close the period the refund is dated in, then try to void it.
+    db.prepare(`
+      INSERT INTO accounting_periods (period_name, start_date, end_date, status)
+      VALUES ('2026-07', '2026-07-01', '2026-07-31', 'open')
+      ON CONFLICT(period_name) DO NOTHING
+    `).run();
+    db.prepare(`UPDATE accounting_periods SET status = 'closed' WHERE period_name = '2026-07'`).run();
+
+    expect(() =>
+      SupplierRefundModel.void(refund.id, 1, 'closed-period void attempt', db)
+    ).toThrow(/inside closed accounting period/);
+
+    const ledgerAfter = db.prepare(
+      `SELECT id, voided FROM supplier_ledger ORDER BY id`
+    ).all();
+    expect(ledgerAfter).toEqual(ledgerBefore);
+  });
+
   test('PRET-002: expected money leaves a refundable credit without recording cash', () => {
     const db = setupDb();
     const { creditNoteId, total } = seedReturn(db);
