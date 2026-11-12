@@ -4389,6 +4389,9 @@ class AppLocalizationsUr extends AppLocalizations {
   String get customersLedgerPayments => 'ادائیگیاں';
 
   @override
+  String get customersLedgerRunningbalance => 'رواں بیلنس';
+
+  @override
   String get customersLedgerTotalcredit => 'کل کریڈٹ';
 
   @override

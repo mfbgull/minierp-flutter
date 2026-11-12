@@ -4391,6 +4391,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get customersLedgerPayments => 'payments';
 
   @override
+  String get customersLedgerRunningbalance => 'Running Balance';
+
+  @override
   String get customersLedgerTotalcredit => 'Total Credit';
 
   @override

@@ -258,7 +258,10 @@ class _CustomerLedgerTabState extends ConsumerState<CustomerLedgerTab> {
                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
               ),
               const Spacer(),
-              Text(l10n.customersBalance, style: const TextStyle(fontSize: 13)),
+              Text(
+                l10n.customersLedgerClosingbalance,
+                style: const TextStyle(fontSize: 13),
+              ),
               const SizedBox(width: 6),
               Text(
                 Formatters.currency(totals.balance),
@@ -454,7 +457,7 @@ class _CustomerLedgerTabState extends ConsumerState<CustomerLedgerTab> {
         },
       ),
       PlutoColumn(
-        title: l10n.customersBalance,
+        title: l10n.customersLedgerRunningbalance,
         field: 'balance',
         type: PlutoColumnType.text(),
         width: 120,

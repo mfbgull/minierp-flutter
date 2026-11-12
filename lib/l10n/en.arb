@@ -1417,6 +1417,7 @@
   "customersLedgerDebit": "Debit",
   "customersLedgerNoentries": "No ledger entries found",
   "customersLedgerPayments": "payments",
+  "customersLedgerRunningbalance": "Running Balance",
   "customersLedgerTotalcredit": "Total Credit",
   "customersLedgerTotaldebit": "Total Debit",
   "customersLedgerTotals": "TOTALS",

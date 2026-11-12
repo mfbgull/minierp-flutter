@@ -15,7 +15,11 @@ import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/detail_error.dart';
 import 'calculations/customer_calculations.dart'
-    show calculateTotalInvoiced, calculateTotalPaid, computeCustomerMetrics;
+    show
+        calculateTotalInvoiced,
+        calculateTotalPaid,
+        computeCustomerMetrics,
+        customerAvailableCredit;
 import 'customer_providers.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
 
@@ -127,10 +131,10 @@ class CustomerOverviewTab extends ConsumerWidget {
                 // as credit) and legacy ledger credit (negative balance).
                 // Surface the total so it never looks contradictory.
                 footer: () {
-                  final credit = customer.creditBalance +
-                      (metrics.currentBalance < 0
-                          ? -metrics.currentBalance
-                          : 0);
+                  final credit = customerAvailableCredit(
+                    storeCreditPool: customer.creditBalance,
+                    currentBalance: metrics.currentBalance,
+                  );
                   return credit > 0
                       ? '${l10n.customersCredit}: ${Formatters.currency(credit)}'
                       : null;

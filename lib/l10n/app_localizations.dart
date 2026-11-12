@@ -8552,6 +8552,12 @@ abstract class AppLocalizations {
   /// **'payments'**
   String get customersLedgerPayments;
 
+  /// No description provided for @customersLedgerRunningbalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Running Balance'**
+  String get customersLedgerRunningbalance;
+
   /// No description provided for @customersLedgerTotalcredit.
   ///
   /// In en, this message translates to:
