@@ -248,6 +248,7 @@ Track actual receipt of goods against POs.
 | discount_value | DECIMAL(15,2) | Discount amount/percent |
 | notes | TEXT | Invoice notes |
 | terms | TEXT | Payment terms text |
+| backdated_before_receipt | INTEGER | 1 when the invoice was dated before the item's first purchase receipt in the warehouse (ACCT-006 / D19); listed by `GET /invoices/backdated` |
 | created_by | INTEGER FK | References users(id) |
 
 ### invoice_items

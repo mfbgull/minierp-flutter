@@ -6,9 +6,16 @@
  * warehouse, and batch availability/expiry is evaluated as of the
  * transaction's own date rather than today.
  *
+ * D19 (2026-11-12) reversed the sale-side stance: a sale dated before the
+ * item's first purchase receipt is now ACCEPTED with a warning, a
+ * `backdated_before_receipt` flag and batch-linked actual-cost COGS, while
+ * inbound retroactivity (D4, receipts, production) still refuses and
+ * closed periods still win. The sale-side cases below assert the D19
+ * contract.
+ *
  * Written FAILING-FIRST: each case below reproduces one of D1-D4 or a
- * companion scenario, and asserts both the rejection AND that a rejection
- * leaves inventory, GL and payments untouched.
+ * companion scenario, and asserts both the outcome AND that inventory, GL
+ * and payments stay consistent.
  */
 import request from 'supertest';
 import app from '../app';
@@ -68,23 +75,32 @@ beforeAll(async () => {
   supId = await resolveSupplierByName('AED Supplier', authCookie);
 });
 
-describe('ACCT-006 D1 — an invoice may not consume stock received after its own date', () => {
-  it('rejects the invoice and leaves inventory + GL untouched', async () => {
+describe('ACCT-006 D1 (D19) — a sale dated before its receipt is accepted with a warning', () => {
+  it('accepts with warning + flag, batch-linked actual-cost COGS, balanced GL', async () => {
     const item = await createItem(code(), authCookie);
     expect((await buy(item, 10, 5, '2026-09-10')).status).toBe(201);
 
-    const stockBefore = currentStock(item);
     const glBefore = journalBalance();
-    const invBefore = (db.prepare(`SELECT COUNT(*) c FROM invoices`).get() as { c: number }).c;
 
     const res = await sell(item, 2, 20, '2026-09-01'); // 9 days before receipt
 
-    expect(res.status).toBeGreaterThanOrEqual(400);
-    expect(res.body.error).toMatch(/stock|date|before|not available|retroactive/i);
-    expect(currentStock(item)).toBe(stockBefore);
-    expect((db.prepare(`SELECT COUNT(*) c FROM invoices`).get() as { c: number }).c).toBe(invBefore);
+    expect(res.status).toBe(201);
+    expect(Array.isArray(res.body.warnings)).toBe(true);
+    expect(res.body.warnings.join(' ')).toMatch(/2026-09-01/);
+    expect(res.body.warnings.join(' ')).toMatch(/receipt/i);
+    expect(res.body.backdated_before_receipt).toBe(1);
+    // Current stock moved 10 -> 8; the future batch was consumed, not fabricated.
+    expect(currentStock(item)).toBe(8);
+    const movement = db
+      .prepare(
+        `SELECT sm.batch_id, sm.unit_cost FROM stock_movements sm
+         WHERE sm.item_id = ? AND sm.movement_type = 'SALE' ORDER BY sm.id DESC LIMIT 1`,
+      )
+      .get(item) as { batch_id: number; unit_cost: number };
+    expect(movement.batch_id).not.toBeNull();
+    expect(Number(movement.unit_cost)).toBe(5);
     expect(journalBalance().balanced).toBe(true);
-    expect(journalBalance().d).toBe(glBefore.d);
+    expect(journalBalance().d).toBeGreaterThan(glBefore.d);
   });
 
   it('allows a same-day sale (document date == receipt date)', async () => {
@@ -94,15 +110,20 @@ describe('ACCT-006 D1 — an invoice may not consume stock received after its ow
   });
 });
 
-describe('ACCT-006 D3 — a backdated sale may not produce historical negative stock', () => {
-  it('rejects, so ledger stock as of the invoice date never goes negative', async () => {
+describe('ACCT-006 D3 (D19) — historical negative stock is the documented, flagged exception', () => {
+  it('accepts with warning + flag; the as-of position reads negative by design', async () => {
     const item = await createItem(code(), authCookie);
     expect((await buy(item, 5, 5, '2026-09-10')).status).toBe(201);
 
     const res = await sell(item, 5, 20, '2026-09-01');
 
-    expect(res.status).toBeGreaterThanOrEqual(400);
-    expect(asOfStock(item, '2026-09-01')).toBeGreaterThanOrEqual(0);
+    expect(res.status).toBe(201);
+    expect(res.body.backdated_before_receipt).toBe(1);
+    expect(res.body.warnings.join(' ')).toMatch(/receipt/i);
+    // D19 exception: the ledger position as of 2026-09-01 is -5 and the
+    // invoice is flagged so the exception report can list it.
+    expect(asOfStock(item, '2026-09-01')).toBe(-5);
+    expect(currentStock(item)).toBe(0);
   });
 });
 

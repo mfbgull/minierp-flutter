@@ -207,6 +207,22 @@ function handleCreateInvoiceError(res: Response, error: unknown): Response | voi
   return handleBusinessError(res, error, 'Create invoice', 'Failed to create invoice');
 }
 
+/**
+ * ACCT-006: exception report of invoices sold before their stock's purchase
+ * receipt. The population carries backdated_before_receipt = 1; historical
+ * as-of stock positions for these sales can read negative by design (D19).
+ */
+function getBackdatedInvoices(_req: AuthRequest, res: Response): Response {
+  const rows = db.prepare(`
+    SELECT id, invoice_no, invoice_date, customer_id, customer_name,
+           total_amount, balance_amount, status, backdated_before_receipt
+    FROM invoices
+    WHERE backdated_before_receipt = 1
+    ORDER BY invoice_date DESC, id DESC
+  `).all();
+  return res.json({ success: true, data: rows });
+}
+
 function createInvoice(req: AuthRequest, res: Response): Response | void {
   if (!req.user) return res.status(401).json({ error: 'Authentication required' });
 
@@ -261,7 +277,8 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
       { total_amount: createdInvoice.total_amount, customer_id: createdInvoice.customer_id },
       { newValue: createdInvoice, correlationId: newCorrelationId() },
     );
-    return res.status(201).json(createdInvoice);
+    // ACCT-006: warnings surface backdated-before-receipt acceptance.
+    return res.status(201).json({ ...createdInvoice, warnings: result.warnings });
   } catch (error: unknown) {
     return handleCreateInvoiceError(res, error);
   }
@@ -1171,6 +1188,7 @@ export {
   returnInvoiceItems,
   getInvoiceReturnHistory,
   getInvoicePosition,
+  getBackdatedInvoices,
 };
 
 export default {
@@ -1185,4 +1203,5 @@ export default {
   returnInvoiceItems,
   getInvoiceReturnHistory,
   getInvoicePosition,
+  getBackdatedInvoices,
 };

@@ -520,15 +520,37 @@ ACCT-006 (backdated warning) → ACCT-008 (key mandate).
 A sale dated before the item's first purchase receipt is accepted, with these
 durable parts:
 
-- The 200 response carries a `warnings` array naming the backdate.
+- The 201 response carries a `warnings` array naming the backdate.
 - The invoice stores a `backdated_before_receipt` flag so the population is
   queryable.
-- A "Backdated sales" exception report lists them.
+- A "Backdated sales" exception report lists them (`GET /invoices/backdated`).
 - Period protection stays a hard block: a backdated sale dated inside a
   closed period is still refused with 409 by the existing primitive.
 - Costing stays as-is (D12 option (b)); as-of stock allocation is not
   selected. The stock allocator's refusal to oversell current sellable stock
   remains the real guard.
+
+**Implementation record (2026-11-13).** Migration
+`add-backdated-invoice-flag.sql` adds `invoices.backdated_before_receipt
+INTEGER NOT NULL DEFAULT 0`. `StockMovement.consumeForSale` wraps the invoice
+consumption path: before any consumption it checks the named D19 case —
+every remaining batch received after the sale date, current sellable stock
+covering the quantity, later stock already sellable (expiry-wise) on the
+sale date — and consumes those later batches at their recorded cost
+(`preReceiptFallback`), batch-linked, with the flag set and the warning
+returned. Refusals stay hard for: oversell of current sellable stock,
+stock already expired on the sale date, insufficient as-of stock, blocked
+locations, and closed periods (409). Under `feature_batch_locations`, sales
+of batches that have no `batch_stock_by_location` rows (API purchases
+predate the location layer) now consume batch-level with the legacy rules
+instead of the NULL-batch standard-cost fallback, which removes an
+invariant-H drift when `standard_cost` differs from the batch cost.
+`GET /api/invoices/backdated` (invoices:read) lists flagged invoices.
+Red-first: 5 of 6 cases failed before the fix; POS and mobile invoice paths
+flow through the same service and inherit the behavior. The invoice
+amendment (update) path keeps the strict as-of allocator: an existing
+invoice cannot be edited into the backdated state — void and recreate
+(which flags and warns) is the supported route.
 
 ### ACCT-008 — Idempotency-Key: mandatory on canonical financial writes
 

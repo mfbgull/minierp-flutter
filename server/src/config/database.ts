@@ -2084,6 +2084,9 @@ export function applyPendingMigrations(): void {
   // claim backfill for existing refund_expected returns.
   runLedgered('add-supplier-refund-claims.sql');
   runLedgered('fn.runSupplierRefundCreditNoteNullableRebuild', runSupplierRefundCreditNoteNullableRebuild, { noTxn: true });
+  // ACCT-006: backdated-before-receipt sales are accepted with a warning;
+  // the flag feeds the Backdated sales exception report.
+  runLedgered('add-backdated-invoice-flag.sql');
   runLedgered('seed-expense-sequence.sql');
   runLedgered('normalize-expense-statuses.sql');
   runLedgered('normalize-expense-payment-methods.sql');

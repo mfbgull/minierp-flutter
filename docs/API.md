@@ -356,6 +356,13 @@ Get invoice with items and customer details.
 ### POST /invoices
 Create invoice. Optionally records payment in the same transaction.
 
+A sale dated **before the item's first purchase receipt** in the warehouse is
+accepted with a warning (decision D19): the response carries a `warnings`
+array, `backdated_before_receipt: 1`, and the stock is consumed from the
+later receipts at their recorded cost. Current sellable stock must still
+cover the quantity — the oversell refusal stays hard. Flagged invoices are
+listed by `GET /invoices/backdated`.
+
 ```json
 {
   "invoice_no": "INV-2026-0001",
@@ -403,6 +410,12 @@ from), posts the GL/ledger reversal and applies the disposition.
 
 ### GET /invoices/returns
 List invoice-return history (paginated).
+
+### GET /invoices/backdated
+ACCT-006 exception report: invoices created with a date before their stock's
+first purchase receipt (`backdated_before_receipt = 1`). Returns `invoice_no`,
+`invoice_date`, `customer_name`, `total_amount` and `status` per row so the
+paperwork can be verified against the goods trail.
 
 ---
 
