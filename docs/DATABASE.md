@@ -506,3 +506,30 @@ All document numbers use atomic generation via `INSERT ... ON CONFLICT DO UPDATE
 | Production | PROD-YYYY-NNNN | `PROD_last_no_YYYY` |
 | Sale | SALE-YYYY-NNNN | `SALE_last_no_YYYY` |
 | Payment | PAY001, PAY002... | `PAY_last_no` |
+
+---
+
+## Supplier refund claims
+
+`supplier_refund_claims` tracks money a supplier owes back after a
+`refund_expected` purchase return (PRET-002). One claim per return's credit
+note, opened automatically when the note posts; standalone claims (no return)
+are also allowed.
+
+| Column | Notes |
+|---|---|
+| `claim_no` | `SRC-YYYYMM-NNNN` (`SRC-LEGACY-<return_id>` for backfilled rows) |
+| `supplier_id` / `return_id` / `credit_note_id` | `credit_note_id` is nullable for standalone claims |
+| `amount` | expected refund |
+| `received_amount` / `written_off_amount` | receipt settlements and give-ups |
+| `status` | `EXPECTED` \| `PARTIAL` \| `RECEIVED` \| `CANCELLED` (CHECK) |
+| `written_off_reason` / `_at` / `_by`, `cancelled_*` | audit of give-ups and cancellations |
+
+`refund_receipt_allocations` links a refund receipt to the claim it settles
+(`receipt_id`, `claim_id`, `amount`, unique per receipt). Rows are deleted
+when the receipt is voided, which returns the claim to EXPECTED/PARTIAL.
+Receipts post the GL as `reference_type: 'REFUND_RECEIPT'` (Dr cash/bank /
+Cr 2000 AP); write-offs post `REFUND_CLAIM_WRITE_OFF` (Dr 7300 Refund
+Write-offs / Cr AP) with a supplier-ledger mirror. Migration: claims +
+allocations + account 7300 + backfill of legacy `refund_expected` returns,
+with a FK-off rebuild making `supplier_refunds.credit_note_id` nullable.

@@ -2003,6 +2003,15 @@ class AppLocalizationsUr extends AppLocalizations {
   String get purchasesRefundnone => 'ابھی کوئی ریفنڈ نہیں ہوا';
 
   @override
+  String purchasesRefundClaim(String claimNo, String status, String remaining) {
+    return 'کلیم $claimNo ($status) — باقی $remaining';
+  }
+
+  @override
+  String get purchasesRefundExcess =>
+      'زیادہ رقم سپلائر کریڈٹ کے طور پر جمع رکھیں';
+
+  @override
   String get purchasesProcessreturn => 'واپسی پراسیس کریں';
 
   @override

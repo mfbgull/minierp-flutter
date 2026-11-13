@@ -47,7 +47,18 @@ afterEach(() => {
 function api(method: 'get' | 'post' | 'put' | 'delete', url: string, body?: Record<string, unknown>) {
   return request(app)[method](url)
     .set('Cookie', token)
+    .set('Idempotency-Key', `cp-${Math.abs(hashCode(url + JSON.stringify(body ?? {})))}`)
     .send(body);
+}
+
+// Deterministic keys so each distinct request body keeps its own idempotency
+// slot — the supplier-refund endpoints mandate the header (ACCT-008).
+function hashCode(value: string): number {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash * 31 + value.charCodeAt(i)) | 0;
+  }
+  return hash;
 }
 
 function closePeriodFor(date: string, name = '2026-09-closed-for-test') {

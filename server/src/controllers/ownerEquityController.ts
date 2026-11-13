@@ -1,4 +1,5 @@
 import { respondToIdempotencyReplay } from '../utils/idempotency';
+import { BusinessRuleError } from '../utils/businessRuleError';
 import { positiveFiniteAmount } from '../utils/controllerValidation';
 import { Request, Response } from 'express';
 import { getQueryParam, getRouteParam } from '../utils/queryUtils';
@@ -66,6 +67,14 @@ function isClientError(message: string): boolean {
 }
 
 function fail(res: Response, error: unknown, fallback: string): void {
+  // ACCT-013: BusinessRuleError carries its own HTTP status (409 for
+  // cash-timeline refusals) plus structured blockers when present.
+  if (error instanceof BusinessRuleError) {
+    res.status(error.status).json(error.details !== undefined
+      ? { success: false, error: error.message, details: error.details }
+      : { success: false, error: error.message });
+    return;
+  }
   const message = error instanceof Error ? error.message : String(error);
   if (isClientError(message)) {
     res.status(400).json({ success: false, error: message });

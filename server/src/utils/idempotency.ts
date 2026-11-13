@@ -52,6 +52,8 @@ export const IDEMPOTENCY_SCOPES = {
   OWNER_WITHDRAWAL: 'owner-equity.withdrawal',
   EMPLOYEE_SALARY_PAY: 'employees.salary.pay',
   SUPPLIER_REFUND_CREATE: 'supplier-refunds.create',
+  SUPPLIER_REFUND_CLAIM_CREATE: 'supplier-refund-claims.create',
+  SUPPLIER_REFUND_CLAIM_WRITE_OFF: 'supplier-refund-claims.write-off',
 } as const;
 
 /** Normalize the raw header value; returns null when absent. Keys are
@@ -286,4 +288,24 @@ export function startIdempotentRequest(
     }
     throw err;
   }
+}
+
+/**
+ * Same as startIdempotentRequest, but a missing key is a 400 instead of an
+ * unprotected proceed. Used where a double-post costs money and the client
+ * has no keyless-exemption promise (PRET-002 receipt/claim writes; the
+ * ACCT-008 global mandate is still unconfirmed — new endpoints carry the
+ * contract from day one, existing endpoints keep the optional behavior).
+ */
+export function startRequiredIdempotentRequest(
+  db: Database.Database,
+  headers: Record<string, unknown> | undefined,
+  scope: string,
+  requestHash: string,
+): IdempotencyStart {
+  const key = headers?.[IDEMPOTENCY_KEY_HEADER];
+  if (key === undefined || key === null || key === '') {
+    return { kind: 'error', status: 400, message: 'Idempotency-Key header is required for this operation' };
+  }
+  return startIdempotentRequest(db, headers, scope, requestHash);
 }

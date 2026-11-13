@@ -30,6 +30,52 @@ import 'api_result.dart';
 import 'paged_request.dart' show PagedRequest, PagedResponse;
 import 'repository_client.dart';
 
+/// The open refund claim behind a credit note (PRET-002) — `claim` block
+/// of the refundable endpoint. Null when the note carries no live claim.
+class RefundClaimSummary {
+  const RefundClaimSummary({
+    required this.id,
+    required this.claimNo,
+    required this.status,
+    required this.amount,
+    required this.receivedAmount,
+    required this.remaining,
+  });
+
+  factory RefundClaimSummary.fromJson(Map<String, dynamic> json) =>
+      RefundClaimSummary(
+        id: json['id'] as int,
+        claimNo: json['claim_no'] as String,
+        status: json['status'] as String,
+        amount: json['amount'] as num? ?? 0,
+        receivedAmount: json['received_amount'] as num? ?? 0,
+        remaining: json['remaining'] as num? ?? 0,
+      );
+
+  final int id;
+  final String claimNo;
+  final String status;
+  final num amount;
+  final num receivedAmount;
+  final num remaining;
+}
+
+/// `GET /supplier-refunds/credit-notes/:id/refundable` response.
+class CreditNoteRefundable {
+  const CreditNoteRefundable({required this.refundable, this.claim});
+
+  factory CreditNoteRefundable.fromJson(Map<String, dynamic> json) =>
+      CreditNoteRefundable(
+        refundable: json['refundable'] as num? ?? 0,
+        claim: json['claim'] == null
+            ? null
+            : RefundClaimSummary.fromJson(json['claim'] as Map<String, dynamic>),
+      );
+
+  final num refundable;
+  final RefundClaimSummary? claim;
+}
+
 class PurchaseRepository {
   PurchaseRepository(this._api);
 
@@ -227,33 +273,39 @@ class PurchaseRepository {
 
   /// Refundable balance of a credit note (`GET
   /// /supplier-refunds/credit-notes/:id/refundable`) — what's left of the
-  /// note after already-issued refunds.
-  Future<ApiResult<num>> creditNoteRefundable(int creditNoteId) => _api.getRaw(
+  /// note after already-issued refunds, plus the open refund claim
+  /// (PRET-002) when the note has one.
+  Future<ApiResult<CreditNoteRefundable>> creditNoteRefundable(
+    int creditNoteId,
+  ) => _api.getRaw(
     '${ApiEndpoints.supplierRefunds}/credit-notes/$creditNoteId/refundable',
     parse: (Object? json) =>
-        (json! as Map<String, dynamic>)['refundable'] as num? ?? 0,
+        CreditNoteRefundable.fromJson(json! as Map<String, dynamic>),
   );
 
-  /// Issue a supplier refund (cash payout against a credit note,
+  /// Issue a supplier refund (cash receipt against a credit note's claim,
   /// `POST /supplier-refunds`) — enveloped `{success, message, data}`.
+  /// Requires an Idempotency-Key header.
   Future<ApiResult<Map<String, dynamic>>> createRefund({
     required String refundDate,
-    required int creditNoteId,
     required num amount,
+    int? creditNoteId,
+    int? claimId,
     String? paymentMethod,
     String? referenceNo,
-    String? idempotencyKey,
+    bool treatExcessAsAdvance = false,
+    required String idempotencyKey,
   }) => _api.postEnvelope<Map<String, dynamic>>(
     ApiEndpoints.supplierRefunds,
-    headers: idempotencyKey == null
-        ? null
-        : {'Idempotency-Key': idempotencyKey},
+    headers: {'Idempotency-Key': idempotencyKey},
     body: {
       'refund_date': refundDate,
-      'credit_note_id': creditNoteId,
+      'credit_note_id': ?creditNoteId,
+      'claim_id': ?claimId,
       'amount': amount,
       'payment_method': ?paymentMethod,
       'reference_no': ?referenceNo,
+      'treat_excess_as_advance': treatExcessAsAdvance ? true : null,
     },
     parse: (json) => json,
   );

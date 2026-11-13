@@ -314,11 +314,35 @@ export const zodBodySchemas = {
     warehouse_id: z.union([z.number(), z.string()]).refine(v => String(v).length > 0, { message: 'Required' }),
   }).passthrough(),
 
-  // Supplier refunds (cash payout against a credit note)
+  // Supplier refunds (PRET-002 refund receipts against a claim or a
+  // legacy credit note — one of the two ids is required; the controller
+  // enforces which and validates the excess/advance option).
   supplierRefundCreate: z.object({
     refund_date: z.string().min(1),
-    credit_note_id: z.union([z.number(), z.string()]).refine(v => Number(v) > 0, { message: 'Must be positive' }),
+    credit_note_id: z.union([z.number(), z.string()]).refine(v => Number(v) > 0, { message: 'Must be positive' }).optional(),
+    claim_id: z.union([z.number(), z.string()]).refine(v => Number(v) > 0, { message: 'Must be positive' }).optional(),
     amount: z.union([z.number(), z.string()]).refine(v => Number(v) > 0, { message: 'Must be positive' }),
+    payment_method: z.string().optional(),
+    reference_no: z.string().optional(),
+    treat_excess_as_advance: z.boolean().optional(),
+  }).passthrough(),
+
+  // Refund claims (standalone: supplier is owed money with no return)
+  supplierRefundClaimCreate: z.object({
+    supplier_id: z.union([z.number(), z.string()]).refine(v => Number(v) > 0, { message: 'Must be positive' }),
+    claim_date: z.string().min(1),
+    amount: z.union([z.number(), z.string()]).refine(v => Number(v) > 0, { message: 'Must be positive' }),
+    reason: z.string().optional(),
+  }).passthrough(),
+
+  supplierRefundClaimWriteOff: z.object({
+    amount: z.union([z.number(), z.string()]).refine(v => Number(v) > 0, { message: 'Must be positive' }).optional(),
+    reason: z.string().min(1),
+    write_off_date: z.string().min(1).optional(),
+  }).passthrough(),
+
+  supplierRefundClaimCancel: z.object({
+    reason: z.string().optional(),
   }).passthrough(),
 
   // Mobile invoices (drafts are flexible; submit mirrors invoiceCreate).

@@ -782,6 +782,42 @@ server rejects (400) returns that are not `POSTED`.
 
 ---
 
+## Supplier Refund Claims
+
+When a `refund_expected` return opens its credit note, the server also opens a
+**refund claim** (`supplier_refund_claims`) — money the supplier owes back.
+Claims are EXPECTED → PARTIAL → RECEIVED; cash moves only when a refund
+receipt (`POST /supplier-refunds`) is recorded against the claim. The claim
+is a memo, not cash: "refunds due" lists what has not arrived yet.
+
+| Method | Path | Description |
+|---|---|---|
+| GET | /supplier-refunds/claims | List claims (paginated; `status`, `supplier_id`, `search`) |
+| GET | /supplier-refunds/claims/due | Claims not fully received — memo of money owed back |
+| GET | /supplier-refunds/claims/:id | One claim with its receipts |
+| POST | /supplier-refunds/claims | Open a standalone claim (no return behind it) |
+| POST | /supplier-refunds/claims/:id/cancel | Cancel a claim — refused while live receipts are allocated |
+| POST | /supplier-refunds/claims/:id/write-off | Give up the remaining balance (mandatory reason) |
+| GET | /supplier-refunds/credit-notes/:id/refundable | Note's refundable balance + its live claim block |
+| POST | /supplier-refunds | Record a refund receipt (cash in; settles the claim) |
+| GET | /supplier-refunds | List refund receipts (paginated) |
+| GET | /supplier-refunds/:id | One refund receipt |
+| POST | /supplier-refunds/:id/void | Void a receipt — releases the claim back |
+
+`POST /supplier-refunds`, `POST /supplier-refunds/claims`,
+`.../write-off` require an `Idempotency-Key` header (400 without it; replay
+returns the original result). Receipt bodies accept `credit_note_id` or
+`claim_id`, `payment_method` **cash or bank transfer only**, and an optional
+`treat_excess_as_advance` — an amount above the claim's remaining room is
+rejected unless that flag is set, in which case the overage rides the same
+cash entry as supplier credit on account (Cr AP). Write-offs post Dr 7300 /
+Cr AP with a mandatory reason; amounts above Rs 1,000 need the owner (admin).
+Voiding a return is refused (409) while its claim has recorded receipts —
+void the receipts first. Voiding a receipt restores the claim to its
+uncollected state (EXPECTED / PARTIAL).
+
+---
+
 ## Sales
 
 | Method | Path | Description |

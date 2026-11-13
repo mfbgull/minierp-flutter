@@ -52,7 +52,7 @@ function refundCashDebit(): number {
     JOIN journal_entries je ON je.id = jl.journal_entry_id
     JOIN chart_of_accounts coa ON coa.id = jl.account_id
     WHERE coa.code IN ('1000','1010','1020','1030','1040')
-      AND je.reference_type = 'SUPPLIER_REFUND'
+      AND je.reference_type = 'REFUND_RECEIPT'
       AND je.voided = 0 AND jl.voided = 0
   `).get() as { total: number }).total);
 }
@@ -515,7 +515,7 @@ describe('idempotency — Round 2 money handlers', () => {
       // create a payments row, so that is not one of the things to count.
       const before = {
         refunds: count('SELECT COUNT(*) AS n FROM supplier_refunds'),
-        gl: count("SELECT COUNT(*) AS n FROM journal_entries WHERE reference_type = 'SUPPLIER_REFUND'"),
+        gl: count("SELECT COUNT(*) AS n FROM journal_entries WHERE reference_type = 'REFUND_RECEIPT'"),
         cashDr: refundCashDebit(),
       };
 
@@ -527,7 +527,7 @@ describe('idempotency — Round 2 money handlers', () => {
       expect(second.headers['x-idempotent-replay']).toBe('true');
       // The defect this prevents: cash out to the supplier a second time.
       expect(count('SELECT COUNT(*) AS n FROM supplier_refunds')).toBe(before.refunds + 1);
-      expect(count("SELECT COUNT(*) AS n FROM journal_entries WHERE reference_type = 'SUPPLIER_REFUND'"))
+      expect(count("SELECT COUNT(*) AS n FROM journal_entries WHERE reference_type = 'REFUND_RECEIPT'"))
         .toBe(before.gl + 1);
       expect(refundCashDebit() - before.cashDr).toBeCloseTo(20, 2);
     });

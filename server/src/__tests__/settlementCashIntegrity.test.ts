@@ -277,7 +277,10 @@ describe('C-02 / H-03 — a refund cannot exceed what was actually collected', (
     expect(netCash()).toBeCloseTo(cashBefore, 2);
     const note = db.prepare<[number], { id: number }>('SELECT id FROM credit_notes WHERE source_id = ?').get(idOf(res));
     if (!note) throw new Error('Missing returned-purchase credit note');
-    const received = await request(app).post('/api/supplier-refunds').set('Cookie', authCookie).send({
+    const received = await request(app).post('/api/supplier-refunds')
+      .set('Cookie', authCookie)
+      .set('Idempotency-Key', `c02-refund-${stamp}`)
+      .send({
       credit_note_id: note.id, refund_date: '2026-09-05', amount: 100, payment_method: 'Cash',
     });
     expect(received.status).toBe(201);

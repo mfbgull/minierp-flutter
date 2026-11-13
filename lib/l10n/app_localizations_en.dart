@@ -2002,6 +2002,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get purchasesRefundnone => 'No refund issued yet';
 
   @override
+  String purchasesRefundClaim(String claimNo, String status, String remaining) {
+    return 'Claim $claimNo ($status) — remaining $remaining';
+  }
+
+  @override
+  String get purchasesRefundExcess =>
+      'Treat any excess as supplier credit on account';
+
+  @override
   String get purchasesProcessreturn => 'Process Return';
 
   @override

@@ -13,7 +13,7 @@ import '../../core/utils/date_utils.dart' show isoDate;
 import '../../data/models/purchase_return.dart' show PurchaseReturn;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
 import '../../data/repositories/purchase_repository.dart'
-    show purchaseRepositoryProvider;
+    show RefundClaimSummary, purchaseRepositoryProvider;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
 import '../../widgets/date_picker.dart' show pickDate;
@@ -29,12 +29,14 @@ Future<void> showSupplierRefundDialog(
   BuildContext context, {
   required PurchaseReturn purchaseReturn,
   required num refundable,
+  RefundClaimSummary? claim,
 }) {
   return showDialog<void>(
     context: context,
     builder: (dialogContext) => _SupplierRefundDialog(
       purchaseReturn: purchaseReturn,
       refundable: refundable,
+      claim: claim,
     ),
   );
 }
@@ -43,10 +45,12 @@ class _SupplierRefundDialog extends ConsumerStatefulWidget {
   const _SupplierRefundDialog({
     required this.purchaseReturn,
     required this.refundable,
+    this.claim,
   });
 
   final PurchaseReturn purchaseReturn;
   final num refundable;
+  final RefundClaimSummary? claim;
 
   @override
   ConsumerState<_SupplierRefundDialog> createState() =>
@@ -60,6 +64,7 @@ class _SupplierRefundDialogState extends ConsumerState<_SupplierRefundDialog> {
 
   DateTime _refundDate = DateTime.now();
   String _paymentMethod = 'cash';
+  bool _excessAsCredit = false;
   bool _busy = false;
   String? _error;
 
@@ -82,7 +87,7 @@ class _SupplierRefundDialogState extends ConsumerState<_SupplierRefundDialog> {
       setState(() => _error = l10n.purchasesReturnqtyinvalid);
       return;
     }
-    if (amount > widget.refundable + 0.005) {
+    if (amount > widget.refundable + 0.005 && !_excessAsCredit) {
       setState(() => _error = l10n.purchasesReturnqtyexceeds);
       return;
     }
@@ -97,9 +102,13 @@ class _SupplierRefundDialogState extends ConsumerState<_SupplierRefundDialog> {
         .createRefund(
           refundDate: isoDate(_refundDate),
           creditNoteId: widget.purchaseReturn.creditNoteId!,
+          claimId: (widget.claim != null && widget.claim!.status != 'CANCELLED')
+              ? widget.claim!.id
+              : null,
           amount: amount,
           paymentMethod: _paymentMethod,
           referenceNo: _referenceController.text.trim(),
+          treatExcessAsAdvance: _excessAsCredit,
           idempotencyKey: _idemKeys.keyFor({
             'refund_date': isoDate(_refundDate),
             'credit_note_id': widget.purchaseReturn.creditNoteId!,
@@ -154,6 +163,18 @@ class _SupplierRefundDialogState extends ConsumerState<_SupplierRefundDialog> {
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
+            if (widget.claim != null &&
+                widget.claim!.status != 'CANCELLED')
+              Text(
+                l10n.purchasesRefundClaim(
+                  widget.claim!.claimNo,
+                  widget.claim!.status,
+                  Formatters.currency(widget.claim!.remaining),
+                ),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
             if (_error != null) ...[
               const SizedBox(height: 10),
               ErrorBanner(message: _error!),
@@ -199,9 +220,6 @@ class _SupplierRefundDialogState extends ConsumerState<_SupplierRefundDialog> {
                 items: const [
                   'cash',
                   'bank',
-                  'easypaisa',
-                  'jazzcash',
-                  'upaisa',
                 ],
                 selected: _paymentMethod,
                 isDense: true,
@@ -209,9 +227,7 @@ class _SupplierRefundDialogState extends ConsumerState<_SupplierRefundDialog> {
                 labelBuilder: (value) => switch (value) {
                   'cash' => l10n.paymentsMethodCash,
                   'bank' => l10n.paymentsMethodBank,
-                  'easypaisa' => 'Easypaisa',
-                  'jazzcash' => 'JazzCash',
-                  _ => 'UPaisa',
+                  _ => value,
                 },
                 decoration: formInputDecoration(),
                 onChanged: (value) {
@@ -219,6 +235,20 @@ class _SupplierRefundDialogState extends ConsumerState<_SupplierRefundDialog> {
                 },
               ),
             ),
+            if (widget.claim != null &&
+                widget.claim!.status != 'CANCELLED') ...[
+              const SizedBox(height: 10),
+              CheckboxListTile(
+                value: _excessAsCredit,
+                enabled: !_busy,
+                controlAffinity: ListTileControlAffinity.leading,
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                title: Text(l10n.purchasesRefundExcess),
+                onChanged: (value) =>
+                    setState(() => _excessAsCredit = value ?? false),
+              ),
+            ],
             const SizedBox(height: 10),
             FormFieldShell(
               label: l10n.purchasesRefundreference,

@@ -1,6 +1,7 @@
 import { localMonthCode } from '../utils/documentNumbering';
 import Database from 'better-sqlite3';
 import AccountingService from '../services/accountingService';
+import { assertCashTimeline } from '../services/cashBalanceGuard';
 import { getNextSequenceNumber } from '../utils/sequence';
 import { ACTIVE_EXPENSE_STATUS, GL_INACTIVE_EXPENSE_STATUSES } from '../utils/reportSql';
 import { BusinessRuleError } from '../utils/businessRuleError';
@@ -221,12 +222,6 @@ function update(db: Database.Database, id: number, data: UpdateExpenseDTO, opts?
         if (!fundsAccount) {
           throw new Error(`Chart of accounts is missing required account: ${cashCode}`);
         }
-        if (newMethod !== 'Credit') AccountingService.assertSufficientFunds(db, {
-          accountId: fundsAccount.id,
-          amount: newAmount,
-          asOfDate: newDate,
-          label: `expense ${existing.expense_no}`,
-        });
         AccountingService.postExpenseEntry(db, {
           expenseId: id,
           expenseNo: String(existing.expense_no),
@@ -235,6 +230,20 @@ function update(db: Database.Database, id: number, data: UpdateExpenseDTO, opts?
           paymentMethod: newMethod || undefined,
           userId: opts?.userId,
         });
+        // ACCT-013: chronological suffix check. Moving an outflow earlier can
+        // overdraw a day between the new and old dates even when the balance
+        // at the new date and today both look fine. Credit expenses do not
+        // touch cash (assertSufficientFunds here only guarded the new date;
+        // the timeline strictly subsumes it).
+        if (String(existing.payment_method ?? '') !== 'Credit') {
+          assertCashTimeline(db, {
+            paymentMethod: String(existing.payment_method ?? '') || undefined,
+            fromDate: String(existing.expense_date),
+          });
+        }
+        if (newMethod !== 'Credit') {
+          assertCashTimeline(db, { paymentMethod: newMethod, fromDate: newDate });
+        }
       }
     };
     postEditedExpense();

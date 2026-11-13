@@ -216,14 +216,19 @@ class _RefundButtonState extends ConsumerState<_RefundButton> {
 
     switch (result) {
       case ApiSuccess(:final data):
-        if (data <= 0) {
+        final claim = data.claim;
+        final remaining = claim == null || claim.status == 'CANCELLED'
+            ? data.refundable
+            : (data.refundable < claim.remaining ? data.refundable : claim.remaining);
+        if (remaining <= 0) {
           showAppToast(context, l10n.purchasesRefundnone);
           return;
         }
         await showSupplierRefundDialog(
           context,
           purchaseReturn: widget.purchaseReturn,
-          refundable: data,
+          refundable: remaining,
+          claim: claim,
         );
       case ApiFailure(:final error):
         showAppToast(context, error.message);

@@ -3,6 +3,7 @@ import { Request, Response } from 'express';
 import { getQueryInteger, getQueryParam } from '../utils/queryUtils';
 import { AuthRequest } from '../types';
 import PurchaseReturnModel from '../models/PurchaseReturn';
+import { BusinessRuleError } from '../utils/businessRuleError';
 import db from '../config/database';
 import logger from '../utils/logger';
 
@@ -129,6 +130,13 @@ function voidPurchaseReturn(req: AuthRequest, res: Response): Response | void {
       data: voided,
     });
   } catch (error: unknown) {
+    // PRET-002: a claim with recorded receipts blocks the return void (409).
+    if (error instanceof BusinessRuleError) {
+      res.status(error.status).json(error.details !== undefined
+        ? { error: error.message, details: error.details }
+        : { error: error.message });
+      return;
+    }
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     logger.error('Void purchase return error:', { error: errorMessage });
     res.status(400).json({ error: errorMessage });

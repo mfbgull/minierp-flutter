@@ -1,6 +1,7 @@
 import { localMonthCode } from '../utils/documentNumbering';
 import Database from 'better-sqlite3';
 import AccountingService from '../services/accountingService';
+import { assertCashTimeline } from '../services/cashBalanceGuard';
 import { getNextSequenceNumber } from '../utils/sequence';
 import StockMovementModel from './StockMovement';
 
@@ -460,16 +461,6 @@ function update(
             voidReason: 'Re-posted after edit',
           });
 
-          const cashCode = AccountingService._cashOrBankAccountCode(newMethod ?? undefined);
-          const cash = AccountingService.getAccountByCode(db, cashCode);
-          if (!cash) throw new Error(`Chart of accounts is missing required account: ${cashCode}`);
-          AccountingService.assertSufficientFunds(db, {
-            accountId: cash.id,
-            amount: newAmount,
-            asOfDate: newDate,
-            label: `owner withdrawal ${existing.withdrawal_no}`,
-          });
-
           db.prepare(`
             UPDATE owner_withdrawals SET withdrawal_date = ?, amount = ?, payment_method = ?,
               note = COALESCE(?, note), updated_at = CURRENT_TIMESTAMP
@@ -484,6 +475,11 @@ function update(
             paymentMethod: newMethod ?? undefined,
             userId: opts.userId,
           });
+          // ACCT-013: chronological suffix check. Moving an outflow earlier can
+          // overdraw a day between the new and old dates even when the balance
+          // at the new date and today both look fine.
+          assertCashTimeline(db, { paymentMethod: existing.payment_method, fromDate: existing.withdrawal_date });
+          assertCashTimeline(db, { paymentMethod: newMethod ?? undefined, fromDate: newDate });
         } else {
           db.prepare(`
             UPDATE owner_withdrawals SET note = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?

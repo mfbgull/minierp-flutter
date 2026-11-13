@@ -3878,6 +3878,18 @@ abstract class AppLocalizations {
   /// **'No refund issued yet'**
   String get purchasesRefundnone;
 
+  /// No description provided for @purchasesRefundClaim.
+  ///
+  /// In en, this message translates to:
+  /// **'Claim {claimNo} ({status}) — remaining {remaining}'**
+  String purchasesRefundClaim(String claimNo, String status, String remaining);
+
+  /// No description provided for @purchasesRefundExcess.
+  ///
+  /// In en, this message translates to:
+  /// **'Treat any excess as supplier credit on account'**
+  String get purchasesRefundExcess;
+
   /// No description provided for @purchasesProcessreturn.
   ///
   /// In en, this message translates to:
