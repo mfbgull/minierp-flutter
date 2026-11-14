@@ -233,7 +233,7 @@ describe('cash-timeline guard-rail: every cash-affecting model calls the chronol
       'OwnerWithdrawal.ts', // outflow create/edit (moved-earlier dip)
       'Payment.ts',        // customer receipt create/delete/restore
       'SupplierRefund.ts', // refund void
-      'Expense.ts',        // expense create/edit (moved-earlier dip)
+      'Expense.ts',        // expense GL post (Draft→Recorded) and edit
     ];
     for (const file of cashAffecting) {
       const source = fs.readFileSync(path.join(modelsDir, file), 'utf8');
