@@ -235,7 +235,8 @@ describe('ACCT-006 — goods receipt and production', () => {
     expect((await buy(raw, 20, 5, '2026-09-10')).status).toBe(201);
     const out = await createItem(code(), authCookie);
 
-    const res = await request(app).post('/api/productions').set('Cookie', authCookie).send({
+    const res = await request(app).post('/api/productions')
+      .set('Idempotency-Key', `prod-${Date.now()}-${Math.floor(Math.random()*1e6)}`).set('Cookie', authCookie).send({
       outputs: [{ item_id: out, quantity: 4 }],
       warehouse_id: warehouseId, production_date: '2026-09-01',
       input_items: [{ item_id: raw, quantity: 8 }],

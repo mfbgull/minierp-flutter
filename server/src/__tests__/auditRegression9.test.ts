@@ -28,7 +28,8 @@ describe('PROD-001 / PROD-005: unpaid production overhead', () => {
     const cashBefore = balance('1000');
     const bankBefore = balance('1010');
 
-    const created = await request(app).post('/api/productions').set('Cookie', cookie).send({
+    const created = await request(app).post('/api/productions')
+      .set('Idempotency-Key', `prod-${Date.now()}-${Math.floor(Math.random()*1e6)}`).set('Cookie', cookie).send({
       output_item_id: finished,
       output_quantity: 10,
       input_items: [{ item_id: raw, quantity: 10 }],
@@ -483,7 +484,8 @@ describe('D6: joint production with multiple outputs allocated by relative sales
     const payableBefore = balance('2200');
     const assetBefore = balance('1200');
 
-    const res = await request(app).post('/api/productions').set('Cookie', cookie).send({
+    const res = await request(app).post('/api/productions')
+      .set('Idempotency-Key', `prod-${Date.now()}-${Math.floor(Math.random()*1e6)}`).set('Cookie', cookie).send({
       warehouse_id: warehouse.id,
       production_date: '2026-09-12',
       overhead_cost: 500,
@@ -542,7 +544,8 @@ describe('D6: joint production with multiple outputs allocated by relative sales
     db.prepare('UPDATE items SET has_expiry = 1 WHERE id = ?').run(oil);
     db.prepare('UPDATE items SET has_expiry = 0 WHERE id = ?').run(cake);
 
-    const res = await request(app).post('/api/productions').set('Cookie', cookie).send({
+    const res = await request(app).post('/api/productions')
+      .set('Idempotency-Key', `prod-${Date.now()}-${Math.floor(Math.random()*1e6)}`).set('Cookie', cookie).send({
       warehouse_id: warehouse.id,
       production_date: '2026-09-14',
       expiry_date: '2027-01-01',
@@ -587,7 +590,8 @@ describe('D6: joint production with multiple outputs allocated by relative sales
     // Sent byte-for-byte as production_form_dialog.dart builds it: no
     // output_item_id / output_quantity when co-products exist, FLOAT
     // quantities (Dart num → JSON 10.0), bom_id alongside outputs[].
-    const res = await request(app).post('/api/productions').set('Cookie', cookie).send({
+    const res = await request(app).post('/api/productions')
+      .set('Idempotency-Key', `prod-${Date.now()}-${Math.floor(Math.random()*1e6)}`).set('Cookie', cookie).send({
       outputs: [
         { item_id: oil, quantity: 10.0 },
         { item_id: cake, quantity: 50.0 },
@@ -634,7 +638,8 @@ describe('D6: joint production with multiple outputs allocated by relative sales
       .prepare('INSERT INTO boms (bom_no, bom_name, finished_item_id, quantity, created_by) VALUES (?, ?, ?, ?, 1)')
       .run(`BOM-MIS-${cake}`, 'Mismatched BOM', cake, 10).lastInsertRowid;
 
-    const res = await request(app).post('/api/productions').set('Cookie', cookie).send({
+    const res = await request(app).post('/api/productions')
+      .set('Idempotency-Key', `prod-${Date.now()}-${Math.floor(Math.random()*1e6)}`).set('Cookie', cookie).send({
       outputs: [
         { item_id: oil, quantity: 5 },
         { item_id: cake, quantity: 20 },
@@ -672,7 +677,8 @@ describe('D6: joint production with multiple outputs allocated by relative sales
       input_items: [{ item_id: seed, quantity: 10 }],
     };
 
-    const repeated = await request(app).post('/api/productions').set('Cookie', cookie).send({
+    const repeated = await request(app).post('/api/productions')
+      .set('Idempotency-Key', `prod-${Date.now()}-${Math.floor(Math.random()*1e6)}`).set('Cookie', cookie).send({
       ...base,
       outputs: [
         { item_id: oil, quantity: 1 },
@@ -681,7 +687,8 @@ describe('D6: joint production with multiple outputs allocated by relative sales
     });
     expect(repeated.status).toBeGreaterThanOrEqual(400);
 
-    const circular = await request(app).post('/api/productions').set('Cookie', cookie).send({
+    const circular = await request(app).post('/api/productions')
+      .set('Idempotency-Key', `prod-${Date.now()}-${Math.floor(Math.random()*1e6)}`).set('Cookie', cookie).send({
       ...base,
       outputs: [
         { item_id: seed, quantity: 1 },
@@ -690,7 +697,8 @@ describe('D6: joint production with multiple outputs allocated by relative sales
     });
     expect(circular.status).toBeGreaterThanOrEqual(400);
 
-    const badQty = await request(app).post('/api/productions').set('Cookie', cookie).send({
+    const badQty = await request(app).post('/api/productions')
+      .set('Idempotency-Key', `prod-${Date.now()}-${Math.floor(Math.random()*1e6)}`).set('Cookie', cookie).send({
       ...base,
       outputs: [
         { item_id: oil, quantity: 0 },
@@ -713,7 +721,8 @@ describe('D6: joint production with multiple outputs allocated by relative sales
     const clearingBefore = balance('7000');
     const payableBefore = balance('2200');
 
-    const created = await request(app).post('/api/productions').set('Cookie', cookie).send({
+    const created = await request(app).post('/api/productions')
+      .set('Idempotency-Key', `prod-${Date.now()}-${Math.floor(Math.random()*1e6)}`).set('Cookie', cookie).send({
       warehouse_id: warehouse.id,
       production_date: '2026-09-13',
       overhead_cost: 60,
@@ -745,7 +754,8 @@ describe('D6: joint production with multiple outputs allocated by relative sales
     const out = await createItem('D6 single out', cookie);
     await purchaseStock(raw, warehouse.id, 10, 4, cookie);
 
-    const res = await request(app).post('/api/productions').set('Cookie', cookie).send({
+    const res = await request(app).post('/api/productions')
+      .set('Idempotency-Key', `prod-${Date.now()}-${Math.floor(Math.random()*1e6)}`).set('Cookie', cookie).send({
       output_item_id: out,
       output_quantity: 5,
       warehouse_id: warehouse.id,
@@ -774,7 +784,8 @@ describe('D6: production summary by item counts every output line', () => {
     db.prepare('UPDATE items SET standard_selling_price = ? WHERE id = ?').run(100, oil);
     db.prepare('UPDATE items SET standard_selling_price = ? WHERE id = ?').run(10, cake);
 
-    const created = await request(app).post('/api/productions').set('Cookie', cookie).send({
+    const created = await request(app).post('/api/productions')
+      .set('Idempotency-Key', `prod-${Date.now()}-${Math.floor(Math.random()*1e6)}`).set('Cookie', cookie).send({
       warehouse_id: warehouse.id,
       production_date: '2026-09-16',
       input_items: [{ item_id: seed, quantity: 30 }],

@@ -320,4 +320,34 @@ describe('ACCT-008 D19 — Idempotency-Key is mandatory on canonical financial w
     expect(db.prepare('SELECT COUNT(*) n FROM purchase_returns WHERE source_id = ?').get(prepared.purchaseId))
       .toEqual({ n: 1 });
   });
+
+  it('rejects a keyless production run with 400 and replays a keyed one', async () => {
+    // ACCT-008: production consumes inputs and posts the output. A retry must
+    // replay, never double-consume.
+    const raw = await createItem(`Mandate Raw ${++seq}`, authCookie);
+    const out = await createItem(`Mandate Out ${++seq}`, authCookie);
+    await purchaseStock(raw, warehouseId, 10, 5, authCookie, '2026-10-01');
+    const body = {
+      warehouse_id: warehouseId,
+      production_date: '2026-10-05',
+      input_items: [{ item_id: raw, quantity: 2 }],
+      outputs: [{ item_id: out, quantity: 1 }],
+    };
+
+    const keyless = await request(app).post('/api/productions').set('Cookie', authCookie).send(body);
+    expect(keyless.status).toBe(400);
+    expect((keyless.body as { error: string }).error).toMatch(MANDATE_MESSAGE);
+
+    const k = key();
+    const first = await request(app).post('/api/productions').set('Cookie', authCookie)
+      .set('Idempotency-Key', k).send(body);
+    expect(first.status).toBe(201);
+    const firstId = (first.body as { id: number }).id;
+
+    const second = await request(app).post('/api/productions').set('Cookie', authCookie)
+      .set('Idempotency-Key', k).send(body);
+    expect(second.status).toBe(201);
+    expect((second.body as { id: number }).id).toBe(firstId);
+    expect(db.prepare('SELECT COUNT(*) n FROM productions WHERE output_item_id = ?').get(out)).toEqual({ n: 1 });
+  });
 });

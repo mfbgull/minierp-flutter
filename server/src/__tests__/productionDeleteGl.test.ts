@@ -73,6 +73,7 @@ describe('Production deletion GL void (C2)', () => {
   async function createProduction(): Promise<{ productionId: number; productionNo: string; movementId: number; journalEntryId: number }> {
     const res = await request(app)
       .post('/api/productions')
+      .set('Idempotency-Key', `prod-${Date.now()}-${Math.floor(Math.random()*1e6)}`)
       .set('Cookie', authCookie)
       .send({
         output_item_id: outputItemId,

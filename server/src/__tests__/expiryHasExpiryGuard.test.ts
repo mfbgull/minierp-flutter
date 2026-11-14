@@ -282,6 +282,7 @@ describe('joint production stamps expiry per output line', () => {
 
     const res = await request(app)
       .post('/api/productions')
+      .set('Idempotency-Key', `prod-${Date.now()}-${Math.floor(Math.random()*1e6)}`)
       .set('Cookie', authCookie)
       .send({
         outputs: [

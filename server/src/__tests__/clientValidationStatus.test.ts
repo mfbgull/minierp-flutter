@@ -76,7 +76,8 @@ describe('CODE-001: invalid client input returns actionable 4xx without writes',
     { overhead_cost: 0, input_quantity: 1000 },
   ])('rejects invalid production input: %j', async ({ overhead_cost, input_quantity }) => {
     const before = financialState();
-    const response = await request(app).post('/api/productions').set('Cookie', cookie).send({
+    const response = await request(app).post('/api/productions')
+      .set('Idempotency-Key', `prod-${Date.now()}-${Math.floor(Math.random()*1e6)}`).set('Cookie', cookie).send({
       output_item_id: outputId, output_quantity: 1, warehouse_id: warehouseId,
       production_date: '2026-09-05', overhead_cost,
       input_items: [{ item_id: itemId, quantity: input_quantity }],
