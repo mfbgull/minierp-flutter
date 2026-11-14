@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
+import '../../core/utils/idempotency_key.dart';
 import '../../data/repositories/inventory_repository.dart'
     show inventoryRepositoryProvider;
 import '../../l10n/app_localizations.dart';
@@ -44,6 +45,7 @@ class _StockTransferDialog extends ConsumerStatefulWidget {
 
 class _StockTransferDialogState extends ConsumerState<_StockTransferDialog> {
   final _formKey = GlobalKey<FormState>();
+  final _idemKeys = IdempotencyKeyCache(prefix: 'stock-xfer');
   final _qtyController = TextEditingController();
   final _remarksController = TextEditingController();
   int? _itemId;
@@ -90,13 +92,17 @@ class _StockTransferDialogState extends ConsumerState<_StockTransferDialog> {
     // INV-02: one atomic server call. FIFO consumption at the source, a
     // mirrored TRANSFER batch at the destination and both movements are
     // written inside a single transaction — no partial-transfer state.
-    final result = await repo.createStockTransfer({
+    final body = <String, dynamic>{
       'item_id': _itemId!,
       'from_warehouse_id': _sourceId!,
       'to_warehouse_id': _destId!,
       'quantity': qty,
       if (remarks.isNotEmpty) 'remarks': remarks,
-    });
+    };
+    final result = await repo.createStockTransfer(
+      body,
+      idempotencyKey: _idemKeys.keyFor(body),
+    );
     if (!mounted) return;
 
     switch (result) {

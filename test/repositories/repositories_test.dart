@@ -1504,7 +1504,7 @@ void main() {
           'input_items': [
             {'item_id': 7, 'quantity': 4},
           ],
-        });
+        }, idempotencyKey: 'test-prod-key');
         expect(seenPath, '/productions');
         expect(seenBody!['output_quantity'], 10);
         expect((seenBody!['input_items'] as List).first['item_id'], 7);

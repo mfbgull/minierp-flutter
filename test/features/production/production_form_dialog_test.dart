@@ -77,8 +77,9 @@ class _FakeProductionRepository extends ProductionRepository {
 
   @override
   Future<ApiResult<Production>> createProduction(
-    Map<String, dynamic> body,
-  ) async {
+    Map<String, dynamic> body, {
+    required String idempotencyKey,
+  }) async {
     lastBody = body;
     return const ApiSuccess(
       Production(

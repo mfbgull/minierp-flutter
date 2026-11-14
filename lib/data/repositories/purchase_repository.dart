@@ -362,9 +362,9 @@ class PurchaseRepository {
     String? reason,
     String? disposition,
     required List<({int sourceItemId, num quantity})> items,
-  }) => _api.post(
-    ApiEndpoints.purchaseReturns,
-    body: {
+    required String idempotencyKey,
+  }) {
+    final body = <String, dynamic>{
       'return_date': returnDate,
       'source_type': sourceType,
       'source_id': sourceId,
@@ -375,10 +375,15 @@ class PurchaseRepository {
         for (final line in items)
           {'source_item_id': line.sourceItemId, 'quantity': line.quantity},
       ],
-    },
-    parse: (Object? json) =>
-        PurchaseReturn.fromJson(json as Map<String, dynamic>),
-  );
+    };
+    return _api.post(
+      ApiEndpoints.purchaseReturns,
+      body: body,
+      headers: {'Idempotency-Key': idempotencyKey},
+      parse: (Object? json) =>
+          PurchaseReturn.fromJson(json as Map<String, dynamic>),
+    );
+  }
 
   /// Return detail — bare object (header + embedded `items`).
   Future<ApiResult<PurchaseReturn>> returnDetail(int id) => _api.getRaw(
