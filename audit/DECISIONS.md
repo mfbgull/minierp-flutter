@@ -658,6 +658,16 @@ keyless-compatible contract (`invoiceIdempotency`, `invoiceMigrationTelemetry`,
   receipts; otherwise the receipt must be reversed first. Reversing a receipt
   returns the claim to EXPECTED or PARTIAL and posts its own ledger and
   journal reversal.
+- **Idempotency-Key on refund receipts (decided 2026-11-14).** Mandatory,
+  like every other keyed financial write under D19. A receipt creates cash, so
+  a lost response followed by a retry must replay, not pay twice. This was
+  recommended in the design discussion, and `f31c511e` already implements it:
+  `POST /supplier-refunds` and `POST /supplier-refunds/claims` return 400 with
+  `IDEMPOTENCY_KEY_REQUIRED_MESSAGE` when the header is absent.
+  Client side verified 2026-11-14: `supplier_refund_dialog.dart` sends a key
+  from `IdempotencyKeyCache.keyFor`, derived from the request body, so an
+  unchanged retry reuses it. All ten mandate sites send a key; a Flutter
+  caller sweep found no keyless caller.
 - **UI.** Single workflow, not tabs: a claim list with status chips (Expected,
   Partial, Received) and a default open-items filter; a "Record receipt"
   action prefilled with the remaining amount plus an account picker; a

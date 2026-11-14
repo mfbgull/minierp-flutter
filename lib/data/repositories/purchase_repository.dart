@@ -76,6 +76,83 @@ class CreditNoteRefundable {
   final RefundClaimSummary? claim;
 }
 
+/// One row of the refund-claim list (`GET /supplier-refunds/claims`).
+/// [remaining] is the uncollected balance: amount minus received minus
+/// written off.
+class RefundClaim {
+  const RefundClaim({
+    required this.id,
+    required this.claimNo,
+    required this.supplierId,
+    required this.supplierName,
+    required this.claimDate,
+    required this.amount,
+    required this.receivedAmount,
+    required this.writtenOffAmount,
+    required this.remaining,
+    required this.status,
+    this.returnNo,
+    this.creditNo,
+    this.reason,
+  });
+
+  factory RefundClaim.fromJson(Map<String, dynamic> json) {
+    final amount = json['amount'] as num? ?? 0;
+    final received = json['received_amount'] as num? ?? 0;
+    final writtenOff = json['written_off_amount'] as num? ?? 0;
+    return RefundClaim(
+      id: json['id'] as int,
+      claimNo: json['claim_no'] as String,
+      supplierId: json['supplier_id'] as int,
+      supplierName: json['supplier_name'] as String? ?? '',
+      claimDate: json['claim_date'] as String,
+      amount: amount,
+      receivedAmount: received,
+      writtenOffAmount: writtenOff,
+      remaining: amount - received - writtenOff,
+      status: json['status'] as String,
+      returnNo: json['return_no'] as String?,
+      creditNo: json['credit_no'] as String?,
+      reason: json['reason'] as String?,
+    );
+  }
+
+  final int id;
+  final String claimNo;
+  final int supplierId;
+  final String supplierName;
+  final String claimDate;
+  final num amount;
+  final num receivedAmount;
+  final num writtenOffAmount;
+  final num remaining;
+  final String status;
+  final String? returnNo;
+  final String? creditNo;
+  final String? reason;
+
+  /// A claim is open while it still expects money. RECEIVED and CANCELLED
+  /// are terminal; PARTIAL still expects the remainder.
+  bool get isOpen => status == 'EXPECTED' || status == 'PARTIAL';
+}
+
+/// `GET /supplier-refunds/claims/due` response — a receivable memo, never a
+/// cash figure.
+class RefundsDue {
+  const RefundsDue({required this.rows, required this.totalDue});
+
+  factory RefundsDue.fromJson(Map<String, dynamic> json) => RefundsDue(
+    rows: [
+      for (final row in (json['data'] as List<dynamic>? ?? const []))
+        RefundClaim.fromJson(row as Map<String, dynamic>),
+    ],
+    totalDue: json['total_due'] as num? ?? 0,
+  );
+
+  final List<RefundClaim> rows;
+  final num totalDue;
+}
+
 class PurchaseRepository {
   PurchaseRepository(this._api);
 
@@ -319,8 +396,118 @@ class PurchaseRepository {
         body: {'reason': reason.trim()},
         parse: (_) {},
       );
+
+  /// One page of refund claims (`GET /supplier-refunds/claims`). [status]
+  /// filters to a single lifecycle state; omit it for all claims.
+  Future<ApiResult<PagedResponse<RefundClaim>>> claimsPaged(
+    PagedRequest request, {
+    String? status,
+    int? supplierId,
+  }) => _api.getPaged(
+    '${ApiEndpoints.supplierRefunds}/claims',
+    queryParameters: {
+      ...request.toQuery(),
+      'status': ?status,
+      'supplier_id': ?supplierId,
+    },
+    parseItem: (Object? json) => RefundClaim.fromJson(json as Map<String, dynamic>),
+  );
+
+  /// The outstanding refund claims (`GET /supplier-refunds/claims/due`).
+  Future<ApiResult<RefundsDue>> refundsDue() => _api.getRaw(
+    '${ApiEndpoints.supplierRefunds}/claims/due',
+    parse: (Object? json) => RefundsDue.fromJson(json! as Map<String, dynamic>),
+  );
+
+  /// Record a standalone refund claim — a supplier owes money with no
+  /// purchase return behind it (`POST /supplier-refunds/claims`). Requires
+  /// an Idempotency-Key header.
+  Future<ApiResult<Map<String, dynamic>>> createClaim({
+    required int supplierId,
+    required String claimDate,
+    required num amount,
+    String? reason,
+    required String idempotencyKey,
+  }) => _api.postEnvelope<Map<String, dynamic>>(
+    '${ApiEndpoints.supplierRefunds}/claims',
+    headers: {'Idempotency-Key': idempotencyKey},
+    body: {
+      'supplier_id': supplierId,
+      'claim_date': claimDate,
+      'amount': amount,
+      'reason': ?reason,
+    },
+    parse: (json) => json,
+  );
+
+  /// Cancel a claim that holds no receipts (`POST
+  /// /supplier-refunds/claims/:id/cancel`).
+  Future<ApiResult<void>> cancelClaim(int id, {String? reason}) =>
+      _api.postEnvelope<void>(
+        '${ApiEndpoints.supplierRefunds}/claims/$id/cancel',
+        body: {'reason': ?reason},
+        parse: (_) {},
+      );
+
+  /// Write off an uncollected claim balance (Dr 7300 / Cr AP). A reason is
+  /// mandatory; above Rs 1,000 the server requires the admin role.
+  Future<ApiResult<void>> writeOffClaim(
+    int id, {
+    required String reason,
+    num? amount,
+    String? writeOffDate,
+  }) => _api.postEnvelope<void>(
+    '${ApiEndpoints.supplierRefunds}/claims/$id/write-off',
+    body: {
+      'reason': reason.trim(),
+      'amount': ?amount,
+      'write_off_date': ?writeOffDate,
+    },
+    parse: (_) {},
+  );
+
+  /// Void a refund receipt (`POST /supplier-refunds/:id/void`). A void that
+  /// would overdraw cash is refused with 409 and a `cashBlockers` list.
+  Future<ApiResult<void>> voidRefund(int id, {required String reason}) =>
+      _api.postEnvelope<void>(
+        '${ApiEndpoints.supplierRefunds}/$id/void',
+        body: {'reason': reason.trim()},
+        parse: (_) {},
+      );
 }
 
 final purchaseRepositoryProvider = Provider<PurchaseRepository>(
   (ref) => PurchaseRepository(ref.watch(repositoryClientProvider)),
 );
+
+/// One page of refund claims. [status] null → every claim, which the list
+/// screen turns into "open only" by passing `EXPECTED`/`PARTIAL`.
+final refundClaimsProvider = FutureProvider.autoDispose
+    .family<
+      PagedResponse<RefundClaim>,
+      ({String? status, int page, int limit})
+    >((ref, args) async {
+      final result = await ref
+          .watch(purchaseRepositoryProvider)
+          .claimsPaged(
+            PagedRequest(
+              page: args.page,
+              limit: args.limit,
+            ),
+            status: args.status,
+          );
+      return switch (result) {
+        ApiSuccess(:final data) => data,
+        ApiFailure(:final error) => throw error,
+      };
+    });
+
+/// The outstanding refunds-due memo (`GET /supplier-refunds/claims/due`).
+/// A receivable figure — deliberately separate from any cash total.
+final refundsDueProvider = FutureProvider.autoDispose<RefundsDue>((ref) async {
+  final result = await ref.watch(purchaseRepositoryProvider).refundsDue();
+  return switch (result) {
+    ApiSuccess(:final data) => data,
+    ApiFailure(:final error) => throw error,
+  };
+});

@@ -3890,6 +3890,174 @@ abstract class AppLocalizations {
   /// **'Treat any excess as supplier credit on account'**
   String get purchasesRefundExcess;
 
+  /// No description provided for @refundsDueTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Refunds Due'**
+  String get refundsDueTitle;
+
+  /// No description provided for @refundsDueBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Refunds due: {amount}'**
+  String refundsDueBadge(String amount);
+
+  /// No description provided for @refundsDueHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Money suppliers owe you. Not cash yet.'**
+  String get refundsDueHint;
+
+  /// No description provided for @refundClaimsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplier Refund Claims'**
+  String get refundClaimsTitle;
+
+  /// No description provided for @refundClaimsOpenOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Open only'**
+  String get refundClaimsOpenOnly;
+
+  /// No description provided for @refundClaimsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No refund claims'**
+  String get refundClaimsEmpty;
+
+  /// No description provided for @refundClaimsEmptyOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'No open refund claims'**
+  String get refundClaimsEmptyOpen;
+
+  /// No description provided for @refundClaimStatusEXPECTED.
+  ///
+  /// In en, this message translates to:
+  /// **'Expected'**
+  String get refundClaimStatusEXPECTED;
+
+  /// No description provided for @refundClaimStatusPARTIAL.
+  ///
+  /// In en, this message translates to:
+  /// **'Partially received'**
+  String get refundClaimStatusPARTIAL;
+
+  /// No description provided for @refundClaimStatusRECEIVED.
+  ///
+  /// In en, this message translates to:
+  /// **'Received'**
+  String get refundClaimStatusRECEIVED;
+
+  /// No description provided for @refundClaimStatusCANCELLED.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get refundClaimStatusCANCELLED;
+
+  /// No description provided for @refundClaimRecordReceipt.
+  ///
+  /// In en, this message translates to:
+  /// **'Record receipt'**
+  String get refundClaimRecordReceipt;
+
+  /// No description provided for @refundClaimWriteOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Write off'**
+  String get refundClaimWriteOff;
+
+  /// No description provided for @refundClaimWriteOffTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Write off refund claim'**
+  String get refundClaimWriteOffTitle;
+
+  /// No description provided for @refundClaimWriteOffReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason'**
+  String get refundClaimWriteOffReason;
+
+  /// No description provided for @refundClaimWriteOffReasonRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'A reason is required to write off a claim'**
+  String get refundClaimWriteOffReasonRequired;
+
+  /// No description provided for @refundClaimWriteOffAdminOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Write-offs above Rs 1,000 need an owner'**
+  String get refundClaimWriteOffAdminOnly;
+
+  /// No description provided for @refundClaimCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel claim'**
+  String get refundClaimCancel;
+
+  /// No description provided for @refundClaimCancelReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason'**
+  String get refundClaimCancelReason;
+
+  /// No description provided for @refundClaimRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Remaining: {amount}'**
+  String refundClaimRemaining(String amount);
+
+  /// No description provided for @refundClaimStandalone.
+  ///
+  /// In en, this message translates to:
+  /// **'Record refund claim'**
+  String get refundClaimStandalone;
+
+  /// No description provided for @refundClaimStandaloneSupplier.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplier'**
+  String get refundClaimStandaloneSupplier;
+
+  /// No description provided for @refundClaimStandaloneAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Expected amount'**
+  String get refundClaimStandaloneAmount;
+
+  /// No description provided for @refundClaimRemainingPrefill.
+  ///
+  /// In en, this message translates to:
+  /// **'Remaining {amount}'**
+  String refundClaimRemainingPrefill(String amount);
+
+  /// No description provided for @refundBlockedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash would go negative'**
+  String get refundBlockedTitle;
+
+  /// No description provided for @refundBlockedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Reverse these entries first, then retry.'**
+  String get refundBlockedHint;
+
+  /// No description provided for @refundBlockedRow.
+  ///
+  /// In en, this message translates to:
+  /// **'{type} on {date} — {amount}'**
+  String refundBlockedRow(String type, String date, String amount);
+
+  /// No description provided for @refundBlockedMore.
+  ///
+  /// In en, this message translates to:
+  /// **'and {count} more'**
+  String refundBlockedMore(int count);
+
   /// No description provided for @purchasesProcessreturn.
   ///
   /// In en, this message translates to:

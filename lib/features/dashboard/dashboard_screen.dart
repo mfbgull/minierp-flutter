@@ -18,6 +18,8 @@ import '../../data/models/dashboard_summary.dart'
         StockByCategory,
         TopCustomer;
 import '../../data/repositories/api_result.dart' show ApiError;
+import '../../data/repositories/purchase_repository.dart'
+    show refundsDueProvider;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/date_range_picker.dart' show DateRangeFilter;
 import '../../widgets/offline_cache_badge.dart';
@@ -282,6 +284,9 @@ class _CashPositionStripState extends ConsumerState<_CashPositionStrip> {
                 ),
               ],
             ),
+            // PRET-002 — refunds due. Shown apart from the cash strip on
+            // purpose: this is a receivable memo, not a cash balance.
+            const _RefundsDueStrip(),
             AnimatedCrossFade(
               duration: AppMotion.duration(
                 context,
@@ -349,6 +354,45 @@ class _CashPositionStripState extends ConsumerState<_CashPositionStrip> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Refunds due across all suppliers (PRET-002). A receivable memo — it sits
+/// inside the cash card but outside the cash strip, with a hint saying so,
+/// because summing it into a cash balance would be wrong. Hidden when zero.
+class _RefundsDueStrip extends ConsumerWidget {
+  const _RefundsDueStrip();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final due = ref.watch(refundsDueProvider).valueOrNull;
+    if (due == null || due.totalDue <= 0) return const SizedBox.shrink();
+    final l10n = AppLocalizations.of(context)!;
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        children: [
+          Icon(Icons.request_quote_outlined, size: 16, color: scheme.primary),
+          const SizedBox(width: 8),
+          Text(
+            l10n.refundsDueBadge(Formatters.currency(due.totalDue)),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              l10n.refundsDueHint,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
