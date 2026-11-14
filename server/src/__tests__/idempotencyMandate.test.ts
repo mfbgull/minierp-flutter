@@ -368,4 +368,41 @@ describe('ACCT-008 D19 — Idempotency-Key is mandatory on canonical financial w
     expect(prepayKeyless.status).toBe(400);
     expect((prepayKeyless.body as { error: string }).error).toMatch(MANDATE_MESSAGE);
   });
+
+  it('rejects keyless stock write-off and stock transfer with 400, and replays a keyed transfer', async () => {
+    // ACCT-008: a write-off posts GL; a transfer consumes FIFO stock. Both
+    // must refuse a keyless call and replay a retried key.
+    const raw = await createItem(`Mandate Inv ${++seq}`, authCookie);
+    await purchaseStock(raw, warehouseId, 20, 7, authCookie, '2026-10-01');
+
+    const writeOffKeyless = await request(app).post('/api/inventory/stock-movements').set('Cookie', authCookie).send({
+      item_id: raw, warehouse_id: warehouseId, quantity: -2, movement_type: 'ADJUSTMENT', remarks: 'damage',
+    });
+    expect(writeOffKeyless.status).toBe(400);
+    expect((writeOffKeyless.body as { error: string }).error).toMatch(MANDATE_MESSAGE);
+
+    const toWarehouse = (db.prepare('SELECT id FROM warehouses WHERE id != ? ORDER BY id LIMIT 1').get(warehouseId) as { id: number } | undefined)?.id;
+    if (toWarehouse === undefined) throw new Error('Need a second warehouse for the transfer case');
+    const transferBody = { item_id: raw, from_warehouse_id: warehouseId, to_warehouse_id: toWarehouse, quantity: 3 };
+
+    const transferKeyless = await request(app).post('/api/inventory/stock-transfers').set('Cookie', authCookie).send(transferBody);
+    expect(transferKeyless.status).toBe(400);
+    expect((transferKeyless.body as { error: string }).error).toMatch(MANDATE_MESSAGE);
+
+    const k = key();
+    const first = await request(app).post('/api/inventory/stock-transfers').set('Cookie', authCookie)
+      .set('Idempotency-Key', k).send(transferBody);
+    expect(first.status).toBe(201);
+    const firstId = (first.body as { data: { out: { id: number } } }).data.out.id;
+    const before = db.prepare('SELECT quantity FROM stock_balances WHERE item_id = ? AND warehouse_id = ?')
+      .get(raw, warehouseId) as { quantity: number };
+
+    const second = await request(app).post('/api/inventory/stock-transfers').set('Cookie', authCookie)
+      .set('Idempotency-Key', k).send(transferBody);
+    expect(second.status).toBe(201);
+    expect((second.body as { data: { out: { id: number } } }).data.out.id).toBe(firstId);
+    const after = db.prepare('SELECT quantity FROM stock_balances WHERE item_id = ? AND warehouse_id = ?')
+      .get(raw, warehouseId) as { quantity: number };
+    expect(after.quantity).toBe(before.quantity);
+  });
 });

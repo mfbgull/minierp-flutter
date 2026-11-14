@@ -153,7 +153,7 @@ describe('C-06 — PO-source returns key on the receipt item id the writer actua
         items: [{ source_item_id: poItemId, quantity: 4 }],
       },
       1,
-      db,
+      db, { 'idempotency-key': `pr-direct-${Date.now()}-${Math.floor(Math.random()*1e6)}` },
     );
 
     expect(header.id).toBeGreaterThan(0);
@@ -191,7 +191,7 @@ describe('C-06 — PO-source returns key on the receipt item id the writer actua
         items: [{ source_item_id: poItemId, quantity: 4 }],
       },
       1,
-      db,
+      db, { 'idempotency-key': `pr-direct-${Date.now()}-${Math.floor(Math.random()*1e6)}` },
     );
 
     const consumed = db.prepare(`
@@ -257,7 +257,7 @@ describe('C-06 — PO-source returns key on the receipt item id the writer actua
         items: [{ source_item_id: poItemId, quantity: 4 }],
       },
       1,
-      db,
+      db, { 'idempotency-key': `pr-direct-${Date.now()}-${Math.floor(Math.random()*1e6)}` },
     );
 
     const after = db.prepare(`SELECT id, quantity_remaining FROM stock_batches ORDER BY id`).all() as {
@@ -289,7 +289,7 @@ describe('C-06 — PO-source returns key on the receipt item id the writer actua
           items: [{ source_item_id: poItemId, quantity: 9 }],
         },
         1,
-        db,
+        db, { 'idempotency-key': `pr-direct-${Date.now()}-${Math.floor(Math.random()*1e6)}` },
       ),
     ).toThrow(/exceeds net received quantity/i);
 
@@ -324,7 +324,7 @@ describe('C-06 — PO-source returns key on the receipt item id the writer actua
         items: [{ source_item_id: poItemId, quantity: 4 }],
       },
       1,
-      db,
+      db, { 'idempotency-key': `pr-direct-${Date.now()}-${Math.floor(Math.random()*1e6)}` },
     );
 
     const mid = snapshot();

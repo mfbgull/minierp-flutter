@@ -692,7 +692,8 @@ describe('Period-protection primitive phases', () => {
     const item = await createItem('Primitive Future Adj Item', token);
     const before = financialTotalsSnapshot();
 
-    const res = await request(app).post('/api/inventory/stock-movements').set('Cookie', token)
+    const res = await request(app).post('/api/inventory/stock-movements')
+      .set('Idempotency-Key', `inv-${Date.now()}-${Math.floor(Math.random()*1e6)}`).set('Cookie', token)
       .send({
         item_id: item, warehouse_id: warehouseId,
         quantity: 5, movement_type: 'ADJUSTMENT',
@@ -716,7 +717,8 @@ describe('Period-protection primitive phases', () => {
     // unit_cost is required for the GL adjustment leg to fire at all —
     // a zero-value adjustment posts no journal entry, so the guard under
     // test (postLegacyStockEntry's closed-period assert) would never run.
-    const res = await request(app).post('/api/inventory/stock-movements').set('Cookie', token)
+    const res = await request(app).post('/api/inventory/stock-movements')
+      .set('Idempotency-Key', `inv-${Date.now()}-${Math.floor(Math.random()*1e6)}`).set('Cookie', token)
       .send({
         item_id: item, warehouse_id: warehouseId,
         quantity: 5, movement_type: 'ADJUSTMENT',

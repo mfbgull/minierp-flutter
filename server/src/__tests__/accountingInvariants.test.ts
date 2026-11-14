@@ -474,6 +474,7 @@ describe('Double-fire rejection on destructive endpoints', () => {
 
     const xferRes = await request(app)
       .post('/api/inventory/stock-transfers')
+      .set('Idempotency-Key', `inv-${Date.now()}-${Math.floor(Math.random()*1e6)}`)
       .set('Cookie', token)
       .send({
         item_id: itemId,
@@ -1029,6 +1030,7 @@ describe('Reconciliation invariants F-I over transaction lifecycle', () => {
         warehouse_id: warehouseId, reason: 'Damaged',
         items: [{ source_item_id: purchaseId, quantity: 3 }],
       }, 1, db,
+      { 'idempotency-key': `pr-invariants-${Date.now()}-${Math.floor(Math.random() * 1e6)}` },
     );
     expect(created.status).toBe('POSTED');
     checkF_I('after purchase return');

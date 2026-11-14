@@ -79,6 +79,7 @@ describe('Stock transfer void (Phase 4)', () => {
   async function createTransfer(quantity: number): Promise<string> {
     const res = await request(app)
       .post('/api/inventory/stock-transfers')
+      .set('Idempotency-Key', `inv-${Date.now()}-${Math.floor(Math.random()*1e6)}`)
       .set('Cookie', authCookie)
       .send({ item_id: itemId, from_warehouse_id: fromWh, to_warehouse_id: toWh, quantity });
     expect(res.status).toBe(201);
@@ -171,6 +172,7 @@ describe('Stock transfer void (Phase 4)', () => {
     // direct stock movement (SALE), draining the mirrored batch.
     const sale = await request(app)
       .post('/api/inventory/stock-movements')
+      .set('Idempotency-Key', `inv-${Date.now()}-${Math.floor(Math.random()*1e6)}`)
       .set('Cookie', authCookie)
       .send({
         item_id: itemId,

@@ -276,6 +276,7 @@ describe('Inventory Endpoints', () => {
 
     const created = await request(app)
       .post('/api/inventory/stock-movements')
+      .set('Idempotency-Key', `inv-${Date.now()}-${Math.floor(Math.random()*1e6)}`)
       .set('Cookie', `token=${token}`)
       .send({
         item_id: item.body.id,

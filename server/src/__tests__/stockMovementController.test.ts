@@ -28,6 +28,7 @@ describe('inventoryController.createStockMovement', () => {
   const post = (body: Record<string, unknown>) =>
     request(app)
       .post('/api/inventory/stock-movements')
+      .set('Idempotency-Key', `inv-${Date.now()}-${Math.floor(Math.random()*1e6)}`)
       .set('Cookie', cookie)
       .send(body);
 
