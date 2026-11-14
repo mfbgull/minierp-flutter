@@ -4,6 +4,7 @@ import { BusinessRuleError } from '../utils/businessRuleError';
 import { isValidPaymentMethod } from '../services/cashService';
 import { roundCurrency } from '../utils/currency';
 import { claimIdempotencyKey, hashRequestPayload, startIdempotentRequest } from '../utils/idempotency';
+import { assertCashTimeline } from '../services/cashBalanceGuard';
 
 interface PaymentInput {
   amount: number;
@@ -63,6 +64,11 @@ export function payCreditExpense(db: Database.Database, expenseId: number, input
       description: `Settlement of ${expense.expense_no}`, created_by: userId,
       lines: [{ account_id: payable.id, debit: amount }, { account_id: cash.id, credit: amount }],
     });
+    // ACCT-013: the funds check above only guards the payment date. A backdated
+    // settlement lowers every later daily balance, so it can overdraw a day
+    // that check never looks at. Run the chronological suffix check AFTER the
+    // posting; a throw rolls the transaction back.
+    assertCashTimeline(db, { paymentMethod: input.payment_method, fromDate: input.payment_date });
     if (start.key) claimIdempotencyKey(db, 'expenses.payment', start.key, hash, id);
     return db.prepare('SELECT * FROM expense_payments WHERE id = ?').get(id) as ExpensePayment;
   })();

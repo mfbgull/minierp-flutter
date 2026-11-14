@@ -13,6 +13,8 @@ import db from '../config/database';
 import { getAuthCookie } from './helpers/invoiceReturnSpec';
 import { resolveSupplierByName } from './helpers/invoiceReturnSpec';
 import { expectAllInvariantsHold } from './helpers/accountingInvariants';
+import { PaymentRecordingService } from '../services/PaymentRecordingService';
+import { createCustomer, createItem, createInvoice, purchaseStock } from './helpers/invoiceReturnSpec';
 let cookie: string;
 
 let supSeq = 0;
@@ -226,30 +228,87 @@ describe('cash-timeline guard-rail: every cash-affecting model calls the chronol
     expectAllInvariantsHold('after refused backdated supplier payment');
   });
 
-  it('each cash-affecting model file references assertCashTimeline', () => {
-    const modelsDir = path.join(__dirname, '..', 'models');
-    const cashAffecting = [
-      'OwnerCapital.ts',   // inflow create/edit/void
-      'OwnerWithdrawal.ts', // outflow create/edit (moved-earlier dip)
-      'Payment.ts',        // customer receipt create/delete/restore
-      'SupplierRefund.ts', // refund void
-      'Expense.ts',        // expense GL post (Draft→Recorded) and edit
+  it('a backdated cash refund is refused when it overdrafts a later day', async () => {
+    // A refund posts cash out. No route backdates a refund today (the
+    // settlement path always uses `today`), so the guard is proved at the
+    // service seam: if a future caller passes an earlier refund date, this
+    // dip must be refused. Capital 1000 (09-01), withdrawal 900 (09-05) leaves
+    // Rs 100; a Rs 150 refund on 09-03 would drive 09-05 to -50.
+    const customerId = await createCustomer(`TL-Refund-${++supSeq}`, cookie);
+    const itemId = await createItem(`TL-Refund-Item-${++itSeq}`, cookie);
+    await purchaseStock(itemId, await whId(), 5, 100, cookie, '2026-08-15');
+    const { invoiceId } = await createInvoice({
+      customerId, itemId, lines: [{ quantity: 1, unitPrice: 500 }], payment: 'full',
+    }, cookie);
+    await capital(1000, '2026-09-01');
+    await withdraw(900, '2026-09-05');
+
+    expect(() => new PaymentRecordingService(db).recordCustomerPayment({
+      mode: 'REFUND',
+      customerId,
+      paymentDate: '2026-09-03',
+      amount: 150,
+      paymentMethod: 'Cash',
+      userId: 1,
+      allocations: [{ invoiceId, amount: 150 }],
+    })).toThrow(/Reverse the later spending first\./);
+
+    // The refused refund wrote nothing.
+    expect(db.prepare("SELECT COUNT(*) n FROM payments WHERE payment_kind = 'REFUND'").get()).toEqual({ n: 0 });
+    expectAllInvariantsHold('after refused backdated cash refund');
+  });
+
+  it('expense GL posts only through the guarded transition, and settlement posts are guarded', () => {
+    const srcDir = path.join(__dirname, '..');
+    // postExpenseEntry is the only writer of EXPENSE journal lines. It must
+    // have exactly one caller: the Draft→Recorded/edit transition in
+    // Expense.ts, which sits next to an assertCashTimeline. Any new caller is
+    // a bypass and must be added to the guard list above.
+    const callers: string[] = [];
+    for (const area of ['models', 'services', 'controllers', 'routes']) {
+      const dir = path.join(srcDir, area);
+      if (!fs.existsSync(dir)) continue;
+      for (const file of fs.readdirSync(dir)) {
+        if (!file.endsWith('.ts')) continue;
+        const source = fs.readFileSync(path.join(dir, file), 'utf8');
+        if (file === 'accountingService.ts') continue; // the definition
+        if (source.includes('postExpenseEntry(')) callers.push(`${area}/${file}`);
+      }
+    }
+    if (callers.length !== 1 || callers[0] !== 'models/Expense.ts') {
+      throw new Error(`postExpenseEntry must be called only from models/Expense.ts; found: ${callers.join(', ')}`);
+    }
+    const expenseSource = fs.readFileSync(path.join(srcDir, 'models', 'Expense.ts'), 'utf8');
+    if (!expenseSource.includes('postExpenseEntry(') || !expenseSource.includes('assertCashTimeline')) {
+      throw new Error('Expense.ts must pair its postExpenseEntry call with assertCashTimeline');
+    }
+    // Credit-expense settlements are an independent cash outflow.
+    const settlement = fs.readFileSync(path.join(srcDir, 'models', 'ExpensePayment.ts'), 'utf8');
+    if (!settlement.includes('assertCashTimeline')) {
+      throw new Error('ExpensePayment.ts settles cash but never calls assertCashTimeline');
+    }
+  });
+
+  it('each cash-affecting model and service file references assertCashTimeline', () => {
+    const srcDir = path.join(__dirname, '..');
+    const cashAffecting: Array<[string, string]> = [
+      ['models', 'OwnerCapital.ts'],    // inflow create/edit/void
+      ['models', 'OwnerWithdrawal.ts'], // outflow create/edit (moved-earlier dip)
+      ['models', 'Payment.ts'],         // customer receipt create/delete/restore
+      ['models', 'SupplierRefund.ts'],  // refund void
+      ['models', 'Expense.ts'],         // expense GL post (Draft→Recorded) and edit
+      ['services', 'SupplierPaymentService.ts'],   // supplier payout posts cash
+      ['services', 'PaymentRecordingService.ts'],  // customer cash refund posts cash
+      ['models', 'ExpensePayment.ts'],             // credit-expense settlement posts cash
     ];
-    for (const file of cashAffecting) {
-      const source = fs.readFileSync(path.join(modelsDir, file), 'utf8');
+    for (const [area, file] of cashAffecting) {
+      const source = fs.readFileSync(path.join(srcDir, area, file), 'utf8');
       if (!source.includes('assertCashTimeline')) {
         throw new Error(
-          `${file} mutates cash but never calls assertCashTimeline — ` +
+          `${area}/${file} mutates cash but never calls assertCashTimeline — ` +
           'add the chronological guard or justify an exemption here',
         );
       }
-    }
-    // Supplier payouts post cash from the service layer, not the model.
-    const service = fs.readFileSync(
-      path.join(__dirname, '..', 'services', 'SupplierPaymentService.ts'), 'utf8',
-    );
-    if (!service.includes('assertCashTimeline')) {
-      throw new Error('SupplierPaymentService.ts posts cash but never calls assertCashTimeline');
     }
   });
 });
