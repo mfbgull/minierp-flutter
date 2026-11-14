@@ -303,8 +303,10 @@ export const IDEMPOTENCY_KEY_REQUIRED_MESSAGE = 'Idempotency-Key header is requi
  * financial writes (invoice create, payments and allocation, purchase-order
  * goods receipts, sales returns, return settlement, supplier refunds and
  * claims, expenses, owner capital and withdrawals, salary pay, direct
- * purchases) use this contract; only /api/mobile-invoices/* stays keyless
- * (D13's promise to the external mobile app).
+ * purchases, supplier bills and prepayments, production runs, purchase
+ * returns, inventory write-offs and stock transfers) use this contract; only
+ * /api/mobile-invoices/* stays keyless (D13's promise to the external mobile
+ * app).
  */
 export function startRequiredIdempotentRequest(
   db: Database.Database,
