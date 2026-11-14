@@ -71,7 +71,8 @@ async function paidPurchase(total: number): Promise<PurchaseInfo> {
 async function returnAgainstPurchase(info: PurchaseInfo, opts: {
   returnQty?: number; disposition?: string;
 } = {}): Promise<{ returnId: number; creditNoteId: number; claimId: number }> {
-  const returned = await request(app).post('/api/purchase-returns').set('Cookie', cookie).send({
+  const returned = await request(app).post('/api/purchase-returns')
+      .set('Idempotency-Key', `pr-${Date.now()}-${Math.floor(Math.random()*1e6)}`).set('Cookie', cookie).send({
     return_date: '2026-08-03', source_type: 'PURCHASE', source_id: info.purchaseId,
     warehouse_id: info.warehouseId, disposition: opts.disposition ?? 'refund_expected',
     items: [{ source_item_id: info.purchaseId, quantity: opts.returnQty ?? 10 }],

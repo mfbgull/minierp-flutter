@@ -102,7 +102,8 @@ function createPurchaseReturn(req: AuthRequest, res: Response): Response | void 
         items: body.items,
       },
       req.user!.id,
-      db
+      db,
+      req.headers as Record<string, unknown>
     );
 
     res.status(201).json({

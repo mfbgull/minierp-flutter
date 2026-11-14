@@ -11,6 +11,15 @@ import { roundQty } from '../utils/quantity';
 import { addCurrency, roundCurrency } from '../utils/currency';
 import { SqlParam } from '../utils/sqlTypes';
 import { BusinessRuleError } from '../utils/businessRuleError';
+import {
+  claimIdempotencyKey,
+  hashRequestPayload,
+  startRequiredIdempotentRequest,
+} from '../utils/idempotency';
+
+const PURCHASE_RETURN_CREATE_SCOPE = 'purchase-returns.create';
+
+export type PurchaseReturnHeaders = Record<string, unknown> | undefined;
 
 /**
  * PurchaseReturnModel — the redesigned, first-class purchase return document.
@@ -569,13 +578,20 @@ class PurchaseReturnModel {
     }
   }
 
-  static create(data: CreatePurchaseReturnDTO, userId: number, db: Database.Database): PurchaseReturnHeaderRow {
+  static create(data: CreatePurchaseReturnDTO, userId: number, db: Database.Database, headers?: PurchaseReturnHeaders): PurchaseReturnHeaderRow {
     if (!data.return_date) throw new Error('return_date is required');
     if (!data.source_type || !data.source_id) throw new Error('Source document is required');
     if (!data.warehouse_id) throw new Error('Restock warehouse is required');
     if (!data.items || data.items.length === 0) throw new Error('At least one item is required');
 
+    const requestHash = hashRequestPayload(data);
     const transaction = db.transaction(() => {
+      // ACCT-008: a retried return must not double-return stock or double-post
+      // the credit note. The key is claimed in the same transaction, so a
+      // rolled-back attempt leaves no claim and the retry proceeds.
+      const start = startRequiredIdempotentRequest(db, headers, PURCHASE_RETURN_CREATE_SCOPE, requestHash);
+      if (start.kind === 'error') throw new BusinessRuleError(start.status, start.message);
+      if (start.kind === 'replay') return this.getById(start.resourceId, db) as PurchaseReturnHeaderRow;
       // Load the source document and validate every line against its
       // returnable quantity BEFORE mutating anything.
       const lines: PurchaseReturnLine[] = [];
@@ -626,6 +642,7 @@ class PurchaseReturnModel {
         totalInputTax
       );
       const returnId = headerResult.lastInsertRowid as number;
+      if (start.key) claimIdempotencyKey(db, PURCHASE_RETURN_CREATE_SCOPE, start.key, requestHash, returnId);
 
       const insertLine = db.prepare(`
         INSERT INTO purchase_return_items (

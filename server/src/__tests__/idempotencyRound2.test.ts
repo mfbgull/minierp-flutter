@@ -475,6 +475,7 @@ describe('idempotency — Round 2 money handlers', () => {
       });
 
       const returned = await request(app).post('/api/purchase-returns')
+      .set('Idempotency-Key', `pr-${Date.now()}-${Math.floor(Math.random()*1e6)}`)
         .set('Cookie', authCookie)
         .send({
           return_date: '2026-09-16',

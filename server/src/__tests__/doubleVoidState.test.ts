@@ -82,6 +82,23 @@ describe('void/cancel/reverse paths fail on state when called twice', () => {
     expect(second.status).toBe(200);
   });
 
+  it('period close is idempotent by state — the second close is a no-op (no key needed)', async () => {
+    // closePeriod only UPDATEs rows WHERE status = 'open' and posts no GL
+    // entry, so a retry cannot double-close or double-post. The second call
+    // answers 200 with alreadyClosed:true. No Idempotency-Key is required.
+    const row = db.prepare("SELECT id FROM accounting_periods WHERE status = 'open' ORDER BY start_date DESC LIMIT 1")
+      .get() as { id: number } | undefined;
+    if (!row) { expect(row).toBeUndefined(); return; }
+
+    const first = await request(app).post(`/api/accounting/periods/${row.id}/close`).set('Cookie', cookie).send({});
+    expect(first.status).toBe(200);
+    expect(first.body.data?.alreadyClosed).toBe(false);
+
+    const second = await request(app).post(`/api/accounting/periods/${row.id}/close`).set('Cookie', cookie).send({});
+    expect(second.status).toBe(200);
+    expect(second.body.data?.alreadyClosed).toBe(true);
+  });
+
   it('purchase return void refuses the second call on state', async () => {
     const supplierId = await supplier();
     const itemId = await createItem(`DV-Item-${++supSeq}`, cookie);
@@ -90,7 +107,8 @@ describe('void/cancel/reverse paths fail on state when called twice', () => {
     const purchaseId = (db.prepare('SELECT id FROM purchases WHERE item_id = ? ORDER BY id DESC LIMIT 1')
       .get(itemId) as { id: number }).id;
 
-    const created = await request(app).post('/api/purchase-returns').set('Cookie', cookie)
+    const created = await request(app).post('/api/purchase-returns')
+      .set('Idempotency-Key', `pr-${Date.now()}-${Math.floor(Math.random()*1e6)}`).set('Cookie', cookie)
       .send({
         return_date: '2026-09-05', source_type: 'PURCHASE', source_id: purchaseId, warehouse_id: whId,
         items: [{ source_item_id: purchaseId, quantity: 1 }],

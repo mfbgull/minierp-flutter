@@ -12,9 +12,10 @@
  * returned 201/200 keyless before the flip.
  */
 import request from 'supertest';
-import { beforeAll, describe, expect, it } from '@jest/globals';
+import { beforeAll, describe, expect, it, jest } from '@jest/globals';
 import app from '../app';
 import db from '../config/database';
+import logger from '../utils/logger';
 import { createCustomer, createItem, getAuthCookie, purchaseStock, resolveSupplierByName } from './helpers/invoiceReturnSpec';
 
 const TEST_PASSWORD = process.env.TEST_ADMIN_PASSWORD;
@@ -71,6 +72,28 @@ describe('ACCT-008 D19 — Idempotency-Key is mandatory on canonical financial w
       items: [{ item_id: itemId, quantity: 1, unit_price: 50, tax_rate: 0 }],
     });
     expect(res.status).toBe(201);
+  });
+
+  it('still accepts a keyless POS sale but logs the stage-1 observation', async () => {
+    // ACCT-008 staged rollout for POST /api/pos/sale. The key is NOT mandatory
+    // yet: older desktop builds and external callers may omit it. The server
+    // must accept the sale and record that it was keyless, so the next release
+    // can prove compatibility before enforcing.
+    const warn = jest.spyOn(logger, 'warn').mockImplementation(() => logger);
+    try {
+      const res = await request(app).post('/api/pos/sale').set('Cookie', authCookie).send({
+        warehouse_id: warehouseId,
+        sale_date: '2026-11-01',
+        customer_id: customerId,
+        items: [{ item_id: itemId, quantity: 1, unit_price: 40 }],
+      });
+      expect(res.status).toBe(201);
+      const observed = warn.mock.calls.some(call =>
+        String(call[0]).includes('keyless write') && String(call[0]).includes('pos_sale'));
+      expect(observed).toBe(true);
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('rejects a keyless customer payment with 400 and accepts a keyed one', async () => {
@@ -260,5 +283,41 @@ describe('ACCT-008 D19 — Idempotency-Key is mandatory on canonical financial w
       .send({ allocations: [{ type: 'refund', amount: 200, method: 'Cash' }] });
     expect(res.status).toBe(400);
     expect((res.body as { error: string }).error).toMatch(MANDATE_MESSAGE);
+  });
+
+  it('rejects a keyless purchase return with 400 and replays a keyed one', async () => {
+    // ACCT-008: the return is a stock + GL + credit-note write. A retry must
+    // replay, not double-return.
+    const prepared = await (async () => {
+      const item2 = await createItem(`Mandate PR Item ${++seq}`, authCookie);
+      await purchaseStock(item2, warehouseId, 10, 100, authCookie, '2026-10-01');
+      const purchaseId = (db.prepare('SELECT id FROM purchases WHERE item_id = ? ORDER BY id DESC LIMIT 1')
+        .get(item2) as { id: number }).id;
+      return { item2, purchaseId };
+    })();
+    const body = {
+      return_date: '2026-10-05',
+      source_type: 'PURCHASE',
+      source_id: prepared.purchaseId,
+      warehouse_id: warehouseId,
+      items: [{ source_item_id: prepared.purchaseId, quantity: 1 }],
+    };
+
+    const keyless = await request(app).post('/api/purchase-returns').set('Cookie', authCookie).send(body);
+    expect(keyless.status).toBe(400);
+    expect((keyless.body as { error: string }).error).toMatch(MANDATE_MESSAGE);
+
+    const k = key();
+    const first = await request(app).post('/api/purchase-returns').set('Cookie', authCookie)
+      .set('Idempotency-Key', k).send(body);
+    expect(first.status).toBe(201);
+    const firstId = (first.body as { data: { id: number } }).data.id;
+
+    const second = await request(app).post('/api/purchase-returns').set('Cookie', authCookie)
+      .set('Idempotency-Key', k).send(body);
+    expect(second.status).toBe(201);
+    expect((second.body as { data: { id: number } }).data.id).toBe(firstId);
+    expect(db.prepare('SELECT COUNT(*) n FROM purchase_returns WHERE source_id = ?').get(prepared.purchaseId))
+      .toEqual({ n: 1 });
   });
 });

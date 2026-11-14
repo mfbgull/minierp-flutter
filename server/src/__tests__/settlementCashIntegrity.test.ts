@@ -224,6 +224,7 @@ describe('C-02 / H-03 — a refund cannot exceed what was actually collected', (
     const cashBefore = netCash();
 
     const res = await request(app).post('/api/purchase-returns')
+      .set('Idempotency-Key', `pr-${Date.now()}-${Math.floor(Math.random()*1e6)}`)
       .set('Cookie', authCookie)
       .send({
         return_date: '2026-09-05',
@@ -262,6 +263,7 @@ describe('C-02 / H-03 — a refund cannot exceed what was actually collected', (
 
     // Return 10 units @ 25 = 250, i.e. 150 MORE than was ever collected.
     const res = await request(app).post('/api/purchase-returns')
+      .set('Idempotency-Key', `pr-${Date.now()}-${Math.floor(Math.random()*1e6)}`)
       .set('Cookie', authCookie)
       .send({
         return_date: '2026-09-05',
@@ -295,6 +297,7 @@ describe('C-02 / H-03 — a refund cannot exceed what was actually collected', (
 
     const cashBefore = netCash();
     const res = await request(app).post('/api/purchase-returns')
+      .set('Idempotency-Key', `pr-${Date.now()}-${Math.floor(Math.random()*1e6)}`)
       .set('Cookie', authCookie)
       .send({
         return_date: '2026-09-05',

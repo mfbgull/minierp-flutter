@@ -54,7 +54,8 @@ describe('cash inflow corrections preserve every later daily balance', () => {
       supplierId: supplier.supplier_id, paymentDate: '2026-08-02', amount: 100, paymentMethod: 'Cash',
       allocations: [{ kind: 'purchase', id: purchaseId, amount: 100 }],
     });
-    const returned = await request(app).post('/api/purchase-returns').set('Cookie', cookie).send({
+    const returned = await request(app).post('/api/purchase-returns')
+      .set('Idempotency-Key', `pr-${Date.now()}-${Math.floor(Math.random()*1e6)}`).set('Cookie', cookie).send({
       return_date: '2026-09-01', source_type: 'PURCHASE', source_id: purchaseId,
       warehouse_id: warehouse.id, disposition: 'credit_on_account',
       items: [{ source_item_id: purchaseId, quantity: 10 }],
@@ -116,7 +117,8 @@ describe('cash inflow corrections preserve every later daily balance', () => {
       supplierId: supplier.supplier_id, paymentDate: '2026-08-02', amount: 100, paymentMethod: 'Cash',
       allocations: [{ kind: 'purchase', id: purchaseId, amount: 100 }],
     });
-    const returned = await request(app).post('/api/purchase-returns').set('Cookie', cookie).send({
+    const returned = await request(app).post('/api/purchase-returns')
+      .set('Idempotency-Key', `pr-${Date.now()}-${Math.floor(Math.random()*1e6)}`).set('Cookie', cookie).send({
       return_date: '2026-09-01', source_type: 'PURCHASE', source_id: purchaseId,
       warehouse_id: warehouse.id, disposition: 'credit_on_account',
       items: [{ source_item_id: purchaseId, quantity: 10 }],

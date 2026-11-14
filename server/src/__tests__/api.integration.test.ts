@@ -589,6 +589,7 @@ describe('Purchase Returns Endpoints (full flow)', () => {
   it('creates a return via the picker shape and posts stock, credit note, ledger + GL', async () => {
     const res = await request(app)
       .post('/api/purchase-returns')
+      .set('Idempotency-Key', `pr-${Date.now()}-${Math.floor(Math.random()*1e6)}`)
       .set('Cookie', authCookie)
       .send({
         return_date: '2026-08-05',
@@ -659,6 +660,7 @@ describe('Purchase Returns Endpoints (full flow)', () => {
     // 4 of 10 already returned — only 6 remain.
     const res = await request(app)
       .post('/api/purchase-returns')
+      .set('Idempotency-Key', `pr-${Date.now()}-${Math.floor(Math.random()*1e6)}`)
       .set('Cookie', authCookie)
       .send({
         return_date: '2026-08-06',
@@ -747,6 +749,7 @@ describe('Purchase Returns Endpoints (full flow)', () => {
     // …but create and void are denied.
     const create = await request(app)
       .post('/api/purchase-returns')
+      .set('Idempotency-Key', `pr-${Date.now()}-${Math.floor(Math.random()*1e6)}`)
       .set('Cookie', userCookie)
       .send({
         return_date: '2026-08-07',
