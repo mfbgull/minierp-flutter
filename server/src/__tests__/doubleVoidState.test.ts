@@ -99,6 +99,31 @@ describe('void/cancel/reverse paths fail on state when called twice', () => {
     expect(second.body.data?.alreadyClosed).toBe(true);
   });
 
+  it('period close under concurrent requests closes once (no key needed)', async () => {
+    // closePeriod UPDATEs only rows WHERE status = 'open'. better-sqlite3 is
+    // synchronous, so the two requests serialize: exactly one transitions
+    // the period and reports alreadyClosed:false; every other reports true.
+    // The period is closed exactly once and no duplicate audit row is written.
+    const row = db.prepare("SELECT id, period_name FROM accounting_periods WHERE status = 'open' ORDER BY start_date DESC LIMIT 1")
+      .get() as { id: number; period_name: string } | undefined;
+    if (!row) { expect(row).toBeUndefined(); return; }
+
+    const results = await Promise.all([
+      request(app).post(`/api/accounting/periods/${row.id}/close`).set('Cookie', cookie).send({}),
+      request(app).post(`/api/accounting/periods/${row.id}/close`).set('Cookie', cookie).send({}),
+    ]);
+
+    for (const res of results) expect(res.status).toBe(200);
+    const closedFlags = results.map((r) => r.body.data?.alreadyClosed as boolean);
+    expect(closedFlags.filter((f) => f === false)).toHaveLength(1);
+    expect(closedFlags.filter((f) => f === true)).toHaveLength(1);
+
+    const auditRows = db.prepare(
+      "SELECT COUNT(*) AS c FROM audit_logs WHERE entity_type = 'accounting_period' AND entity_id = ? AND action_type = 'SETTING_UPDATE'"
+    ).get(row.id) as { c: number };
+    expect(auditRows.c).toBe(1);
+  });
+
   it('purchase return void refuses the second call on state', async () => {
     const supplierId = await supplier();
     const itemId = await createItem(`DV-Item-${++supSeq}`, cookie);

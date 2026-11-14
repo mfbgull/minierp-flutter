@@ -405,4 +405,32 @@ describe('ACCT-008 D19 — Idempotency-Key is mandatory on canonical financial w
       .get(raw, warehouseId) as { quantity: number };
     expect(after.quantity).toBe(before.quantity);
   });
+
+  it('two different operations through the same internal path both post (keys are not shared)', async () => {
+    // Regression: internal callers must mint a fresh key per operation. If a
+    // caller reused one fixed key, the second distinct write would be treated
+    // as a replay of the first and silently drop. Two production runs are the
+    // cheapest probe — the model is called directly and each call must create
+    // its own row.
+    const ProductionModel = (await import('../models/Production')).default;
+    const raw = await createItem(`Mandate Dup In ${++seq}`, authCookie);
+    const fg = await createItem(`Mandate Dup Out ${++seq}`, authCookie);
+    await purchaseStock(raw, warehouseId, 40, 5, authCookie, '2026-10-01');
+
+    const runOnce = (k: string) => ProductionModel.recordProduction({
+      output_item_id: fg, output_quantity: 1, warehouse_id: warehouseId,
+      production_date: '2026-10-05', input_items: [{ item_id: raw, quantity: 4 }],
+    } as never, 1, db, { 'idempotency-key': k });
+
+    const k1 = key();
+    const k2 = key();
+    const first = runOnce(k1);
+    const second = runOnce(k2);
+    expect(first.id).not.toBe(second.id);
+    expect(first.production_no).not.toBe(second.production_no);
+
+    // A replay with the FIRST key returns the FIRST run, not a new row.
+    const replay = runOnce(k1);
+    expect((replay as { id: number }).id).toBe(first.id);
+  });
 });

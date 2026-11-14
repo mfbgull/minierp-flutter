@@ -88,7 +88,10 @@ import { applyPendingMigrations, dbSeedReady } from '../config/database';
 beforeAll(async () => {
   applyPendingMigrations();
   await dbSeedReady;
-}, 15000);
+  // 30s, not 15s: under a full-suite run the migration + admin seed can
+  // exceed 15s of machine load and time the hook out, failing every test
+  // in the suite for reasons unrelated to the code under test.
+}, 30000);
 
 // 6. Clean up rate limiter intervals and logger after all tests in this worker
 import { shutdownRateLimiters } from '../middleware/rateLimiter';
