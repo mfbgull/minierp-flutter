@@ -2072,6 +2072,31 @@ class AppLocalizationsEn extends AppLocalizations {
   String get refundClaimCancelReason => 'Reason';
 
   @override
+  String get refundClaimViewReceipts => 'View receipts';
+
+  @override
+  String get refundClaimReceiptsTitle => 'Refund receipts';
+
+  @override
+  String get refundClaimNoReceipts => 'No refund receipts against this claim';
+
+  @override
+  String get refundClaimVoidReceipt => 'Void receipt';
+
+  @override
+  String get refundClaimVoidConfirm =>
+      'This reverses the cash receipt and reopens the claim.';
+
+  @override
+  String get refundClaimReceiptVoided => 'Refund receipt voided';
+
+  @override
+  String get refundClaimReceiptStatusPOSTED => 'Posted';
+
+  @override
+  String get refundClaimReceiptStatusVOIDED => 'Voided';
+
+  @override
   String refundClaimRemaining(String amount) {
     return 'Remaining: $amount';
   }

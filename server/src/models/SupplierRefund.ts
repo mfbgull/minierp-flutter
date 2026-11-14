@@ -62,6 +62,9 @@ export interface SupplierRefundRow {
 
 interface RefundFilters {
   supplier_id?: number;
+  /** Only receipts allocated to this claim (BUG-008). The link is
+   * refund_receipt_allocations — supplier_refunds has no claim_id column. */
+  claim_id?: number;
   page?: number;
   limit?: number;
 }
@@ -128,6 +131,14 @@ class SupplierRefundModel {
     if (filters.supplier_id) {
       where += ' AND sr.supplier_id = ?';
       params.push(filters.supplier_id);
+    }
+    // A receipt reaches a claim only through its allocation row. The EXISTS
+    // form keeps the row count right; a JOIN would multiply rows when one
+    // receipt were ever split across claims.
+    if (filters.claim_id) {
+      where += ` AND EXISTS (SELECT 1 FROM refund_receipt_allocations a
+        WHERE a.receipt_id = sr.id AND a.claim_id = ?)`;
+      params.push(filters.claim_id);
     }
 
     const total = (db.prepare(

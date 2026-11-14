@@ -4004,6 +4004,54 @@ abstract class AppLocalizations {
   /// **'Reason'**
   String get refundClaimCancelReason;
 
+  /// No description provided for @refundClaimViewReceipts.
+  ///
+  /// In en, this message translates to:
+  /// **'View receipts'**
+  String get refundClaimViewReceipts;
+
+  /// No description provided for @refundClaimReceiptsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Refund receipts'**
+  String get refundClaimReceiptsTitle;
+
+  /// No description provided for @refundClaimNoReceipts.
+  ///
+  /// In en, this message translates to:
+  /// **'No refund receipts against this claim'**
+  String get refundClaimNoReceipts;
+
+  /// No description provided for @refundClaimVoidReceipt.
+  ///
+  /// In en, this message translates to:
+  /// **'Void receipt'**
+  String get refundClaimVoidReceipt;
+
+  /// No description provided for @refundClaimVoidConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'This reverses the cash receipt and reopens the claim.'**
+  String get refundClaimVoidConfirm;
+
+  /// No description provided for @refundClaimReceiptVoided.
+  ///
+  /// In en, this message translates to:
+  /// **'Refund receipt voided'**
+  String get refundClaimReceiptVoided;
+
+  /// No description provided for @refundClaimReceiptStatusPOSTED.
+  ///
+  /// In en, this message translates to:
+  /// **'Posted'**
+  String get refundClaimReceiptStatusPOSTED;
+
+  /// No description provided for @refundClaimReceiptStatusVOIDED.
+  ///
+  /// In en, this message translates to:
+  /// **'Voided'**
+  String get refundClaimReceiptStatusVOIDED;
+
   /// No description provided for @refundClaimRemaining.
   ///
   /// In en, this message translates to:

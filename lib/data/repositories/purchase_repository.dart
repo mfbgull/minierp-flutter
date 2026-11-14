@@ -60,6 +60,58 @@ class RefundClaimSummary {
   final num remaining;
 }
 
+/// One refund RECEIPT row (`GET /supplier-refunds`) — the cash payout that
+/// settles a claim. [status] is POSTED or VOIDED; a voided receipt is kept
+/// for audit but no longer settles anything.
+class SupplierRefundReceipt {
+  const SupplierRefundReceipt({
+    required this.id,
+    required this.refundNo,
+    required this.refundDate,
+    required this.supplierId,
+    required this.supplierName,
+    required this.amount,
+    required this.paymentMethod,
+    required this.status,
+    this.creditNoteId,
+    this.creditNo,
+    this.referenceNo,
+    this.voidedReason,
+  });
+
+  factory SupplierRefundReceipt.fromJson(Map<String, dynamic> json) =>
+      SupplierRefundReceipt(
+        id: json['id'] as int,
+        refundNo: json['refund_no'] as String,
+        refundDate: json['refund_date'] as String,
+        supplierId: json['supplier_id'] as int,
+        supplierName: json['supplier_name'] as String? ?? '',
+        amount: json['amount'] as num? ?? 0,
+        paymentMethod: json['payment_method'] as String? ?? '',
+        status: json['status'] as String,
+        creditNoteId: json['credit_note_id'] as int?,
+        creditNo: json['credit_no'] as String?,
+        referenceNo: json['reference_no'] as String?,
+        voidedReason: json['voided_reason'] as String?,
+      );
+
+  final int id;
+  final String refundNo;
+  final String refundDate;
+  final int supplierId;
+  final String supplierName;
+  final num amount;
+  final String paymentMethod;
+  final String status;
+  final int? creditNoteId;
+  final String? creditNo;
+  final String? referenceNo;
+  final String? voidedReason;
+
+  /// Only a POSTED receipt can be voided.
+  bool get isPosted => status == 'POSTED';
+}
+
 /// `GET /supplier-refunds/credit-notes/:id/refundable` response.
 class CreditNoteRefundable {
   const CreditNoteRefundable({required this.refundable, this.claim});
@@ -417,6 +469,19 @@ class PurchaseRepository {
   Future<ApiResult<RefundsDue>> refundsDue() => _api.getRaw(
     '${ApiEndpoints.supplierRefunds}/claims/due',
     parse: (Object? json) => RefundsDue.fromJson(json! as Map<String, dynamic>),
+  );
+
+  /// The receipts allocated to one claim (`GET /supplier-refunds?claim_id=`).
+  /// The server resolves the link through refund_receipt_allocations, so a
+  /// receipt that settles no claim of this id is not returned.
+  Future<ApiResult<PagedResponse<SupplierRefundReceipt>>> refundReceipts(
+    PagedRequest request, {
+    required int claimId,
+  }) => _api.getPaged(
+    ApiEndpoints.supplierRefunds,
+    queryParameters: {...request.toQuery(), 'claim_id': claimId},
+    parseItem: (Object? json) =>
+        SupplierRefundReceipt.fromJson(json as Map<String, dynamic>),
   );
 
   /// Record a standalone refund claim — a supplier owes money with no

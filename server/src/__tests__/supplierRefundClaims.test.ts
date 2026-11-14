@@ -525,4 +525,73 @@ describe('PRET-002 supplier refund claims', () => {
       .get(info.claimId) as { status: string };
     expect(claim.status).toBe('PARTIAL');
   });
+
+  // BUG-008 — the claim row must be able to list the receipts against it,
+  // so the user can void one. The list endpoint gains a `claim_id` filter
+  // that resolves through refund_receipt_allocations (the only link between
+  // a receipt and a claim; supplier_refunds has no claim_id column).
+  it('lists only the receipts allocated to a given claim', async () => {
+    await seedOpeningCash(500);
+    const mine = await paidPurchaseWithReturn({ total: 100 });
+    const other = await paidPurchaseWithReturn({ total: 80 });
+
+    const mineFirst = await receipt({
+      refund_date: '2026-08-05', credit_note_id: mine.creditNoteId, amount: 40,
+    }, 'c1a1c1a1-1111-4111-8111-111111111111');
+    expect(mineFirst.status).toBe(201);
+    const mineSecond = await receipt({
+      refund_date: '2026-08-06', credit_note_id: mine.creditNoteId, amount: 60,
+    }, 'c1a1c1a1-2222-4222-8222-222222222222');
+    expect(mineSecond.status).toBe(201);
+    const theirs = await receipt({
+      refund_date: '2026-08-05', credit_note_id: other.creditNoteId, amount: 80,
+    }, 'c1a1c1a1-3333-4333-8333-333333333333');
+    expect(theirs.status).toBe(201);
+
+    const res = await request(app)
+      .get(`/api/supplier-refunds?claim_id=${mine.claimId}`)
+      .set('Cookie', cookie);
+    expect(res.status).toBe(200);
+
+    const ids = (res.body.data as Array<{ id: number; amount: number }>)
+      .map((row) => row.id).sort((a, b) => a - b);
+    expect(ids).toEqual([mineFirst.body.data.id, mineSecond.body.data.id].sort((a, b) => a - b));
+    // The other claim's receipt must not leak in.
+    expect(ids).not.toContain(theirs.body.data.id);
+    // Pagination totals the filtered set, not the whole table.
+    expect(res.body.pagination.totalItems).toBe(2);
+
+    // Reversing one receipt drops it from the filtered list.
+    const voided = await request(app)
+      .post(`/api/supplier-refunds/${mineSecond.body.data.id}/void`)
+      .set('Cookie', cookie).send({ reason: 'Wrong amount' });
+    expect(voided.status).toBe(200);
+    const after = await request(app)
+      .get(`/api/supplier-refunds?claim_id=${mine.claimId}`)
+      .set('Cookie', cookie);
+    expect((after.body.data as Array<{ id: number }>).map((r) => r.id))
+      .toEqual([mineFirst.body.data.id]);
+  });
+
+  it('a claim_id filter combines with supplier_id and ignores a bogus claim', async () => {
+    await seedOpeningCash(500);
+    const mine = await paidPurchaseWithReturn({ total: 100 });
+    const rec = await receipt({
+      refund_date: '2026-08-05', credit_note_id: mine.creditNoteId, amount: 40,
+    }, 'c1a1c1a1-4444-4444-8444-444444444444');
+    expect(rec.status).toBe(201);
+
+    const both = await request(app)
+      .get(`/api/supplier-refunds?claim_id=${mine.claimId}&supplier_id=${mine.supplierId}`)
+      .set('Cookie', cookie);
+    expect(both.status).toBe(200);
+    expect((both.body.data as Array<{ id: number }>).map((r) => r.id))
+      .toEqual([rec.body.data.id]);
+
+    const bogus = await request(app)
+      .get('/api/supplier-refunds?claim_id=999999')
+      .set('Cookie', cookie);
+    expect(bogus.status).toBe(200);
+    expect(bogus.body.data).toEqual([]);
+  });
 });

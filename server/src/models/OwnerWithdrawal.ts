@@ -241,6 +241,16 @@ function create(db: Database.Database, data: CreateOwnerWithdrawalDTO): { id: nu
           paymentMethod: data.payment_method || 'cash',
           userId: data.created_by,
         });
+        // ACCT-013: a backdated cash withdrawal can overdraw a LATER day even
+        // when the balance at its own date and today both look fine. The
+        // point-in-time check above only guards the entry date; the
+        // chronological suffix check closes the gap. Run it AFTER the posting
+        // (like the edit path) so the new outflow is part of the timeline; a
+        // throw rolls the whole transaction back.
+        assertCashTimeline(db, {
+          paymentMethod: data.payment_method || 'cash',
+          fromDate: data.withdrawal_date,
+        });
         return { id: newId, amount };
       };
       return createCashWithdrawal();

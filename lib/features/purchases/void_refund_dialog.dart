@@ -3,10 +3,8 @@
 // go negative; the blocking journal lines arrive as [ApiError.cashBlockers]
 // and are listed so the user knows what to reverse first.
 //
-// PRET-002 follow-up: no screen calls this yet — the refund-claim list ships
-// without a receipts section, so a receipt cannot be voided from the app.
-// The dialog and the blocker list are complete and tested so the follow-up
-// only has to add the entry point. See audit/FINDINGS-STATUS.md.
+// Opened from the refund-claim receipts list
+// (features/purchases/refund_claim_receipts_dialog.dart).
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

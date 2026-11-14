@@ -26,6 +26,7 @@ import '../../widgets/detail_tab_grid.dart';
 import '../../widgets/pagination_bar.dart';
 import '../../widgets/status_badge.dart';
 import 'refund_claim_write_off_dialog.dart';
+import 'refund_claim_receipts_dialog.dart';
 import 'supplier_refund_dialog.dart';
 
 class RefundClaimsScreen extends ConsumerStatefulWidget {
@@ -242,23 +243,34 @@ class _RefundClaimsScreenState extends ConsumerState<RefundClaimsScreen> {
       width: 90,
       renderer: (cell) {
         final claim = cell.row.cells['data']!.value as RefundClaim;
+        final canRead = user?.hasPermission('supplier_refunds', 'read') ?? false;
+        final canCreate =
+            user?.hasPermission('supplier_refunds', 'create') ?? false;
+        final canWriteOff =
+            user?.hasPermission('supplier_refunds', 'write_off') ?? false;
+        // Receipts stay viewable on a closed claim; the actions that change
+        // it need an open claim.
         return PopupMenuButton<_ClaimAction>(
           tooltip: l10n.commonActions,
-          enabled: claim.isOpen,
+          enabled: canRead || canCreate || canWriteOff,
           onSelected: (action) => _action(action, claim),
           itemBuilder: (_) => [
-            if (user?.hasPermission('supplier_refunds', 'create') ?? false)
+            if (canRead)
+              PopupMenuItem(
+                value: _ClaimAction.receipts,
+                child: Text(l10n.refundClaimViewReceipts),
+              ),
+            if (canCreate && claim.isOpen)
               PopupMenuItem(
                 value: _ClaimAction.receipt,
                 child: Text(l10n.refundClaimRecordReceipt),
               ),
-            if (user?.hasPermission('supplier_refunds', 'write_off') ??
-                false)
+            if (canWriteOff && claim.isOpen)
               PopupMenuItem(
                 value: _ClaimAction.writeOff,
                 child: Text(l10n.refundClaimWriteOff),
               ),
-            if (user?.hasPermission('supplier_refunds', 'create') ?? false)
+            if (canCreate && claim.isOpen)
               PopupMenuItem(
                 value: _ClaimAction.cancel,
                 child: Text(l10n.refundClaimCancel),
@@ -293,6 +305,13 @@ class _RefundClaimsScreenState extends ConsumerState<RefundClaimsScreen> {
   Future<void> _action(_ClaimAction action, RefundClaim claim) async {
     final l10n = AppLocalizations.of(context)!;
     switch (action) {
+      case _ClaimAction.receipts:
+        final changed = await showRefundClaimReceiptsDialog(
+          context,
+          claim: claim,
+        );
+        if (!mounted || !changed) return;
+        ref.invalidate(refundsDueProvider);
       case _ClaimAction.receipt:
         // A standalone claim settles against itself; a return-backed claim
         // carries its credit note.
@@ -334,7 +353,7 @@ class _RefundClaimsScreenState extends ConsumerState<RefundClaimsScreen> {
   }
 }
 
-enum _ClaimAction { receipt, writeOff, cancel }
+enum _ClaimAction { receipts, receipt, writeOff, cancel }
 
 /// The refunds-due total, deliberately rendered apart from any cash figure.
 class _RefundsDueBanner extends ConsumerWidget {

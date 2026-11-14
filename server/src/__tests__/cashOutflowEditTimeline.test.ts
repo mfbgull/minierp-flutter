@@ -11,9 +11,38 @@ import path from 'path';
 import app from '../app';
 import db from '../config/database';
 import { getAuthCookie } from './helpers/invoiceReturnSpec';
+import { resolveSupplierByName } from './helpers/invoiceReturnSpec';
 import { expectAllInvariantsHold } from './helpers/accountingInvariants';
-
 let cookie: string;
+
+let supSeq = 0;
+let itSeq = 0;
+
+async function whId(): Promise<number> {
+  return (db.prepare('SELECT id FROM warehouses ORDER BY id LIMIT 1').get() as { id: number }).id;
+}
+
+/** Submit + receive a purchase order so AP holds a payable to settle. */
+async function poFor(poDate: string, supplierId: number, warehouseId: number): Promise<number> {
+  itSeq += 1;
+  const itemRes = await request(app).post('/api/inventory/items').set('Cookie', cookie)
+    .send({ item_code: `TL-IT-${itSeq}`, item_name: `TL Item ${itSeq}`, unit_of_measure: 'pcs', current_stock: 0 });
+  const itemId = (itemRes.body?.data ?? itemRes.body).id as number;
+
+  const poRes = await request(app).post('/api/purchase-orders').set('Cookie', cookie)
+    .send({ supplier_id: supplierId, po_date: poDate, items: [{ item_id: itemId, quantity: 10, unit_price: 25 }] });
+  const po = poRes.body?.data ?? poRes.body;
+  if (![200, 201].includes(poRes.status)) throw new Error(`PO create failed: ${poRes.status} ${JSON.stringify(poRes.body)}`);
+  await request(app).post(`/api/purchase-orders/${po.id}/status`).set('Cookie', cookie).send({ status: 'Submitted' });
+
+  const poItem = db.prepare('SELECT id FROM purchase_order_items WHERE po_id = ?').get(po.id) as { id: number };
+  const recRes = await request(app).post(`/api/purchase-orders/${po.id}/receipts`).set('Cookie', cookie)
+    .set('Idempotency-Key', `patch-cashOutflowEdi-po-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+    .send({ receipt_date: poDate, warehouse_id: warehouseId, items: [{ po_item_id: poItem.id, received_quantity: 10 }] });
+  if (![200, 201].includes(recRes.status)) throw new Error(`PO receipt failed: ${recRes.status} ${JSON.stringify(recRes.body)}`);
+  return po.id as number;
+}
+
 
 beforeAll(async () => { cookie = await getAuthCookie(); });
 beforeEach(() => { db.exec('SAVEPOINT outflow_edit_case'); });
@@ -108,14 +137,103 @@ describe('editing a cash outflow to an earlier date cannot overdraw a later day 
 });
 
 describe('cash-timeline guard-rail: every cash-affecting model calls the chronological guard', () => {
+  it('recording a backdated draft expense is refused when it overdrafts a later day', async () => {
+    // An expense is created as a Draft with no GL. Cash moves when it leaves
+    // Draft, so the guard must hold on that transition. Same dip as the
+    // withdrawal case: individually affordable at 09-03 (850), but it drives
+    // 09-05 to -50.
+    await capital(1000, '2026-09-01');
+    await withdraw(900, '2026-09-05');
+
+    const draft = await request(app).post('/api/expenses').set('Cookie', cookie)
+      .set('Idempotency-Key', `patch-cashOutflowEdi-14-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .send({
+        expense_category: 'Utilities', description: 'Backdated dip fixture', amount: 150,
+        expense_date: '2026-09-03', payment_method: 'Cash', status: 'Recorded',
+      });
+    expect(draft.status).toBe(201);
+    const expenseId = draft.body.data.id as number;
+    const before = snapshot(['expenses', 'journal_lines']);
+
+    const response = await request(app).put(`/api/expenses/${expenseId}`)
+      .set('Cookie', cookie)
+      .send({
+        expense_category: 'Utilities', description: 'Backdated dip fixture', amount: 150,
+        expense_date: '2026-09-03', payment_method: 'Cash', status: 'Recorded',
+      });
+
+    expect(response.status).toBe(409);
+    expect(response.body.error).toContain('Reverse the later spending first.');
+    expect(response.body.error).toContain('2026-09-05');
+    expect(snapshot(['expenses', 'journal_lines'])).toEqual(before);
+    expectAllInvariantsHold('after refused backdated expense');
+  });
+
+  it('creating a backdated owner withdrawal is refused when it overdrafts a later day', async () => {
+    await capital(1000, '2026-09-01');
+    await withdraw(900, '2026-09-05');
+    const before = snapshot(['owner_withdrawals', 'journal_lines']);
+
+    const response = await request(app).post('/api/owner-equity/withdrawals').set('Cookie', cookie)
+      .set('Idempotency-Key', `patch-cashOutflowEdi-15-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .send({
+        amount: 150, withdrawal_date: '2026-09-03', payment_method: 'Cash', kind: 'cash',
+      });
+
+    expect(response.status).toBe(409);
+    expect(response.body.error).toContain('Reverse the later spending first.');
+    expect(response.body.error).toContain('2026-09-05');
+    expect(snapshot(['owner_withdrawals', 'journal_lines'])).toEqual(before);
+    expectAllInvariantsHold('after refused backdated withdrawal');
+  });
+
+  it('a backdated outflow that stays non-negative on every later day is accepted', async () => {
+    // Same dates, but only Rs 50 goes out early against a Rs 100 cushion, so
+    // every later day stays >= 0 and the guard must not fire.
+    await capital(1000, '2026-09-01');
+    await withdraw(900, '2026-09-05');
+
+    const response = await request(app).post('/api/owner-equity/withdrawals').set('Cookie', cookie)
+      .set('Idempotency-Key', `patch-cashOutflowEdi-16-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .send({
+        amount: 50, withdrawal_date: '2026-09-03', payment_method: 'Cash', kind: 'cash',
+      });
+
+    expect(response.status).toBe(201);
+    expectAllInvariantsHold('after accepted backdated withdrawal');
+  });
+
+  it('creating a backdated supplier payment is refused when it overdrafts a later day', async () => {
+    // Same dip, but through a supplier payout. A PO receipt gives AP a balance
+    // to pay; a later cash withdrawal then leaves too thin a cushion for a
+    // backdated payout. Rs 100 cushion, Rs 150 backdated payout → 09-05 = -50.
+    const supplierId = await resolveSupplierByName(`TL-Sup-${++supSeq}`, cookie);
+    const warehouseId = await whId();
+    const poId = await poFor('2026-09-01', supplierId, warehouseId);
+    await capital(1000, '2026-09-01');
+    await withdraw(900, '2026-09-05');
+
+    const response = await request(app).post('/api/payments').set('Cookie', cookie)
+      .set('Idempotency-Key', `patch-cashOutflowEdi-17-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .send({
+        supplier_id: supplierId, payment_date: '2026-09-03', amount: 150, payment_method: 'cash',
+        po_allocations: [{ po_id: poId, amount: 150 }],
+      });
+
+    expect(response.status).toBe(409);
+    expect(response.body.error).toContain('Reverse the later spending first.');
+    expect(response.body.error).toContain('2026-09-05');
+    expectAllInvariantsHold('after refused backdated supplier payment');
+  });
+
   it('each cash-affecting model file references assertCashTimeline', () => {
     const modelsDir = path.join(__dirname, '..', 'models');
     const cashAffecting = [
       'OwnerCapital.ts',   // inflow create/edit/void
-      'OwnerWithdrawal.ts', // outflow edit (moved-earlier dip)
-      'Payment.ts',        // customer receipt delete/restore
+      'OwnerWithdrawal.ts', // outflow create/edit (moved-earlier dip)
+      'Payment.ts',        // customer receipt create/delete/restore
       'SupplierRefund.ts', // refund void
-      'Expense.ts',        // expense edit (moved-earlier dip)
+      'Expense.ts',        // expense create/edit (moved-earlier dip)
     ];
     for (const file of cashAffecting) {
       const source = fs.readFileSync(path.join(modelsDir, file), 'utf8');
@@ -125,6 +243,13 @@ describe('cash-timeline guard-rail: every cash-affecting model calls the chronol
           'add the chronological guard or justify an exemption here',
         );
       }
+    }
+    // Supplier payouts post cash from the service layer, not the model.
+    const service = fs.readFileSync(
+      path.join(__dirname, '..', 'services', 'SupplierPaymentService.ts'), 'utf8',
+    );
+    if (!service.includes('assertCashTimeline')) {
+      throw new Error('SupplierPaymentService.ts posts cash but never calls assertCashTimeline');
     }
   });
 });

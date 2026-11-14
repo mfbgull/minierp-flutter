@@ -14,9 +14,10 @@ function getSupplierRefunds(req: Request, res: Response): void {
   try {
     const { page, limit } = listPageQuery(req.query);
     const supplierId = Number(req.query.supplier_id) || undefined;
+    const claimId = Number(req.query.claim_id) || undefined;
 
     const { rows, total, pageNum, limitNum } = SupplierRefundModel.getAll(
-      { supplier_id: supplierId, page, limit },
+      { supplier_id: supplierId, claim_id: claimId, page, limit },
       db
     );
 

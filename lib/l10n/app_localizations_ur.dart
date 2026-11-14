@@ -2073,6 +2073,31 @@ class AppLocalizationsUr extends AppLocalizations {
   String get refundClaimCancelReason => 'وجہ';
 
   @override
+  String get refundClaimViewReceipts => 'رسیدیں دیکھیں';
+
+  @override
+  String get refundClaimReceiptsTitle => 'ریفنڈ رسیدیں';
+
+  @override
+  String get refundClaimNoReceipts => 'اس کلیم کے خلاف کوئی ریفنڈ رسید نہیں';
+
+  @override
+  String get refundClaimVoidReceipt => 'رسید منسوخ کریں';
+
+  @override
+  String get refundClaimVoidConfirm =>
+      'یہ نقد رسید کو واپس کرتا ہے اور کلیم دوبارہ کھولتا ہے۔';
+
+  @override
+  String get refundClaimReceiptVoided => 'ریفنڈ رسید منسوخ ہو گئی';
+
+  @override
+  String get refundClaimReceiptStatusPOSTED => 'درج شدہ';
+
+  @override
+  String get refundClaimReceiptStatusVOIDED => 'منسوخ شدہ';
+
+  @override
   String refundClaimRemaining(String amount) {
     return 'باقی: $amount';
   }

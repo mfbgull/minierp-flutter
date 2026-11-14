@@ -131,4 +131,55 @@ void main() {
       reason: 'remaining should appear in the dialog',
     );
   });
+
+  testWidgets(
+      'a standalone claim retains its key on retry and rotates it when the amount changes',
+      (tester) async {
+    // A network-timeout retry must reuse the key (the write may have landed);
+    // an edited amount must mint a new one (it is a different receipt).
+    final requests = <RequestOptions>[];
+    adapter = _Adapter((options) async {
+      requests.add(options);
+      throw DioException(
+        requestOptions: options,
+        type: DioExceptionType.receiveTimeout,
+      );
+    });
+    dio.httpClientAdapter = adapter;
+
+    await tester.pumpWidget(host(const SizedBox()));
+    await openDialog(tester);
+    final amount = find.byType(TextField).first;
+    final submit = find.byType(FilledButton).last;
+
+    await tester.enterText(amount, '400');
+    await tester.pump();
+    await tester.ensureVisible(submit);
+    await tester.tap(submit);
+    await tester.pumpAndSettle();
+
+    // Same amount again: the retry reuses the first key.
+    await tester.ensureVisible(submit);
+    await tester.tap(submit);
+    await tester.pumpAndSettle();
+
+    // Edited amount: a new key.
+    await tester.enterText(amount, '500');
+    await tester.pump();
+    await tester.ensureVisible(submit);
+    await tester.tap(submit);
+    await tester.pumpAndSettle();
+
+    expect(requests, hasLength(3));
+    final keys = requests
+        .map((r) => r.headers['Idempotency-Key'])
+        .toList(growable: false);
+    expect(keys[0], isA<String>());
+    expect(keys[1], keys[0], reason: 'an unchanged retry reuses the key');
+    expect(keys[2], isNot(keys[0]), reason: 'an edited amount mints a new key');
+    // The claim id rides in every attempt so the server settles the claim.
+    for (final request in requests) {
+      expect(request.data['claim_id'], 42);
+    }
+  });
 }
