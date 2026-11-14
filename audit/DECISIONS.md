@@ -619,6 +619,37 @@ change. The blast radius was 26 test suites whose fixtures posted keyless
 payloads; they were updated to send keys, and three suites that pinned the old
 keyless-compatible contract (`invoiceIdempotency`, `invoiceMigrationTelemetry`,
 `clientValidationStatus`) were rewritten to the D19 contract.
+
+**Staged rollout (2026-11-14).** The mandate is enforced in stages. Stage 1
+(`POST /api/pos/sale`) observes only: a keyless call is accepted and logged by
+`logKeylessIdempotentWrite` (the existing Release 1 telemetry, D12). Stages 2–5
+are mandatory (400 keyless, replay on retry): purchase returns, production runs,
+supplier bills/prepayments (was optional → required), and inventory
+write-offs/transfers. Three writes are left keyless **by design** because they
+are already idempotent by state — no key adds safety: `POST
+/api/accounting/periods/:id/close` (second close returns `alreadyClosed: true`),
+`POST /api/physical-counts/:id/complete` (second complete throws "Cannot complete
+Completed session"), and `POST /api/physical-counts/:id/items` (set-based upsert
+by `(count_id, item_id)`). `/api/mobile-invoices/*` stays keyless (D13).
+
+**POS stage 2 exit criteria (not yet triggered).** Move `POST /api/pos/sale`
+from observational to mandatory only when all three hold:
+
+1. **Telemetry is quiet.** The `logKeylessIdempotentWrite` counter for scope
+   `pos.sale` reads zero keyless calls for 30 consecutive days of production use.
+2. **Old-client check.** No deployed client build predates the POS key is still
+   in use. The in-repo POS and Flutter desktop already send a rotating key, so a
+   nonzero counter means an out-of-repo or stale build. Confirm with the version
+   header those builds send before enforcing.
+3. **Replay is proven.** A test proves a retried POS sale with the same key posts
+   exactly one sale and returns the original on replay. This is the safety the
+   mandate buys; without it, enforcement only creates a 400 wall.
+
+**POS stage 3 (retire the observation).** After stage 2 is stable, delete the
+`logKeylessIdempotentWrite` call for `pos.sale` and its telemetry counter once it
+has read zero for a full quarter, or when the same finding is closed for every
+other write. Record the removal in this section, not silently.
+
 ### PRET-002 — supplier refunds: one claim object, expected → received
 
 - **Entry points.** The purchase-return flow is primary: when a return is
