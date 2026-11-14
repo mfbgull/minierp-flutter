@@ -69,7 +69,11 @@ beforeAll(async () => {
 // ────────────────────────────────────────────────────────────────────
 
 function api(method: 'get' | 'post' | 'put' | 'delete', url: string, body?: Record<string, unknown>) {
-  return request(app)[method](url).set('Cookie', token).send(body);
+  // ACCT-008 / D19: mandated financial writes reject a keyless request, so
+  // every POST through this wrapper carries a fresh key.
+  const req = request(app)[method](url);
+  if (method === 'post') req.set('Idempotency-Key', `h8-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  return req.set('Cookie', token).send(body);
 }
 
 type GlLine = {

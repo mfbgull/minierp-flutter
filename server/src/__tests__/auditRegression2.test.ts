@@ -17,7 +17,10 @@ import PurchaseModel from '../models/Purchase';
 
 let cookie: string;
 let warehouseId: number;
-const post = (url: string, body: unknown) => request(app).post(url).set('Cookie', cookie).send(body as object);
+const post = (url: string, body: unknown) => request(app).post(url)
+  // ACCT-008 / D19: mandated financial writes reject a keyless request.
+  .set('Idempotency-Key', `reg-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+  .set('Cookie', cookie).send(body as object);
 const r2 = (v: number): number => Math.round(v * 100) / 100;
 const idOf = (res: request.Response): number => (res.body?.data?.id ?? res.body?.id) as number;
 

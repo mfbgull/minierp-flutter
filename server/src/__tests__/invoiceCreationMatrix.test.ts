@@ -59,6 +59,7 @@ describe('invoice creation endpoint matrix', () => {
   it('routes standard, mobile, POS, and sales-order writes through shared accounting semantics', async () => {
     const standard = await request(app)
       .post('/api/invoices')
+      .set('Idempotency-Key', `patch-invoiceCreationM-29-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         customer_id: customerId,
@@ -117,6 +118,7 @@ describe('invoice creation endpoint matrix', () => {
   it('rejects an overpaying recorded payment on standard creation with 400', async () => {
     const res = await request(app)
       .post('/api/invoices')
+      .set('Idempotency-Key', `patch-invoiceCreationM-30-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         customer_id: customerId,

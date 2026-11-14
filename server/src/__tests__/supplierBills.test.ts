@@ -9,7 +9,10 @@ import { generateToken } from '../middleware/auth';
 describe('Supplier bills, input tax and settlement', () => {
   let cookie: string;
   let supplierId: number;
-  const post = (url: string, body: object) => request(app).post(url).set('Cookie', cookie).send(body);
+  // D19: owner-equity / expense / purchase writes mandate a key.
+  const post = (url: string, body: object) => request(app).post(url)
+    .set('Idempotency-Key', `sb-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    .set('Cookie', cookie).send(body);
   beforeAll(async () => {
     cookie = await getAuthCookie();
     const supplier = await post('/api/suppliers', { supplier_code: 'BILL-REGRESSION', supplier_name: 'Bill regression supplier', phone: '03001234567' });
@@ -110,7 +113,8 @@ describe('Supplier bills, input tax and settlement', () => {
       }
       const token = generateToken({ id: Number(user.lastInsertRowid), username: name, role: 'user' });
       const before = db.prepare('SELECT COUNT(*) AS count FROM supplier_bills').get();
-      const response = await request(app).post('/api/supplier-bills').auth(token, { type: 'bearer' }).send({
+      const response = await request(app).post('/api/supplier-bills').auth(token, { type: 'bearer' })
+        .set('Idempotency-Key', `sb-boundary-${Date.now()}-${Math.random().toString(36).slice(2)}`).send({
         supplier_id: supplierId, bill_no: name, bill_date: '2026-09-08', net_amount: 10, description: 'Approval boundary',
       });
       expect(response.status).toBe(approved ? 201 : 403);

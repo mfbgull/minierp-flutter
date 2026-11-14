@@ -170,11 +170,24 @@ guard test widened to match.
 
 ## BUG-004 · C-04 blocked on the inventory batch/lot rewrite
 
-**Status:** `OPEN` — blocked · **Severity:** medium
-**Depends on:** `openspec/changes/inventory-batch-lot-spec` (breaking rewrite)
+**Status:** `STALE` — blocker landed, and the finding itself is untraceable
+**Severity:** medium
+**Checked:** 2026-11-14
 
-C-04 cannot be remediated until the batch/lot model rewrite lands, because the
-finding sits on the layer that rewrite replaces. No code has been touched.
+This entry is stale on two counts.
+
+1. **The blocker is gone.** The batch/lot rewrite it waited on has landed.
+   `batch_stock_by_location`, `stock_reservations`, `invoice_return_batches`
+   and `locations` all exist in the schema, and `inventory-batch-lot-spec` is
+   fully checked off except task 8.6 (a deliberate deferral). A dependency on
+   that change can no longer hold anything back.
+2. **The finding cannot be found.** `C-04` appears in no audit archive or
+   findings table. No `C-04` row exists to remediate, so there is nothing to
+   unblock.
+
+Action: re-derive the underlying concern from the current code before treating
+`C-04` as open work. If no concrete defect is found, delete this entry rather
+than carry an unverifiable ID. No code has been touched.
 
 ---
 
@@ -319,6 +332,51 @@ SALES-016: a sales order cannot carry per-line tax or discount, so converting on
 to an invoice either drops those values or hard-codes `discount_type: 'none'`.
 This needs a schema migration, so it is separate work and deliberately not folded
 into any behaviour-only change.
+
+---
+
+## BUG-008 · No way to void a refund receipt from the app
+
+**Status:** `OPEN` — **Severity:** medium
+**Found:** 2026-11-14 · PRET-002 follow-up
+
+The server can void a supplier refund receipt (`POST /supplier-refunds/:id/void`)
+and correctly refuses the void with `409` plus a structured `details` blocker list
+when the cash or bank day would go negative. The Flutter client cannot reach that
+path.
+
+### Why this exists
+
+Refunds are only ever *created*, from the purchase-return detail dialog. Nothing
+lists a supplier refund, so there is no row to act on and no void button anywhere
+in `lib/`. This is not an oversight in one screen — the listing surface was never
+built.
+
+### What is already in place (do not rebuild)
+
+- `ApiError.cashBlockers` parses the `409` `details` array into typed
+  `CashBlocker {id, date, amount, type}` rows (`lib/data/repositories/api_result.dart`).
+  `blockedBy` is a separate, unchanged field.
+- `CashBlockersList` (`lib/widgets/cash_blockers_list.dart`) renders the rows with
+  the guard title, a retry hint, and an "and N more" cap.
+- `showVoidRefundDialog` (`lib/features/purchases/void_refund_dialog.dart`) posts
+  the void with a mandatory reason and shows the blocker list on `409`. Nothing
+  calls it yet.
+
+All three are covered by tests (`cash_blockers_test.dart`,
+`cash_blockers_list_test.dart`).
+
+### The follow-up change must cover
+
+1. A **Receipts** section on the refund-claim row showing each receipt against
+   the claim.
+2. A server **filter** to fetch refunds by claim (`GET /supplier-refunds?claim_id=`
+   — no such filter exists today; `SupplierRefundModel.getAll` takes only
+   `supplier_id`).
+3. The **void dialog** wired to that row, with confirmation, reason, and role
+   gating consistent with the claim endpoints (`supplier_refunds` / `void`).
+4. The `409` **blocker list** shown in the void dialog — `showVoidRefundDialog`
+   already does this; it only needs a caller.
 
 ---
 

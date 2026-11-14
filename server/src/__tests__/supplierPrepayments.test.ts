@@ -9,7 +9,10 @@ describe('Supplier advances are assets until explicitly applied', () => {
   let cookie: string;
   let supplierId: number;
   let billId: number;
-  const post = (url: string, body: object) => request(app).post(url).set('Cookie', cookie).send(body);
+  // D19: mandated financial writes need a key.
+  const post = (url: string, body: object) => request(app).post(url)
+    .set('Idempotency-Key', `sp-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    .set('Cookie', cookie).send(body);
   beforeAll(async () => {
     cookie = await getAuthCookie();
     const supplier = await post('/api/suppliers', { supplier_code: 'PREPAY-REG', supplier_name: 'Prepayment supplier' });

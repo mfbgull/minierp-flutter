@@ -506,3 +506,288 @@ Related implementation rules:
   and void entry point.
 - Only the Admin role receives the new Party and adjustment permissions
   automatically.
+
+## D19 — Four audit findings decided by Gull (2026-11-13)
+
+**Reference:** ACCT-006 sub-item 3, ACCT-008, PRET-002, ACCT-013
+
+Decisions taken in a design session on 2026-11-13. Implementation order:
+ACCT-013 (guard) → PRET-002 (refund receipts build on the guard) →
+ACCT-006 (backdated warning) → ACCT-008 (key mandate).
+
+### ACCT-006 — backdated sales: allow with warning
+
+A sale dated before the item's first purchase receipt is accepted, with these
+durable parts:
+
+- The 201 response carries a `warnings` array naming the backdate.
+- The invoice stores a `backdated_before_receipt` flag so the population is
+  queryable.
+- A "Backdated sales" exception report lists them (`GET /invoices/backdated`).
+- Period protection stays a hard block: a backdated sale dated inside a
+  closed period is still refused with 409 by the existing primitive.
+- Costing stays as-is (D12 option (b)); as-of stock allocation is not
+  selected. The stock allocator's refusal to oversell current sellable stock
+  remains the real guard.
+
+**Implementation record (2026-11-13).** Migration
+`add-backdated-invoice-flag.sql` adds `invoices.backdated_before_receipt
+INTEGER NOT NULL DEFAULT 0`. `StockMovement.consumeForSale` wraps the invoice
+consumption path: before any consumption it checks the named D19 case —
+every remaining batch received after the sale date, current sellable stock
+covering the quantity, later stock already sellable (expiry-wise) on the
+sale date — and consumes those later batches at their recorded cost
+(`preReceiptFallback`), batch-linked, with the flag set and the warning
+returned. Refusals stay hard for: oversell of current sellable stock,
+stock already expired on the sale date, insufficient as-of stock, blocked
+locations, and closed periods (409). Under `feature_batch_locations`, sales
+of batches that have no `batch_stock_by_location` rows (API purchases
+predate the location layer) now consume batch-level with the legacy rules
+instead of the NULL-batch standard-cost fallback, which removes an
+invariant-H drift when `standard_cost` differs from the batch cost.
+`GET /api/invoices/backdated` (invoices:read) lists flagged invoices.
+Red-first: 5 of 6 cases failed before the fix; POS and mobile invoice paths
+flow through the same service and inherit the behavior. The invoice
+amendment (update) path keeps the strict as-of allocator: an existing
+invoice cannot be edited into the backdated state — void and recreate
+(which flags and warns) is the supported route.
+
+### ACCT-008 — Idempotency-Key: mandatory on canonical financial writes
+
+History (so the attribution is checkable): the original finding is duplicate
+submission without a key. D13 (2026-10-18) preserved keyless compatibility and
+deferred mandatory keys. D12 recorded that idempotency is already implemented
+to end (claim inside the create transaction, 409 on payload conflict,
+concurrent same-key creates one invoice; 50+ tests), that every in-repo client
+(Flutter desktop, POS) already sends the key, and that Release 1 keyless-warning
+telemetry is live. The only blanket-mandate blocker is the deprecated
+`/api/mobile-invoices/*` route, consumed by a mobile app not in this repo.
+
+Decision (source: this design discussion with Gull, 2026-11-13, synthesized
+with D12's staged plan):
+
+- The `Idempotency-Key` header becomes mandatory — 400 when missing — on the
+  canonical financial write endpoints: invoices, payments, receipts, refunds,
+  returns.
+- `/api/mobile-invoices/*` stays keyless-compatible until the external app
+  migrates or the route is retired (D13's compatibility promise stands).
+- Existing replay and conflict semantics stay as implemented and tested (D12).
+- Flutter: one UUID per user action, reused on every retry of that action; a
+  new action gets a new key (`core/utils/idempotency_key.dart` pattern,
+  extended to any endpoint that does not yet send it).
+
+**Implementation record (2026-11-14).** The mandate is enforced on six write
+sites, through one shared helper, `startRequiredIdempotentRequest` in
+`server/src/utils/idempotency.ts`. A missing header returns 400 with the
+constant message `Idempotency-Key header is required for this operation`.
+
+The six sites and their scopes:
+
+| Write | Controller | Scope |
+|---|---|---|
+| Invoice create | `invoiceController.createInvoice` | `invoices.create` |
+| Invoice return | `invoiceController` INVOICE_RETURN | `invoices.return` |
+| Return settlement | `invoiceReturnController` INVOICE_RETURN_SETTLE | `invoices.return` |
+| Customer + allocation payments | `paymentsController.readIdempotencyKey` | `payments.customer`, `payments.allocate` |
+| Purchase-order goods receipt | `purchaseOrderController` PURCHASE_ORDER_RECEIPT | `purchase_orders.receipt` |
+
+`/api/mobile-invoices/*` stays keyless (D13). Two ordering notes: the mandate
+check precedes entity existence checks, so a keyless request to a nonexistent
+invoice returns 400, not 404; and the customer-payment endpoint keeps its
+requirement of at least one `invoice_allocations` entry. Supplier refunds and
+claims were already mandatory from PRET-002.
+
+Out of scope in this pass (they keep the optional `startIdempotentRequest`):
+expenses, owner capital/withdrawals, employee salary pay, and the direct
+purchase record. They are not in the decision's endpoint list.
+
+**Widened (2026-11-14, on Gull's instruction).** The four writes above are
+now mandatory too. All four already had idempotent implementations; only the
+missing-key path changed, from an unprotected proceed to 400. Owner capital,
+owner withdrawals and salary pay switched to `startRequiredIdempotentRequest`;
+expenses and the direct purchase record shared one message constant,
+`IDEMPOTENCY_KEY_REQUIRED_MESSAGE`. The mandate now covers ten write sites.
+The blast radius was 30 suites / 45 keyless fixtures, patched as before; the
+shared `purchaseStock` and `purchaseWithNamedSupplier` test helpers now send a
+key, which covers a further ~40 suites that seed stock through them.
+
+Every in-repo client already sends a key on all six writes: the Flutter
+repositories expose an optional `idempotencyKey` and every feature dialog
+passes one derived from the request body (`IdempotencyKeyCache.keyFor`).
+Red-first: `idempotencyMandate.test.ts` failed 7 of 8 cases before the
+change. The blast radius was 26 test suites whose fixtures posted keyless
+payloads; they were updated to send keys, and three suites that pinned the old
+keyless-compatible contract (`invoiceIdempotency`, `invoiceMigrationTelemetry`,
+`clientValidationStatus`) were rewritten to the D19 contract.
+
+**Staged rollout (2026-11-14).** The mandate is enforced in stages. Stage 1
+(`POST /api/pos/sale`) observes only: a keyless call is accepted and logged by
+`logKeylessIdempotentWrite` (the existing Release 1 telemetry, D12). Stages 2–5
+are mandatory (400 keyless, replay on retry): purchase returns, production runs,
+supplier bills/prepayments (was optional → required), and inventory
+write-offs/transfers. Three writes are left keyless **by design** because they
+are already idempotent by state — no key adds safety: `POST
+/api/accounting/periods/:id/close` (second close returns `alreadyClosed: true`),
+`POST /api/physical-counts/:id/complete` (second complete throws "Cannot complete
+Completed session"), and `POST /api/physical-counts/:id/items` (set-based upsert
+by `(count_id, item_id)`). `/api/mobile-invoices/*` stays keyless (D13).
+
+**POS stage 2 exit criteria (not yet triggered).** Move `POST /api/pos/sale`
+from observational to mandatory only when all three hold:
+
+1. **Telemetry is quiet.** The `logKeylessIdempotentWrite` counter for scope
+   `pos.sale` reads zero keyless calls for 30 consecutive days of production use.
+2. **Old-client check.** No deployed client build predates the POS key is still
+   in use. The in-repo POS and Flutter desktop already send a rotating key, so a
+   nonzero counter means an out-of-repo or stale build. Confirm with the version
+   header those builds send before enforcing.
+3. **Replay is proven.** A test proves a retried POS sale with the same key posts
+   exactly one sale and returns the original on replay. This is the safety the
+   mandate buys; without it, enforcement only creates a 400 wall.
+
+**POS stage 3 (retire the observation).** After stage 2 is stable, delete the
+`logKeylessIdempotentWrite` call for `pos.sale` and its telemetry counter once it
+has read zero for a full quarter, or when the same finding is closed for every
+other write. Record the removal in this section, not silently.
+
+### PRET-002 — supplier refunds: one claim object, expected → received
+
+- **Entry points.** The purchase-return flow is primary: when a return is
+  finished, the user chooses how the supplier settles — reduce payable (credit
+  note applied against open bills) or expect cash refund (creates a claim).
+  A standalone "record refund claim" action covers no-return cases
+  (overpayment, cancelled advance, supplier error). Both paths create the same
+  underlying record. If the supplier has open payables, the credit offsets
+  them first; a cash claim arises only for the excess or by explicit choice.
+- **No `EXPECTED_REFUND` ledger type.** An expected refund is a negative
+  payable that already exists once the return posts its `CREDIT_NOTE`; a
+  second entry would double-count. The ledger sees only: `CREDIT_NOTE` on the
+  return (existing) and a new `REFUND_RECEIPT` on receipt, which also posts
+  Dr Cash/Bank, Cr Supplier.
+- **Claim record.** `supplier_refund_claims`: `return_id` (nullable),
+  `supplier_id`, `amount`, `received_amount`, `status` (EXPECTED, PARTIAL,
+  RECEIVED, CANCELLED). Intent and status live here, separate from the
+  ledger.
+- **Allocations.** `refund_receipt_allocations` (`receipt_id`, `claim_id`,
+  `amount`) makes partial and multiple receipts work and closes the
+  claim↔receipt loop.
+- **Cash invariant (tested).** Cash and bank accounts change only on
+  `REFUND_RECEIPT`. Cash-flow and cash-position reports never read the claims
+  table; expected refunds surface as a separate "refunds due" figure.
+- **Short-pays.** An explicit write-off with a mandatory reason, posted to a
+  purchase-adjustments account. Role rule: write-offs above Rs 1,000 require
+  owner or manager; at or below that threshold, any user with the
+  supplier-refund permission may record one. No approval workflow beyond the
+  role rule.
+- **Excess receipts.** Rejected by default. An explicit "treat excess as
+  advance" action may post the excess as a supplier advance; never silent.
+- **Payment methods.** Cash and bank transfer, with a payment-method field on
+  the receipt, mirroring the existing supplier-payment flow. No cheque
+  clearing for now.
+- **Edge cases.** Partial receipt → claim PARTIAL with remaining balance.
+  Cancelling/reversing a return is allowed only while its claim has no
+  receipts; otherwise the receipt must be reversed first. Reversing a receipt
+  returns the claim to EXPECTED or PARTIAL and posts its own ledger and
+  journal reversal.
+- **Idempotency-Key on refund receipts (decided 2026-11-14).** Mandatory,
+  like every other keyed financial write under D19. A receipt creates cash, so
+  a lost response followed by a retry must replay, not pay twice. This was
+  recommended in the design discussion, and `f31c511e` already implements it:
+  `POST /supplier-refunds` and `POST /supplier-refunds/claims` return 400 with
+  `IDEMPOTENCY_KEY_REQUIRED_MESSAGE` when the header is absent.
+  Client side verified 2026-11-14: `supplier_refund_dialog.dart` sends a key
+  from `IdempotencyKeyCache.keyFor`, derived from the request body, so an
+  unchanged retry reuses it. All ten mandate sites send a key; a Flutter
+  caller sweep found no keyless caller.
+- **UI.** Single workflow, not tabs: a claim list with status chips (Expected,
+  Partial, Received) and a default open-items filter; a "Record receipt"
+  action prefilled with the remaining amount plus an account picker; a
+  "Refunds due" badge on the supplier page and owner dashboard, shown outside
+  the cash total.
+
+**Implementation record (2026-11-12).** Landed as designed, with three
+refinements:
+1. **Excess receipts ride one entry, not a prepayment.** "Treat excess as
+   advance" books a single receipt entry at the full amount (Dr cash / Cr AP);
+   the claim absorbs only its remaining room and the overage stays as supplier
+   credit on the supplier's account. A separate 1330 prepayment was rejected
+   during testing: it would have recorded a cash OUT for money the supplier
+   handed over. Allocations are capped at `claim_remaining`.
+2. **Write-off ledger mirror.** The write-off posts Dr 7300 / Cr AP **plus** a
+   `REFUND_CLAIM_WRITE_OFF` supplier-ledger entry (debit) so GL AP and the
+   supplier subledger stay aligned (invariant G). Owner-only above Rs 1,000 is
+   mapped to role `admin` (schema has admin/user only).
+3. **Claim cancel guard by allocations, not status.** Cancelling refuses when
+   live receipts are allocated; a RECEIVED claim with no allocations (legacy
+   backfill shape) can still be cancelled with its return.
+
+Ledger type is `REFUND_RECEIPT` (GL) with `REFUND_RECEIPT_VOID` reversals;
+legacy pre-claim rows post as `SUPPLIER_REFUND` and cascade on return void.
+`POST /supplier-refunds`, claim create and write-off ship with mandatory
+`Idempotency-Key` (ACCT-008). Tests: `supplierRefundClaims.test.ts` (10),
+updated `supplierRefund.test.ts`, `idempotencyRound2.test.ts`.
+
+### ACCT-013 — chronological cash guard on supplier-refund void, plus a sweep
+
+- **Guard placement.** The check moves into the service layer: the controller
+  calls an `AccountingService` wrapper (e.g. `voidSupplierRefund`) that runs
+  the chronological check before the model void. The controller never calls
+  the model void directly. This fixes the class, not one call site.
+- **Suffix check.** Removing an inflow dated D lowers every balance from D
+  onward: for every date ≥ D, `running_balance − refund_amount ≥ 0` on the
+  receiving account — not only the balance at D or today. Reuse the D2
+  chronological routine with the refund amount as a negative delta at its
+  original receipt date.
+- **Atomicity.** Check and void run inside one DB transaction (better-sqlite3
+  synchronous single connection), so a concurrent payment cannot slip between
+  check and void.
+- **Error.** Keep "Reverse the later spending first." Return the blocking
+  transactions (id, date, amount, type) as structured data for the first date
+  that would go negative. HTTP 409, not a bare 400.
+- **Claim consistency.** A successful void sets the claim back to EXPECTED or
+  PARTIAL; claim balance, ledger reversal and journal void post in the same
+  transaction.
+- **Same-day ordering.** Use the same intra-day sequence rule as the existing
+  D2 guard so the paths agree.
+- **Tests.** Void blocked when later spending would overdraw; void succeeds
+  when every later date stays non-negative; blocked when the dip sits between
+  receipt date and today while today's balance looks fine; a failed void
+  leaves ledger, journal entries and claim unchanged.
+- **Sweep.** Search for other direct controller→model void/delete/reverse
+  calls on cash- or bank-affecting paths. Add a guard-rail test that fails if
+  any controller calls such a model method without going through the guard,
+  so future regressions are caught structurally.
+
+#### Implementation record (2026-11-13)
+
+- **Guard placement — deviation, accepted.** The chronological guard already
+  lived inside `SupplierRefundModel.void` (commit `3ed1a6c9`), before the
+  audit note was written. A model-internal guard is stronger than a service
+  wrapper because it cannot be bypassed by any caller, so the proposed
+  `AccountingService.voidSupplierRefund` wrapper was skipped as dead
+  delegation. The audit-note premise ("controller invokes the unguarded model
+  void") was stale.
+- **HTTP contract.** `assertCashTimeline` now throws `BusinessRuleError(409)`
+  carrying a `details` array of the blocking lines on the first deficit date
+  (`id`, `date`, `amount`, `type`). `classifyError`/`handleBusinessError` pass
+  `details` through; the supplier-refund, owner-equity, payment, expense and
+  employee controllers all honor the embedded status. Red-first: three 400
+  pins in `cashInflowReversal.test.ts` flipped to 409 failed before the fix.
+- **Sweep findings and fixes.** `OwnerWithdrawal.update` and `Expense.update`
+  re-timed cash outflows with only a point-in-time funds check at the new
+  date. Moving an outflow earlier past other spending drove a later daily
+  balance negative while the new date and today both looked fine — both edits
+  returned 200 in red tests. Both now run the double `assertCashTimeline`
+  (old and new method/date) inside the re-post transaction, mirroring the
+  existing `OwnerCapital.update` pattern. A source-scan tripwire in
+  `cashOutflowEditTimeline.test.ts` fails if any of the five cash-affecting
+  models (`OwnerCapital`, `OwnerWithdrawal`, `Payment`, `SupplierRefund`,
+  `Expense`) loses its `assertCashTimeline` reference.
+- **Claim consistency — deferred.** No refund-claims table exists yet; the
+  refundable-balance recompute already restores the cap when a refund voids.
+  The claim-lifecycle rule lands with PRET-002.
+- **Same-day ordering.** Daily-bucket running balance unchanged; matches D2.
+- **Residual, documented.** Backdated CREATION of cash outflows (withdrawal,
+  expense) still uses only the point-in-time check; D2/D19 scope edits,
+  voids and reversals. Creation-path tightening is left for a future
+  decision.

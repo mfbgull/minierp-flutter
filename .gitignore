@@ -13,8 +13,11 @@
 migrate_working_dir/
 .opencode/
 .fuse_hidden*
-openspec/
+openspec/changes/*
+!openspec/changes/archive/
 **/specs/
+!openspec/specs/
+!openspec/changes/archive/**/specs/
 
 # IntelliJ related
 *.iml

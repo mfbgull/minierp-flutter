@@ -56,6 +56,7 @@ describe('POST /api/inventory/stock-transfers (INV-02)', () => {
 
     const res = await request(app)
       .post('/api/inventory/stock-transfers')
+      .set('Idempotency-Key', `inv-${Date.now()}-${Math.floor(Math.random()*1e6)}`)
       .set('Cookie', authCookie)
       .send({ item_id: 1, from_warehouse_id: 1, to_warehouse_id: 2, quantity: 4 });
 
@@ -97,6 +98,7 @@ describe('POST /api/inventory/stock-transfers (INV-02)', () => {
     const beforeN = before?.n ?? 0;
     const res = await request(app)
       .post('/api/inventory/stock-transfers')
+      .set('Idempotency-Key', `inv-${Date.now()}-${Math.floor(Math.random()*1e6)}`)
       .set('Cookie', authCookie)
       .send({ item_id: 1, from_warehouse_id: 1, to_warehouse_id: 2, quantity: 9999 });
     expect(res.status).toBe(400);

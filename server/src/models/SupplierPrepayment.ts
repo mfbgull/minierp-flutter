@@ -5,7 +5,7 @@ import type { SupplierPaymentAllocation } from '../services/paymentRecordingType
 import { isValidPaymentMethod } from '../services/cashService';
 import { BusinessRuleError } from '../utils/businessRuleError';
 import { addCurrency, roundCurrency } from '../utils/currency';
-import { claimIdempotencyKey, hashRequestPayload, startIdempotentRequest } from '../utils/idempotency';
+import { claimIdempotencyKey, hashRequestPayload, startRequiredIdempotentRequest } from '../utils/idempotency';
 
 interface PrepaymentInput {
   supplier_id: number;
@@ -81,7 +81,7 @@ export class SupplierPrepaymentModel {
   create(input: PrepaymentInput, userId: number, headers: Headers): SupplierPrepayment {
     return this.db.transaction(() => {
       const hash = hashRequestPayload(input);
-      const start = startIdempotentRequest(this.db, headers, 'supplier-prepayments.create', hash);
+      const start = startRequiredIdempotentRequest(this.db, headers, 'supplier-prepayments.create', hash);
       if (start.kind === 'error') throw new BusinessRuleError(start.status, start.message);
       if (start.kind === 'replay') return this.get(start.resourceId);
       const amount = roundCurrency(input.amount);
@@ -109,7 +109,7 @@ export class SupplierPrepaymentModel {
   apply(id: number, input: { applied_at: string; allocations: SupplierPaymentAllocation[] }, userId: number, headers: Headers): { id: number } {
     return this.db.transaction(() => {
       const hash = hashRequestPayload({ prepaymentId: id, ...input });
-      const start = startIdempotentRequest(this.db, headers, 'supplier-prepayments.apply', hash);
+      const start = startRequiredIdempotentRequest(this.db, headers, 'supplier-prepayments.apply', hash);
       if (start.kind === 'error') throw new BusinessRuleError(start.status, start.message);
       if (start.kind === 'replay') return { id: start.resourceId };
       const source = this.get(id);

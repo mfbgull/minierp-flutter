@@ -16,7 +16,7 @@ import {
   IDEMPOTENCY_SCOPES,
   claimIdempotencyKey,
   hashRequestPayload,
-  startIdempotentRequest,
+  startRequiredIdempotentRequest,
 } from '../utils/idempotency';
 
 import { errorMessage, errorCode } from '../utils/errorMessage';
@@ -481,7 +481,7 @@ function paySalary(req: Request, res: Response): void {
     // next-month advance, so a retry after a lost response must replay
     // rather than pay the employee twice.
     const hash = hashRequestPayload(req.body);
-    const start = startIdempotentRequest(db, req.headers, IDEMPOTENCY_SCOPES.EMPLOYEE_SALARY_PAY, hash);
+    const start = startRequiredIdempotentRequest(db, req.headers, IDEMPOTENCY_SCOPES.EMPLOYEE_SALARY_PAY, hash);
     if (start.kind === 'error') {
       res.status(start.status).json({ success: false, error: start.message });
       return;

@@ -3,7 +3,7 @@ import AccountingService from '../services/accountingService';
 import { SupplierPaymentService } from '../services/SupplierPaymentService';
 import { BusinessRuleError } from '../utils/businessRuleError';
 import { roundCurrency } from '../utils/currency';
-import { claimIdempotencyKey, hashRequestPayload, startIdempotentRequest } from '../utils/idempotency';
+import { claimIdempotencyKey, hashRequestPayload, startRequiredIdempotentRequest } from '../utils/idempotency';
 import ledgerUtils from '../utils/ledgerUtils';
 import SupplierLedgerModel from './SupplierLedger';
 import { assertNoPartyAdjustment } from '../utils/partyAdjustmentBalances';
@@ -74,7 +74,7 @@ export class SupplierBillModel {
   create(input: SupplierBillInput, userId: number, headers: Headers): SupplierBill {
     return this.db.transaction(() => {
       const hash = hashRequestPayload(input);
-      const start = startIdempotentRequest(this.db, headers, 'supplier-bills.create', hash);
+      const start = startRequiredIdempotentRequest(this.db, headers, 'supplier-bills.create', hash);
       if (start.kind === 'error') throw new BusinessRuleError(start.status, start.message);
       if (start.kind === 'replay') return this.get(start.resourceId);
       const net = roundCurrency(input.net_amount);
@@ -115,7 +115,7 @@ export class SupplierBillModel {
   pay(id: number, input: BillPaymentInput, userId: number, headers: Headers): { id: number } {
     return this.db.transaction(() => {
       const hash = hashRequestPayload({ billId: id, ...input });
-      const start = startIdempotentRequest(this.db, headers, 'supplier-bills.pay', hash);
+      const start = startRequiredIdempotentRequest(this.db, headers, 'supplier-bills.pay', hash);
       if (start.kind === 'error') throw new BusinessRuleError(start.status, start.message);
       if (start.kind === 'replay') return { id: start.resourceId };
       const bill = this.get(id);

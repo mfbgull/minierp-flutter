@@ -71,7 +71,7 @@ describe('7.5 purchase return consumes and voids per-location quantities', () =>
       warehouse_id: 1,
       disposition: 'credit_on_account',
       items: [{ source_item_id: purchaseId, quantity: 4 }],
-    }, 1, db);
+    }, 1, db, { 'idempotency-key': `pr-direct-${Date.now()}-${Math.floor(Math.random()*1e6)}` });
 
     // Location row consumed, master batch synced, balance updated
     let loc = db.prepare(`SELECT quantity_physical, quantity_available FROM batch_stock_by_location WHERE batch_id=? AND location_id=?`).get(batchId, locId) as { quantity_physical: number; quantity_available: number };

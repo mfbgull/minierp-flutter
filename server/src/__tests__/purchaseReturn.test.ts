@@ -221,7 +221,7 @@ describe('PurchaseReturnModel', () => {
           items: [{ source_item_id: purchaseId, quantity: 4 }],
         },
         1,
-        db
+        db, { 'idempotency-key': `pr-direct-${Date.now()}-${Math.floor(Math.random()*1e6)}` }
       );
 
       expect(result.return_no).toMatch(/^PR-\d{4}-\d{4}$/);
@@ -295,7 +295,7 @@ describe('PurchaseReturnModel', () => {
           items: [{ source_item_id: purchaseId, quantity: 4 }],
         },
         1,
-        db,
+        db, { 'idempotency-key': `pr-direct-${Date.now()}-${Math.floor(Math.random()*1e6)}` },
       );
       expect(result.status).toBe('POSTED');
 
@@ -336,7 +336,7 @@ describe('PurchaseReturnModel', () => {
           items: [{ source_item_id: purchaseId, quantity: 4 }],
         },
         1,
-        db
+        db, { 'idempotency-key': `pr-direct-${Date.now()}-${Math.floor(Math.random()*1e6)}` }
       );
 
       expect(() =>
@@ -349,7 +349,7 @@ describe('PurchaseReturnModel', () => {
             items: [{ source_item_id: purchaseId, quantity: 2 }], // only 1 left
           },
           1,
-          db
+          db, { 'idempotency-key': `pr-direct-${Date.now()}-${Math.floor(Math.random()*1e6)}` }
         )
       ).toThrow(/exceeds remaining available/);
     });
@@ -369,7 +369,7 @@ describe('PurchaseReturnModel', () => {
             items: [{ source_item_id: otherId, quantity: 1 }],
           },
           1,
-          db
+          db, { 'idempotency-key': `pr-direct-${Date.now()}-${Math.floor(Math.random()*1e6)}` }
         )
       ).toThrow(/does not belong to source/);
     });
@@ -389,7 +389,7 @@ describe('PurchaseReturnModel', () => {
           items: [{ source_item_id: poItemId, quantity: 8 }],
         },
         1,
-        db
+        db, { 'idempotency-key': `pr-direct-${Date.now()}-${Math.floor(Math.random()*1e6)}` }
       );
 
       expect(result.status).toBe('POSTED');
@@ -419,7 +419,7 @@ describe('PurchaseReturnModel', () => {
             items: [{ source_item_id: poItemId, quantity: 6 }],
           },
           1,
-          db
+          db, { 'idempotency-key': `pr-direct-${Date.now()}-${Math.floor(Math.random()*1e6)}` }
         )
       ).toThrow(/exceeds net received quantity/);
     });
@@ -441,7 +441,7 @@ describe('PurchaseReturnModel', () => {
           items: [{ source_item_id: purchaseId, quantity: 4 }],
         },
         1,
-        db
+        db, { 'idempotency-key': `pr-direct-${Date.now()}-${Math.floor(Math.random()*1e6)}` }
       );
 
       const voided = PurchaseReturnModel.voidReturn(created.id, 1, 'Wrong stock', db);
@@ -494,7 +494,7 @@ describe('PurchaseReturnModel', () => {
           items: [{ source_item_id: purchaseId, quantity: 2 }],
         },
         1,
-        db
+        db, { 'idempotency-key': `pr-direct-${Date.now()}-${Math.floor(Math.random()*1e6)}` }
       );
       PurchaseReturnModel.voidReturn(created.id, 1, '', db);
 
@@ -611,7 +611,7 @@ describe('PurchaseReturnModel', () => {
             ],
           },
           1,
-          db
+          db, { 'idempotency-key': `pr-direct-${Date.now()}-${Math.floor(Math.random()*1e6)}` }
         )
       ).toThrow(/exceeds remaining available/);
 
@@ -637,7 +637,7 @@ describe('PurchaseReturnModel', () => {
           ],
         },
         1,
-        db
+        db, { 'idempotency-key': `pr-direct-${Date.now()}-${Math.floor(Math.random()*1e6)}` }
       );
       expect(result.total_qty).toBe(70);
       const p = db.prepare('SELECT returned_quantity q FROM purchases WHERE id = ?').get(purchaseId) as { q: string };
@@ -663,7 +663,7 @@ describe('PurchaseReturnModel', () => {
             items: [{ source_item_id: purchaseId, quantity: 10 }],
           },
           1,
-          db
+          db, { 'idempotency-key': `pr-direct-${Date.now()}-${Math.floor(Math.random()*1e6)}` }
         )
       ).toThrow(/Insufficient stock in the source batch/);
     });
@@ -684,7 +684,7 @@ describe('PurchaseReturnModel', () => {
           items: [{ source_item_id: purchaseId, quantity: 4 }],
         },
         1,
-        db
+        db, { 'idempotency-key': `pr-direct-${Date.now()}-${Math.floor(Math.random()*1e6)}` }
       );
       PurchaseReturnModel.voidReturn(created.id, 1, 'wrong stock', db);
 
@@ -728,7 +728,7 @@ describe('PurchaseReturnModel', () => {
             items: [{ source_item_id: purchaseId, quantity: 10 }],
           },
           1,
-          db
+          db, { 'idempotency-key': `pr-direct-${Date.now()}-${Math.floor(Math.random()*1e6)}` }
         )
       ).toThrow(/Supply a disposition/);
       db.close();

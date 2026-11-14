@@ -82,10 +82,14 @@ class ProductionRepository {
 
   // ---- Productions ----
 
-  Future<ApiResult<Production>> createProduction(Map<String, dynamic> body) =>
+  Future<ApiResult<Production>> createProduction(
+    Map<String, dynamic> body, {
+    required String idempotencyKey,
+  }) =>
       _api.postRaw(
         ApiEndpoints.productions,
         body: body,
+        headers: {'Idempotency-Key': idempotencyKey},
         parse: (Object? json) =>
             Production.fromJson(json as Map<String, dynamic>),
       );

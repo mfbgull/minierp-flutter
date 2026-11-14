@@ -52,7 +52,7 @@ function refundCashDebit(): number {
     JOIN journal_entries je ON je.id = jl.journal_entry_id
     JOIN chart_of_accounts coa ON coa.id = jl.account_id
     WHERE coa.code IN ('1000','1010','1020','1030','1040')
-      AND je.reference_type = 'SUPPLIER_REFUND'
+      AND je.reference_type = 'REFUND_RECEIPT'
       AND je.voided = 0 AND jl.voided = 0
   `).get() as { total: number }).total);
 }
@@ -84,6 +84,7 @@ describe('idempotency — Round 2 money handlers', () => {
    */
   async function fundCash(): Promise<void> {
     await request(app).post('/api/owner-equity/capital')
+      .set('Idempotency-Key', `patch-idempotencyRou-32-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({ capital_date: '2026-09-01', amount: 500000, payment_method: 'Cash' });
   }
@@ -382,6 +383,7 @@ describe('idempotency — Round 2 money handlers', () => {
       );
       const created = await request(app).post(`/api/invoices/${invoiceId}/return`)
         .set('Cookie', authCookie)
+        .set('Idempotency-Key', `ret-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
         .send({
           reason: 'settle probe',
           warehouse_id: warehouseId,
@@ -415,6 +417,7 @@ describe('idempotency — Round 2 money handlers', () => {
       );
       const created = await request(app).post(`/api/invoices/${invoiceId}/return`)
         .set('Cookie', authCookie)
+        .set('Idempotency-Key', `ret-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
         .send({
           reason: 'settle conflict probe',
           warehouse_id: warehouseId,
@@ -454,6 +457,7 @@ describe('idempotency — Round 2 money handlers', () => {
       const supplierId = supplier.body.data?.id ?? supplier.body.id;
 
       const purchase = await request(app).post('/api/purchases')
+        .set('Idempotency-Key', `patch-idempotencyRou-33-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
         .set('Cookie', authCookie)
         .send({
           item_id: itemId,
@@ -471,6 +475,7 @@ describe('idempotency — Round 2 money handlers', () => {
       });
 
       const returned = await request(app).post('/api/purchase-returns')
+      .set('Idempotency-Key', `pr-${Date.now()}-${Math.floor(Math.random()*1e6)}`)
         .set('Cookie', authCookie)
         .send({
           return_date: '2026-09-16',
@@ -515,7 +520,7 @@ describe('idempotency — Round 2 money handlers', () => {
       // create a payments row, so that is not one of the things to count.
       const before = {
         refunds: count('SELECT COUNT(*) AS n FROM supplier_refunds'),
-        gl: count("SELECT COUNT(*) AS n FROM journal_entries WHERE reference_type = 'SUPPLIER_REFUND'"),
+        gl: count("SELECT COUNT(*) AS n FROM journal_entries WHERE reference_type = 'REFUND_RECEIPT'"),
         cashDr: refundCashDebit(),
       };
 
@@ -527,7 +532,7 @@ describe('idempotency — Round 2 money handlers', () => {
       expect(second.headers['x-idempotent-replay']).toBe('true');
       // The defect this prevents: cash out to the supplier a second time.
       expect(count('SELECT COUNT(*) AS n FROM supplier_refunds')).toBe(before.refunds + 1);
-      expect(count("SELECT COUNT(*) AS n FROM journal_entries WHERE reference_type = 'SUPPLIER_REFUND'"))
+      expect(count("SELECT COUNT(*) AS n FROM journal_entries WHERE reference_type = 'REFUND_RECEIPT'"))
         .toBe(before.gl + 1);
       expect(refundCashDebit() - before.cashDr).toBeCloseTo(20, 2);
     });

@@ -8,6 +8,13 @@ import ItemModel from './Item';
 import AccountingService from '../services/accountingService';
 import { SqlParam } from '../utils/sqlTypes';
 import { BusinessRuleError } from '../utils/businessRuleError';
+import {
+  claimIdempotencyKey,
+  hashRequestPayload,
+  startRequiredIdempotentRequest,
+} from '../utils/idempotency';
+
+const PRODUCTION_CREATE_SCOPE = 'production.create';
 
 interface Production {
   id: number;
@@ -179,7 +186,7 @@ class ProductionModel {
     return generateDocNo(db, 'PROD');
   }
 
-  static recordProduction(data: CreateProductionDTO, userId: number, db: Database.Database): Production {
+  static recordProduction(data: CreateProductionDTO, userId: number, db: Database.Database, headers?: Record<string, unknown>): Production {
     const {
       warehouse_id,
       raw_materials_warehouse_id,
@@ -233,6 +240,12 @@ class ProductionModel {
     // better-sqlite3 API: db.transaction(fn) returns a Transaction<F>
     // with .deferred / .immediate / .exclusive call modes.
     const transaction = db.transaction(() => {
+      // ACCT-008: a retried production run must not consume inputs or post the
+      // output twice. The key is claimed in the same transaction.
+      const start = startRequiredIdempotentRequest(
+        db, headers, PRODUCTION_CREATE_SCOPE, hashRequestPayload(data));
+      if (start.kind === 'error') throw new BusinessRuleError(start.status, start.message);
+      if (start.kind === 'replay') return this.getById(start.resourceId, db) as Production;
       const productionNo = this.generateProductionNo(db);
       const batchNo = this.generateBatchNo(db);
 
@@ -257,6 +270,7 @@ class ProductionModel {
       );
 
       const productionId = result.lastInsertRowid as number;
+      if (start.key) claimIdempotencyKey(db, PRODUCTION_CREATE_SCOPE, start.key, hashRequestPayload(data), productionId);
 
       const consumeProductionInputs = (): number => {
         const inputStmt = db.prepare(`

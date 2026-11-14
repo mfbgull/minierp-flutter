@@ -181,11 +181,12 @@ describe('P11: idempotent invoice creation', () => {
 
     const b = await request(app).post('/api/invoices')
       .set('Cookie', authCookie)
-      .send(body(2)); // keyless legacy client — still works
-    expect(b.status).toBe(201);
+      .send(body(2)); // keyless legacy client — refused by the ACCT-008 (D19) mandate
+    expect(b.status).toBe(400);
+    expect(String(b.body.error)).toMatch(/Idempotency-Key header is required/);
 
-    expect(count('SELECT COUNT(*) as c FROM invoices WHERE customer_id = ?', customerId)).toBe(3);
-    expect(stockOnHand(itemId)).toBe(stockBefore - 4); // key2 + keyless each consumed 2
+    expect(count('SELECT COUNT(*) as c FROM invoices WHERE customer_id = ?', customerId)).toBe(2);
+    expect(stockOnHand(itemId)).toBe(stockBefore - 2); // only the keyed invoice consumed stock
   });
 
   it('rejects a malformed idempotency key with 400', async () => {
@@ -195,7 +196,7 @@ describe('P11: idempotent invoice creation', () => {
       .send(body(1));
     expect(res.status).toBe(400);
     expect(String(res.body.error)).toMatch(/Idempotency-Key/);
-    expect(count('SELECT COUNT(*) as c FROM invoices WHERE customer_id = ?', customerId)).toBe(3);
+    expect(count('SELECT COUNT(*) as c FROM invoices WHERE customer_id = ?', customerId)).toBe(2);
   });
 
   it('a failed create leaves the key unclaimed so a corrected retry runs', async () => {
@@ -235,7 +236,7 @@ describe('P11: idempotent invoice creation', () => {
     const ids = [r1.body.id, r2.body.id, r3.body.id];
     const uniqueIds = new Set(ids);
     expect(uniqueIds.size).toBe(1);
-    expect(count('SELECT COUNT(*) as c FROM invoices WHERE customer_id = ?', customerId)).toBe(5);
+    expect(count('SELECT COUNT(*) as c FROM invoices WHERE customer_id = ?', customerId)).toBe(4);
   });
 });
 

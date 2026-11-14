@@ -87,6 +87,25 @@ class ApiDependency {
   final List<int> invoices;
 }
 
+/// One journal line that lands on the first negative-cash day, from the
+/// cash guard's 409 `details` list (ACCT-013). The client needs this to say
+/// *what* must be reversed first, not just that the day is overdrawn.
+class CashBlocker {
+  const CashBlocker({
+    required this.id,
+    required this.date,
+    required this.amount,
+    required this.type,
+  });
+
+  final int id;
+  final String date;
+  final num amount;
+
+  /// Journal `reference_type`, for example `EXPENSE` or `SUPPLIER_REFUND`.
+  final String type;
+}
+
 class ApiError {
   const ApiError({
     required this.message,
@@ -95,6 +114,7 @@ class ApiError {
     this.outcomeUnknown = false,
     this.code,
     this.blockedBy = const [],
+    this.cashBlockers = const [],
   });
 
   factory ApiError.fromResponse({
@@ -109,6 +129,10 @@ class ApiError {
         ? error['code'] as String
         : null;
     final blockers = error is Map ? error['blockedBy'] : null;
+    // The cash guard posts its per-line list as `details` (a sibling of
+    // `error`, not a child). Missing or malformed entries are dropped rather
+    // than thrown — a 409 must still reach the user with its message.
+    final details = body is Map ? body['details'] : null;
     return ApiError(
       message: message,
       statusCode: statusCode,
@@ -130,6 +154,21 @@ class ApiError {
                 ),
               ),
       ]),
+      cashBlockers: List.unmodifiable([
+        if (details is List)
+          for (final blocker in details)
+            if (blocker is Map &&
+                blocker['id'] is int &&
+                blocker['date'] is String &&
+                blocker['amount'] is num &&
+                blocker['type'] is String)
+              CashBlocker(
+                id: blocker['id'] as int,
+                date: blocker['date'] as String,
+                amount: blocker['amount'] as num,
+                type: blocker['type'] as String,
+              ),
+      ]),
     );
   }
 
@@ -138,6 +177,10 @@ class ApiError {
   final bool isNetwork;
   final String? code;
   final List<ApiDependency> blockedBy;
+
+  /// Lines that must be reversed first when the cash guard rejects a write.
+  /// Empty when the 409 carried no `details` list.
+  final List<CashBlocker> cashBlockers;
 
   /// The request may already have been applied server-side, so a *write*
   /// must not be reported as a plain failure and must not be blindly

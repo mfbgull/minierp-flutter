@@ -28,12 +28,19 @@ import {
 
 /**
  * audit-3 task 08: read the retry key, or 400 on a malformed one.
- * Returns null when the client sent no key, which leaves the write unguarded
- * exactly as before.
+ * ACCT-008 / D19: a customer/supplier payment and an allocation are
+ * canonical financial writes, so an ABSENT key is also a client error:
+ * 400 with the mandate message. Returns undefined after sending a 400
+ * (malformed or missing), never null.
  */
-function readIdempotencyKey(req: AuthRequest, res: Response): string | null | undefined {
+function readIdempotencyKey(req: AuthRequest, res: Response): string | undefined {
   try {
-    return normalizeIdempotencyKey(req.headers[IDEMPOTENCY_KEY_HEADER]);
+    const key = normalizeIdempotencyKey(req.headers[IDEMPOTENCY_KEY_HEADER]);
+    if (key === null) {
+      res.status(400).json({ success: false, error: 'Idempotency-Key header is required for this operation' });
+      return undefined;
+    }
+    return key;
   } catch (err) {
     res.status(400).json({ success: false, error: (err as Error).message });
     return undefined;

@@ -12,6 +12,8 @@ import 'package:go_router/go_router.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/models/supplier.dart' show Supplier;
 import '../../data/repositories/api_result.dart' show ApiError;
+import '../../data/repositories/purchase_repository.dart'
+    show refundsDueProvider;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/date_range_picker.dart' show DateRangeFilter;
 import '../../widgets/screen_error_panel.dart';
@@ -205,6 +207,10 @@ class _SupplierDetailScreenState extends ConsumerState<SupplierDetailScreen>
                         ? supplier.paymentTerms!
                         : 'Net 30',
                   ),
+                  _statDivider(scheme),
+                  // PRET-002 — money this supplier owes you in refund claims.
+                  // A receivable memo, not cash: cash moves only on a receipt.
+                  _RefundsDueStat(supplierId: widget.supplierId),
                 ],
               ),
             ),
@@ -272,6 +278,63 @@ class _SupplierDetailScreenState extends ConsumerState<SupplierDetailScreen>
 }
 
 /// One quick-stat tile: icon + value + label.
+/// This supplier's open refund claims. Summed from the refunds-due memo,
+/// which already carries every supplier's rows — one fetch for both this
+/// badge and the claim list. Hidden while loading or when nothing is due.
+class _RefundsDueStat extends ConsumerWidget {
+  const _RefundsDueStat({required this.supplierId});
+
+  final int supplierId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final due = ref.watch(refundsDueProvider).valueOrNull;
+    if (due == null) return const SizedBox.shrink();
+    var total = 0.0;
+    for (final row in due.rows) {
+      if (row.supplierId == supplierId) total += row.remaining;
+    }
+    if (total <= 0) return const SizedBox.shrink();
+
+    final l10n = AppLocalizations.of(context)!;
+    final scheme = Theme.of(context).colorScheme;
+    return Expanded(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.request_quote_outlined,
+            size: 18,
+            color: scheme.primary,
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  l10n.refundsDueTitle,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+                Text(
+                  Formatters.currency(total),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: scheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _QuickStat extends StatelessWidget {
   const _QuickStat({
     required this.icon,

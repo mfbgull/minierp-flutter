@@ -59,6 +59,7 @@ describe('activity-log currency text', () => {
 
   it('logs an expense amount with the configured currency, not a dollar sign', async () => {
     const res = await request(app).post('/api/expenses')
+      .set('Idempotency-Key', `patch-activityLogCur-4-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         expense_category: 'Utilities',
@@ -88,6 +89,7 @@ describe('activity-log currency text', () => {
     );
 
     const res = await request(app).post('/api/payments')
+      .set('Idempotency-Key', `patch-activityLogCurre-22-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         customer_id: customerId,

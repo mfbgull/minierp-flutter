@@ -221,9 +221,13 @@ export class InvoiceCreationService {
 
       const lineWarehouses = this.resolveLineWarehouses(input.items, input.warehouseId);
 
-      const { itemResults, consumptions, cogsAmount } = this.consumeInvoiceItems(
-        invoiceId, invoiceNo, input, lineWarehouses
-      );
+      const { itemResults, consumptions, cogsAmount, warnings, backdatedBeforeReceipt } =
+        this.consumeInvoiceItems(invoiceId, invoiceNo, input, lineWarehouses);
+      if (backdatedBeforeReceipt) {
+        // ACCT-006: mark the invoice so the Backdated sales exception report
+        // can list the population.
+        this.db.prepare('UPDATE invoices SET backdated_before_receipt = 1 WHERE id = ?').run(invoiceId);
+      }
 
       InvoiceModel.denormalizeExpiryInfo(invoiceId, consumptions, this.db);
       InvoiceModel.createLedgerEntry(this.db, input.customerId, 'INVOICE', invoiceNo, input.invoiceDate, totalAmount, 0, `Invoice ${invoiceNo}`);
@@ -236,7 +240,7 @@ export class InvoiceCreationService {
       ledgerUtils.rebuildLedgerBalances(input.customerId, this.db);
       ledgerUtils.recalcCustomerBalanceFromLedger(input.customerId, this.db);
       if (input.draftId) this.db.prepare('DELETE FROM invoice_drafts WHERE id = ?').run(input.draftId);
-      return { invoiceId, invoiceNo, totalAmount, paidAmount, balanceAmount, taxAmount: InvoiceModel.getInvoiceTaxTotal(this.db, invoiceId), cogsAmount: parseCurrency(cogsAmount), paymentId, paymentNo, replayed: false, items: itemResults };
+      return { invoiceId, invoiceNo, totalAmount, paidAmount, balanceAmount, taxAmount: InvoiceModel.getInvoiceTaxTotal(this.db, invoiceId), cogsAmount: parseCurrency(cogsAmount), paymentId, paymentNo, replayed: false, items: itemResults, warnings };
     });
 
     return transaction();
@@ -274,10 +278,14 @@ export class InvoiceCreationService {
     itemResults: InvoiceCreationItemResult[];
     consumptions: Array<{ itemId: number; consumption: Array<{ batchId: number | null; consumed: number }> }>;
     cogsAmount: number;
+    warnings: string[];
+    backdatedBeforeReceipt: boolean;
   } {
     const itemResults: InvoiceCreationItemResult[] = [];
     const consumptions: Array<{ itemId: number; consumption: Array<{ batchId: number | null; consumed: number }> }> = [];
+    const warnings: string[] = [];
     let cogsAmount = 0;
+    let backdatedBeforeReceipt = false;
 
     for (let li = 0; li < input.items.length; li++) {
       const item = input.items[li];
@@ -291,7 +299,18 @@ export class InvoiceCreationService {
         discount_value: item.discount_value,
         amount: item.amount,
       });
-      const consumption = InvoiceModel.consumeFromOldestBatches(item.item_id, warehouseId, item.quantity, this.db, input.invoiceDate);
+      const { consumption, backdatedBeforeReceipt: backdatedLine, firstReceiptDate } =
+        StockMovementModel.consumeForSale(item.item_id, warehouseId, item.quantity, this.db, input.invoiceDate);
+      if (backdatedLine) {
+        backdatedBeforeReceipt = true;
+        const itemName = (this.db.prepare('SELECT item_name FROM items WHERE id = ?').get(item.item_id) as
+          | { item_name: string }
+          | undefined)?.item_name ?? `item ${item.item_id}`;
+        warnings.push(
+          `Item ${itemName}: invoice date ${input.invoiceDate} is before the item's first purchase receipt in this warehouse (${firstReceiptDate ?? 'unknown'}). ` +
+          `Stock was consumed from later receipts at their recorded cost — verify the documents.`
+        );
+      }
       const batchIds: Array<number | null> = [];
       for (const entry of consumption) {
         StockMovementModel.recordMovement({
@@ -313,7 +332,7 @@ export class InvoiceCreationService {
       itemResults.push({ itemId: item.item_id, quantity: item.quantity, unitPrice: item.unit_price, amount: parseCurrency(item.quantity * item.unit_price), warehouseId, batchIds });
     }
 
-    return { itemResults, consumptions, cogsAmount };
+    return { itemResults, consumptions, cogsAmount, warnings, backdatedBeforeReceipt };
   }
 
   /**
@@ -391,7 +410,7 @@ export class InvoiceCreationService {
   private resultFromExisting(invoiceId: number, replayed: boolean): InvoiceCreationResult {
     const row = this.db.prepare('SELECT id, invoice_no, total_amount, paid_amount, balance_amount FROM invoices WHERE id = ?').get(invoiceId) as ExistingInvoiceRow | undefined;
     if (!row) throw new Error(`Invoice ${invoiceId} not found for idempotency replay`);
-    return { invoiceId: row.id, invoiceNo: row.invoice_no, totalAmount: numberValue(row.total_amount), paidAmount: numberValue(row.paid_amount), balanceAmount: numberValue(row.balance_amount), taxAmount: 0, cogsAmount: 0, paymentId: null, paymentNo: null, replayed, items: [] };
+    return { invoiceId: row.id, invoiceNo: row.invoice_no, totalAmount: numberValue(row.total_amount), paidAmount: numberValue(row.paid_amount), balanceAmount: numberValue(row.balance_amount), taxAmount: 0, cogsAmount: 0, paymentId: null, paymentNo: null, replayed, items: [], warnings: [] };
   }
 }
 

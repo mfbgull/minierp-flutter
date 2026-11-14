@@ -10,7 +10,10 @@ describe('Recoverable tax on purchase-order receipts', () => {
   let supplierId: number;
   let itemId: number;
   let warehouseId: number;
-  const post = (url: string, body: object) => request(app).post(url).set('Cookie', cookie).send(body);
+  const post = (url: string, body: object) => request(app).post(url)
+    // ACCT-008 / D19: mandated financial writes reject a keyless request.
+    .set('Idempotency-Key', `potx-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    .set('Cookie', cookie).send(body);
   const taxBalance = () => (db.prepare(`SELECT ROUND(COALESCE(SUM(j.debit-j.credit),0),2) AS amount
     FROM journal_lines j JOIN chart_of_accounts a ON a.id=j.account_id WHERE a.code='1320' AND j.voided=0`).get() as { amount: number }).amount;
   beforeAll(async () => {

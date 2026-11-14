@@ -2003,6 +2003,137 @@ class AppLocalizationsUr extends AppLocalizations {
   String get purchasesRefundnone => 'ابھی کوئی ریفنڈ نہیں ہوا';
 
   @override
+  String purchasesRefundClaim(String claimNo, String status, String remaining) {
+    return 'کلیم $claimNo ($status) — باقی $remaining';
+  }
+
+  @override
+  String get purchasesRefundExcess =>
+      'زیادہ رقم سپلائر کریڈٹ کے طور پر جمع رکھیں';
+
+  @override
+  String get refundsDueTitle => 'واپس ہونے والی رقوم';
+
+  @override
+  String refundsDueBadge(String amount) {
+    return 'واپس ہونے والی رقوم: $amount';
+  }
+
+  @override
+  String get refundsDueHint => 'سپلائرز کی واجب الادا رقم۔ ابھی نقد نہیں۔';
+
+  @override
+  String get refundClaimsTitle => 'سپلائر ریفنڈ کلیمز';
+
+  @override
+  String get refundClaimsOpenOnly => 'صرف کھلے';
+
+  @override
+  String get refundClaimsEmpty => 'کوئی ریفنڈ کلیم نہیں';
+
+  @override
+  String get refundClaimsEmptyOpen => 'کوئی کھلا ریفنڈ کلیم نہیں';
+
+  @override
+  String get refundClaimStatusEXPECTED => 'متوقع';
+
+  @override
+  String get refundClaimStatusPARTIAL => 'جزوی طور پر موصول';
+
+  @override
+  String get refundClaimStatusRECEIVED => 'موصول';
+
+  @override
+  String get refundClaimStatusCANCELLED => 'منسوخ';
+
+  @override
+  String get refundClaimRecordReceipt => 'وصولی درج کریں';
+
+  @override
+  String get refundClaimWriteOff => 'معاف کریں';
+
+  @override
+  String get refundClaimWriteOffTitle => 'ریفنڈ کلیم معاف کریں';
+
+  @override
+  String get refundClaimWriteOffReason => 'وجہ';
+
+  @override
+  String get refundClaimWriteOffReasonRequired =>
+      'کلیم معاف کرنے کے لیے وجہ درکار ہے';
+
+  @override
+  String get refundClaimWriteOffAdminOnly =>
+      '1,000 روپے سے زیادہ معافی کے لیے مالک درکار ہے';
+
+  @override
+  String get refundClaimCancel => 'کلیم منسوخ کریں';
+
+  @override
+  String get refundClaimCancelReason => 'وجہ';
+
+  @override
+  String get refundClaimViewReceipts => 'رسیدیں دیکھیں';
+
+  @override
+  String get refundClaimReceiptsTitle => 'ریفنڈ رسیدیں';
+
+  @override
+  String get refundClaimNoReceipts => 'اس کلیم کے خلاف کوئی ریفنڈ رسید نہیں';
+
+  @override
+  String get refundClaimVoidReceipt => 'رسید منسوخ کریں';
+
+  @override
+  String get refundClaimVoidConfirm =>
+      'یہ نقد رسید کو واپس کرتا ہے اور کلیم دوبارہ کھولتا ہے۔';
+
+  @override
+  String get refundClaimReceiptVoided => 'ریفنڈ رسید منسوخ ہو گئی';
+
+  @override
+  String get refundClaimReceiptStatusPOSTED => 'درج شدہ';
+
+  @override
+  String get refundClaimReceiptStatusVOIDED => 'منسوخ شدہ';
+
+  @override
+  String refundClaimRemaining(String amount) {
+    return 'باقی: $amount';
+  }
+
+  @override
+  String get refundClaimStandalone => 'ریفنڈ کلیم درج کریں';
+
+  @override
+  String get refundClaimStandaloneSupplier => 'سپلائر';
+
+  @override
+  String get refundClaimStandaloneAmount => 'متوقع رقم';
+
+  @override
+  String refundClaimRemainingPrefill(String amount) {
+    return 'باقی $amount';
+  }
+
+  @override
+  String get refundBlockedTitle => 'نقد منفی ہو جائے گا';
+
+  @override
+  String get refundBlockedHint =>
+      'پہلے یہ اندراجات واپس کریں، پھر دوبارہ کوشش کریں۔';
+
+  @override
+  String refundBlockedRow(String type, String date, String amount) {
+    return '$type بہ تاریخ $date — $amount';
+  }
+
+  @override
+  String refundBlockedMore(int count) {
+    return 'اور $count مزید';
+  }
+
+  @override
   String get purchasesProcessreturn => 'واپسی پراسیس کریں';
 
   @override
@@ -4387,6 +4518,9 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get customersLedgerPayments => 'ادائیگیاں';
+
+  @override
+  String get customersLedgerRunningbalance => 'رواں بیلنس';
 
   @override
   String get customersLedgerTotalcredit => 'کل کریڈٹ';

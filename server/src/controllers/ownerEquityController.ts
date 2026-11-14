@@ -1,4 +1,5 @@
 import { respondToIdempotencyReplay } from '../utils/idempotency';
+import { BusinessRuleError } from '../utils/businessRuleError';
 import { positiveFiniteAmount } from '../utils/controllerValidation';
 import { Request, Response } from 'express';
 import { getQueryParam, getRouteParam } from '../utils/queryUtils';
@@ -26,7 +27,7 @@ import {
   IDEMPOTENCY_SCOPES,
   claimIdempotencyKey,
   hashRequestPayload,
-  startIdempotentRequest,
+  startRequiredIdempotentRequest,
 } from '../utils/idempotency';
 
 /**
@@ -66,6 +67,14 @@ function isClientError(message: string): boolean {
 }
 
 function fail(res: Response, error: unknown, fallback: string): void {
+  // ACCT-013: BusinessRuleError carries its own HTTP status (409 for
+  // cash-timeline refusals) plus structured blockers when present.
+  if (error instanceof BusinessRuleError) {
+    res.status(error.status).json(error.details !== undefined
+      ? { success: false, error: error.message, details: error.details }
+      : { success: false, error: error.message });
+    return;
+  }
   const message = error instanceof Error ? error.message : String(error);
   if (isClientError(message)) {
     res.status(400).json({ success: false, error: message });
@@ -103,7 +112,7 @@ function createCapital(req: AuthRequest, res: Response): void {
     // audit-3 task 08: owner capital is money IN, so a retry after a lost
     // response must replay rather than capitalise the bank twice.
     const hash = hashRequestPayload(req.body);
-    const start = startIdempotentRequest(db, req.headers, IDEMPOTENCY_SCOPES.OWNER_CAPITAL, hash);
+    const start = startRequiredIdempotentRequest(db, req.headers, IDEMPOTENCY_SCOPES.OWNER_CAPITAL, hash);
     if (respondToIdempotencyReplay(res, start, {
       status: 201,
       buildBody: (id) => ({ success: true, idempotentReplay: true, data: { id } }),
@@ -324,7 +333,7 @@ function createWithdrawal(req: AuthRequest, res: Response): void {
     // audit-3 task 08: a goods withdrawal reverses stock batches, so a retry
     // must replay rather than reverse the same stock twice.
     const hash = hashRequestPayload(req.body);
-    const start = startIdempotentRequest(db, req.headers, IDEMPOTENCY_SCOPES.OWNER_WITHDRAWAL, hash);
+    const start = startRequiredIdempotentRequest(db, req.headers, IDEMPOTENCY_SCOPES.OWNER_WITHDRAWAL, hash);
     if (respondToIdempotencyReplay(res, start, {
       status: 201,
       buildBody: (id) => ({ success: true, idempotentReplay: true, data: { id } }),

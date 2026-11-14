@@ -9,6 +9,8 @@ router.use(authenticateToken);
 
 router.get('/', requirePermission('invoices', 'read'), invoiceController.getInvoices);
 router.get('/returns', requirePermission('invoices', 'read'), invoiceController.getInvoiceReturnHistory);
+// ACCT-006: exception report — must stay above /:id.
+router.get('/backdated', requirePermission('invoices', 'read'), invoiceController.getBackdatedInvoices);
 router.get('/:id/position', requirePermission('invoices', 'read'), invoiceController.getInvoicePosition);
 router.get('/:id', requirePermission('invoices', 'read'), invoiceController.getInvoice);
 router.get('/:id/payments', requirePermission('invoices', 'read'), invoiceController.getInvoicePayments);

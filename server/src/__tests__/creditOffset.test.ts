@@ -48,6 +48,7 @@ describe('invoice create with credit_offset', () => {
     // ACCT-005: purchases must name an identified supplier.
     const supplierId = await resolveSupplierByName('Credit Offset Supplier', authCookie);
     await request(app).post('/api/purchases')
+      .set('Idempotency-Key', `patch-creditOffset.t-16-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         item_id: itemId,
@@ -69,6 +70,7 @@ describe('invoice create with credit_offset', () => {
   /// with `credit` disposition so the customer ends with a credit balance.
   async function seedCustomerCredit(qty: number): Promise<number> {
     const created = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-creditOffset.tes-35-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         customer_id: customerId,
@@ -99,6 +101,7 @@ describe('invoice create with credit_offset', () => {
 
     const returned = await request(app)
       .post(`/api/invoices/${created.body.id}/return`)
+      .set('Idempotency-Key', `patch-creditOffset.tes-17-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         reason: 'Credit offset seed',
@@ -138,6 +141,7 @@ describe('invoice create with credit_offset', () => {
     expect(balance).toBe(-200);
 
     const res = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-creditOffset.tes-36-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send(buildInvoice(200));
 
@@ -153,6 +157,7 @@ describe('invoice create with credit_offset', () => {
     await seedCustomerCredit(2);
 
     const res = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-creditOffset.tes-37-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send(buildInvoice(200));
     expect(res.status).toBe(201);
@@ -170,6 +175,7 @@ describe('invoice create with credit_offset', () => {
 
   it('rejects a credit offset larger than the available balance', async () => {
     const res = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-creditOffset.tes-38-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send(buildInvoice(9999));
 

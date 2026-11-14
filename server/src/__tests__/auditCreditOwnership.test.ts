@@ -35,7 +35,9 @@ describe('F-002 source credit cannot be regenerated after consumption', () => {
     const customer = await createCustomer(`Ownership ${consumed}-${draws.length}`, cookie);
     const source = await grant(customer);
     for (const draw of draws) {
-    const offset = await request(app).post('/api/invoices').set('Cookie', cookie).send({
+    const offset = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-auditCreditOwner-24-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .set('Cookie', cookie).send({
       customer_id: customer, invoice_date: '2026-09-16',
       items: [{ item_id: item, quantity: draw.quantity, unit_price: 15 }], credit_offset: draw.amount,
     });
@@ -71,12 +73,16 @@ describe('F-002 source credit cannot be regenerated after consumption', () => {
     const invoice = await createInvoice({ customerId: customer, itemId: item, lines: [{ quantity: 4, unitPrice: 15 }], payment: 'full' }, cookie);
     const ret = await processReturn(invoice.invoiceId, { invoiceItemIds: invoice.invoiceItemIds, quantities: [4], warehouseId: warehouse, returnDate: '2026-09-15' }, cookie);
     expect(ret.status).toBe(200);
-    const applied = await request(app).post('/api/invoices').set('Cookie', cookie).send({
+    const applied = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-auditCreditOwner-25-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .set('Cookie', cookie).send({
       customer_id: customer, invoice_date: '2026-09-16', items: [{ item_id: item, quantity: 5, unit_price: 15 }], credit_offset: 60,
     });
     expect(applied.status).toBe(201);
     const before = financialState();
-    const settle = await request(app).post(`/api/invoice-returns/${ret.returnId}/settle`).set('Cookie', cookie)
+    const settle = await request(app).post(`/api/invoice-returns/${ret.returnId}/settle`)
+      .set('Idempotency-Key', `patch-auditCreditOwner-26-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .set('Cookie', cookie)
       .send({ allocations: [{ type: 'credit', amount: 60 }] });
     expect(settle.status).toBe(400);
     expect((await request(app).post(`/api/invoice-returns/${ret.returnId}/void`).set('Cookie', cookie)).status).toBe(409);
@@ -93,7 +99,9 @@ describe('F-002 source credit cannot be regenerated after consumption', () => {
     const second = await processReturn(invoice.invoiceId, { invoiceItemIds: invoice.invoiceItemIds, quantities: [4], warehouseId: warehouse, returnDate: '2026-09-15' }, cookie);
     expect(first.status).toBe(200);
     expect(second.status).toBe(200);
-    const applied = await request(app).post('/api/invoices').set('Cookie', cookie).send({ customer_id: customer,
+    const applied = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-auditCreditOwner-27-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .set('Cookie', cookie).send({ customer_id: customer,
       invoice_date: '2026-09-16', items: [{ item_id: item, quantity: 4, unit_price: 15 }], credit_offset: 50 });
     expect(applied.status).toBe(201);
     const before = financialState();

@@ -112,6 +112,7 @@ describe('Mobile invoice return endpoint — parity with desktop (spec §5.3)', 
 
     const desktopRes = await request(app)
       .post(`/api/invoices/${desktop.invoiceId}/return`)
+      .set('Idempotency-Key', `patch-mobileReturn.tes-31-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         ...MOBILE_BODY,

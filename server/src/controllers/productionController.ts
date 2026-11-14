@@ -120,7 +120,7 @@ function recordProduction(req: AuthRequest, res: Response): void {
       overhead_cost: overhead_cost ? parseFloat(String(overhead_cost)) : 0
     };
 
-    const production = ProductionModel.recordProduction(productionData, req.user!.id, db);
+    const production = ProductionModel.recordProduction(productionData, req.user!.id, db, req.headers as Record<string, unknown>);
 
     // Log production creation using activity logger
     logCRUD(ActionType.WO_CREATE, 'WorkOrder', production.id, `Created production: ${production.production_no} - ${production.output_item_name} (${production.output_quantity} units)`, req.user!.id);

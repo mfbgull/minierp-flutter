@@ -79,6 +79,7 @@ async function createDiscountedInvoice(
   args: DiscountedInvoiceArgs,
 ): Promise<{ invoiceId: number; invoiceItemIds: number[] }> {
   const res = await request(app).post('/api/invoices')
+    .set('Idempotency-Key', `patch-headerDiscountPe-51-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
     .set('Cookie', authCookie)
     .send({
       customer_id: args.customerId,

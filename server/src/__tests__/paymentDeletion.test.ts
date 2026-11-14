@@ -51,6 +51,7 @@ describe('Payment deletion safety on invoice update (PAY-01)', () => {
     const supplierId = await resolveSupplierByName('PAY-01 Supplier', authCookie);
     await request(app)
       .post('/api/purchases')
+        .set('Idempotency-Key', `patch-paymentDeletio-39-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         item_id: itemId,
@@ -80,6 +81,7 @@ describe('Payment deletion safety on invoice update (PAY-01)', () => {
     invoiceNoCounter += 1;
     const res = await request(app)
       .post('/api/invoices')
+      .set('Idempotency-Key', `patch-paymentDeletion.-32-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         invoice_no: `INV-PAY01-${invoiceNoCounter}`,

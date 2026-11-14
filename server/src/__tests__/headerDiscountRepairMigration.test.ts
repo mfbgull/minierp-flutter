@@ -38,6 +38,7 @@ function returnsCredited(invoiceId: number): number {
 
 async function seedDiscountedInvoice(): Promise<{ invoiceId: number; invoiceItemIds: number[] }> {
   const res = await request(app).post('/api/invoices')
+    .set('Idempotency-Key', `patch-headerDiscountRe-52-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
     .set('Cookie', authCookie)
     .send({
       customer_id: customerId,
@@ -117,6 +118,7 @@ describe('H2 repair migration — backfillInvoiceHeaderDiscount', () => {
 
   it('undiscounted invoices are left alone', async () => {
     const res = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-headerDiscountRe-53-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         customer_id: customerId,

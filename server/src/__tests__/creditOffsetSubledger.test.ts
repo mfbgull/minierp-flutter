@@ -67,6 +67,7 @@ describe('customer credit offset accounting', () => {
 
     const supplierId = await resolveSupplierByName('Credit Offset Supplier', authCookie);
     await request(app).post('/api/purchases')
+      .set('Idempotency-Key', `patch-creditOffsetSu-17-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         item_id: itemId, warehouse_id: warehouseId, quantity: 60, unit_cost: 10,
@@ -87,6 +88,7 @@ describe('customer credit offset accounting', () => {
   /** Sell on account, collect in full, then return the goods as ledger credit. */
   async function seedLedgerCredit(customerId: number, qty: number, date: string): Promise<number> {
     const inv = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-creditOffsetSubl-39-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         customer_id: customerId, invoice_date: date, due_date: date,
@@ -99,6 +101,7 @@ describe('customer credit offset accounting', () => {
 
     const invItem = db.prepare('SELECT id FROM invoice_items WHERE invoice_id = ?').get(inv.body.id) as { id: number };
     const ret = await request(app).post(`/api/invoices/${inv.body.id}/return`)
+      .set('Idempotency-Key', `patch-creditOffsetSubl-40-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         reason: 'seed ledger credit', disposition: 'credit', warehouse_id: warehouseId,
@@ -111,6 +114,7 @@ describe('customer credit offset accounting', () => {
   /** Sell on account, collect in full, then settle the return into the pool. */
   async function seedPoolCredit(customerId: number, qty: number, date: string): Promise<number> {
     const inv = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-creditOffsetSubl-41-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         customer_id: customerId, invoice_date: date, due_date: date,
@@ -123,6 +127,7 @@ describe('customer credit offset accounting', () => {
 
     const invItem = db.prepare('SELECT id FROM invoice_items WHERE invoice_id = ?').get(inv.body.id) as { id: number };
     const ret = await request(app).post(`/api/invoices/${inv.body.id}/return`)
+      .set('Idempotency-Key', `patch-creditOffsetSubl-42-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         reason: 'seed pool credit', warehouse_id: warehouseId,
@@ -163,6 +168,7 @@ describe('customer credit offset accounting', () => {
       expect(R2(position(customerId).credit_balance)).toBe(0);
 
       const inv = await request(app).post('/api/invoices')
+        .set('Idempotency-Key', `patch-creditOffsetSubl-43-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
         .set('Cookie', authCookie)
         .send({
           customer_id: customerId, invoice_date: '2026-09-10', due_date: '2026-09-24',
@@ -233,6 +239,7 @@ describe('customer credit offset accounting', () => {
       expect(R2(position(customerId).current_balance)).toBe(0);
 
       const inv = await request(app).post('/api/invoices')
+        .set('Idempotency-Key', `patch-creditOffsetSubl-44-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
         .set('Cookie', authCookie)
         .send({
           customer_id: customerId, invoice_date: '2026-10-10', due_date: '2026-10-24',

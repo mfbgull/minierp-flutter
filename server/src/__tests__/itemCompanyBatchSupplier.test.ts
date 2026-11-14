@@ -8,7 +8,10 @@ let cookie = '';
 let warehouseId = 0;
 let seq = 0;
 const get = (url: string) => request(app).get(url).set('Cookie', cookie);
-const post = (url: string, body: Record<string, unknown>) => request(app).post(url).set('Cookie', cookie).send(body);
+const post = (url: string, body: Record<string, unknown>) => request(app).post(url)
+  // ACCT-008 / D19: mandated financial writes reject a keyless request.
+  .set('Idempotency-Key', `icbs-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+  .set('Cookie', cookie).send(body);
 
 beforeAll(async () => {
   cookie = await getAuthCookie();

@@ -67,6 +67,7 @@ describe('money-path suites (tasks 9.2–9.4)', () => {
     // Partial payment of 100 against a 200 invoice — via the allocation
     // API the production client uses.
     const pay = await request(app).post('/api/payments')
+      .set('Idempotency-Key', `patch-moneyPaths.test-65-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         customer_id: customerId,
@@ -99,6 +100,7 @@ describe('money-path suites (tasks 9.2–9.4)', () => {
 
     // overpaying past the balance is refused
     const over = await request(app).post('/api/payments')
+      .set('Idempotency-Key', `patch-moneyPaths.test-66-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         customer_id: customerId,
@@ -123,6 +125,7 @@ describe('money-path suites (tasks 9.2–9.4)', () => {
 
     // pay in full first
     const pay = await request(app).post('/api/payments')
+      .set('Idempotency-Key', `patch-moneyPaths.test-67-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         customer_id: customerId,
@@ -227,6 +230,7 @@ describe('money-path suites (tasks 9.2–9.4)', () => {
     // constraint plus server-side retry/guard must keep numbers unique).
     const results = await Promise.all(Array.from({ length: 5 }, () =>
       request(app).post('/api/invoices')
+        .set('Idempotency-Key', `patch-moneyPaths.test-68-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
         .set('Cookie', authCookie)
         .send({
           customer_id: customerId,

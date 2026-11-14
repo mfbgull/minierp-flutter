@@ -224,6 +224,7 @@ describe('C-02 / H-03 — a refund cannot exceed what was actually collected', (
     const cashBefore = netCash();
 
     const res = await request(app).post('/api/purchase-returns')
+      .set('Idempotency-Key', `pr-${Date.now()}-${Math.floor(Math.random()*1e6)}`)
       .set('Cookie', authCookie)
       .send({
         return_date: '2026-09-05',
@@ -262,6 +263,7 @@ describe('C-02 / H-03 — a refund cannot exceed what was actually collected', (
 
     // Return 10 units @ 25 = 250, i.e. 150 MORE than was ever collected.
     const res = await request(app).post('/api/purchase-returns')
+      .set('Idempotency-Key', `pr-${Date.now()}-${Math.floor(Math.random()*1e6)}`)
       .set('Cookie', authCookie)
       .send({
         return_date: '2026-09-05',
@@ -277,7 +279,10 @@ describe('C-02 / H-03 — a refund cannot exceed what was actually collected', (
     expect(netCash()).toBeCloseTo(cashBefore, 2);
     const note = db.prepare<[number], { id: number }>('SELECT id FROM credit_notes WHERE source_id = ?').get(idOf(res));
     if (!note) throw new Error('Missing returned-purchase credit note');
-    const received = await request(app).post('/api/supplier-refunds').set('Cookie', authCookie).send({
+    const received = await request(app).post('/api/supplier-refunds')
+      .set('Cookie', authCookie)
+      .set('Idempotency-Key', `c02-refund-${stamp}`)
+      .send({
       credit_note_id: note.id, refund_date: '2026-09-05', amount: 100, payment_method: 'Cash',
     });
     expect(received.status).toBe(201);
@@ -292,6 +297,7 @@ describe('C-02 / H-03 — a refund cannot exceed what was actually collected', (
 
     const cashBefore = netCash();
     const res = await request(app).post('/api/purchase-returns')
+      .set('Idempotency-Key', `pr-${Date.now()}-${Math.floor(Math.random()*1e6)}`)
       .set('Cookie', authCookie)
       .send({
         return_date: '2026-09-05',
@@ -420,6 +426,7 @@ describe('H-03 — a customer refund is capped by the cash actually collected', 
 
     // Seed the credit pool: a 400 invoice paid in cash, then fully returned to credit.
     const pool = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-settlementCashIn-84-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         customer_id: customerId,
@@ -436,6 +443,7 @@ describe('H-03 — a customer refund is capped by the cash actually collected', 
     const poolItem = db.prepare('SELECT id FROM invoice_items WHERE invoice_id = ?')
       .get(pool.body.id) as { id: number };
     const seeded = await request(app).post(`/api/invoices/${pool.body.id}/return`)
+      .set('Idempotency-Key', `patch-settlementCashIn-85-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         reason: 'H03 seed credit pool',
@@ -447,6 +455,7 @@ describe('H-03 — a customer refund is capped by the cash actually collected', 
 
     // Settle a 400 invoice with that credit and NO cash.
     const cashless = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-settlementCashIn-86-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         customer_id: customerId,
@@ -500,6 +509,7 @@ describe('H-03 — a customer refund is capped by the cash actually collected', 
 
     // 400 total, settled with 100 cash → only 100 may ever come back.
     const inv = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-settlementCashIn-87-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         customer_id: customerId,

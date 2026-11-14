@@ -79,6 +79,7 @@ async function purchase(
 ): Promise<number> {
   const res = await request(app)
     .post('/api/purchases')
+      .set('Idempotency-Key', `patch-expiryHasExpir-22-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
     .set('Cookie', authCookie)
     .send({
       item_id: itemId,
@@ -135,6 +136,7 @@ async function goodsReceipt(
 
   const receipt = await request(app)
     .post(`/api/purchase-orders/${poId}/receipts`)
+    .set('Idempotency-Key', `patch-expiryHasExpiryG-22-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
     .set('Cookie', authCookie)
     .send({
       receipt_date: '2026-08-05',
@@ -280,6 +282,7 @@ describe('joint production stamps expiry per output line', () => {
 
     const res = await request(app)
       .post('/api/productions')
+      .set('Idempotency-Key', `prod-${Date.now()}-${Math.floor(Math.random()*1e6)}`)
       .set('Cookie', authCookie)
       .send({
         outputs: [

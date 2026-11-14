@@ -47,7 +47,18 @@ afterEach(() => {
 function api(method: 'get' | 'post' | 'put' | 'delete', url: string, body?: Record<string, unknown>) {
   return request(app)[method](url)
     .set('Cookie', token)
+    .set('Idempotency-Key', `cp-${Math.abs(hashCode(url + JSON.stringify(body ?? {})))}`)
     .send(body);
+}
+
+// Deterministic keys so each distinct request body keeps its own idempotency
+// slot — the supplier-refund endpoints mandate the header (ACCT-008).
+function hashCode(value: string): number {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash * 31 + value.charCodeAt(i)) | 0;
+  }
+  return hash;
 }
 
 function closePeriodFor(date: string, name = '2026-09-closed-for-test') {
@@ -357,6 +368,7 @@ describe('Period-protection primitive phases', () => {
       .send({ supplier_code: 'PRIM-VOID-SUP', supplier_name: 'Primitive Void Supplier' })
       .then(r => r.body?.data?.id as number);
     const res = await request(app).post('/api/purchases').set('Cookie', token)
+      .set('Idempotency-Key', `patch-closedPeriodIm-14-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .send({
         item_id: await createItem('Primitive Purchase Item', token),
         warehouse_id: warehouseId,
@@ -420,7 +432,9 @@ describe('Period-protection primitive phases', () => {
     const submit = await request(app).post(`/api/purchase-orders/${poId}/status`).set('Cookie', token)
       .send({ status: 'Submitted' });
     expect(submit.status).toBeLessThan(300);
-    const receiptRes = await request(app).post(`/api/purchase-orders/${poId}/receipts`).set('Cookie', token)
+    const receiptRes = await request(app).post(`/api/purchase-orders/${poId}/receipts`)
+      .set('Idempotency-Key', `patch-closedPeriodImmu-32-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .set('Cookie', token)
       .send({
         receipt_date: receiptDate,
         warehouse_id: warehouseId,
@@ -557,6 +571,7 @@ describe('Period-protection primitive phases', () => {
     const before = financialTotalsSnapshot();
 
     const res = await request(app).post('/api/purchases').set('Cookie', token)
+      .set('Idempotency-Key', `patch-closedPeriodIm-15-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .send({
         item_id: itemId, warehouse_id: warehouseId,
         quantity: 10, unit_cost: 100,
@@ -579,7 +594,9 @@ describe('Period-protection primitive phases', () => {
     await purchaseStock(item, warehouseId, 10, 100, token);
     const before = financialTotalsSnapshot();
 
-    const res = await request(app).post('/api/invoices').set('Cookie', token)
+    const res = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-closedPeriodImmu-33-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .set('Cookie', token)
       .send({
         customer_id: customer,
         invoice_date: FUTURE_DATE,
@@ -653,7 +670,9 @@ describe('Period-protection primitive phases', () => {
     const before = financialTotalsSnapshot();
 
     // The receipt endpoint refuses a future receipt_date before any write.
-    const res = await request(app).post(`/api/purchase-orders/${poId}/receipts`).set('Cookie', token)
+    const res = await request(app).post(`/api/purchase-orders/${poId}/receipts`)
+      .set('Idempotency-Key', `patch-closedPeriodImmu-34-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .set('Cookie', token)
       .send({
         receipt_date: '2030-01-01',
         warehouse_id: warehouseId,
@@ -673,7 +692,8 @@ describe('Period-protection primitive phases', () => {
     const item = await createItem('Primitive Future Adj Item', token);
     const before = financialTotalsSnapshot();
 
-    const res = await request(app).post('/api/inventory/stock-movements').set('Cookie', token)
+    const res = await request(app).post('/api/inventory/stock-movements')
+      .set('Idempotency-Key', `inv-${Date.now()}-${Math.floor(Math.random()*1e6)}`).set('Cookie', token)
       .send({
         item_id: item, warehouse_id: warehouseId,
         quantity: 5, movement_type: 'ADJUSTMENT',
@@ -697,7 +717,8 @@ describe('Period-protection primitive phases', () => {
     // unit_cost is required for the GL adjustment leg to fire at all —
     // a zero-value adjustment posts no journal entry, so the guard under
     // test (postLegacyStockEntry's closed-period assert) would never run.
-    const res = await request(app).post('/api/inventory/stock-movements').set('Cookie', token)
+    const res = await request(app).post('/api/inventory/stock-movements')
+      .set('Idempotency-Key', `inv-${Date.now()}-${Math.floor(Math.random()*1e6)}`).set('Cookie', token)
       .send({
         item_id: item, warehouse_id: warehouseId,
         quantity: 5, movement_type: 'ADJUSTMENT',

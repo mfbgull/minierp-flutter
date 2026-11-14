@@ -6,15 +6,18 @@ import SupplierRefundModel, { creditNoteRefundable } from '../models/SupplierRef
 import db from '../config/database';
 import logger from '../utils/logger';
 import { isValidPaymentMethod } from '../services/cashService';
-import { IDEMPOTENCY_SCOPES, claimIdempotencyKey, hashRequestPayload, respondToIdempotencyReplay, startIdempotentRequest } from '../utils/idempotency';
+import { SupplierRefundClaimModel, claimRemaining } from '../models/SupplierRefundClaim';
+import { BusinessRuleError } from '../utils/businessRuleError';
+import { IDEMPOTENCY_SCOPES, claimIdempotencyKey, hashRequestPayload, respondToIdempotencyReplay, startIdempotentRequest, startRequiredIdempotentRequest } from '../utils/idempotency';
 
 function getSupplierRefunds(req: Request, res: Response): void {
   try {
     const { page, limit } = listPageQuery(req.query);
     const supplierId = Number(req.query.supplier_id) || undefined;
+    const claimId = Number(req.query.claim_id) || undefined;
 
     const { rows, total, pageNum, limitNum } = SupplierRefundModel.getAll(
-      { supplier_id: supplierId, page, limit },
+      { supplier_id: supplierId, claim_id: claimId, page, limit },
       db
     );
 
@@ -43,15 +46,45 @@ function getSupplierRefund(req: Request, res: Response): void {
   }
 }
 
-/** Refundable balance of a credit note — for the payout dialog. */
+/** Refundable balance of a credit note — for the payout dialog. When the
+ * note carries a live refund claim (PRET-002), its remaining balance is
+ * included: the receipt must fit both caps. */
 function getCreditNoteRefundable(req: Request, res: Response): void {
   try {
     const creditNoteId = Number(req.params.id);
-    res.json({ credit_note_id: creditNoteId, refundable: creditNoteRefundable(creditNoteId, db) });
+    const refundable = creditNoteRefundable(creditNoteId, db);
+    const claim = SupplierRefundClaimModel.getByCreditNoteId(creditNoteId, db);
+    res.json({
+      credit_note_id: creditNoteId,
+      refundable,
+      claim: claim ? {
+        id: claim.id,
+        claim_no: claim.claim_no,
+        status: claim.status,
+        amount: claim.amount,
+        received_amount: claim.received_amount,
+        remaining: claimRemaining(claim),
+      } : null,
+    });
   } catch (error) {
     logger.error('Get refundable balance error:', error);
     res.status(500).json({ error: 'Failed to get refundable balance' });
   }
+}
+
+/** Controller-level request guards for create; returns the first error message. */
+function refundRequestError(body: {
+  refund_date?: string; credit_note_id?: number; claim_id?: number;
+  amount?: number; payment_method?: string;
+}): string | undefined {
+  if (!body.refund_date) return 'refund_date is required';
+  const amount = Number(body.amount);
+  if (!Number.isFinite(amount) || amount <= 0) return 'A positive amount is required';
+  if (!body.credit_note_id && !body.claim_id) return 'A credit_note_id or claim_id is required';
+  if (body.payment_method !== undefined && !isValidPaymentMethod(body.payment_method)) {
+    return `Invalid payment_method "${body.payment_method}" — use Cash or Bank transfer`;
+  }
+  return undefined;
 }
 
 function createSupplierRefund(req: AuthRequest, res: Response): Response | void {
@@ -59,36 +92,28 @@ function createSupplierRefund(req: AuthRequest, res: Response): Response | void 
     const body = req.body as {
       refund_date?: string;
       credit_note_id?: number;
+      claim_id?: number;
       amount?: number;
       payment_method?: string;
       reference_no?: string;
+      treat_excess_as_advance?: boolean;
     };
 
-    if (!body.refund_date) return res.status(400).json({ error: 'refund_date is required' });
-    if (!body.credit_note_id || body.credit_note_id <= 0) {
-      return res.status(400).json({ error: 'A valid credit_note_id is required' });
-    }
-    // Validate amount here rather than letting Number(undefined) become NaN
-    // and surface as a 500 from the model layer.
-    const amount = Number(body.amount);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      return res.status(400).json({ error: 'A positive amount is required' });
-    }
-    if (body.payment_method !== undefined && !isValidPaymentMethod(body.payment_method)) {
-      return res.status(400).json({
-        error: `Invalid payment_method "${body.payment_method}" — use Cash, Bank, Easypaisa, JazzCash or Upaisa`,
-      });
-    }
+    const validationError = refundRequestError(body);
+    if (validationError) return res.status(400).json({ error: validationError });
 
     // Bind the validated values: the guards above narrow `body.*`, but that
     // narrowing does not carry into the transaction callback below.
-    const refundDate = body.refund_date;
-    const creditNoteId = body.credit_note_id;
+    const refundDate = body.refund_date as string;
+    const creditNoteId = body.credit_note_id ? Number(body.credit_note_id) : undefined;
+    const claimId = body.claim_id ? Number(body.claim_id) : undefined;
+    const amount = Number(body.amount);
 
-    // audit-3 task 08: a supplier refund is cash OUT and reduces AP, so a
-    // retry after a lost response must replay rather than refund twice.
+    // ACCT-013 + PRET-002: a refund receipt is cash IN — a retry after a
+    // lost response must replay rather than post twice. The key is now
+    // mandatory (new-surface ACCT-008 contract).
     const hash = hashRequestPayload(req.body);
-    const start = startIdempotentRequest(db, req.headers, IDEMPOTENCY_SCOPES.SUPPLIER_REFUND_CREATE, hash);
+    const start = startRequiredIdempotentRequest(db, req.headers, IDEMPOTENCY_SCOPES.SUPPLIER_REFUND_CREATE, hash);
     if (respondToIdempotencyReplay(res, start, {
       status: 201,
       buildBody: (resourceId) => ({ success: true, idempotentReplay: true, data: { id: resourceId } }),
@@ -99,9 +124,11 @@ function createSupplierRefund(req: AuthRequest, res: Response): Response | void 
         {
           refund_date: refundDate,
           credit_note_id: creditNoteId,
+          claim_id: claimId,
           amount,
           payment_method: body.payment_method,
           reference_no: body.reference_no,
+          treat_excess_as_advance: body.treat_excess_as_advance === true,
         },
         req.user!.id,
         db
@@ -114,10 +141,18 @@ function createSupplierRefund(req: AuthRequest, res: Response): Response | void 
 
     res.status(201).json({
       success: true,
-      message: `Supplier refund ${created.refund_no} issued successfully`,
+      message: created.excess > 0
+        ? `Refund receipt ${created.refund_no} recorded; excess ${created.excess.toFixed(2)} held as supplier credit on account`
+        : `Supplier refund ${created.refund_no} issued successfully`,
       data: created,
     });
   } catch (error: unknown) {
+    if (error instanceof BusinessRuleError) {
+      res.status(error.status).json(error.details !== undefined
+        ? { error: error.message, details: error.details }
+        : { error: error.message });
+      return;
+    }
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     logger.error('Create supplier refund error:', { error: errorMessage });
     res.status(400).json({ error: errorMessage });
@@ -137,6 +172,14 @@ function voidSupplierRefund(req: AuthRequest, res: Response): Response | void {
       data: voided,
     });
   } catch (error: unknown) {
+    // ACCT-013: BusinessRuleError carries its own status (409 for cash-timeline
+    // and closed-period refusals) plus structured blockers when present.
+    if (error instanceof BusinessRuleError) {
+      res.status(error.status).json(error.details !== undefined
+        ? { error: error.message, details: error.details }
+        : { error: error.message });
+      return;
+    }
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     if (errorMessage.includes('inside closed accounting period')) {
       res.status(409).json({ error: errorMessage });

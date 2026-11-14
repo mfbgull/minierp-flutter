@@ -14,6 +14,7 @@ import '../../data/repositories/inventory_repository.dart'
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
 import '../../widgets/detail_labels.dart' show detailSectionLabel;
+import '../../core/utils/idempotency_key.dart';
 import '../../widgets/form_field.dart' show FormFieldShell;
 import '../../widgets/form_helpers.dart'
     show ErrorBanner, formInputDecoration, submitOnEnter;
@@ -45,6 +46,7 @@ class _StockAdjustmentDialog extends ConsumerStatefulWidget {
 class _StockAdjustmentDialogState
     extends ConsumerState<_StockAdjustmentDialog> {
   final _formKey = GlobalKey<FormState>();
+  final _idemKeys = IdempotencyKeyCache(prefix: 'stock-adj');
   final _qtyController = TextEditingController();
   final _reasonController = TextEditingController();
   int? _itemId;
@@ -77,15 +79,16 @@ class _StockAdjustmentDialogState
       _busy = true;
       _error = null;
     });
+    final body = <String, dynamic>{
+      'item_id': _itemId!,
+      'warehouse_id': _warehouseId!,
+      'quantity': num.parse(_qtyController.text.trim()),
+      'movement_type': 'ADJUSTMENT',
+      if (remarks.isNotEmpty) 'remarks': remarks,
+    };
     final result = await ref
         .read(inventoryRepositoryProvider)
-        .createStockMovement({
-          'item_id': _itemId!,
-          'warehouse_id': _warehouseId!,
-          'quantity': num.parse(_qtyController.text.trim()),
-          'movement_type': 'ADJUSTMENT',
-          if (remarks.isNotEmpty) 'remarks': remarks,
-        });
+        .createStockMovement(body, idempotencyKey: _idemKeys.keyFor(body));
     if (!mounted) return;
 
     switch (result) {
