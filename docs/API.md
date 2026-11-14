@@ -355,6 +355,11 @@ A missing header returns 400 with the message
 | Customer payment | `POST /payments` |
 | Payment allocation | `POST /payments/:id/allocate` |
 | Purchase-order goods receipt | `POST /purchase-orders/:id/receipts` |
+| Expense create | `POST /expenses` |
+| Owner capital | `POST /owner-equity/capital` |
+| Owner withdrawal | `POST /owner-equity/withdrawals` |
+| Salary pay | `POST /employees/:id/salary/pay` |
+| Direct purchase record | `POST /purchases` |
 
 Supplier refunds and refund-claim writes are already mandatory (PRET-002).
 `POST /api/mobile-invoices/*` stays keyless until the external mobile app

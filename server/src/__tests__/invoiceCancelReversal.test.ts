@@ -54,6 +54,7 @@ describe('Invoice/SO cancellation reversal (C1 + C4)', () => {
     const supplierId = await resolveSupplierByName('C1/C4 Stock Supplier', authCookie);
     await request(app)
       .post('/api/purchases')
+        .set('Idempotency-Key', `patch-invoiceCancelR-35-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         item_id: itemId,

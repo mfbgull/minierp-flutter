@@ -368,6 +368,7 @@ describe('Period-protection primitive phases', () => {
       .send({ supplier_code: 'PRIM-VOID-SUP', supplier_name: 'Primitive Void Supplier' })
       .then(r => r.body?.data?.id as number);
     const res = await request(app).post('/api/purchases').set('Cookie', token)
+      .set('Idempotency-Key', `patch-closedPeriodIm-14-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .send({
         item_id: await createItem('Primitive Purchase Item', token),
         warehouse_id: warehouseId,
@@ -570,6 +571,7 @@ describe('Period-protection primitive phases', () => {
     const before = financialTotalsSnapshot();
 
     const res = await request(app).post('/api/purchases').set('Cookie', token)
+      .set('Idempotency-Key', `patch-closedPeriodIm-15-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .send({
         item_id: itemId, warehouse_id: warehouseId,
         quantity: 10, unit_cost: 100,

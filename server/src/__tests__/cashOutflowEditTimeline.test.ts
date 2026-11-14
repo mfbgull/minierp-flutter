@@ -21,6 +21,7 @@ afterEach(() => { db.exec('ROLLBACK TO outflow_edit_case; RELEASE outflow_edit_c
 
 async function capital(amount: number, date: string): Promise<number> {
   const response = await request(app).post('/api/owner-equity/capital').set('Cookie', cookie)
+    .set('Idempotency-Key', `patch-cashOutflowEdi-11-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
     .send({ amount, capital_date: date, payment_method: 'Cash' });
   expect(response.status).toBe(201);
   const data: { data: { id: number } } = response.body;
@@ -30,6 +31,7 @@ async function capital(amount: number, date: string): Promise<number> {
 /** Cash withdrawal (outflow); returns the row id. */
 async function withdraw(amount: number, date: string): Promise<number> {
   const response = await request(app).post('/api/owner-equity/withdrawals').set('Cookie', cookie)
+    .set('Idempotency-Key', `patch-cashOutflowEdi-12-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
     .send({ amount, withdrawal_date: date, payment_method: 'Cash', kind: 'cash' });
   expect(response.status).toBe(201);
   const data: { data: { id: number } } = response.body;
@@ -38,6 +40,7 @@ async function withdraw(amount: number, date: string): Promise<number> {
 
 async function createExpense(amount: number, date: string): Promise<number> {
   const response = await request(app).post('/api/expenses').set('Cookie', cookie)
+    .set('Idempotency-Key', `patch-cashOutflowEdi-13-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
     .send({
       expense_category: 'Utilities', description: 'ACCT-013 dip fixture', amount,
       expense_date: date, payment_method: 'Cash', status: 'Recorded',

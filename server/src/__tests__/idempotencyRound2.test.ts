@@ -84,6 +84,7 @@ describe('idempotency — Round 2 money handlers', () => {
    */
   async function fundCash(): Promise<void> {
     await request(app).post('/api/owner-equity/capital')
+      .set('Idempotency-Key', `patch-idempotencyRou-32-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({ capital_date: '2026-09-01', amount: 500000, payment_method: 'Cash' });
   }
@@ -456,6 +457,7 @@ describe('idempotency — Round 2 money handlers', () => {
       const supplierId = supplier.body.data?.id ?? supplier.body.id;
 
       const purchase = await request(app).post('/api/purchases')
+        .set('Idempotency-Key', `patch-idempotencyRou-33-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
         .set('Cookie', authCookie)
         .send({
           item_id: itemId,

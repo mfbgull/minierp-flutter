@@ -64,6 +64,7 @@ describe('Stock transfer void (Phase 4)', () => {
     const supplierId = await resolveSupplierByName('Transfer Void Supplier', authCookie);
     await request(app)
       .post('/api/purchases')
+        .set('Idempotency-Key', `patch-stockTransferV-42-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         item_id: itemId,

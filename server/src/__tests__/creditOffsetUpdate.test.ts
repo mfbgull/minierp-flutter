@@ -60,6 +60,7 @@ describe('invoice update with applied store credit', () => {
     // ACCT-005: purchases must name an identified supplier.
     const supplierId = await resolveSupplierByName('Update Credit Supplier', authCookie);
     await request(app).post('/api/purchases')
+      .set('Idempotency-Key', `patch-creditOffsetUp-18-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         item_id: itemId,

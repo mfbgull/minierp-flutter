@@ -10,7 +10,10 @@ import { getAuthCookie } from './helpers/invoiceReturnSpec';
 describe('Accrual expenses and settlements', () => {
   let cookie: string;
   let category: string;
-  const post = (url: string, body: object) => request(app).post(url).set('Cookie', cookie).send(body);
+  // D19: expense / owner-equity / purchase writes mandate a key.
+  const post = (url: string, body: object) => request(app).post(url)
+    .set('Idempotency-Key', `ce-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    .set('Cookie', cookie).send(body);
   const balance = (code: string) => db.prepare(`
     SELECT COALESCE(SUM(jl.debit - jl.credit), 0) AS amount
     FROM journal_lines jl JOIN chart_of_accounts a ON a.id = jl.account_id

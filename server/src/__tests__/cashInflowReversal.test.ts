@@ -15,6 +15,7 @@ afterEach(() => { db.exec('ROLLBACK TO cash_inflow_case; RELEASE cash_inflow_cas
 
 async function capital(amount: number, date: string, method = 'Cash'): Promise<number> {
   const response = await request(app).post('/api/owner-equity/capital').set('Cookie', cookie)
+    .set('Idempotency-Key', `patch-cashInflowReve-9-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
     .send({ amount, capital_date: date, payment_method: method });
   expect(response.status).toBe(201);
   const data: { data: { id: number } } = response.body;
@@ -23,6 +24,7 @@ async function capital(amount: number, date: string, method = 'Cash'): Promise<n
 
 async function spend(amount: number, date: string): Promise<void> {
   const response = await request(app).post('/api/owner-equity/withdrawals').set('Cookie', cookie)
+    .set('Idempotency-Key', `patch-cashInflowReve-10-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
     .send({ amount, withdrawal_date: date, payment_method: 'Cash', kind: 'cash' });
   expect(response.status).toBe(201);
 }

@@ -168,6 +168,7 @@ describe('Accounting invariants over a full lifecycle', () => {
     // funds guard rejects payments when cash is negative).
     const capRes = await request(app)
       .post('/api/owner-equity/capital')
+        .set('Idempotency-Key', `patch-accountingInva-0-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', token)
       .send({ capital_date: '2026-09-01', amount: 10000 });
     expectOperationStatus(capRes, 'capital');
@@ -852,6 +853,7 @@ describe('Reconciliation invariants F-I over transaction lifecycle', () => {
   it('8. expense creation — invariants hold', async () => {
     const apBefore = apSnapshot();
     const expRes = await request(app).post('/api/expenses').set('Cookie', token)
+      .set('Idempotency-Key', `patch-accountingInva-1-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .send({ expense_date: '2026-09-15', expense_category: 'Office Supplies', description: 'FI expense', amount: 50, payment_method: 'cash' });
     expect([200, 201]).toContain(expRes.status);
     checkF_I('after expense');
@@ -969,6 +971,7 @@ describe('Reconciliation invariants F-I over transaction lifecycle', () => {
     const apBefore = apSnapshot();
 
     const createRes = await request(app).post('/api/expenses').set('Cookie', token)
+      .set('Idempotency-Key', `patch-accountingInva-2-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .send({ expense_date: '2026-09-15', expense_category: 'Office Supplies', description: 'FI expense cancel test', amount: 75, payment_method: 'cash' });
     expect([200, 201]).toContain(createRes.status);
     const expense = createRes.body?.data ?? createRes.body;
@@ -1006,6 +1009,7 @@ describe('Reconciliation invariants F-I over transaction lifecycle', () => {
     // Acquire through the real purchase path so the inventory GL exists;
     // a direct batch insert would make the invariant unmeasurable.
     const buyRes = await request(app).post('/api/purchases').set('Cookie', token)
+      .set('Idempotency-Key', `patch-accountingInva-3-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .send({
         item_id: itemId, warehouse_id: warehouseId, quantity: 10, unit_cost: 50,
         purchase_date: '2026-09-15', supplier_id: supplierId,

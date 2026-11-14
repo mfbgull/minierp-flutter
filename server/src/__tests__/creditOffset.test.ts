@@ -48,6 +48,7 @@ describe('invoice create with credit_offset', () => {
     // ACCT-005: purchases must name an identified supplier.
     const supplierId = await resolveSupplierByName('Credit Offset Supplier', authCookie);
     await request(app).post('/api/purchases')
+      .set('Idempotency-Key', `patch-creditOffset.t-16-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         item_id: itemId,

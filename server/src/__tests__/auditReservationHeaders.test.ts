@@ -56,6 +56,7 @@ describe('reservation and journal audit invariants', () => {
       .toEqual({ voided: 1, voided_by: 1, void_reason: 'Audit void' });
     // Mounted cash-capital void must reach the same shared invariant.
     const created = await request(app).post('/api/owner-equity/capital').set('Cookie', cookie)
+      .set('Idempotency-Key', `patch-auditReservati-8-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .send({ amount: 50, capital_date: '2026-09-01', payment_method: 'Bank' });
     expect(created.status).toBe(201);
     const id = created.body.data.id;

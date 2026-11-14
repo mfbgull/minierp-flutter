@@ -79,6 +79,7 @@ async function purchase(
 ): Promise<number> {
   const res = await request(app)
     .post('/api/purchases')
+      .set('Idempotency-Key', `patch-expiryHasExpir-22-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
     .set('Cookie', authCookie)
     .send({
       item_id: itemId,

@@ -49,7 +49,9 @@ function currentStock(itemId: number): number {
 }
 
 async function buy(itemId: number, qty: number, cost: number, date: string) {
-  return request(app).post('/api/purchases').set('Cookie', authCookie).send({
+  return request(app).post('/api/purchases')
+    .set('Idempotency-Key', `patch-inventoryEffec-34-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+    .set('Cookie', authCookie).send({
     item_id: itemId, warehouse_id: warehouseId, quantity: qty, unit_cost: cost,
     purchase_date: date, supplier_id: supId,
   });

@@ -568,6 +568,7 @@ describe('Purchase Returns Endpoints (full flow)', () => {
 
     const purchase = await request(app)
       .post('/api/purchases')
+        .set('Idempotency-Key', `patch-api.integratio-5-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         item_id: itemId,
@@ -812,6 +813,7 @@ describe('Invoice Returns Endpoints (restock warehouse)', () => {
     const supplierId = await resolveSupplierByName('Invoice Return Supplier', authCookie);
     const purchase = await request(app)
       .post('/api/purchases')
+        .set('Idempotency-Key', `patch-api.integratio-6-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         item_id: itemId,
@@ -959,6 +961,7 @@ describe('Invoice Returns Endpoints (restock warehouse)', () => {
     const ledgerSupplierId = await resolveSupplierByName('Ledger Test Supplier', authCookie);
     const purchase = await request(app)
       .post('/api/purchases')
+        .set('Idempotency-Key', `patch-api.integratio-7-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         item_id: itmId,

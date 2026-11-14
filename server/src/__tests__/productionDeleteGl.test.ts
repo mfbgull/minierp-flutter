@@ -58,6 +58,7 @@ describe('Production deletion GL void (C2)', () => {
     const supplierId = await resolveSupplierByName('C2 Stock Supplier', authCookie);
     await request(app)
       .post('/api/purchases')
+        .set('Idempotency-Key', `patch-productionDele-41-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         item_id: rawItemId,

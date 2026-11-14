@@ -9,7 +9,10 @@ import { generateToken } from '../middleware/auth';
 describe('Supplier bills, input tax and settlement', () => {
   let cookie: string;
   let supplierId: number;
-  const post = (url: string, body: object) => request(app).post(url).set('Cookie', cookie).send(body);
+  // D19: owner-equity / expense / purchase writes mandate a key.
+  const post = (url: string, body: object) => request(app).post(url)
+    .set('Idempotency-Key', `sb-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    .set('Cookie', cookie).send(body);
   beforeAll(async () => {
     cookie = await getAuthCookie();
     const supplier = await post('/api/suppliers', { supplier_code: 'BILL-REGRESSION', supplier_name: 'Bill regression supplier', phone: '03001234567' });

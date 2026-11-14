@@ -70,6 +70,7 @@ describe('payment allocation cannot exceed the credit-offset-adjusted balance', 
 
     const supplierId = await resolveSupplierByName('Credit Offset Supplier', authCookie);
     await request(app).post('/api/purchases')
+      .set('Idempotency-Key', `patch-overAllocation-38-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         item_id: itemId, warehouse_id: warehouseId, quantity: 200, unit_cost: 10,

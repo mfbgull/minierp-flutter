@@ -45,6 +45,7 @@ describe('Expense status machine (TASK 25 Option A)', () => {
   async function createExpense(): Promise<number> {
     const res = await request(app)
       .post('/api/expenses')
+        .set('Idempotency-Key', `patch-expenseTransit-21-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         expense_date: '2026-09-20',

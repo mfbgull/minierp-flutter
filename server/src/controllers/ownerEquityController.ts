@@ -27,7 +27,7 @@ import {
   IDEMPOTENCY_SCOPES,
   claimIdempotencyKey,
   hashRequestPayload,
-  startIdempotentRequest,
+  startRequiredIdempotentRequest,
 } from '../utils/idempotency';
 
 /**
@@ -112,7 +112,7 @@ function createCapital(req: AuthRequest, res: Response): void {
     // audit-3 task 08: owner capital is money IN, so a retry after a lost
     // response must replay rather than capitalise the bank twice.
     const hash = hashRequestPayload(req.body);
-    const start = startIdempotentRequest(db, req.headers, IDEMPOTENCY_SCOPES.OWNER_CAPITAL, hash);
+    const start = startRequiredIdempotentRequest(db, req.headers, IDEMPOTENCY_SCOPES.OWNER_CAPITAL, hash);
     if (respondToIdempotencyReplay(res, start, {
       status: 201,
       buildBody: (id) => ({ success: true, idempotentReplay: true, data: { id } }),
@@ -333,7 +333,7 @@ function createWithdrawal(req: AuthRequest, res: Response): void {
     // audit-3 task 08: a goods withdrawal reverses stock batches, so a retry
     // must replay rather than reverse the same stock twice.
     const hash = hashRequestPayload(req.body);
-    const start = startIdempotentRequest(db, req.headers, IDEMPOTENCY_SCOPES.OWNER_WITHDRAWAL, hash);
+    const start = startRequiredIdempotentRequest(db, req.headers, IDEMPOTENCY_SCOPES.OWNER_WITHDRAWAL, hash);
     if (respondToIdempotencyReplay(res, start, {
       status: 201,
       buildBody: (id) => ({ success: true, idempotentReplay: true, data: { id } }),

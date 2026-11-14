@@ -38,6 +38,7 @@ async function getLoginCookie(username = 'admin', password?: string): Promise<st
  * Cr 3000 and the operational flow counts the same inflow. */
 async function seedOpeningCash(amount: number, date = '2026-08-01'): Promise<void> {
   const r = await request(app).post('/api/owner-equity/capital').set('Cookie', cookie)
+    .set('Idempotency-Key', `patch-supplierRefund-43-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
     .send({ amount, capital_date: date, payment_method: 'Cash' });
   expect(r.status).toBe(201);
 }

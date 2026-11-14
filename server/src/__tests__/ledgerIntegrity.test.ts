@@ -59,6 +59,7 @@ describe('ledger integrity and reconciliation', () => {
     // ACCT-005: purchases must name an identified supplier.
     const supplierId = await resolveSupplierByName('Ledger Integrity Supplier', authCookie);
     const supplierRes = await request(app).post('/api/purchases')
+      .set('Idempotency-Key', `patch-ledgerIntegrit-36-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         item_id: itemId,

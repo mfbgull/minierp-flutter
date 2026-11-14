@@ -63,6 +63,7 @@ describe('GL lifecycle: update/delete voiding', () => {
     // ACCT-005: purchases must name an identified supplier.
     const supplierId = await resolveSupplierByName('GL Lifecycle Supplier', authCookie);
     await request(app).post('/api/purchases')
+      .set('Idempotency-Key', `patch-glLifecycle.te-24-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         item_id: itemId,

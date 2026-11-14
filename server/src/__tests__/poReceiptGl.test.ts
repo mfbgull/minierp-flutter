@@ -247,6 +247,7 @@ beforeAll(async () => {
   // a 400. One capital injection covers every payment in the suite.
   const capital = await request(app)
     .post('/api/owner-equity/capital')
+      .set('Idempotency-Key', `patch-poReceiptGl.te-40-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
     .set('Cookie', authCookie)
     .send({ capital_date: '2026-09-01', amount: 100000 });
   expect([200, 201]).toContain(capital.status);

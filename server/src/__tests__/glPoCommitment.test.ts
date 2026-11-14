@@ -52,6 +52,7 @@ describe('PO commitment removal (ACC-16)', () => {
     supplierId = supplier.body?.data?.id ?? supplier.body?.id;
 
     await request(app).post('/api/purchases')
+      .set('Idempotency-Key', `patch-glPoCommitment-25-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         item_id: itemId,
@@ -117,6 +118,7 @@ describe('PO commitment removal (ACC-16)', () => {
     expect(po.status).toBe(201);
 
     const pur = await request(app).post('/api/purchases')
+      .set('Idempotency-Key', `patch-glPoCommitment-26-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         item_id: itemId,

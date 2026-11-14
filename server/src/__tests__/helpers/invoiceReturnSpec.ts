@@ -106,6 +106,8 @@ export async function purchaseStock(
   stockSupplierId = await ensureStockSupplier(authCookie);
   const res = await request(app).post('/api/purchases')
     .set('Cookie', authCookie)
+    // D19: the direct purchase record mandates a key.
+    .set('Idempotency-Key', nextIdemKey('stock'))
     .send({
       item_id: itemId,
       warehouse_id: warehouseId,
@@ -181,6 +183,8 @@ export async function purchaseWithNamedSupplier(
   const supplierId = await resolveSupplierByName(supplierName, authCookie);
   return request(app).post('/api/purchases')
     .set('Cookie', authCookie)
+    // D19: the direct purchase record mandates a key.
+    .set('Idempotency-Key', nextIdemKey('namedbuy'))
     .send({ ...payload, supplier_id: supplierId });
 }
 

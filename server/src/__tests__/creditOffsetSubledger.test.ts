@@ -67,6 +67,7 @@ describe('customer credit offset accounting', () => {
 
     const supplierId = await resolveSupplierByName('Credit Offset Supplier', authCookie);
     await request(app).post('/api/purchases')
+      .set('Idempotency-Key', `patch-creditOffsetSu-17-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         item_id: itemId, warehouse_id: warehouseId, quantity: 60, unit_cost: 10,

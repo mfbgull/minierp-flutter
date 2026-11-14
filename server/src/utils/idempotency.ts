@@ -291,11 +291,19 @@ export function startIdempotentRequest(
 }
 
 /**
+ * The refusal message for a missing key on a mandated write (D19). Shared so
+ * the helper and the two manual-key controllers (expenses, direct purchases)
+ * cannot drift apart.
+ */
+export const IDEMPOTENCY_KEY_REQUIRED_MESSAGE = 'Idempotency-Key header is required for this operation';
+
+/**
  * Same as startIdempotentRequest, but a missing key is a 400 instead of an
  * unprotected proceed. ACCT-008 / D19 confirmed the mandate: the canonical
  * financial writes (invoice create, payments and allocation, purchase-order
  * goods receipts, sales returns, return settlement, supplier refunds and
- * claims) use this contract; only /api/mobile-invoices/* stays keyless
+ * claims, expenses, owner capital and withdrawals, salary pay, direct
+ * purchases) use this contract; only /api/mobile-invoices/* stays keyless
  * (D13's promise to the external mobile app).
  */
 export function startRequiredIdempotentRequest(
@@ -306,7 +314,7 @@ export function startRequiredIdempotentRequest(
 ): IdempotencyStart {
   const key = headers?.[IDEMPOTENCY_KEY_HEADER];
   if (key === undefined || key === null || key === '') {
-    return { kind: 'error', status: 400, message: 'Idempotency-Key header is required for this operation' };
+    return { kind: 'error', status: 400, message: IDEMPOTENCY_KEY_REQUIRED_MESSAGE };
   }
   return startIdempotentRequest(db, headers, scope, requestHash);
 }

@@ -601,6 +601,16 @@ Out of scope in this pass (they keep the optional `startIdempotentRequest`):
 expenses, owner capital/withdrawals, employee salary pay, and the direct
 purchase record. They are not in the decision's endpoint list.
 
+**Widened (2026-11-14, on Gull's instruction).** The four writes above are
+now mandatory too. All four already had idempotent implementations; only the
+missing-key path changed, from an unprotected proceed to 400. Owner capital,
+owner withdrawals and salary pay switched to `startRequiredIdempotentRequest`;
+expenses and the direct purchase record shared one message constant,
+`IDEMPOTENCY_KEY_REQUIRED_MESSAGE`. The mandate now covers ten write sites.
+The blast radius was 30 suites / 45 keyless fixtures, patched as before; the
+shared `purchaseStock` and `purchaseWithNamedSupplier` test helpers now send a
+key, which covers a further ~40 suites that seed stock through them.
+
 Every in-repo client already sends a key on all six writes: the Flutter
 repositories expose an optional `idempotencyKey` and every feature dialog
 passes one derived from the request body (`IdempotencyKeyCache.keyFor`).
