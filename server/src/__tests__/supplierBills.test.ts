@@ -113,7 +113,8 @@ describe('Supplier bills, input tax and settlement', () => {
       }
       const token = generateToken({ id: Number(user.lastInsertRowid), username: name, role: 'user' });
       const before = db.prepare('SELECT COUNT(*) AS count FROM supplier_bills').get();
-      const response = await request(app).post('/api/supplier-bills').auth(token, { type: 'bearer' }).send({
+      const response = await request(app).post('/api/supplier-bills').auth(token, { type: 'bearer' })
+        .set('Idempotency-Key', `sb-boundary-${Date.now()}-${Math.random().toString(36).slice(2)}`).send({
         supplier_id: supplierId, bill_no: name, bill_date: '2026-09-08', net_amount: 10, description: 'Approval boundary',
       });
       expect(response.status).toBe(approved ? 201 : 403);

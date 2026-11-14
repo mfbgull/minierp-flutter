@@ -350,4 +350,22 @@ describe('ACCT-008 D19 — Idempotency-Key is mandatory on canonical financial w
     expect((second.body as { id: number }).id).toBe(firstId);
     expect(db.prepare('SELECT COUNT(*) n FROM productions WHERE output_item_id = ?').get(out)).toEqual({ n: 1 });
   });
+
+  it('rejects keyless supplier bill and prepayment writes with 400', async () => {
+    // ACCT-008: both are AP + GL writes (bill posts expense/AP, prepayment
+    // moves cash to a supplier advance). Keys were optional; now mandatory.
+    const sup = await resolveSupplierByName(`Mandate Keyless Supplier ${Date.now()}`, authCookie);
+
+    const billKeyless = await request(app).post('/api/supplier-bills').set('Cookie', authCookie).send({
+      supplier_id: sup, bill_no: `K-${++seq}`, bill_date: '2026-10-01', net_amount: 100, input_tax_amount: 15, description: 'Mandate probe',
+    });
+    expect(billKeyless.status).toBe(400);
+    expect((billKeyless.body as { error: string }).error).toMatch(MANDATE_MESSAGE);
+
+    const prepayKeyless = await request(app).post('/api/supplier-prepayments').set('Cookie', authCookie).send({
+      supplier_id: sup, prepay_date: '2026-10-01', amount: 50, payment_method: 'Cash',
+    });
+    expect(prepayKeyless.status).toBe(400);
+    expect((prepayKeyless.body as { error: string }).error).toMatch(MANDATE_MESSAGE);
+  });
 });
