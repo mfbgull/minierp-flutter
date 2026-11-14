@@ -832,6 +832,7 @@ describe('Invoice Returns Endpoints (restock warehouse)', () => {
     invoiceNoCounter += 1;
     const invoice = await request(app)
       .post('/api/invoices')
+      .set('Idempotency-Key', `patch-api.integration.-9-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         invoice_no: `INV-2026-${invoiceNoCounter}`,
@@ -862,6 +863,7 @@ describe('Invoice Returns Endpoints (restock warehouse)', () => {
 
     const res = await request(app)
       .post(`/api/invoices/${invoiceId}/return`)
+      .set('Idempotency-Key', `patch-api.integration.-10-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         reason: 'Damaged goods',
@@ -901,6 +903,7 @@ describe('Invoice Returns Endpoints (restock warehouse)', () => {
 
     const res = await request(app)
       .post(`/api/invoices/${invoiceId}/return`)
+      .set('Idempotency-Key', `patch-api.integration.-11-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         reason: 'Wrong colour',
@@ -923,6 +926,7 @@ describe('Invoice Returns Endpoints (restock warehouse)', () => {
 
     const res = await request(app)
       .post(`/api/invoices/${invoiceId}/return`)
+      .set('Idempotency-Key', `patch-api.integration.-12-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         reason: 'x',
@@ -978,6 +982,7 @@ describe('Invoice Returns Endpoints (restock warehouse)', () => {
       counter += 1;
       const invoice = await request(app)
         .post('/api/invoices')
+        .set('Idempotency-Key', `patch-api.integration.-13-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
         .set('Cookie', authCookie)
         .send({
           invoice_no: `INV-2026-${counter}`,
@@ -1005,6 +1010,7 @@ describe('Invoice Returns Endpoints (restock warehouse)', () => {
     // allocation, doubling its credit in the running balance.
     const multiAlloc = await request(app)
       .post('/api/payments')
+      .set('Idempotency-Key', `patch-api.integration.-14-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         customer_id: custId,
@@ -1026,6 +1032,7 @@ describe('Invoice Returns Endpoints (restock warehouse)', () => {
     ] as const) {
       const pay = await request(app)
         .post('/api/payments')
+        .set('Idempotency-Key', `patch-api.integration.-15-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
         .set('Cookie', authCookie)
         .send({
           customer_id: custId,
@@ -1040,6 +1047,7 @@ describe('Invoice Returns Endpoints (restock warehouse)', () => {
     // Fully return invoice B with a cash refund (RETURN + REFUND pair).
     const ret = await request(app)
       .post(`/api/invoices/${invB.invoiceId}/return`)
+      .set('Idempotency-Key', `patch-api.integration.-16-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         reason: 'regression test',

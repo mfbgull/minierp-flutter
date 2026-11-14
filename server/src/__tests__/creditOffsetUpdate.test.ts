@@ -87,6 +87,7 @@ describe('invoice update with applied store credit', () => {
    */
   async function seedCreditPool(): Promise<void> {
     const created = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-creditOffsetUpda-45-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         customer_id: customerId,
@@ -116,6 +117,7 @@ describe('invoice update with applied store credit', () => {
 
     const returned = await request(app)
       .post(`/api/invoices/${created.body.id}/return`)
+      .set('Idempotency-Key', `patch-creditOffsetUpda-18-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         reason: 'seed credit pool',
@@ -131,6 +133,7 @@ describe('invoice update with applied store credit', () => {
     await seedCreditPool();
 
     const res = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-creditOffsetUpda-46-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         customer_id: customerId,

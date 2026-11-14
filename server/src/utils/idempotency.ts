@@ -292,10 +292,11 @@ export function startIdempotentRequest(
 
 /**
  * Same as startIdempotentRequest, but a missing key is a 400 instead of an
- * unprotected proceed. Used where a double-post costs money and the client
- * has no keyless-exemption promise (PRET-002 receipt/claim writes; the
- * ACCT-008 global mandate is still unconfirmed — new endpoints carry the
- * contract from day one, existing endpoints keep the optional behavior).
+ * unprotected proceed. ACCT-008 / D19 confirmed the mandate: the canonical
+ * financial writes (invoice create, payments and allocation, purchase-order
+ * goods receipts, sales returns, return settlement, supplier refunds and
+ * claims) use this contract; only /api/mobile-invoices/* stays keyless
+ * (D13's promise to the external mobile app).
  */
 export function startRequiredIdempotentRequest(
   db: Database.Database,

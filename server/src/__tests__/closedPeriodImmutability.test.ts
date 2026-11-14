@@ -431,7 +431,9 @@ describe('Period-protection primitive phases', () => {
     const submit = await request(app).post(`/api/purchase-orders/${poId}/status`).set('Cookie', token)
       .send({ status: 'Submitted' });
     expect(submit.status).toBeLessThan(300);
-    const receiptRes = await request(app).post(`/api/purchase-orders/${poId}/receipts`).set('Cookie', token)
+    const receiptRes = await request(app).post(`/api/purchase-orders/${poId}/receipts`)
+      .set('Idempotency-Key', `patch-closedPeriodImmu-32-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .set('Cookie', token)
       .send({
         receipt_date: receiptDate,
         warehouse_id: warehouseId,
@@ -590,7 +592,9 @@ describe('Period-protection primitive phases', () => {
     await purchaseStock(item, warehouseId, 10, 100, token);
     const before = financialTotalsSnapshot();
 
-    const res = await request(app).post('/api/invoices').set('Cookie', token)
+    const res = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-closedPeriodImmu-33-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .set('Cookie', token)
       .send({
         customer_id: customer,
         invoice_date: FUTURE_DATE,
@@ -664,7 +668,9 @@ describe('Period-protection primitive phases', () => {
     const before = financialTotalsSnapshot();
 
     // The receipt endpoint refuses a future receipt_date before any write.
-    const res = await request(app).post(`/api/purchase-orders/${poId}/receipts`).set('Cookie', token)
+    const res = await request(app).post(`/api/purchase-orders/${poId}/receipts`)
+      .set('Idempotency-Key', `patch-closedPeriodImmu-34-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .set('Cookie', token)
       .send({
         receipt_date: '2030-01-01',
         warehouse_id: warehouseId,

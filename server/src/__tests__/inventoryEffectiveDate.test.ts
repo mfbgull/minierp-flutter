@@ -56,7 +56,9 @@ async function buy(itemId: number, qty: number, cost: number, date: string) {
 }
 
 async function sell(itemId: number, qty: number, price: number, date: string) {
-  return request(app).post('/api/invoices').set('Cookie', authCookie).send({
+  return request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-inventoryEffecti-54-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .set('Cookie', authCookie).send({
     customer_id: customerId, invoice_date: date,
     items: [{ item_id: itemId, quantity: qty, unit_price: price, amount: qty * price }],
   });
@@ -203,6 +205,7 @@ describe('ACCT-006 — goods receipt and production', () => {
       .set('Cookie', authCookie).send({ status: 'Submitted' });
     const poItem = db.prepare(`SELECT id FROM purchase_order_items WHERE po_id = ?`).get(poId) as { id: number };
     const rec = await request(app).post(`/api/purchase-orders/${poId}/receipts`)
+      .set('Idempotency-Key', `patch-inventoryEffecti-55-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({ receipt_date: receiptDate, warehouse_id: warehouseId, items: [{ po_item_id: poItem.id, received_quantity: 5 }] });
     return rec.status;

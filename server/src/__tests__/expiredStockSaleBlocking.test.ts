@@ -159,6 +159,7 @@ function postInvoice(payload: Record<string, unknown>): Promise<request.Response
   invoiceSeq += 1;
   return request(app)
     .post('/api/invoices')
+    .set('Idempotency-Key', `patch-expiredStockSale-19-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
     .set('Cookie', token)
     .send({ invoice_no: `INV-EX-${invoiceSeq}`, ...payload });
 }
@@ -370,6 +371,7 @@ describe('Scenario 6 (7.6) — returns never re-sell expired stock', () => {
     // sellable availability must not grow (expired goods ≠ sellable).
     const returnRes = await request(app)
       .post(`/api/invoices/${invoiceId}/return`)
+      .set('Idempotency-Key', `patch-expiredStockSale-20-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', token)
       .send({
         return_date: new Date().toISOString().slice(0, 10),
@@ -463,6 +465,7 @@ describe('7.9 — full lifecycle invariant (create → return → cancel leaves 
 
     const retRes = await request(app)
       .post(`/api/invoices/${invoiceId}/return`)
+      .set('Idempotency-Key', `patch-expiredStockSale-21-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', token)
       .send({
         return_date: new Date().toISOString().slice(0, 10),

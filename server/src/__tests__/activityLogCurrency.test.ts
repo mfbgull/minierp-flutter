@@ -88,6 +88,7 @@ describe('activity-log currency text', () => {
     );
 
     const res = await request(app).post('/api/payments')
+      .set('Idempotency-Key', `patch-activityLogCurre-22-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         customer_id: customerId,

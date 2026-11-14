@@ -42,6 +42,7 @@ async function invoiceWithOffset(
   qty: number, creditOffset: number,
 ): Promise<{ status: number; body: { id?: number; error?: string } }> {
   return request(app).post('/api/invoices')
+    .set('Idempotency-Key', `patch-customerStoreCre-47-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
     .set('Cookie', authCookie)
     .send({
       customer_id: customerId,
@@ -178,6 +179,7 @@ describe('H9: store credit lifecycle', () => {
 
     // Entitlement guard: payment 50 + offset 100 exceeds the 100 total.
     const res = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-customerStoreCre-48-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         customer_id: customerId,

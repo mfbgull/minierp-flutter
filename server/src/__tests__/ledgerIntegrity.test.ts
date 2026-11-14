@@ -85,6 +85,7 @@ describe('ledger integrity and reconciliation', () => {
   async function createInvoice(customerIdArg: number, totalAmount: number, date: string): Promise<{ invoiceId: number; invoiceNo: string }> {
     counter += 1;
     const res = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-ledgerIntegrity.-58-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         invoice_no: `INV-LGR-${counter}`,
@@ -164,6 +165,7 @@ describe('ledger integrity and reconciliation', () => {
     const invA = await createInvoice(customerId2, 300, '2026-06-10');
     expect(invA.invoiceId).toBeGreaterThan(0);
     const pay = await request(app).post('/api/payments')
+      .set('Idempotency-Key', `patch-ledgerIntegrity.-59-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         customer_id: customerId2,
@@ -209,6 +211,7 @@ describe('ledger integrity and reconciliation', () => {
     const inv = await createInvoice(customerId, 400, '2026-05-01');
 
     const pay = await request(app).post('/api/payments')
+      .set('Idempotency-Key', `patch-ledgerIntegrity.-60-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         customer_id: customerId,
@@ -241,6 +244,7 @@ describe('ledger integrity and reconciliation', () => {
 
     counter += 1;
     const res = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-ledgerIntegrity.-61-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         invoice_no: `INV-LGR-BAD-${counter}`,
@@ -261,6 +265,7 @@ describe('ledger integrity and reconciliation', () => {
   it('discount and tax are reflected in the stored line amount and header', async () => {
     counter += 1;
     const res = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-ledgerIntegrity.-62-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         invoice_no: `INV-LGR-DISC-${counter}`,
@@ -298,6 +303,7 @@ describe('ledger integrity and reconciliation', () => {
     // total 150. Before computeInvoiceGrandTotal this was rejected as a
     // mismatch because the header discount was ignored.
     const res = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-ledgerIntegrity.-63-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         invoice_no: `INV-LGR-INVDC-${counter}`,
@@ -329,6 +335,7 @@ describe('ledger integrity and reconciliation', () => {
     // Flip-model loose line (§5.2): the user billed a flat 60 for
     // 1.75 units — qty × price would disagree by design.
     const res = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-ledgerIntegrity.-64-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         invoice_no: `INV-LGR-LOOSE-${counter}`,

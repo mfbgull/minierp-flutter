@@ -65,6 +65,7 @@ describe('GL authority (audit task 34)', () => {
     );
 
     const returned = await request(app).post(`/api/invoices/${taxInvoiced.invoiceId}/return`)
+      .set('Idempotency-Key', `patch-glAuthority.test-49-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         items: [{ invoice_item_id: taxInvoiced.invoiceItemIds[0], return_quantity: 1 }],

@@ -245,7 +245,9 @@ describe('ACCT-006 / ACCT-007: date and pricing bounds', () => {
   let itemId: number;
 
   const postInvoice = (payload: Record<string, unknown>) =>
-    request(app).post('/api/invoices').set('Cookie', cookie).send(payload);
+    request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-auditRegression9-28-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .set('Cookie', cookie).send(payload);
 
   const invoice = (overrides: Record<string, unknown> = {}) => ({
     customer_id: customerId,

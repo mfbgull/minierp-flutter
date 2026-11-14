@@ -96,6 +96,7 @@ describe('H11: PO cancel only unreceived remainder', () => {
 
     const res = await request(app)
       .post(`/api/purchase-orders/${poId}/receipts`)
+      .set('Idempotency-Key', `patch-poCancelPartialR-33-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         po_id: poId,

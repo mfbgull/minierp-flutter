@@ -576,6 +576,39 @@ with D12's staged plan):
   new action gets a new key (`core/utils/idempotency_key.dart` pattern,
   extended to any endpoint that does not yet send it).
 
+**Implementation record (2026-11-14).** The mandate is enforced on six write
+sites, through one shared helper, `startRequiredIdempotentRequest` in
+`server/src/utils/idempotency.ts`. A missing header returns 400 with the
+constant message `Idempotency-Key header is required for this operation`.
+
+The six sites and their scopes:
+
+| Write | Controller | Scope |
+|---|---|---|
+| Invoice create | `invoiceController.createInvoice` | `invoices.create` |
+| Invoice return | `invoiceController` INVOICE_RETURN | `invoices.return` |
+| Return settlement | `invoiceReturnController` INVOICE_RETURN_SETTLE | `invoices.return` |
+| Customer + allocation payments | `paymentsController.readIdempotencyKey` | `payments.customer`, `payments.allocate` |
+| Purchase-order goods receipt | `purchaseOrderController` PURCHASE_ORDER_RECEIPT | `purchase_orders.receipt` |
+
+`/api/mobile-invoices/*` stays keyless (D13). Two ordering notes: the mandate
+check precedes entity existence checks, so a keyless request to a nonexistent
+invoice returns 400, not 404; and the customer-payment endpoint keeps its
+requirement of at least one `invoice_allocations` entry. Supplier refunds and
+claims were already mandatory from PRET-002.
+
+Out of scope in this pass (they keep the optional `startIdempotentRequest`):
+expenses, owner capital/withdrawals, employee salary pay, and the direct
+purchase record. They are not in the decision's endpoint list.
+
+Every in-repo client already sends a key on all six writes: the Flutter
+repositories expose an optional `idempotencyKey` and every feature dialog
+passes one derived from the request body (`IdempotencyKeyCache.keyFor`).
+Red-first: `idempotencyMandate.test.ts` failed 7 of 8 cases before the
+change. The blast radius was 26 test suites whose fixtures posted keyless
+payloads; they were updated to send keys, and three suites that pinned the old
+keyless-compatible contract (`invoiceIdempotency`, `invoiceMigrationTelemetry`,
+`clientValidationStatus`) were rewritten to the D19 contract.
 ### PRET-002 — supplier refunds: one claim object, expected → received
 
 - **Entry points.** The purchase-return flow is primary: when a return is

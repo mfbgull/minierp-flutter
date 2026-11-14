@@ -340,6 +340,36 @@ transfers can be traced using their existing movement link.
 
 ---
 
+## Mandatory Idempotency-Key (Financial Writes)
+
+The header `Idempotency-Key` (8..200 characters, a fresh UUID per user
+action) is **required** on these canonical financial writes (decision D19).
+A missing header returns 400 with the message
+`Idempotency-Key header is required for this operation`.
+
+| Write | Endpoint |
+|---|---|
+| Invoice create | `POST /invoices` |
+| Invoice return | `POST /invoices/:id/return` |
+| Return settlement | `POST /invoice-returns/:id/settle` |
+| Customer payment | `POST /payments` |
+| Payment allocation | `POST /payments/:id/allocate` |
+| Purchase-order goods receipt | `POST /purchase-orders/:id/receipts` |
+
+Supplier refunds and refund-claim writes are already mandatory (PRET-002).
+`POST /api/mobile-invoices/*` stays keyless until the external mobile app
+migrates (D13).
+
+Reuse the same key and payload when retrying a lost response. A changed
+payload under the same key returns 409 `IDEMPOTENCY_CONFLICT`; an unchanged
+retry replays the original result. The mandate check runs before entity
+existence checks, so a keyless request returns 400 even when the target row
+does not exist.
+
+Every in-repo client (Flutter desktop, POS) already sends a key on these
+writes. Keys are derived from the request body, so an unchanged retry reuses
+the key and an edited payload rotates it.
+
 ## Invoices
 
 ### GET /invoices

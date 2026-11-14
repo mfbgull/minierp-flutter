@@ -382,6 +382,7 @@ describe('idempotency — Round 2 money handlers', () => {
       );
       const created = await request(app).post(`/api/invoices/${invoiceId}/return`)
         .set('Cookie', authCookie)
+        .set('Idempotency-Key', `ret-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
         .send({
           reason: 'settle probe',
           warehouse_id: warehouseId,
@@ -415,6 +416,7 @@ describe('idempotency — Round 2 money handlers', () => {
       );
       const created = await request(app).post(`/api/invoices/${invoiceId}/return`)
         .set('Cookie', authCookie)
+        .set('Idempotency-Key', `ret-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
         .send({
           reason: 'settle conflict probe',
           warehouse_id: warehouseId,

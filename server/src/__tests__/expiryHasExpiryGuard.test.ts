@@ -135,6 +135,7 @@ async function goodsReceipt(
 
   const receipt = await request(app)
     .post(`/api/purchase-orders/${poId}/receipts`)
+    .set('Idempotency-Key', `patch-expiryHasExpiryG-22-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
     .set('Cookie', authCookie)
     .send({
       receipt_date: '2026-08-05',

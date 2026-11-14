@@ -83,6 +83,7 @@ describe('GL lifecycle: update/delete voiding', () => {
   async function createInvoice(totalAmount: number): Promise<{ invoiceId: number; invoiceNo: string }> {
     invoiceNoCounter += 1;
     const res = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-glLifecycle.test-50-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         invoice_no: `INV-GLLC-${invoiceNoCounter}`,

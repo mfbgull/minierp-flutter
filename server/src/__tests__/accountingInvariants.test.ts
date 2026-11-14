@@ -181,6 +181,7 @@ describe('Accounting invariants over a full lifecycle', () => {
 
     const invRes = await request(app)
       .post('/api/invoices')
+      .set('Idempotency-Key', `patch-accountingInvari-1-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', token)
       .send({
         invoice_no: `INV-AI-${seq}`,
@@ -196,6 +197,7 @@ describe('Accounting invariants over a full lifecycle', () => {
     // Pay 100 of the 150 invoice.
     const payRes = await request(app)
       .post('/api/payments')
+      .set('Idempotency-Key', `patch-accountingInvari-2-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', token)
       .send({
         customer_id: customerId,
@@ -215,6 +217,7 @@ describe('Accounting invariants over a full lifecycle', () => {
     ).get(invoice.id) as { id: number };
     const retRes = await request(app)
       .post(`/api/invoices/${invoice.id}/return`)
+      .set('Idempotency-Key', `patch-accountingInvari-3-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', token)
       .send({
         disposition: 'refund',
@@ -248,6 +251,7 @@ describe('Accounting invariants over a full lifecycle', () => {
     seq += 1;
     const inv2Res = await request(app)
       .post('/api/invoices')
+      .set('Idempotency-Key', `patch-accountingInvari-4-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', token)
       .send({
         invoice_no: `INV-AI-${seq}`,
@@ -292,6 +296,7 @@ describe('Accounting invariants over a full lifecycle', () => {
     // Supplier payment.
     const supPay = await request(app)
       .post('/api/payments')
+      .set('Idempotency-Key', `patch-accountingInvari-5-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', token)
       .send({
         supplier_id: supplier.id,
@@ -326,6 +331,7 @@ async function paidInvoiceFixture(): Promise<{ invoiceId: number; customerId: nu
   seq += 1;
   const invRes = await request(app)
     .post('/api/invoices')
+    .set('Idempotency-Key', `patch-accountingInvari-6-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
     .set('Cookie', token)
     .send({
       invoice_no: `INV-AI-${seq}`,
@@ -338,6 +344,7 @@ async function paidInvoiceFixture(): Promise<{ invoiceId: number; customerId: nu
 
   const payRes = await request(app)
     .post('/api/payments')
+    .set('Idempotency-Key', `patch-accountingInvari-7-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
     .set('Cookie', token)
     .send({
       customer_id: customerId,
@@ -430,6 +437,7 @@ describe('Double-fire rejection on destructive endpoints', () => {
 
     const recRes = await request(app)
       .post(`/api/purchase-orders/${po.id}/receipts`)
+      .set('Idempotency-Key', `patch-accountingInvari-8-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', token)
       .send({ receipt_date: '2026-09-12', warehouse_id: warehouseId,
               items: [{ po_item_id: poItem.id, received_quantity: 8 }] });
@@ -637,7 +645,9 @@ describe('Reconciliation invariants F-I over transaction lifecycle', () => {
       .set('Cookie', token).send({ status: 'Submitted' });
 
     const poItem = db.prepare('SELECT id FROM purchase_order_items WHERE po_id = ?').get(po.id) as { id: number };
-    const recRes = await request(app).post(`/api/purchase-orders/${po.id}/receipts`).set('Cookie', token)
+    const recRes = await request(app).post(`/api/purchase-orders/${po.id}/receipts`)
+      .set('Idempotency-Key', `patch-accountingInvari-1-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .set('Cookie', token)
       .send({ receipt_date: '2026-09-15', warehouse_id: warehouseId, items: [{ po_item_id: poItem.id, received_quantity: 5 }] });
     expect([200, 201]).toContain(recRes.status);
     checkF_I('after direct purchase');
@@ -655,7 +665,9 @@ describe('Reconciliation invariants F-I over transaction lifecycle', () => {
       .set('Cookie', token).send({ status: 'Submitted' });
 
     const poItem = db.prepare('SELECT id FROM purchase_order_items WHERE po_id = ?').get(po.id) as { id: number };
-    const recRes = await request(app).post(`/api/purchase-orders/${po.id}/receipts`).set('Cookie', token)
+    const recRes = await request(app).post(`/api/purchase-orders/${po.id}/receipts`)
+      .set('Idempotency-Key', `patch-accountingInvari-2-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .set('Cookie', token)
       .send({ receipt_date: '2026-09-15', warehouse_id: warehouseId, items: [{ po_item_id: poItem.id, received_quantity: 10 }] });
     expect([200, 201]).toContain(recRes.status);
     checkF_I('after PO receipt');
@@ -669,7 +681,9 @@ describe('Reconciliation invariants F-I over transaction lifecycle', () => {
     const itemId = await makeItem();
     uniqueSeed(itemId, warehouseId, 20, 10);
 
-    const invRes = await request(app).post('/api/invoices').set('Cookie', token)
+    const invRes = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-accountingInvari-3-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .set('Cookie', token)
       .send({
         invoice_no: `FI-INV-${itSeq}-S3`, customer_id: customerId, invoice_date: '2026-09-15',
         warehouse_id: warehouseId, items: [{ item_id: itemId, quantity: 5, unit_price: 20, warehouse_id: warehouseId }],
@@ -679,7 +693,9 @@ describe('Reconciliation invariants F-I over transaction lifecycle', () => {
     checkF_I('after invoice');
     expect(apSnapshot()).toEqual(apBefore);
 
-    const payRes = await request(app).post('/api/payments').set('Cookie', token)
+    const payRes = await request(app).post('/api/payments')
+      .set('Idempotency-Key', `patch-accountingInvari-4-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .set('Cookie', token)
       .send({ customer_id: customerId, payment_date: '2026-09-15', amount: 100, payment_method: 'cash',
               invoice_allocations: [{ invoice_id: invoice.id, amount: 100 }] });
     expect([200, 201]).toContain(payRes.status);
@@ -695,7 +711,9 @@ describe('Reconciliation invariants F-I over transaction lifecycle', () => {
     const itemId = await makeItem();
     uniqueSeed(itemId, warehouseId, 20, 10);
 
-    const invRes = await request(app).post('/api/invoices').set('Cookie', token)
+    const invRes = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-accountingInvari-5-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .set('Cookie', token)
       .send({
         invoice_no: `FI-INV-${itSeq}-S4`, customer_id: customerId, invoice_date: '2026-09-15',
         warehouse_id: warehouseId, items: [{ item_id: itemId, quantity: 5, unit_price: 20, warehouse_id: warehouseId }],
@@ -703,7 +721,9 @@ describe('Reconciliation invariants F-I over transaction lifecycle', () => {
     const invoice = invRes.body?.data ?? invRes.body;
     expect([200, 201]).toContain(invRes.status);
 
-    const payRes = await request(app).post('/api/payments').set('Cookie', token)
+    const payRes = await request(app).post('/api/payments')
+      .set('Idempotency-Key', `patch-accountingInvari-6-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .set('Cookie', token)
       .send({ customer_id: customerId, payment_date: '2026-09-15', amount: 40, payment_method: 'cash',
               invoice_allocations: [{ invoice_id: invoice.id, amount: 40 }] });
     expect([200, 201]).toContain(payRes.status);
@@ -719,7 +739,9 @@ describe('Reconciliation invariants F-I over transaction lifecycle', () => {
     const itemId = await makeItem();
     uniqueSeed(itemId, warehouseId, 30, 10);
 
-    const invRes = await request(app).post('/api/invoices').set('Cookie', token)
+    const invRes = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-accountingInvari-7-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .set('Cookie', token)
       .send({
         invoice_no: `FI-INV-${itSeq}-S5`, customer_id: customerId, invoice_date: '2026-09-15',
         warehouse_id: warehouseId, items: [{ item_id: itemId, quantity: 10, unit_price: 20, warehouse_id: warehouseId }],
@@ -727,7 +749,9 @@ describe('Reconciliation invariants F-I over transaction lifecycle', () => {
     const invoice = invRes.body?.data ?? invRes.body;
     expect([200, 201]).toContain(invRes.status);
 
-    const payRes = await request(app).post('/api/payments').set('Cookie', token)
+    const payRes = await request(app).post('/api/payments')
+      .set('Idempotency-Key', `patch-accountingInvari-8-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .set('Cookie', token)
       .send({ customer_id: customerId, payment_date: '2026-09-15', amount: 200, payment_method: 'cash',
               invoice_allocations: [{ invoice_id: invoice.id, amount: 200 }] });
     expect([200, 201]).toContain(payRes.status);
@@ -736,7 +760,9 @@ describe('Reconciliation invariants F-I over transaction lifecycle', () => {
 
     const invItem = db.prepare('SELECT id FROM invoice_items WHERE invoice_id = ? ORDER BY id LIMIT 1')
       .get(invoice.id) as { id: number };
-    const retRes = await request(app).post(`/api/invoices/${invoice.id}/return`).set('Cookie', token)
+    const retRes = await request(app).post(`/api/invoices/${invoice.id}/return`)
+      .set('Idempotency-Key', `patch-accountingInvari-9-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .set('Cookie', token)
       .send({ disposition: 'refund', items: [{ invoice_item_id: invItem.id, return_quantity: 3 }] });
     expect([200, 201]).toContain(retRes.status);
     checkF_I('after return refund');
@@ -751,7 +777,9 @@ describe('Reconciliation invariants F-I over transaction lifecycle', () => {
     const itemId = await makeItem();
     uniqueSeed(itemId, warehouseId, 30, 10);
 
-    const invRes = await request(app).post('/api/invoices').set('Cookie', token)
+    const invRes = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-accountingInvari-10-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .set('Cookie', token)
       .send({
         invoice_no: `FI-INV-${itSeq}-S6`, customer_id: customerId, invoice_date: '2026-09-15',
         warehouse_id: warehouseId, items: [{ item_id: itemId, quantity: 10, unit_price: 20, warehouse_id: warehouseId }],
@@ -759,7 +787,9 @@ describe('Reconciliation invariants F-I over transaction lifecycle', () => {
     const invoice = invRes.body?.data ?? invRes.body;
     expect([200, 201]).toContain(invRes.status);
 
-    const payRes = await request(app).post('/api/payments').set('Cookie', token)
+    const payRes = await request(app).post('/api/payments')
+      .set('Idempotency-Key', `patch-accountingInvari-11-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .set('Cookie', token)
       .send({ customer_id: customerId, payment_date: '2026-09-15', amount: 200, payment_method: 'cash',
               invoice_allocations: [{ invoice_id: invoice.id, amount: 200 }] });
     expect([200, 201]).toContain(payRes.status);
@@ -767,13 +797,17 @@ describe('Reconciliation invariants F-I over transaction lifecycle', () => {
     const invItem = db.prepare('SELECT id FROM invoice_items WHERE invoice_id = ? ORDER BY id LIMIT 1')
       .get(invoice.id) as { id: number };
 
-    const ret1 = await request(app).post(`/api/invoices/${invoice.id}/return`).set('Cookie', token)
+    const ret1 = await request(app).post(`/api/invoices/${invoice.id}/return`)
+      .set('Idempotency-Key', `patch-accountingInvari-12-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .set('Cookie', token)
       .send({ disposition: 'refund', items: [{ invoice_item_id: invItem.id, return_quantity: 2 }] });
     expect([200, 201]).toContain(ret1.status);
     checkF_I('after first return');
     expect(apSnapshot()).toEqual(apBefore);
 
-    const ret2 = await request(app).post(`/api/invoices/${invoice.id}/return`).set('Cookie', token)
+    const ret2 = await request(app).post(`/api/invoices/${invoice.id}/return`)
+      .set('Idempotency-Key', `patch-accountingInvari-13-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .set('Cookie', token)
       .send({ disposition: 'refund', items: [{ invoice_item_id: invItem.id, return_quantity: 2 }] });
     expect([200, 201]).toContain(ret2.status);
     checkF_I('after repeated return');
@@ -788,7 +822,9 @@ describe('Reconciliation invariants F-I over transaction lifecycle', () => {
     const itemId = await makeItem();
     uniqueSeed(itemId, warehouseId, 20, 10);
 
-    const invRes = await request(app).post('/api/invoices').set('Cookie', token)
+    const invRes = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-accountingInvari-14-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .set('Cookie', token)
       .send({
         invoice_no: `FI-INV-${itSeq}-S7`, customer_id: customerId, invoice_date: '2026-09-15',
         warehouse_id: warehouseId, items: [{ item_id: itemId, quantity: 5, unit_price: 20, warehouse_id: warehouseId }],
@@ -796,7 +832,9 @@ describe('Reconciliation invariants F-I over transaction lifecycle', () => {
     const invoice = invRes.body?.data ?? invRes.body;
     expect([200, 201]).toContain(invRes.status);
 
-    const payRes = await request(app).post('/api/payments').set('Cookie', token)
+    const payRes = await request(app).post('/api/payments')
+      .set('Idempotency-Key', `patch-accountingInvari-15-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .set('Cookie', token)
       .send({ customer_id: customerId, payment_date: '2026-09-15', amount: 80, payment_method: 'cash',
               invoice_allocations: [{ invoice_id: invoice.id, amount: 80 }] });
     const payment = payRes.body?.data ?? payRes.body;
@@ -849,7 +887,9 @@ describe('Reconciliation invariants F-I over transaction lifecycle', () => {
     const itemId = await makeItem();
     uniqueSeed(itemId, warehouseId, 30, 10);
 
-    const inv1Res = await request(app).post('/api/invoices').set('Cookie', token)
+    const inv1Res = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-accountingInvari-16-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .set('Cookie', token)
       .send({
         invoice_no: `FI-INV-${itSeq}-S10-A`, customer_id: customerId, invoice_date: '2026-09-15',
         warehouse_id: warehouseId, items: [{ item_id: itemId, quantity: 5, unit_price: 20, warehouse_id: warehouseId }],
@@ -857,14 +897,18 @@ describe('Reconciliation invariants F-I over transaction lifecycle', () => {
     const inv1 = inv1Res.body?.data ?? inv1Res.body;
     expect([200, 201]).toContain(inv1Res.status);
 
-    const payRes = await request(app).post('/api/payments').set('Cookie', token)
+    const payRes = await request(app).post('/api/payments')
+      .set('Idempotency-Key', `patch-accountingInvari-17-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .set('Cookie', token)
       .send({ customer_id: customerId, payment_date: '2026-09-15', amount: 100, payment_method: 'cash',
               invoice_allocations: [{ invoice_id: inv1.id, amount: 100 }] });
     expect([200, 201]).toContain(payRes.status);
 
     const invItem = db.prepare('SELECT id FROM invoice_items WHERE invoice_id = ? ORDER BY id LIMIT 1')
       .get(inv1.id) as { id: number };
-    const retRes = await request(app).post(`/api/invoices/${inv1.id}/return`).set('Cookie', token)
+    const retRes = await request(app).post(`/api/invoices/${inv1.id}/return`)
+      .set('Idempotency-Key', `patch-accountingInvari-18-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .set('Cookie', token)
       .send({ disposition: 'credit', items: [{ invoice_item_id: invItem.id, return_quantity: 3 }] });
     expect([200, 201]).toContain(retRes.status);
     checkF_I('credit return');
@@ -876,7 +920,9 @@ describe('Reconciliation invariants F-I over transaction lifecycle', () => {
     expect(availableCredit).toBeGreaterThan(0);
 
     itSeq += 1;
-    const inv2Res = await request(app).post('/api/invoices').set('Cookie', token)
+    const inv2Res = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-accountingInvari-19-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .set('Cookie', token)
       .send({
         invoice_no: `FI-INV-${itSeq}-S10-B`, customer_id: customerId, invoice_date: '2026-09-16',
         warehouse_id: warehouseId,
@@ -902,12 +948,16 @@ describe('Reconciliation invariants F-I over transaction lifecycle', () => {
       .set('Cookie', token).send({ status: 'Submitted' });
 
     const poItem = db.prepare('SELECT id FROM purchase_order_items WHERE po_id = ?').get(po.id) as { id: number };
-    const recRes = await request(app).post(`/api/purchase-orders/${po.id}/receipts`).set('Cookie', token)
+    const recRes = await request(app).post(`/api/purchase-orders/${po.id}/receipts`)
+      .set('Idempotency-Key', `patch-accountingInvari-20-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .set('Cookie', token)
       .send({ receipt_date: '2026-09-15', warehouse_id: warehouseId, items: [{ po_item_id: poItem.id, received_quantity: 10 }] });
     expect([200, 201]).toContain(recRes.status);
     checkF_I_core('after PO receipt');
 
-    const payRes = await request(app).post('/api/payments').set('Cookie', token)
+    const payRes = await request(app).post('/api/payments')
+      .set('Idempotency-Key', `patch-accountingInvari-21-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .set('Cookie', token)
       .send({ supplier_id: supplierId, payment_date: '2026-09-15', amount: 250, payment_method: 'cash',
               po_allocations: [{ po_id: po.id, amount: 250 }] });
     expect([200, 201]).toContain(payRes.status);

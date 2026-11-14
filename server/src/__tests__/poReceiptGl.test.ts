@@ -144,6 +144,7 @@ async function createSubmittedPo(quantity: number, unitPrice: number): Promise<F
 async function receive(fixture: Fixture, qty: number): Promise<number> {
   const res = await request(app)
     .post(`/api/purchase-orders/${fixture.poId}/receipts`)
+    .set('Idempotency-Key', `patch-poReceiptGl.test-34-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
     .set('Cookie', authCookie)
     .send({
       receipt_date: '2026-09-16',
@@ -162,6 +163,7 @@ async function receive(fixture: Fixture, qty: number): Promise<number> {
 async function paySupplier(poId: number, amount: number): Promise<void> {
   const res = await request(app)
     .post('/api/payments')
+    .set('Idempotency-Key', `patch-poReceiptGl.test-35-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
     .set('Cookie', authCookie)
     .send({
       supplier_id: supplierId,
@@ -197,6 +199,7 @@ async function sell(saleItemId: number, qty: number): Promise<void> {
 
   const res = await request(app)
     .post('/api/invoices')
+    .set('Idempotency-Key', `patch-poReceiptGl.test-36-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
     .set('Cookie', authCookie)
     .send({
       customer_id: customerId,
@@ -341,6 +344,7 @@ describe('C3: PO goods receipts post to the GL', () => {
 
     const over = await request(app)
       .post(`/api/purchase-orders/${po.poId}/receipts`)
+      .set('Idempotency-Key', `patch-poReceiptGl.test-37-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         receipt_date: '2026-09-16',
@@ -405,6 +409,7 @@ describe('C3: PO goods receipts post to the GL', () => {
 
     const receipt = await request(app)
       .post(`/api/purchase-orders/${poId}/receipts`)
+      .set('Idempotency-Key', `patch-poReceiptGl.test-38-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         receipt_date: '2026-09-16',

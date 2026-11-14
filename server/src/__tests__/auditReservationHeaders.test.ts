@@ -67,7 +67,9 @@ describe('reservation and journal audit invariants', () => {
   it('unsupported supplier return-credit allocation rejects as a client error without new cash', async () => {
     const supplier = db.prepare('SELECT supplier_id FROM purchases WHERE item_id=? LIMIT 1').get(item) as { supplier_id: number };
     const before = db.prepare('SELECT * FROM payments ORDER BY id').all();
-    const res = await request(app).post('/api/payments').set('Cookie', cookie).send({ supplier_id: supplier.supplier_id,
+    const res = await request(app).post('/api/payments')
+      .set('Idempotency-Key', `patch-auditReservation-29-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .set('Cookie', cookie).send({ supplier_id: supplier.supplier_id,
       payment_date: '2026-09-15', amount: 10, payment_method: 'credit', credit_note_id: 1, purchase_allocations: [] });
     expect(res.status).toBe(400);
     expect(db.prepare('SELECT * FROM payments ORDER BY id').all()).toEqual(before);

@@ -61,7 +61,9 @@ async function seedItemWithFutureReceipt(opts: {
 }
 
 async function postInvoice(body: Record<string, unknown>): Promise<request.Response> {
-  return request(app).post('/api/invoices').set('Cookie', cookie).send(body);
+  return request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-backdatedSaleWar-30-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .set('Cookie', cookie).send(body);
 }
 
 function invoiceRow(invoiceId: number): { backdated_before_receipt: number; invoice_no: string } {

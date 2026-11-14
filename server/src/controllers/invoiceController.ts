@@ -33,7 +33,7 @@ import {
   InvoiceCreationService,
   InvoiceCreationTotalMismatchError,
 } from '../services/InvoiceCreationService';
-import { IDEMPOTENCY_KEY_HEADER, IDEMPOTENCY_SCOPES, INVOICE_CREATE_SCOPE, claimIdempotencyKey, hashRequestPayload, logKeylessIdempotentWrite, normalizeIdempotencyKey, observeInvoiceIdempotency, respondToIdempotencyReplay, startIdempotentRequest } from '../utils/idempotency';
+import { IDEMPOTENCY_KEY_HEADER, IDEMPOTENCY_SCOPES, INVOICE_CREATE_SCOPE, claimIdempotencyKey, hashRequestPayload, normalizeIdempotencyKey, observeInvoiceIdempotency, respondToIdempotencyReplay, startRequiredIdempotentRequest } from '../utils/idempotency';
 
 /**
  * ACC-18 interim: thrown when a client-supplied invoice total disagrees
@@ -235,12 +235,10 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
       return res.status(400).json({ error: (keyError as Error).message });
     }
     observeInvoiceIdempotency('POST /api/invoices', idemKey !== null);
+    // ACCT-008 / D19: the key is mandatory on this financial write. A
+    // keyless submission is a client bug, not a supported posture.
     if (idemKey === null) {
-      logKeylessIdempotentWrite(INVOICE_CREATE_SCOPE, {
-        userId: req.user.id,
-        route: 'POST /api/invoices',
-        userAgent: req.headers['user-agent'],
-      });
+      return res.status(400).json({ error: 'Idempotency-Key header is required for this operation' });
     }
 
     const service = new InvoiceCreationService(db);
@@ -1088,8 +1086,9 @@ function returnInvoiceItems(req: AuthRequest, res: Response): Response | void {
 
     // audit-3 task 08: a sales return puts stock back and may refund or
     // credit, so a retry must replay rather than return the goods twice.
+    // ACCT-008 / D19: the key is mandatory here.
     const idemHash = hashRequestPayload(req.body);
-    const start = startIdempotentRequest(db, req.headers, IDEMPOTENCY_SCOPES.INVOICE_RETURN, idemHash);
+    const start = startRequiredIdempotentRequest(db, req.headers, IDEMPOTENCY_SCOPES.INVOICE_RETURN, idemHash);
     if (respondToIdempotencyReplay(res, start, {
       buildBody: (resourceId) => ({ success: true, message: 'Return processed successfully', idempotentReplay: true, data: { returnId: resourceId } }),
     })) return;

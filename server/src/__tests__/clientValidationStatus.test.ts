@@ -41,6 +41,9 @@ describe('CODE-001: invalid client input returns actionable 4xx without writes',
     const body = invoiceBody();
     const before = financialState();
     const response = await request(app).post(path).set('Cookie', cookie)
+      // ACCT-008 / D19: /api/invoices mandates a key; mobile is exempt but a
+      // key there is harmless, so both cases exercise the 404 path.
+      .set('Idempotency-Key', `cvx-item-${Date.now()}-${Math.random().toString(36).slice(2)}`)
       .send({ ...body, items: [{ ...body.items[0], item_id: 999999 }] });
     expect(response.status).toBe(404);
     expect(JSON.stringify(response.body)).not.toMatch(/SQLITE_|FOREIGN KEY|stack|\.ts:\d/);
@@ -50,6 +53,7 @@ describe('CODE-001: invalid client input returns actionable 4xx without writes',
   it.each(['/api/invoices', '/api/mobile-invoices/submit'])('rejects an unknown customer on %s with 404', async (path) => {
     const before = financialState();
     const response = await request(app).post(path).set('Cookie', cookie)
+      .set('Idempotency-Key', `cvx-cust-${Date.now()}-${Math.random().toString(36).slice(2)}`)
       .send({ ...invoiceBody(), customer_id: 999999 });
     expect(response.status).toBe(404);
     expect(JSON.stringify(response.body)).not.toMatch(/SQLITE_|FOREIGN KEY|stack|\.ts:\d/);
