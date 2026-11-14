@@ -24,7 +24,13 @@ jobs:
       # Build a fresh database from the migrations (the same path a
       # production restore would take: empty file → schema + seed), then
       # exercise the full backup → verify chain against it.
+      #
+      # The migration call is required: importing the module only opens the
+      # file. `server.ts` boots with `applyPendingMigrations()`; without it
+      # the database stays empty and the backup copies an empty file.
       - name: Create seeded database
+        env:
+          DEFAULT_ADMIN_PASSWORD: Admin@2026nightly
         run: |
           mkdir -p database
           node -e "
@@ -35,7 +41,16 @@ jobs:
           node -e "
             process.env.DATABASE_PATH = process.cwd() + '/database';
             require('ts-node').register({ transpileOnly: true, project: './tsconfig.json' });
-            require('./src/config/database').default;
+            require('./src/config/database').applyPendingMigrations();
+          "
+          # Fail loudly if the schema did not land — an empty file must not
+          # reach the backup step and then read as a "verified" empty DB.
+          node -e "
+            const Database = require('better-sqlite3');
+            const db = new Database('database/erp.db', { readonly: true });
+            const c = db.prepare(\"SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'table'\").get().c;
+            if (c < 10) { console.error('Schema not created: only ' + c + ' tables'); process.exit(1); }
+            console.log('Schema created: ' + c + ' tables');
           "
 
       - name: Backup
