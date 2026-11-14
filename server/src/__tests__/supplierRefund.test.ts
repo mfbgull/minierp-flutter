@@ -103,7 +103,8 @@ function seedReturn(db: Database.Database, opts: { cash?: number; disposition?: 
       items: [{ source_item_id: purchaseId, quantity: opts.returnQty ?? qty }],
     },
     1,
-    db
+    db,
+    { 'idempotency-key': `sr-return-${Date.now()}-${Math.floor(Math.random() * 1e6)}` }
   );
 
   const note = db.prepare(`SELECT id FROM credit_notes WHERE source_id = ?`)
@@ -177,7 +178,7 @@ describe('SupplierRefundModel', () => {
       return_date: '2026-07-04', source_type: 'PURCHASE', source_id: first.purchaseId,
       warehouse_id: 1, disposition: 'credit_on_account',
       items: [{ source_item_id: first.purchaseId, quantity: 5 }],
-    }, 1, db);
+    }, 1, db, { 'idempotency-key': `sr-return2-${Date.now()}-${Math.floor(Math.random() * 1e6)}` });
     const note = db.prepare<[number], { id: number }>('SELECT id FROM credit_notes WHERE source_id = ?').get(second.id);
     if (!note) throw new Error('Missing second credit note');
     expect(creditNoteRefundable(note.id, db)).toBe(0);

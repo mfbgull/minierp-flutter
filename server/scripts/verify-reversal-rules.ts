@@ -284,7 +284,7 @@ function createPostedInvoice(invoiceNo: string, qty: number, unitPrice: number):
     output_item_id: fgItemId, output_quantity: 4, warehouse_id: warehouseId,
     production_date: '2026-08-10', input_items: [{ item_id: rawItemId, quantity: 8 }],
     overhead_cost: 10,
-  } as never, 1, db);
+  } as never, 1, db, { 'idempotency-key': 'verify-reversal-production' });
   const outputMovement = db.prepare(
     "SELECT id, journal_entry_id FROM stock_movements WHERE reference_docno = ? AND movement_type = 'PRODUCTION' AND quantity > 0"
   ).get(prod.production_no) as { id: number; journal_entry_id: number | null };
