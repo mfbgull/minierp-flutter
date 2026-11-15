@@ -211,9 +211,10 @@ void main() {
   });
 
   testWidgets('lays out without overflow at a narrow width', (tester) async {
-    // 1024 x 768 is the smallest sensible desktop window here.
+    // 500 px is below the 760 px one-line breakpoint, so the line fields
+    // must wrap. Before the LayoutBuilder guard this overflowed by 278 px.
     final repo = _FakeSalesOrderRepository();
-    await _openDialog(tester, repo, size: const Size(1024, 768));
+    await _openDialog(tester, repo, size: const Size(500, 768));
     await _fillLine(tester, tax: '17');
     await tester.pumpAndSettle();
 
@@ -223,12 +224,32 @@ void main() {
     expect(find.byKey(const ValueKey('so-line-discount-value')), findsOneWidget);
   });
 
+  testWidgets('keeps the line on one row at a wide width', (tester) async {
+    final repo = _FakeSalesOrderRepository();
+    await _openDialog(tester, repo, size: const Size(1600, 1000));
+    await _fillLine(tester, tax: '17');
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    // One line: every field sits at the same height, left to right in
+    // source order (ignoring the label offset the shell adds).
+    final qty = tester.getCenter(find.byKey(const ValueKey('so-line-quantity')));
+    final tax = tester.getCenter(find.byKey(const ValueKey('so-line-tax')));
+    final disc = tester.getCenter(
+      find.byKey(const ValueKey('so-line-discount-value')),
+    );
+    expect(tax.dx, greaterThan(qty.dx));
+    expect(disc.dx, greaterThan(tax.dx));
+    // A wrapped row would put a later field on a much lower line.
+    expect((disc.dy - qty.dy).abs(), lessThan(30));
+  });
+
   testWidgets('lays out in Urdu (RTL) without overflow', (tester) async {
     final repo = _FakeSalesOrderRepository();
     await _openDialog(
       tester,
       repo,
-      size: const Size(1024, 768),
+      size: const Size(500, 768),
       locale: const Locale('ur'),
     );
     await _fillLine(tester, tax: '17');

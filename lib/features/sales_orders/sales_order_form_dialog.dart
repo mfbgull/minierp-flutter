@@ -341,160 +341,188 @@ class _SalesOrderFormDialogState extends ConsumerState<SalesOrderFormDialog> {
     // BUG-006: the shared line total (tax and discount included, rounded
     // like the server) — not a bare qty x price sum.
     final amount = calculateItemTotal(line.formItem);
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          flex: 3,
-          child: FormFieldShell(
-            label: l10n.fieldsItem,
-            child: SearchableSelect<int>(
-              items: [for (final i in items) i.id],
-              selected: line.itemId.isEmpty ? null : int.tryParse(line.itemId),
-              labelBuilder: (id) {
-                final match = items.where((i) => i.id == id);
-                final item = match.isEmpty ? null : match.first;
-                return item == null
-                    ? '$id'
-                    : '${item.itemCode} — ${item.itemName}';
-              },
-              onChanged: (value) =>
-                  setState(() => line.itemId = value?.toString() ?? ''),
+
+    final itemField = FormFieldShell(
+      label: l10n.fieldsItem,
+      child: SearchableSelect<int>(
+        items: [for (final i in items) i.id],
+        selected: line.itemId.isEmpty ? null : int.tryParse(line.itemId),
+        labelBuilder: (id) {
+          final match = items.where((i) => i.id == id);
+          final item = match.isEmpty ? null : match.first;
+          return item == null ? '$id' : '${item.itemCode} — ${item.itemName}';
+        },
+        onChanged: (value) =>
+            setState(() => line.itemId = value?.toString() ?? ''),
+      ),
+    );
+    final quantityField = SizedBox(
+      width: 86,
+      child: TextFormField(
+        key: const ValueKey('so-line-quantity'),
+        controller: line.quantityController,
+        enabled: !_submitting,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        decoration: _decoration(),
+        validator: (value) => (double.tryParse(value ?? '') ?? -1) > 0
+            ? null
+            : l10n.commonRequired,
+        onChanged: (_) => setState(() {}),
+      ),
+    );
+    final priceField = SizedBox(
+      width: 100,
+      child: TextFormField(
+        key: const ValueKey('so-line-price'),
+        controller: line.priceController,
+        enabled: !_submitting,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        decoration: _decoration(),
+        validator: (value) => (double.tryParse(value ?? '') ?? -1) > 0
+            ? null
+            : l10n.commonRequired,
+        onChanged: (_) => setState(() {}),
+      ),
+    );
+    final taxField = SizedBox(
+      width: 76,
+      child: FormFieldShell(
+        label: l10n.fieldsTax,
+        child: TextFormField(
+          key: const ValueKey('so-line-tax'),
+          controller: line.taxRateController,
+          enabled: !_submitting,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: _decoration(),
+          validator: (value) {
+            final rate = double.tryParse(value ?? '') ?? 0;
+            return rate < 0 || rate > 100 ? l10n.commonInvalid : null;
+          },
+          onChanged: (_) => setState(() {}),
+        ),
+      ),
+    );
+    final discountTypeField = SizedBox(
+      width: 124,
+      child: FormFieldShell(
+        label: l10n.fieldsDiscount,
+        child: DropdownButtonFormField<DiscountType?>(
+          initialValue: line.discountType,
+          isDense: true,
+          isExpanded: true,
+          decoration: _decoration(),
+          items: [
+            DropdownMenuItem<DiscountType?>(
+              value: null,
+              child: Text(l10n.commonNone),
             ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 86,
-          child: TextFormField(
-            key: const ValueKey('so-line-quantity'),
-            controller: line.quantityController,
-            enabled: !_submitting,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: _decoration(),
-            validator: (value) => (double.tryParse(value ?? '') ?? -1) > 0
-                ? null
-                : l10n.commonRequired,
-            onChanged: (_) => setState(() {}),
-          ),
-        ),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 100,
-          child: TextFormField(
-            key: const ValueKey('so-line-price'),
-            controller: line.priceController,
-            enabled: !_submitting,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: _decoration(),
-            validator: (value) => (double.tryParse(value ?? '') ?? -1) > 0
-                ? null
-                : l10n.commonRequired,
-            onChanged: (_) => setState(() {}),
-          ),
-        ),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 76,
-          child: FormFieldShell(
-            label: l10n.fieldsTax,
-            child: TextFormField(
-              key: const ValueKey('so-line-tax'),
-              controller: line.taxRateController,
-              enabled: !_submitting,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: _decoration(),
-              validator: (value) {
-                final rate = double.tryParse(value ?? '') ?? 0;
-                return rate < 0 || rate > 100 ? l10n.commonInvalid : null;
-              },
-              onChanged: (_) => setState(() {}),
+            DropdownMenuItem<DiscountType?>(
+              value: DiscountType.flat,
+              child: Text(l10n.commonAmount),
             ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 124,
-          child: FormFieldShell(
-            label: l10n.fieldsDiscount,
-            child: DropdownButtonFormField<DiscountType?>(
-              initialValue: line.discountType,
-              isDense: true,
-              isExpanded: true,
-              decoration: _decoration(),
-              items: [
-                DropdownMenuItem<DiscountType?>(
-                  value: null,
-                  child: Text(l10n.commonNone),
-                ),
-                DropdownMenuItem<DiscountType?>(
-                  value: DiscountType.flat,
-                  child: Text(l10n.commonAmount),
-                ),
-                DropdownMenuItem<DiscountType?>(
-                  value: DiscountType.percentage,
-                  child: Text(l10n.commonPercent),
-                ),
-              ],
-              onChanged: _submitting
-                  ? null
-                  : (value) => setState(() => line.discountType = value),
+            DropdownMenuItem<DiscountType?>(
+              value: DiscountType.percentage,
+              child: Text(l10n.commonPercent),
             ),
+          ],
+          onChanged: _submitting
+              ? null
+              : (value) => setState(() => line.discountType = value),
+        ),
+      ),
+    );
+    final discountValueField = SizedBox(
+      width: 86,
+      child: FormFieldShell(
+        label: l10n.fieldsAmount,
+        child: TextFormField(
+          key: const ValueKey('so-line-discount-value'),
+          controller: line.discountValueController,
+          enabled: !_submitting || line.discountType == null,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: _decoration(),
+          validator: (value) {
+            final amount = double.tryParse(value ?? '') ?? 0;
+            if (line.discountType == DiscountType.percentage && amount >= 100) {
+              return l10n.commonInvalid;
+            }
+            return null;
+          },
+          onChanged: (_) => setState(() {}),
+        ),
+      ),
+    );
+    final amountField = SizedBox(
+      width: 100,
+      child: FormFieldShell(
+        label: l10n.fieldsAmount,
+        child: Container(
+          height: 44,
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.only(right: 6),
+          child: Text(
+            Formatters.currency(amount),
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontWeight: FontWeight.w600),
           ),
         ),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 86,
-          child: FormFieldShell(
-            label: l10n.fieldsAmount,
-            child: TextFormField(
-              key: const ValueKey('so-line-discount-value'),
-              controller: line.discountValueController,
-              enabled: !_submitting || line.discountType == null,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: _decoration(),
-              validator: (value) {
-                final amount = double.tryParse(value ?? '') ?? 0;
-                if (line.discountType == DiscountType.percentage && amount >= 100) {
-                  return l10n.commonInvalid;
-                }
-                return null;
-              },
-              onChanged: (_) => setState(() {}),
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 100,
-          child: FormFieldShell(
-            label: l10n.fieldsAmount,
-            child: Container(
-              height: 44,
-              alignment: Alignment.centerRight,
-              padding: const EdgeInsets.only(right: 6),
-              child: Text(
-                Formatters.currency(amount),
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 4),
-        SizedBox(
-          width: 34,
-          child: IconButton(
-            tooltip: l10n.commonRemove,
-            icon: const Icon(Icons.remove_circle_outline, size: 18),
-            onPressed: _submitting || _lines.length <= 1
-                ? null
-                : () => setState(() {
-                    _lines.removeAt(index).dispose();
-                  }),
-          ),
-        ),
-      ],
+      ),
+    );
+    final removeButton = SizedBox(
+      width: 34,
+      child: IconButton(
+        tooltip: l10n.commonRemove,
+        icon: const Icon(Icons.remove_circle_outline, size: 18),
+        onPressed: _submitting || _lines.length <= 1
+            ? null
+            : () => setState(() {
+                _lines.removeAt(index).dispose();
+              }),
+      ),
+    );
+
+    // The seven fields do not fit a narrow window side by side. Below the
+    // width that fits them, wrap them so nothing overflows the dialog.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= 760) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(flex: 3, child: itemField),
+              const SizedBox(width: 8),
+              quantityField,
+              const SizedBox(width: 8),
+              priceField,
+              const SizedBox(width: 8),
+              taxField,
+              const SizedBox(width: 8),
+              discountTypeField,
+              const SizedBox(width: 8),
+              discountValueField,
+              const SizedBox(width: 8),
+              amountField,
+              const SizedBox(width: 4),
+              removeButton,
+            ],
+          );
+        }
+        return Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.end,
+          children: [
+            SizedBox(width: double.infinity, child: itemField),
+            quantityField,
+            priceField,
+            taxField,
+            discountTypeField,
+            discountValueField,
+            amountField,
+            removeButton,
+          ],
+        );
+      },
     );
   }
 
