@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import StockMovementModel from './StockMovement';
 import SupplierLedgerModel from './SupplierLedger';
 import SupplierRefundModel from './SupplierRefund';
+import { SupplierRefundClaimModel } from './SupplierRefundClaim';
 import AccountingService from '../services/accountingService';
 import { generateDocNo } from '../utils/sequence';
 import { sanitizeSortParams, PURCHASE_RETURN_HEADER_SORT_COLUMNS } from '../utils/sqlSanitizer';
@@ -10,6 +11,15 @@ import { roundQty } from '../utils/quantity';
 import { addCurrency, roundCurrency } from '../utils/currency';
 import { SqlParam } from '../utils/sqlTypes';
 import { BusinessRuleError } from '../utils/businessRuleError';
+import {
+  claimIdempotencyKey,
+  hashRequestPayload,
+  startRequiredIdempotentRequest,
+} from '../utils/idempotency';
+
+const PURCHASE_RETURN_CREATE_SCOPE = 'purchase-returns.create';
+
+export type PurchaseReturnHeaders = Record<string, unknown> | undefined;
 
 /**
  * PurchaseReturnModel — the redesigned, first-class purchase return document.
@@ -568,13 +578,20 @@ class PurchaseReturnModel {
     }
   }
 
-  static create(data: CreatePurchaseReturnDTO, userId: number, db: Database.Database): PurchaseReturnHeaderRow {
+  static create(data: CreatePurchaseReturnDTO, userId: number, db: Database.Database, headers?: PurchaseReturnHeaders): PurchaseReturnHeaderRow {
     if (!data.return_date) throw new Error('return_date is required');
     if (!data.source_type || !data.source_id) throw new Error('Source document is required');
     if (!data.warehouse_id) throw new Error('Restock warehouse is required');
     if (!data.items || data.items.length === 0) throw new Error('At least one item is required');
 
+    const requestHash = hashRequestPayload(data);
     const transaction = db.transaction(() => {
+      // ACCT-008: a retried return must not double-return stock or double-post
+      // the credit note. The key is claimed in the same transaction, so a
+      // rolled-back attempt leaves no claim and the retry proceeds.
+      const start = startRequiredIdempotentRequest(db, headers, PURCHASE_RETURN_CREATE_SCOPE, requestHash);
+      if (start.kind === 'error') throw new BusinessRuleError(start.status, start.message);
+      if (start.kind === 'replay') return this.getById(start.resourceId, db) as PurchaseReturnHeaderRow;
       // Load the source document and validate every line against its
       // returnable quantity BEFORE mutating anything.
       const lines: PurchaseReturnLine[] = [];
@@ -625,6 +642,7 @@ class PurchaseReturnModel {
         totalInputTax
       );
       const returnId = headerResult.lastInsertRowid as number;
+      if (start.key) claimIdempotencyKey(db, PURCHASE_RETURN_CREATE_SCOPE, start.key, requestHash, returnId);
 
       const insertLine = db.prepare(`
         INSERT INTO purchase_return_items (
@@ -742,6 +760,24 @@ class PurchaseReturnModel {
       );
 
       db.prepare('UPDATE purchase_returns SET credit_note_id = ? WHERE id = ?').run(creditNoteId, returnId);
+
+      // PRET-002: a refund_expected return means the supplier owes the
+      // company money — open the claim that tracks expected → received.
+      // The claim posts no GL; cash moves only when a receipt settles it.
+      if ((data.disposition || 'credit_on_account') === 'refund_expected') {
+        const note = db.prepare('SELECT supplier_id FROM credit_notes WHERE id = ?')
+          .get(creditNoteId) as { supplier_id: number | null } | undefined;
+        if (note?.supplier_id) {
+          SupplierRefundClaimModel.create({
+            supplier_id: note.supplier_id,
+            claim_date: data.return_date,
+            amount: totalAmount,
+            reason: `Expected refund for return ${returnNo}`,
+            return_id: returnId,
+            credit_note_id: creditNoteId,
+          }, userId, db);
+        }
+      }
 
       // Audit
       db.prepare(`
@@ -883,15 +919,30 @@ class PurchaseReturnModel {
 
       // Reverse the supplier credit note + ledger entry.
       if (header.credit_note_id) {
-        // PRET-001: a `refund_expected` return auto-issues a supplier refund
-        // against this credit note in the same transaction as the create
-        // (`create` → `SupplierRefundModel.create`). Voiding the note without
-        // reversing that refund left `Dr Cash / Cr AP` posted for goods the
-        // business no longer returned, and the now-VOIDED note made the
-        // orphan unrecoverable — `creditNoteRefundable` returns 0 for a
-        // non-POSTED note, so the money became invisible on every surface.
-        // Reverse every live refund against the note so the pair unwinds
-        // together.
+        // PRET-002: the return's refund claim must be receipt-free before
+        // the return can void — the receipts collected real cash that
+        // only their own reversal can unwind.
+        const claim = SupplierRefundClaimModel.getByReturnId(id, db);
+        if (claim) {
+          const liveReceipts = SupplierRefundClaimModel.liveReceiptCount(claim.id, db);
+          if (liveReceipts > 0) {
+            throw new BusinessRuleError(
+              409,
+              `Return ${header.return_no} cannot be voided — its refund claim ${claim.claim_no} has ` +
+              `${liveReceipts} recorded receipt(s). Void the refund receipts first.`,
+            );
+          }
+          SupplierRefundClaimModel.cancel(
+            claim.id, userId,
+            `Purchase return ${header.return_no} voided`,
+            db,
+          );
+        }
+
+        // PRET-001: legacy refunds recorded directly against this credit
+        // note (before claims existed, no allocation) reverse with the
+        // note so `Dr Cash / Cr AP` is not left posted for goods the
+        // business no longer returned.
         const liveRefunds = db.prepare(`
           SELECT id FROM supplier_refunds
           WHERE credit_note_id = ? AND status = 'POSTED'

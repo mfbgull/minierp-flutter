@@ -25,7 +25,7 @@ import { getAuthCookie, createItem, purchaseStock, createCustomer, createInvoice
 
 let cookie: string;
 let warehouseId: number;
-const post = (url: string, body: unknown) => request(app).post(url).set('Cookie', cookie).send(body as object);
+const post = (url: string, body: unknown) => request(app).post(url).set('Cookie', cookie).set('Idempotency-Key', `idem-${Date.now()}-${Math.floor(Math.random()*1e6)}`).send(body as object);
 const get = (url: string) => request(app).get(url).set('Cookie', cookie);
 const del = (url: string) => request(app).delete(url).set('Cookie', cookie).send({});
 const r2 = (v: number): number => Math.round(v * 100) / 100;

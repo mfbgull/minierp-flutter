@@ -2002,6 +2002,136 @@ class AppLocalizationsEn extends AppLocalizations {
   String get purchasesRefundnone => 'No refund issued yet';
 
   @override
+  String purchasesRefundClaim(String claimNo, String status, String remaining) {
+    return 'Claim $claimNo ($status) — remaining $remaining';
+  }
+
+  @override
+  String get purchasesRefundExcess =>
+      'Treat any excess as supplier credit on account';
+
+  @override
+  String get refundsDueTitle => 'Refunds Due';
+
+  @override
+  String refundsDueBadge(String amount) {
+    return 'Refunds due: $amount';
+  }
+
+  @override
+  String get refundsDueHint => 'Money suppliers owe you. Not cash yet.';
+
+  @override
+  String get refundClaimsTitle => 'Supplier Refund Claims';
+
+  @override
+  String get refundClaimsOpenOnly => 'Open only';
+
+  @override
+  String get refundClaimsEmpty => 'No refund claims';
+
+  @override
+  String get refundClaimsEmptyOpen => 'No open refund claims';
+
+  @override
+  String get refundClaimStatusEXPECTED => 'Expected';
+
+  @override
+  String get refundClaimStatusPARTIAL => 'Partially received';
+
+  @override
+  String get refundClaimStatusRECEIVED => 'Received';
+
+  @override
+  String get refundClaimStatusCANCELLED => 'Cancelled';
+
+  @override
+  String get refundClaimRecordReceipt => 'Record receipt';
+
+  @override
+  String get refundClaimWriteOff => 'Write off';
+
+  @override
+  String get refundClaimWriteOffTitle => 'Write off refund claim';
+
+  @override
+  String get refundClaimWriteOffReason => 'Reason';
+
+  @override
+  String get refundClaimWriteOffReasonRequired =>
+      'A reason is required to write off a claim';
+
+  @override
+  String get refundClaimWriteOffAdminOnly =>
+      'Write-offs above Rs 1,000 need an owner';
+
+  @override
+  String get refundClaimCancel => 'Cancel claim';
+
+  @override
+  String get refundClaimCancelReason => 'Reason';
+
+  @override
+  String get refundClaimViewReceipts => 'View receipts';
+
+  @override
+  String get refundClaimReceiptsTitle => 'Refund receipts';
+
+  @override
+  String get refundClaimNoReceipts => 'No refund receipts against this claim';
+
+  @override
+  String get refundClaimVoidReceipt => 'Void receipt';
+
+  @override
+  String get refundClaimVoidConfirm =>
+      'This reverses the cash receipt and reopens the claim.';
+
+  @override
+  String get refundClaimReceiptVoided => 'Refund receipt voided';
+
+  @override
+  String get refundClaimReceiptStatusPOSTED => 'Posted';
+
+  @override
+  String get refundClaimReceiptStatusVOIDED => 'Voided';
+
+  @override
+  String refundClaimRemaining(String amount) {
+    return 'Remaining: $amount';
+  }
+
+  @override
+  String get refundClaimStandalone => 'Record refund claim';
+
+  @override
+  String get refundClaimStandaloneSupplier => 'Supplier';
+
+  @override
+  String get refundClaimStandaloneAmount => 'Expected amount';
+
+  @override
+  String refundClaimRemainingPrefill(String amount) {
+    return 'Remaining $amount';
+  }
+
+  @override
+  String get refundBlockedTitle => 'Cash would go negative';
+
+  @override
+  String get refundBlockedHint => 'Reverse these entries first, then retry.';
+
+  @override
+  String refundBlockedRow(String type, String date, String amount) {
+    return '$type on $date — $amount';
+  }
+
+  @override
+  String refundBlockedMore(int count) {
+    return 'and $count more';
+  }
+
+  @override
   String get purchasesProcessreturn => 'Process Return';
 
   @override
@@ -4389,6 +4519,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get customersLedgerPayments => 'payments';
+
+  @override
+  String get customersLedgerRunningbalance => 'Running Balance';
 
   @override
   String get customersLedgerTotalcredit => 'Total Credit';

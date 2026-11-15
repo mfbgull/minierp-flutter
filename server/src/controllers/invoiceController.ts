@@ -33,7 +33,7 @@ import {
   InvoiceCreationService,
   InvoiceCreationTotalMismatchError,
 } from '../services/InvoiceCreationService';
-import { IDEMPOTENCY_KEY_HEADER, IDEMPOTENCY_SCOPES, INVOICE_CREATE_SCOPE, claimIdempotencyKey, hashRequestPayload, logKeylessIdempotentWrite, normalizeIdempotencyKey, observeInvoiceIdempotency, respondToIdempotencyReplay, startIdempotentRequest } from '../utils/idempotency';
+import { IDEMPOTENCY_KEY_HEADER, IDEMPOTENCY_SCOPES, INVOICE_CREATE_SCOPE, claimIdempotencyKey, hashRequestPayload, normalizeIdempotencyKey, observeInvoiceIdempotency, respondToIdempotencyReplay, startRequiredIdempotentRequest } from '../utils/idempotency';
 
 /**
  * ACC-18 interim: thrown when a client-supplied invoice total disagrees
@@ -207,6 +207,22 @@ function handleCreateInvoiceError(res: Response, error: unknown): Response | voi
   return handleBusinessError(res, error, 'Create invoice', 'Failed to create invoice');
 }
 
+/**
+ * ACCT-006: exception report of invoices sold before their stock's purchase
+ * receipt. The population carries backdated_before_receipt = 1; historical
+ * as-of stock positions for these sales can read negative by design (D19).
+ */
+function getBackdatedInvoices(_req: AuthRequest, res: Response): Response {
+  const rows = db.prepare(`
+    SELECT id, invoice_no, invoice_date, customer_id, customer_name,
+           total_amount, balance_amount, status, backdated_before_receipt
+    FROM invoices
+    WHERE backdated_before_receipt = 1
+    ORDER BY invoice_date DESC, id DESC
+  `).all();
+  return res.json({ success: true, data: rows });
+}
+
 function createInvoice(req: AuthRequest, res: Response): Response | void {
   if (!req.user) return res.status(401).json({ error: 'Authentication required' });
 
@@ -219,12 +235,10 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
       return res.status(400).json({ error: (keyError as Error).message });
     }
     observeInvoiceIdempotency('POST /api/invoices', idemKey !== null);
+    // ACCT-008 / D19: the key is mandatory on this financial write. A
+    // keyless submission is a client bug, not a supported posture.
     if (idemKey === null) {
-      logKeylessIdempotentWrite(INVOICE_CREATE_SCOPE, {
-        userId: req.user.id,
-        route: 'POST /api/invoices',
-        userAgent: req.headers['user-agent'],
-      });
+      return res.status(400).json({ error: 'Idempotency-Key header is required for this operation' });
     }
 
     const service = new InvoiceCreationService(db);
@@ -261,7 +275,8 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
       { total_amount: createdInvoice.total_amount, customer_id: createdInvoice.customer_id },
       { newValue: createdInvoice, correlationId: newCorrelationId() },
     );
-    return res.status(201).json(createdInvoice);
+    // ACCT-006: warnings surface backdated-before-receipt acceptance.
+    return res.status(201).json({ ...createdInvoice, warnings: result.warnings });
   } catch (error: unknown) {
     return handleCreateInvoiceError(res, error);
   }
@@ -1071,8 +1086,9 @@ function returnInvoiceItems(req: AuthRequest, res: Response): Response | void {
 
     // audit-3 task 08: a sales return puts stock back and may refund or
     // credit, so a retry must replay rather than return the goods twice.
+    // ACCT-008 / D19: the key is mandatory here.
     const idemHash = hashRequestPayload(req.body);
-    const start = startIdempotentRequest(db, req.headers, IDEMPOTENCY_SCOPES.INVOICE_RETURN, idemHash);
+    const start = startRequiredIdempotentRequest(db, req.headers, IDEMPOTENCY_SCOPES.INVOICE_RETURN, idemHash);
     if (respondToIdempotencyReplay(res, start, {
       buildBody: (resourceId) => ({ success: true, message: 'Return processed successfully', idempotentReplay: true, data: { returnId: resourceId } }),
     })) return;
@@ -1171,6 +1187,7 @@ export {
   returnInvoiceItems,
   getInvoiceReturnHistory,
   getInvoicePosition,
+  getBackdatedInvoices,
 };
 
 export default {
@@ -1185,4 +1202,5 @@ export default {
   returnInvoiceItems,
   getInvoiceReturnHistory,
   getInvoicePosition,
+  getBackdatedInvoices,
 };

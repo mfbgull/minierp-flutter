@@ -76,6 +76,7 @@ async function createInvoiceWithHeaderDiscount(args: {
   invoiceDate?: string;
 }): Promise<{ invoiceId: number; invoiceItemIds: number[] }> {
   const res = await request(app).post('/api/invoices')
+    .set('Idempotency-Key', `patch-taxPostingConsis-89-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
     .set('Cookie', authCookie)
     .send({
       customer_id: args.customerId,

@@ -225,6 +225,11 @@ export async function submitInvoice(req: AuthRequest, res: Response) {
     const { hash: idemHash, replayed } = replayMobileInvoice(req, res, idemKey);
     if (replayed) return;
 
+    // ACCT-008 / D13: this route stays keyless. A keyless submit is accepted
+    // and only observed (below). A natural-key guard was tried and removed:
+    // (customer, date, total) cannot tell a timeout retry from a legitimate
+    // second invoice, so it replayed real sales. See DECISIONS.md.
+
     const resolvedInvoiceNo = generateDocNo(db, 'INV', 5);
     const invoiceId = MobileInvoiceModel.submitInvoice(db, {
       draft_id: draft_id ? parseInt(draft_id, 10) : undefined,

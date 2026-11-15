@@ -22,7 +22,10 @@ import {
 let cookie: string;
 let warehouseId: number;
 
-const post = (url: string, body: unknown) => request(app).post(url).set('Cookie', cookie).send(body as object);
+const post = (url: string, body: unknown) => request(app).post(url)
+  // ACCT-008 / D19: mandated financial writes reject a keyless request.
+  .set('Idempotency-Key', `reg-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+  .set('Cookie', cookie).send(body as object);
 const get = (url: string) => request(app).get(url).set('Cookie', cookie);
 const r2 = (v: number): number => Math.round(v * 100) / 100;
 // Stock quantities are DECIMAL(15,3): compare at 3dp or sub-cent errors (3.003 vs 3) are hidden.

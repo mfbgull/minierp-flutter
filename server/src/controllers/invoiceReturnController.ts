@@ -9,7 +9,7 @@ import { AuthRequest } from '../types';
 import { InvoiceReturnService, ReturnError, type SettlementInput } from '../services/invoiceReturnService';
 import { handleBusinessError } from '../utils/businessRuleError';
 import db from '../config/database';
-import { IDEMPOTENCY_SCOPES, claimIdempotencyKey, hashRequestPayload, respondToIdempotencyReplay, startIdempotentRequest } from '../utils/idempotency';
+import { IDEMPOTENCY_SCOPES, claimIdempotencyKey, hashRequestPayload, respondToIdempotencyReplay, startRequiredIdempotentRequest } from '../utils/idempotency';
 
 function settleReturn(req: AuthRequest, res: Response): Response | void {
   try {
@@ -21,8 +21,9 @@ function settleReturn(req: AuthRequest, res: Response): Response | void {
     // audit-3 task 08: settling issues the refund or credit, so a retry must
     // replay rather than pay the customer twice. The claim is keyed on the
     // return being settled, which is the operation's resource identity.
+    // ACCT-008 / D19: the key is mandatory here.
     const hash = hashRequestPayload(req.body);
-    const start = startIdempotentRequest(db, req.headers, IDEMPOTENCY_SCOPES.INVOICE_RETURN_SETTLE, hash);
+    const start = startRequiredIdempotentRequest(db, req.headers, IDEMPOTENCY_SCOPES.INVOICE_RETURN_SETTLE, hash);
     if (respondToIdempotencyReplay(res, start, {
       buildBody: (resourceId) => ({ success: true, message: 'Return settled successfully', idempotentReplay: true, data: { returnId: resourceId } }),
     })) return;

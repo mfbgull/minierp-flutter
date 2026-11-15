@@ -81,4 +81,6 @@ export type InvoiceCreationResult = {
   readonly paymentNo: string | null;
   readonly replayed: boolean;
   readonly items: readonly InvoiceCreationItemResult[];
+  /** ACCT-006: non-empty when a sale predates its stock's purchase receipt. */
+  readonly warnings: readonly string[];
 };

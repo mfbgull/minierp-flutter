@@ -61,6 +61,7 @@ describe('TASK 26 payment method options', () => {
     for (const method of options) {
       const res = await request(app)
         .post('/api/expenses')
+          .set('Idempotency-Key', `patch-expensePayment-19-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
         .set('Cookie', authCookie)
         .send({
           expense_date: '2026-09-21',
@@ -76,6 +77,7 @@ describe('TASK 26 payment method options', () => {
   it('rejects payment_method Other on create', async () => {
     const res = await request(app)
       .post('/api/expenses')
+        .set('Idempotency-Key', `patch-expensePayment-20-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         expense_date: '2026-09-21',

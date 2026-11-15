@@ -85,6 +85,7 @@ describe('GL posting matrix', () => {
       })).body?.data?.id;
 
     await request(app).post('/api/purchases')
+      .set('Idempotency-Key', `patch-glPostingMatri-27-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         item_id: itemId,
@@ -105,6 +106,7 @@ describe('GL posting matrix', () => {
   it('purchase posts a balanced Dr Inventory / Cr AP entry', async () => {
     // A linked supplier → credit purchase: Dr 1200 Inventory / Cr 2000 AP.
     const res = await request(app).post('/api/purchases')
+      .set('Idempotency-Key', `patch-glPostingMatri-28-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         item_id: itemId,
@@ -131,6 +133,7 @@ describe('GL posting matrix', () => {
     // no orphan AP liability can ever be created (H12 holds by
     // construction: no supplier → no purchase).
     const cashRes = await request(app).post('/api/purchases')
+      .set('Idempotency-Key', `patch-glPostingMatri-29-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         item_id: itemId,
@@ -181,6 +184,7 @@ describe('GL posting matrix', () => {
 
   it('expense posts a balanced Dr OpEx / Cr cash entry', async () => {
     const res = await request(app).post('/api/expenses')
+      .set('Idempotency-Key', `patch-glPostingMatri-30-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         expense_category: 'Utilities',

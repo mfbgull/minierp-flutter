@@ -70,6 +70,7 @@ describe('payment allocation cannot exceed the credit-offset-adjusted balance', 
 
     const supplierId = await resolveSupplierByName('Credit Offset Supplier', authCookie);
     await request(app).post('/api/purchases')
+      .set('Idempotency-Key', `patch-overAllocation-38-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         item_id: itemId, warehouse_id: warehouseId, quantity: 200, unit_cost: 10,
@@ -88,6 +89,7 @@ describe('payment allocation cannot exceed the credit-offset-adjusted balance', 
   /** Sell 1200, collect 1200, return the goods so a 1200 ledger credit exists. */
   async function seedLedgerCredit(customerId: number, date: string): Promise<void> {
     const inv = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-overAllocationGu-69-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         customer_id: customerId, invoice_date: date, due_date: date,
@@ -99,6 +101,7 @@ describe('payment allocation cannot exceed the credit-offset-adjusted balance', 
     expect(inv.status).toBe(201);
     const invItem = db.prepare('SELECT id FROM invoice_items WHERE invoice_id = ?').get(inv.body.id) as { id: number };
     const ret = await request(app).post(`/api/invoices/${inv.body.id}/return`)
+      .set('Idempotency-Key', `patch-overAllocationGu-70-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         reason: 'seed ledger credit', disposition: 'credit', warehouse_id: warehouseId,
@@ -120,6 +123,7 @@ describe('payment allocation cannot exceed the credit-offset-adjusted balance', 
     // 1200 invoice, 600 credit offset, but a 1200 cash leg: 1800 collected
     // against a 1200 invoice. Must be refused by the line-144 bound.
     const res = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-overAllocationGu-71-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         customer_id: customerId, invoice_date: '2026-09-10', due_date: '2026-09-24',
@@ -139,6 +143,7 @@ describe('payment allocation cannot exceed the credit-offset-adjusted balance', 
     await seedLedgerCredit(customerId, '2026-09-01');
 
     const res = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-overAllocationGu-72-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         customer_id: customerId, invoice_date: '2026-09-10', due_date: '2026-09-24',
@@ -162,6 +167,7 @@ describe('payment allocation cannot exceed the credit-offset-adjusted balance', 
     await seedLedgerCredit(customerId, '2026-09-01');
 
     const inv = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-overAllocationGu-73-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         customer_id: customerId, invoice_date: '2026-09-10', due_date: '2026-09-24',
@@ -177,6 +183,7 @@ describe('payment allocation cannot exceed the credit-offset-adjusted balance', 
     expect(R2(row.balance_amount)).toBe(600);
 
     const over = await request(app).post('/api/payments')
+      .set('Idempotency-Key', `patch-overAllocationGu-74-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         customer_id: customerId, payment_date: '2026-09-20', amount: 700,
@@ -188,6 +195,7 @@ describe('payment allocation cannot exceed the credit-offset-adjusted balance', 
 
     // Exactly the remaining 600 is fine, and closes the invoice.
     const exact = await request(app).post('/api/payments')
+      .set('Idempotency-Key', `patch-overAllocationGu-75-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         customer_id: customerId, payment_date: '2026-09-20', amount: 600,
@@ -202,6 +210,7 @@ describe('payment allocation cannot exceed the credit-offset-adjusted balance', 
     // Balance is now 0: the historical 50/51 shape — a second full cash
     // settlement of an already-settled invoice — stays refused.
     const again = await request(app).post('/api/payments')
+      .set('Idempotency-Key', `patch-overAllocationGu-76-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         customer_id: customerId, payment_date: '2026-09-21', amount: 600,

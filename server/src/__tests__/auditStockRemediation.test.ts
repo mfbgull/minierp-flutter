@@ -18,7 +18,8 @@ describe('audited count and production economics', () => {
       HAVING ABS(SUM(debit-credit))>0.005`).all()).toEqual([]);
   });
   async function post(url: string, body: object) {
-    return request(app).post(url).set('Cookie', cookie).send(body);
+    return request(app).post(url).set('Cookie', cookie)
+      .set('Idempotency-Key', `idem-${Date.now()}-${Math.floor(Math.random() * 1e6)}`).send(body);
   }
   function net(code: string) {
     return Math.round((db.prepare(`SELECT COALESCE(SUM(j.debit-j.credit),0) AS n FROM journal_lines j

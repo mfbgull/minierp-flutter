@@ -228,6 +228,13 @@ function getInvoiceWithCustomer(db: Database.Database, invoiceId: number) {
   `).get(invoiceId);
 }
 
+/**
+ * Removed: a natural-key duplicate guard for the keyless mobile submit path
+ * (customer + invoice_date + total in a 2-minute window). It could not tell a
+ * timeout retry from a legitimate second invoice, so it replayed real sales.
+ * The keyless path is observed only; see audit/DECISIONS.md.
+ */
+
 
 export default {
   getDraftById,

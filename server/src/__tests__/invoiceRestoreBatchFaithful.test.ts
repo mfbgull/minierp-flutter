@@ -31,6 +31,8 @@ function uid(): number { return ++seq; }
 
 async function api(method: 'get' | 'post' | 'put' | 'delete', url: string, body?: Record<string, unknown>) {
   let r = request(app)[method](url);
+  // ACCT-008 / D19: mandated financial writes reject a keyless request.
+  if (method === 'post') r = r.set('Idempotency-Key', `api-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   if (authCookie) r = r.set('Cookie', authCookie);
   if (body !== undefined) r = r.send(body);
   return r;

@@ -52,6 +52,8 @@ export const IDEMPOTENCY_SCOPES = {
   OWNER_WITHDRAWAL: 'owner-equity.withdrawal',
   EMPLOYEE_SALARY_PAY: 'employees.salary.pay',
   SUPPLIER_REFUND_CREATE: 'supplier-refunds.create',
+  SUPPLIER_REFUND_CLAIM_CREATE: 'supplier-refund-claims.create',
+  SUPPLIER_REFUND_CLAIM_WRITE_OFF: 'supplier-refund-claims.write-off',
 } as const;
 
 /** Normalize the raw header value; returns null when absent. Keys are
@@ -286,4 +288,35 @@ export function startIdempotentRequest(
     }
     throw err;
   }
+}
+
+/**
+ * The refusal message for a missing key on a mandated write (D19). Shared so
+ * the helper and the two manual-key controllers (expenses, direct purchases)
+ * cannot drift apart.
+ */
+export const IDEMPOTENCY_KEY_REQUIRED_MESSAGE = 'Idempotency-Key header is required for this operation';
+
+/**
+ * Same as startIdempotentRequest, but a missing key is a 400 instead of an
+ * unprotected proceed. ACCT-008 / D19 confirmed the mandate: the canonical
+ * financial writes (invoice create, payments and allocation, purchase-order
+ * goods receipts, sales returns, return settlement, supplier refunds and
+ * claims, expenses, owner capital and withdrawals, salary pay, direct
+ * purchases, supplier bills and prepayments, production runs, purchase
+ * returns, inventory write-offs and stock transfers) use this contract; only
+ * /api/mobile-invoices/* stays keyless (D13's promise to the external mobile
+ * app).
+ */
+export function startRequiredIdempotentRequest(
+  db: Database.Database,
+  headers: Record<string, unknown> | undefined,
+  scope: string,
+  requestHash: string,
+): IdempotencyStart {
+  const key = headers?.[IDEMPOTENCY_KEY_HEADER];
+  if (key === undefined || key === null || key === '') {
+    return { kind: 'error', status: 400, message: IDEMPOTENCY_KEY_REQUIRED_MESSAGE };
+  }
+  return startIdempotentRequest(db, headers, scope, requestHash);
 }

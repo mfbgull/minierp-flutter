@@ -106,6 +106,8 @@ export async function purchaseStock(
   stockSupplierId = await ensureStockSupplier(authCookie);
   const res = await request(app).post('/api/purchases')
     .set('Cookie', authCookie)
+    // D19: the direct purchase record mandates a key.
+    .set('Idempotency-Key', nextIdemKey('stock'))
     .send({
       item_id: itemId,
       warehouse_id: warehouseId,
@@ -127,6 +129,19 @@ export async function purchaseStock(
  * fixtures reuse one row.
  */
 const namedSupplierIds = new Map<string, number>();
+
+/**
+ * ACCT-008 / D19: the canonical financial writes (invoice create, sales
+ * return, return settlement, payments, goods receipts) reject a keyless
+ * request with 400. Test helpers are API clients, so every mandated call
+ * carries a fresh key — unique per call so a repeated helper call never
+ * collides into a replay.
+ */
+let idemKeySeq = 0;
+export function nextIdemKey(prefix = 'spec'): string {
+  idemKeySeq += 1;
+  return `${prefix}-${Date.now()}-${idemKeySeq}-${Math.floor(Math.random() * 1e6)}`;
+}
 
 export async function resolveSupplierByName(
   supplierName: string,
@@ -168,6 +183,8 @@ export async function purchaseWithNamedSupplier(
   const supplierId = await resolveSupplierByName(supplierName, authCookie);
   return request(app).post('/api/purchases')
     .set('Cookie', authCookie)
+    // D19: the direct purchase record mandates a key.
+    .set('Idempotency-Key', nextIdemKey('namedbuy'))
     .send({ ...payload, supplier_id: supplierId });
 }
 
@@ -217,6 +234,7 @@ export async function createInvoice(
 
   const res = await request(app).post('/api/invoices')
     .set('Cookie', authCookie)
+    .set('Idempotency-Key', nextIdemKey('spec-inv'))
     .send({
       customer_id: opts.customerId,
       invoice_date: opts.invoiceDate ?? '2026-09-15',
@@ -275,6 +293,7 @@ export async function processReturn(
   const res = await request(app)
     .post(`/api/invoices/${invoiceId}/return`)
     .set('Cookie', authCookie)
+    .set('Idempotency-Key', nextIdemKey('spec-ret'))
     .send({
       items: spec.invoiceItemIds.map((id, i) => ({ invoice_item_id: id, return_quantity: spec.quantities[i] })),
       fee_type: spec.feeType ?? 'none',
@@ -300,6 +319,7 @@ export async function settleReturn(
   const res = await request(app)
     .post(`/api/invoice-returns/${returnId}/settle`)
     .set('Cookie', authCookie)
+    .set('Idempotency-Key', nextIdemKey('spec-settle'))
     .send({ allocations });
   return { status: res.status, body: res.body as Record<string, unknown> };
 }

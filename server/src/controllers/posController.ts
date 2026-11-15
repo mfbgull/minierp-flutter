@@ -18,6 +18,7 @@ import {
 import {
   IDEMPOTENCY_KEY_HEADER,
   POS_SALE_SCOPE,
+  logKeylessIdempotentWrite,
   normalizeIdempotencyKey,
   hashRequestPayload,
 } from '../utils/idempotency';
@@ -289,6 +290,17 @@ function createPOSSale(req: AuthRequest, res: Response): void {
     } catch (keyError) {
       res.status(400).json({ error: (keyError as Error).message });
       return;
+    }
+    // ACCT-008 stage one for POS: the key is optional today because older
+    // desktop builds and any external caller may omit it. Observe keyless
+    // sales before mandating, so enforcement is proved compatible rather
+    // than assumed.
+    if (!idemKey) {
+      logKeylessIdempotentWrite(POS_SALE_SCOPE, {
+        userId: req.user?.id,
+        route: 'POST /api/pos/sale',
+        userAgent: req.headers['user-agent'],
+      });
     }
 
     const customerId = body.customer_id && body.customer_id > 0

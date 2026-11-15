@@ -143,6 +143,7 @@ describe('TASK 24 integration — 409 closed period, no partial mutation, no sta
       invoiceDate: '2026-09-10',
     }, token);
     const payRes = await request(app).post('/api/payments')
+      .set('Idempotency-Key', `patch-businessErrorCla-31-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', token)
       .send({
         customer_id: customer,

@@ -25,6 +25,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/date_utils.dart' show isoDate;
 import '../../core/utils/formatters.dart';
+import '../../core/utils/idempotency_key.dart';
 import '../../data/models/bom.dart';
 import '../../data/models/item.dart' show Item;
 import '../../data/models/warehouse.dart' show Warehouse;
@@ -92,6 +93,7 @@ class ProductionFormDialog extends ConsumerStatefulWidget {
 
 class _ProductionFormDialogState extends ConsumerState<ProductionFormDialog> {
   final _formKey = GlobalKey<FormState>();
+  final _idemKeys = IdempotencyKeyCache(prefix: 'prod');
   final _quantityController = TextEditingController();
   final _overheadController = TextEditingController();
   final _remarksController = TextEditingController();
@@ -451,7 +453,7 @@ class _ProductionFormDialogState extends ConsumerState<ProductionFormDialog> {
 
     final result = await ref
         .read(productionRepositoryProvider)
-        .createProduction(payload);
+        .createProduction(payload, idempotencyKey: _idemKeys.keyFor(payload));
     if (!mounted) return;
 
     switch (result) {

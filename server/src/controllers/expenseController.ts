@@ -14,6 +14,7 @@ import { handleBusinessError } from '../utils/businessRuleError';
 import { formatCurrency, getCurrencySymbol } from '../utils/displayCurrency';
 import {
   IDEMPOTENCY_KEY_HEADER,
+  IDEMPOTENCY_KEY_REQUIRED_MESSAGE,
   IDEMPOTENCY_SCOPES,
   IdempotencyConflictError,
   beginIdempotentWrite,
@@ -58,14 +59,19 @@ function createExpense(req: AuthRequest, res: Response): void {
       return;
     }
 
-    // audit-3 task 08: a retry after a lost response must not expense the
-    // cash twice. The check and the claim both sit inside the write
-    // transaction, so a rolled-back attempt leaves no claim behind.
+    // audit-3 task 08 + D19: a retry after a lost response must not expense
+    // the cash twice. The key is mandatory here (D19), and the check and the
+    // claim both sit inside the write transaction, so a rolled-back attempt
+    // leaves no claim behind.
     let idemKey: string | null;
     try {
       idemKey = normalizeIdempotencyKey(req.headers[IDEMPOTENCY_KEY_HEADER]);
     } catch (keyError) {
       res.status(400).json({ success: false, error: (keyError as Error).message });
+      return;
+    }
+    if (idemKey === null) {
+      res.status(400).json({ success: false, error: IDEMPOTENCY_KEY_REQUIRED_MESSAGE });
       return;
     }
     const hash = hashRequestPayload(req.body);

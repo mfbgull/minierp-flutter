@@ -12,6 +12,7 @@ import '../purchase_orders/purchase_orders_screen.dart';
 import '../shell/module_refresh.dart' show moduleTabRefreshOnVisit;
 import 'purchase_returns_screen.dart';
 import 'purchases_screen.dart';
+import 'refund_claims_screen.dart';
 
 class PurchasingShell extends ConsumerStatefulWidget {
   const PurchasingShell({super.key});
@@ -55,6 +56,11 @@ class _PurchasingShellState extends ConsumerState<PurchasingShell> {
               selectedIcon: const Icon(Icons.assignment_return),
               label: l10n.navPurchasereturns,
             ),
+            NavigationDestination(
+              icon: const Icon(Icons.request_quote_outlined),
+              selectedIcon: const Icon(Icons.request_quote),
+              label: l10n.refundClaimsTitle,
+            ),
           ],
         ),
         Expanded(
@@ -64,6 +70,7 @@ class _PurchasingShellState extends ConsumerState<PurchasingShell> {
               PurchaseOrdersScreen(),
               PurchasesScreen(),
               PurchaseReturnsScreen(),
+              RefundClaimsScreen(),
             ],
           ),
         ),

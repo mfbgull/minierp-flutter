@@ -100,6 +100,7 @@ async function createFixture(): Promise<Fixture> {
 async function receive(po: Fixture, qty: number): Promise<number> {
   const res = await request(app)
     .post(`/api/purchase-orders/${po.poId}/receipts`)
+    .set('Idempotency-Key', `patch-goodsReceiptVoid-27-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
     .set('Cookie', token)
     .send({
       receipt_date: '2026-09-12',

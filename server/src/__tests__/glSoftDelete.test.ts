@@ -36,6 +36,7 @@ describe('invoice soft-delete GL integrity', () => {
 
     const create = await request(app)
       .post('/api/invoices')
+      .set('Idempotency-Key', `patch-glSoftDelete.tes-25-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         customer_id: customer.id,
@@ -82,6 +83,7 @@ describe('invoice soft-delete GL integrity', () => {
 
     const create = await request(app)
       .post('/api/invoices')
+      .set('Idempotency-Key', `patch-glSoftDelete.tes-26-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         customer_id: customer.id,

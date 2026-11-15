@@ -370,10 +370,12 @@ class InventoryRepository {
   );
 
   Future<ApiResult<StockMovement>> createStockMovement(
-    Map<String, dynamic> body,
-  ) => _api.postRaw(
+    Map<String, dynamic> body, {
+    required String idempotencyKey,
+  }) => _api.postRaw(
     ApiEndpoints.stockMovements,
     body: body,
+    headers: {'Idempotency-Key': idempotencyKey},
     parse: (Object? json) =>
         StockMovement.fromJson(json as Map<String, dynamic>),
   );
@@ -389,10 +391,12 @@ class InventoryRepository {
   /// FIFO layers at the source, mirrors a TRANSFER batch at the destination
   /// and writes both movements inside one transaction.
   Future<ApiResult<Map<String, dynamic>>> createStockTransfer(
-    Map<String, dynamic> body,
-  ) => _api.postRaw(
+    Map<String, dynamic> body, {
+    required String idempotencyKey,
+  }) => _api.postRaw(
     ApiEndpoints.stockTransfers,
     body: body,
+    headers: {'Idempotency-Key': idempotencyKey},
     parse: (Object? json) =>
         (json ?? <String, dynamic>{}) as Map<String, dynamic>,
   );

@@ -46,10 +46,13 @@ a sale on one date is normal wholesale trading.
 
 ## What it prevents
 
-- **D1** — a sale consuming a batch received after the sale's own date
-- **D3** — a backdated sale driving historical stock negative
 - **D4** — a backdated receipt reordering FIFO beneath an already-posted sale
 - **D2** — expiry judged at today's date rather than at the transaction date
+- **D1/D3 (sales)** — a sale dated before the item's first purchase receipt
+  is no longer refused: decision D19 accepts it with a warning, a
+  `backdated_before_receipt` flag and batch-linked actual-cost COGS, so the
+  historical as-of position reads negative only as a documented, reportable
+  exception. The allocator's oversell refusal and the expiry rules still hold.
 
 ## Where it is enforced
 
@@ -59,6 +62,14 @@ The as-of filter lives in the consumption path, not in a separate guard:
   warehouseId, quantity, db, asOfDate)`; `asOf` defaults to today when the
   caller does not supply it, and the batch query filters
   `sb.received_date <= @asOf` and `sb.expiry_date >= @asOf`
+- `server/src/models/StockMovement.ts` — `consumeForSale(...)` wraps the
+  allocator for the invoice path. Before consuming it evaluates the D19
+  fallback (`preReceiptFallback`): when every remaining batch was received
+  after the sale date, current sellable stock covers the quantity and the
+  later stock was already sellable (expiry-wise) on the sale date, those
+  later batches are consumed at their recorded cost and the caller flags
+  the invoice. Every other refusal (oversell, expired-only stock, as-of
+  stock present, blocked locations) stays hard.
 - `server/src/models/Invoice.ts` — `consumeFromOldestBatches` forwards
   `asOfDate`
 - `server/src/models/Production.ts` — passes `production_date` as the `asOf`
@@ -69,13 +80,18 @@ The as-of filter lives in the consumption path, not in a separate guard:
 ## Coverage
 
 `server/src/__tests__/inventoryEffectiveDate.test.ts` exercises the rule
-end-to-end through the HTTP API (13 cases): D1, D2, D3, D4, goods receipt and
-production, closed periods still winning, and an unaffected forward-only
-sequence.
+end-to-end through the HTTP API (13 cases): D1 and D3 under the D19 contract,
+D2, D4, goods receipt and production, closed periods still winning, and an
+unaffected forward-only sequence. `backdatedSaleWarning.test.ts` covers the
+accept-with-warning path itself (warnings text, flag, actual-cost COGS,
+refusals that still hold, and the exception report).
 
-## Related open decision
+## Decision history
 
-ACCT-006 sub-item 3 — rejecting a sale dated before the item's first purchase
-— was implemented, red-tested, then removed: 16 tests legitimately purchase
-stock and then invoice it with a historical date. See `audit/DECISIONS.md` D12
-and `audit/FINDINGS-STATUS.md`.
+ACCT-006 sub-item 3 — a sale dated before the item's first purchase receipt —
+has moved twice: the original hard refusal was implemented, red-tested, then
+removed under D12 (16 tests legitimately purchase stock and then invoice it
+with a historical date); decision D19 (2026-11-12) re-introduced a middle
+path — accept with warning, flag and exception report, keeping the oversell
+refusal hard. See `audit/DECISIONS.md` D12 and D19 and
+`audit/FINDINGS-STATUS.md`.

@@ -179,12 +179,17 @@ function selectLocationBatches(
   itemId: number,
   warehouseId: number,
   asOf: string,
-  useFEFO: boolean
+  useFEFO: boolean,
+  opts?: { ignoreReceiptDate?: boolean }
 ): LocationBatchRow[] {
   const locationFilter = useFEFO
     ? `AND COALESCE(sb.halted, 0) = 0 AND COALESCE(bsl.status_override, 'ACTIVE') = 'ACTIVE'
        AND (sb.expiry_date IS NULL OR sb.expiry_date >= @asOf)`
     : `AND COALESCE(sb.halted, 0) = 0 AND COALESCE(bsl.status_override, 'ACTIVE') = 'ACTIVE'`;
+  // ACCT-006 backdated fallback: drop the received_date cutoff so batches
+  // received after the sale date are visible. Expiry sellability is still
+  // judged at the sale date.
+  const receiptFilter = opts?.ignoreReceiptDate ? '' : 'AND sb.received_date <= @asOf';
 
   return db.prepare(`
     SELECT sb.id, sb.unit_cost, sb.received_date, sb.expiry_date,
@@ -194,7 +199,7 @@ function selectLocationBatches(
     JOIN locations l ON bsl.location_id = l.id
     WHERE sb.item_id = ? AND l.warehouse_id = ?
       AND bsl.quantity_available > 0
-      AND sb.received_date <= @asOf
+      ${receiptFilter}
       ${locationFilter}
     GROUP BY sb.id
     ORDER BY
@@ -319,14 +324,18 @@ function selectLegacyBatches(
   warehouseId: number,
   asOf: string,
   useFEFO: boolean,
-  availableQty: number
+  availableQty: number,
+  opts?: { ignoreReceiptDate?: boolean }
 ): { batches: LegacyBatchRow[]; totalBatchTrackedQty: number } {
+  // ACCT-006 backdated fallback: drop the received_date cutoff (expiry
+  // sellability is still judged at the sale date).
+  const receiptFilter = opts?.ignoreReceiptDate ? '' : 'AND received_date <= @asOf';
   if (!useFEFO) {
     const batches = db.prepare(`
       SELECT id, quantity_remaining, unit_cost
       FROM stock_batches
       WHERE item_id = ? AND warehouse_id = ? AND quantity_remaining > 0
-        AND received_date <= @asOf
+        ${receiptFilter}
       ORDER BY received_date ASC, id ASC
     `).all(itemId, warehouseId, { asOf }) as LegacyBatchRow[];
     return { batches, totalBatchTrackedQty: 0 };
@@ -337,7 +346,7 @@ function selectLegacyBatches(
     FROM stock_batches
     WHERE item_id = ? AND warehouse_id = ? AND quantity_remaining > 0
       AND (halted = 0 OR halted IS NULL)
-      AND received_date <= @asOf
+      ${receiptFilter}
       AND (expiry_date IS NULL OR expiry_date >= @asOf)
     ORDER BY
       CASE WHEN expiry_date IS NULL THEN 1 ELSE 0 END,
@@ -1191,8 +1200,24 @@ class StockMovementModel {
         assertNoBlockedStockOnly(db, itemId, warehouseId, quantity);
       }
 
-      // Legacy case: positive warehouse stock but no batch_stock_by_location rows.
       if (batchRows.length === 0) {
+        // Batches exist but carry no batch_stock_by_location rows (the
+        // batch-locations rollout is transitional — API purchases create
+        // stock_batches without location rows). Consume them batch-level
+        // with the legacy rules so the sale stays batch-linked at actual
+        // cost: a standard-cost phantom sale here would consume no batch
+        // and drift GL inventory away from batch values.
+        const tracked = db.prepare(`
+          SELECT COUNT(*) AS c FROM stock_batches
+          WHERE item_id = ? AND warehouse_id = ? AND quantity_remaining > 0
+        `).get(itemId, warehouseId) as { c: number };
+        if (Number(tracked.c) > 0) {
+          return consumeLegacyStock(
+            db, itemId, warehouseId, quantity, roundedQty, asOf, useFEFO, availableQty, itemRow
+          );
+        }
+
+        // Legacy case: positive warehouse stock and no batch rows at all.
         const fallbackCost = itemRow?.standard_cost ?? 0;
         logger.warn(
           `[BatchCosting] No batch_stock_by_location rows for ${itemRow?.item_name || 'item'} in warehouse. ` +
@@ -1208,6 +1233,125 @@ class StockMovementModel {
     return consumeLegacyStock(
       db, itemId, warehouseId, quantity, roundedQty, asOf, useFEFO, availableQty, itemRow
     );
+  }
+
+  /**
+   * ACCT-006: sale consumption with the backdated-before-receipt fallback.
+   *
+   * The named D19 case is decided BEFORE any consumption (so a partially
+   * consumed as-of layer can never poison the check): every remaining batch
+   * in this warehouse was received after the sale date, current sellable
+   * stock covers the quantity, and the later stock was already sellable
+   * (expiry-wise) on the sale date. Those later batches are then consumed
+   * at their actual recorded cost. The oversell guard (current sellable
+   * stock) is never bypassed; D19 accepts the historical as-of position
+   * going negative and asks callers to flag + warn instead. Everything else
+   * (as-of stock present, expired-only stock, oversell) keeps the normal
+   * allocator behavior, including its refusals.
+   *
+   * Returns whether the fallback fired, plus the first receipt date for the
+   * caller's warning text.
+   */
+  static consumeForSale(
+    itemId: number,
+    warehouseId: number,
+    quantity: number,
+    db: Database.Database,
+    saleDate: string
+  ): { consumption: ConsumptionEntry[]; backdatedBeforeReceipt: boolean; firstReceiptDate: string | null } {
+    const fallback = this.preReceiptFallback(db, itemId, warehouseId, quantity, saleDate);
+    if (fallback !== null) return { ...fallback, backdatedBeforeReceipt: true };
+    return {
+      consumption: this.consumeFromOldestBatches(itemId, warehouseId, quantity, db, saleDate),
+      backdatedBeforeReceipt: false,
+      firstReceiptDate: null,
+    };
+  }
+
+  /**
+   * The named ACCT-006 case, checked and consumed atomically (better-sqlite3
+   * keeps this synchronous inside the caller's transaction). Returns null
+   * whenever any precondition fails so the caller runs the normal as-of
+   * allocator, whose refusals stay intact (expired-only stock, oversell,
+   * as-of stock present, blocked locations).
+   */
+  private static preReceiptFallback(
+    db: Database.Database,
+    itemId: number,
+    warehouseId: number,
+    quantity: number,
+    saleDate: string
+  ): { consumption: ConsumptionEntry[]; firstReceiptDate: string | null } | null {
+    const roundedQty = roundQty(quantity);
+    const useFEFO = (db.prepare('SELECT has_expiry FROM items WHERE id = ?').get(itemId) as
+      | { has_expiry: number }
+      | undefined)?.has_expiry === 1;
+
+    if (isFeatureEnabled(db, 'feature_batch_locations')) {
+      const withLocations = selectLocationBatches(db, itemId, warehouseId, saleDate, useFEFO, {
+        ignoreReceiptDate: true,
+      });
+      const hasLocationRows = db.prepare(`
+        SELECT 1 FROM batch_stock_by_location bsl
+        JOIN locations l ON bsl.location_id = l.id
+        WHERE l.warehouse_id = ?
+          AND EXISTS (SELECT 1 FROM stock_batches sb WHERE sb.id = bsl.batch_id AND sb.item_id = ?)
+        LIMIT 1
+      `).get(warehouseId, itemId);
+      if (hasLocationRows) {
+        // Location rows exist: sellability (ACTIVE status, expiry at the
+        // sale date) is judged on them only. The fallback needs the as-of
+        // position empty and the later receipts covering the quantity.
+        if (withLocations.length === 0) return null;
+        const covered = roundQty(withLocations.reduce((s, b) => s + Number(b.qty_avail), 0));
+        if (qtyLessThan(covered, roundedQty)) return null;
+        const asOfRows = selectLocationBatches(db, itemId, warehouseId, saleDate, useFEFO);
+        if (asOfRows.length > 0) return null;
+        const firstReceiptDate = (db.prepare(`
+          SELECT MIN(received_date) AS d FROM stock_batches
+          WHERE item_id = ? AND warehouse_id = ? AND quantity_remaining > 0
+        `).get(itemId, warehouseId) as { d: string | null }).d;
+        return { consumption: consumeBatchesByLocation(db, itemId, warehouseId, withLocations, roundedQty), firstReceiptDate };
+      }
+      // No location rows: fall through to the batch-level path (API-purchased
+      // batches predate the location layer).
+    }
+
+    // Batch-level eligibility (both flags): the as-of position must be empty
+    // and later receipts must cover the quantity.
+    const expiryFilter = useFEFO ? 'AND (expiry_date IS NULL OR expiry_date >= @sale)' : '';
+    const asOfQty = db.prepare(`
+      SELECT COALESCE(SUM(quantity_remaining), 0) AS q FROM stock_batches
+      WHERE item_id = ? AND warehouse_id = ? AND quantity_remaining > 0
+        AND received_date <= @sale
+        AND (halted = 0 OR halted IS NULL)
+        ${expiryFilter}
+    `).get(itemId, warehouseId, { sale: saleDate }) as { q: number };
+    if (Number(asOfQty.q) > 0) return null;
+
+    const batches = db.prepare(`
+      SELECT id, quantity_remaining, unit_cost, received_date
+      FROM stock_batches
+      WHERE item_id = ? AND warehouse_id = ? AND quantity_remaining > 0
+        AND (halted = 0 OR halted IS NULL)
+        ${expiryFilter}
+      ORDER BY received_date ASC, id ASC
+    `).all(itemId, warehouseId, { sale: saleDate }) as Array<LegacyBatchRow & { received_date: string }>;
+    const covered = roundQty(batches.reduce((s, b) => s + Number(b.quantity_remaining), 0));
+    if (batches.length === 0 || qtyLessThan(covered, roundedQty)) return null;
+
+    const consumption: ConsumptionEntry[] = [];
+    let remaining = roundedQty;
+    for (const batch of batches) {
+      if (remaining <= 0) break;
+      const take = roundQty(Math.min(remaining, roundQty(Number(batch.quantity_remaining))));
+      db.prepare(`
+        UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?
+      `).run(take, batch.id);
+      consumption.push({ batchId: batch.id, consumed: take, unitCost: batch.unit_cost });
+      remaining -= take;
+    }
+    return { consumption, firstReceiptDate: batches[0].received_date };
   }
 
     /**

@@ -130,6 +130,7 @@ describe('inventory authority (audit task 35)', () => {
 
     const poItem = db.prepare('SELECT id FROM purchase_order_items WHERE po_id = ?').get(poId) as { id: number };
     const receipt = await request(app).post(`/api/purchase-orders/${poId}/receipts`)
+      .set('Idempotency-Key', `patch-stockAuthority.t-88-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         receipt_date: '2026-09-16',

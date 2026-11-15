@@ -13,7 +13,10 @@ interface CreatedPayment {
   readonly advance_created: number | null;
 }
 
-const post = (url: string, body: object) => request(app).post(url).set('Cookie', cookie).send(body);
+// D19: salary pay / owner-equity / purchase writes mandate a key.
+const post = (url: string, body: object) => request(app).post(url)
+  .set('Idempotency-Key', `prl-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+  .set('Cookie', cookie).send(body);
 
 function net(code: string): number {
   return db.prepare<[string], { amount: number }>(`

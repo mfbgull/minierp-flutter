@@ -340,6 +340,41 @@ transfers can be traced using their existing movement link.
 
 ---
 
+## Mandatory Idempotency-Key (Financial Writes)
+
+The header `Idempotency-Key` (8..200 characters, a fresh UUID per user
+action) is **required** on these canonical financial writes (decision D19).
+A missing header returns 400 with the message
+`Idempotency-Key header is required for this operation`.
+
+| Write | Endpoint |
+|---|---|
+| Invoice create | `POST /invoices` |
+| Invoice return | `POST /invoices/:id/return` |
+| Return settlement | `POST /invoice-returns/:id/settle` |
+| Customer payment | `POST /payments` |
+| Payment allocation | `POST /payments/:id/allocate` |
+| Purchase-order goods receipt | `POST /purchase-orders/:id/receipts` |
+| Expense create | `POST /expenses` |
+| Owner capital | `POST /owner-equity/capital` |
+| Owner withdrawal | `POST /owner-equity/withdrawals` |
+| Salary pay | `POST /employees/:id/salary/pay` |
+| Direct purchase record | `POST /purchases` |
+
+Supplier refunds and refund-claim writes are already mandatory (PRET-002).
+`POST /api/mobile-invoices/*` stays keyless until the external mobile app
+migrates (D13).
+
+Reuse the same key and payload when retrying a lost response. A changed
+payload under the same key returns 409 `IDEMPOTENCY_CONFLICT`; an unchanged
+retry replays the original result. The mandate check runs before entity
+existence checks, so a keyless request returns 400 even when the target row
+does not exist.
+
+Every in-repo client (Flutter desktop, POS) already sends a key on these
+writes. Keys are derived from the request body, so an unchanged retry reuses
+the key and an edited payload rotates it.
+
 ## Invoices
 
 ### GET /invoices
@@ -355,6 +390,13 @@ Get invoice with items and customer details.
 
 ### POST /invoices
 Create invoice. Optionally records payment in the same transaction.
+
+A sale dated **before the item's first purchase receipt** in the warehouse is
+accepted with a warning (decision D19): the response carries a `warnings`
+array, `backdated_before_receipt: 1`, and the stock is consumed from the
+later receipts at their recorded cost. Current sellable stock must still
+cover the quantity — the oversell refusal stays hard. Flagged invoices are
+listed by `GET /invoices/backdated`.
 
 ```json
 {
@@ -403,6 +445,12 @@ from), posts the GL/ledger reversal and applies the disposition.
 
 ### GET /invoices/returns
 List invoice-return history (paginated).
+
+### GET /invoices/backdated
+ACCT-006 exception report: invoices created with a date before their stock's
+first purchase receipt (`backdated_before_receipt = 1`). Returns `invoice_no`,
+`invoice_date`, `customer_name`, `total_amount` and `status` per row so the
+paperwork can be verified against the goods trail.
 
 ---
 
@@ -779,6 +827,42 @@ line id (`purchases.id` or `purchase_order_items.id`).
 
 `POST /purchase-returns/:id/void` body: `{ "reason": "..." }` (optional). The
 server rejects (400) returns that are not `POSTED`.
+
+---
+
+## Supplier Refund Claims
+
+When a `refund_expected` return opens its credit note, the server also opens a
+**refund claim** (`supplier_refund_claims`) — money the supplier owes back.
+Claims are EXPECTED → PARTIAL → RECEIVED; cash moves only when a refund
+receipt (`POST /supplier-refunds`) is recorded against the claim. The claim
+is a memo, not cash: "refunds due" lists what has not arrived yet.
+
+| Method | Path | Description |
+|---|---|---|
+| GET | /supplier-refunds/claims | List claims (paginated; `status`, `supplier_id`, `search`) |
+| GET | /supplier-refunds/claims/due | Claims not fully received — memo of money owed back |
+| GET | /supplier-refunds/claims/:id | One claim with its receipts |
+| POST | /supplier-refunds/claims | Open a standalone claim (no return behind it) |
+| POST | /supplier-refunds/claims/:id/cancel | Cancel a claim — refused while live receipts are allocated |
+| POST | /supplier-refunds/claims/:id/write-off | Give up the remaining balance (mandatory reason) |
+| GET | /supplier-refunds/credit-notes/:id/refundable | Note's refundable balance + its live claim block |
+| POST | /supplier-refunds | Record a refund receipt (cash in; settles the claim) |
+| GET | /supplier-refunds | List refund receipts (paginated) |
+| GET | /supplier-refunds/:id | One refund receipt |
+| POST | /supplier-refunds/:id/void | Void a receipt — releases the claim back |
+
+`POST /supplier-refunds`, `POST /supplier-refunds/claims`,
+`.../write-off` require an `Idempotency-Key` header (400 without it; replay
+returns the original result). Receipt bodies accept `credit_note_id` or
+`claim_id`, `payment_method` **cash or bank transfer only**, and an optional
+`treat_excess_as_advance` — an amount above the claim's remaining room is
+rejected unless that flag is set, in which case the overage rides the same
+cash entry as supplier credit on account (Cr AP). Write-offs post Dr 7300 /
+Cr AP with a mandatory reason; amounts above Rs 1,000 need the owner (admin).
+Voiding a return is refused (409) while its claim has recorded receipts —
+void the receipts first. Voiding a receipt restores the claim to its
+uncollected state (EXPECTED / PARTIAL).
 
 ---
 

@@ -7,6 +7,7 @@ import { afterAll, describe, expect, test } from '@jest/globals';
 import SupplierRefundModel, { creditNoteRefundable } from '../models/SupplierRefund';
 import PurchaseReturnModel from '../models/PurchaseReturn';
 import AccountingService from '../services/accountingService';
+import SupplierLedgerModel from '../models/SupplierLedger';
 import { createFixtureDb, cleanupFixtureDbs } from './helpers/productionSchema';
 
 afterAll(() => cleanupFixtureDbs());
@@ -102,7 +103,8 @@ function seedReturn(db: Database.Database, opts: { cash?: number; disposition?: 
       items: [{ source_item_id: purchaseId, quantity: opts.returnQty ?? qty }],
     },
     1,
-    db
+    db,
+    { 'idempotency-key': `sr-return-${Date.now()}-${Math.floor(Math.random() * 1e6)}` }
   );
 
   const note = db.prepare(`SELECT id FROM credit_notes WHERE source_id = ?`)
@@ -176,7 +178,7 @@ describe('SupplierRefundModel', () => {
       return_date: '2026-07-04', source_type: 'PURCHASE', source_id: first.purchaseId,
       warehouse_id: 1, disposition: 'credit_on_account',
       items: [{ source_item_id: first.purchaseId, quantity: 5 }],
-    }, 1, db);
+    }, 1, db, { 'idempotency-key': `sr-return2-${Date.now()}-${Math.floor(Math.random() * 1e6)}` });
     const note = db.prepare<[number], { id: number }>('SELECT id FROM credit_notes WHERE source_id = ?').get(second.id);
     if (!note) throw new Error('Missing second credit note');
     expect(creditNoteRefundable(note.id, db)).toBe(0);
@@ -242,7 +244,7 @@ describe('SupplierRefundModel', () => {
     const gl = db.prepare(`
       SELECT SUM(jl.debit) AS dr, SUM(jl.credit) AS cr
       FROM journal_lines jl
-      WHERE jl.reference_type = 'SUPPLIER_REFUND' AND jl.reference_id = ? AND jl.voided = 0
+      WHERE jl.reference_type = 'REFUND_RECEIPT' AND jl.reference_id = ? AND jl.voided = 0
       GROUP BY jl.journal_entry_id
     `).all(refund.id) as Array<{ dr: number; cr: number }>;
     expect(gl).toHaveLength(1);
@@ -308,7 +310,7 @@ describe('SupplierRefundModel', () => {
     expect(total).toBeGreaterThan(0);
   });
 
-  test('PRET-001: voiding a return also voids its explicitly recorded supplier refund', () => {
+  test('PRET-002: a return with a receipted claim voids only after the receipt reverses', () => {
     const db = setupDb();
     const { returnId, creditNoteId } = seedReturn(db, { cash: 1000 });
 
@@ -320,26 +322,29 @@ describe('SupplierRefundModel', () => {
     ).get(creditNoteId) as { id: number };
     expect(refund).toBeDefined();
 
+    // The receipted claim blocks the return void (D19): void the receipt first.
+    expect(() => PurchaseReturnModel.voidReturn(returnId, 1, 'blocked', db))
+      .toThrow(/recorded receipt/);
+
+    SupplierRefundModel.void(refund.id, 1, 'wrong amount', db);
     PurchaseReturnModel.voidReturn(returnId, 1, 'PRET-001 regression', db);
 
-    // The refund is voided WITH the return — a POSTED refund against a
-    // VOIDED credit note made the paid-out cash invisible
-    // (creditNoteRefundable returns 0 for a non-POSTED note).
-    const after = db.prepare(`SELECT status FROM supplier_refunds WHERE id = ?`)
-      .get(refund.id) as { status: string };
-    expect(after.status).toBe('VOIDED');
+    // The claim was released to CANCELLED with the return.
+    const claim = db.prepare(
+      `SELECT status FROM supplier_refund_claims WHERE return_id = ?`
+    ).get(returnId) as { status: string };
+    expect(claim.status).toBe('CANCELLED');
 
-    // GL: both reversal groups fully voided — no fabricated cash/AP survives.
+    // GL: receipt + return reversal groups fully voided.
     const live = db.prepare(`
       SELECT COUNT(*) AS n FROM journal_lines
       WHERE voided = 0
-        AND ((reference_type = 'SUPPLIER_REFUND' AND reference_id = ?)
+        AND ((reference_type IN ('SUPPLIER_REFUND', 'REFUND_RECEIPT') AND reference_id = ?)
           OR (reference_type = 'PURCHASE_RETURN' AND reference_id = ?))
     `).get(refund.id, returnId) as { n: number };
     expect(live.n).toBe(0);
 
-    // Cash account holds only the seeded opening balance: the refund's
-    // Dr 1000 leg is reversed, not left behind.
+    // Cash account holds only the seeded opening balance.
     const cash = db.prepare(`
       SELECT COALESCE(SUM(jl.debit - jl.credit), 0) AS net
       FROM journal_lines jl JOIN chart_of_accounts a ON a.id = jl.account_id
@@ -352,6 +357,65 @@ describe('SupplierRefundModel', () => {
       `SELECT balance FROM supplier_ledger WHERE supplier_id = 1 ORDER BY id DESC LIMIT 1`
     ).get() as { balance: number };
     expect(Math.abs(balance.balance)).toBeLessThan(0.01);
+  });
+
+  test('PRET-001 legacy: voiding a return cascades to a pre-claim SUPPLIER_REFUND row', () => {
+    const db = setupDb();
+    const { returnId, creditNoteId, total } = seedReturn(db, { cash: 1000 });
+
+    // Backfilled legacy shape: a POSTED refund with a legacy GL group and a
+    // received-up claim carrying no allocation rows (pre-PRET-002 data).
+    const claim = db.prepare(
+      'SELECT id, supplier_id FROM supplier_refund_claims WHERE return_id = ?'
+    ).get(returnId) as { id: number; supplier_id: number };
+    db.prepare(
+      `UPDATE supplier_refund_claims SET status = 'RECEIVED', received_amount = ? WHERE id = ?`
+    ).run(total, claim.id);
+    const ins = db.prepare(`
+      INSERT INTO supplier_refunds
+        (refund_no, supplier_id, credit_note_id, refund_date, amount, payment_method, status, created_by)
+      VALUES ('SR-LEGACY-1', ?, ?, '2026-07-03', ?, 'Cash', 'POSTED', 1)
+    `).run(claim.supplier_id, creditNoteId, total);
+    const refundId = ins.lastInsertRowid as number;
+    const cashAcc = db.prepare(`SELECT id FROM chart_of_accounts WHERE code = '1000'`).get() as { id: number };
+    const ap = db.prepare(`SELECT id FROM chart_of_accounts WHERE code = '2000'`).get() as { id: number };
+    AccountingService.postEntry(db, {
+      entry_date: '2026-07-03', description: 'legacy refund', created_by: 1,
+      reference_type: 'SUPPLIER_REFUND', reference_id: refundId,
+      lines: [
+        { account_id: cashAcc.id, debit: total, description: 'legacy refund' },
+        { account_id: ap.id, credit: total, description: 'legacy refund' },
+      ],
+    });
+    SupplierLedgerModel.createEntry({
+      supplier_id: claim.supplier_id, transaction_date: '2026-07-03',
+      transaction_type: 'SUPPLIER_REFUND', reference_no: 'SR-LEGACY-1',
+      debit: total, credit: 0, description: 'legacy refund',
+    }, db);
+    SupplierLedgerModel.rebuildBalances(claim.supplier_id, db);
+
+    // No allocation rows → the guard does not fire; the legacy cascade voids
+    // the POSTED refund together with the return.
+    PurchaseReturnModel.voidReturn(returnId, 1, 'PRET-001 legacy cascade', db);
+
+    const after = db.prepare(`SELECT status FROM supplier_refunds WHERE id = ?`)
+      .get(refundId) as { status: string };
+    expect(after.status).toBe('VOIDED');
+    const live = db.prepare(`
+      SELECT COUNT(*) AS n FROM journal_lines
+      WHERE voided = 0 AND reference_type = 'SUPPLIER_REFUND' AND reference_id = ?
+    `).get(refundId) as { n: number };
+    expect(live.n).toBe(0);
+    const cash = db.prepare(`
+      SELECT COALESCE(SUM(jl.debit - jl.credit), 0) AS net
+      FROM journal_lines jl JOIN chart_of_accounts a ON a.id = jl.account_id
+      WHERE a.code = '1000' AND jl.voided = 0
+    `).get() as { net: number };
+    expect(cash.net).toBeCloseTo(1000, 2);
+    const claimStatus = db.prepare(
+      `SELECT status FROM supplier_refund_claims WHERE id = ?`
+    ).get(claim.id) as { status: string };
+    expect(claimStatus.status).toBe('CANCELLED');
   });
 
   test('void reverses ledger + GL and restores the refundable balance', () => {
@@ -371,7 +435,7 @@ describe('SupplierRefundModel', () => {
     // GL reversed (all lines voided by reference).
     const gl = db.prepare(`
       SELECT COUNT(*) AS n FROM journal_lines jl
-      WHERE jl.reference_type = 'SUPPLIER_REFUND' AND jl.reference_id = ? AND jl.voided = 0
+      WHERE jl.reference_type = 'REFUND_RECEIPT' AND jl.reference_id = ? AND jl.voided = 0
     `).get(refund.id) as { n: number };
     expect(gl.n).toBe(0);
 

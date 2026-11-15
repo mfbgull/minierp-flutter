@@ -10,7 +10,13 @@ describe('Recoverable tax on stock purchases', () => {
   let supplierId: number;
   let itemId: number;
   let warehouseId: number;
-  const post = (url: string, body: object) => request(app).post(url).set('Cookie', cookie).send(body);
+  // Distinct deterministic keys — /supplier-refunds mandates Idempotency-Key.
+  let postCounter = 0;
+  const post = (url: string, body: object) =>
+    request(app).post(url)
+      .set('Cookie', cookie)
+      .set('Idempotency-Key', `sitx-${(postCounter += 1)}-${JSON.stringify(body).length}`)
+      .send(body);
   const balance = (code: string) => (db.prepare(`SELECT COALESCE(SUM(jl.debit - jl.credit), 0) AS amount FROM journal_lines jl JOIN chart_of_accounts a ON a.id = jl.account_id WHERE a.code = ? AND jl.voided = 0`).get(code) as { amount: number }).amount;
   beforeAll(async () => {
     cookie = await getAuthCookie();

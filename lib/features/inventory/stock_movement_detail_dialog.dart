@@ -14,6 +14,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/utils/idempotency_key.dart';
 import '../../data/models/stock_movement.dart' show StockMovement;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
 import '../../data/repositories/inventory_repository.dart'
@@ -204,6 +205,7 @@ class _ReverseAdjustmentAction extends ConsumerStatefulWidget {
 class _ReverseAdjustmentActionState
     extends ConsumerState<_ReverseAdjustmentAction> {
   bool _busy = false;
+  final _idemKeys = IdempotencyKeyCache(prefix: 'stock-rev');
 
   Future<void> _reverse() async {
     final l10n = AppLocalizations.of(context)!;
@@ -217,17 +219,18 @@ class _ReverseAdjustmentActionState
     if (!confirmed || !mounted) return;
     setState(() => _busy = true);
 
+    final body = <String, dynamic>{
+      'item_id': widget.movement.itemId,
+      'warehouse_id': widget.movement.warehouseId,
+      'quantity': -widget.movement.quantity,
+      'movement_type': 'ADJUSTMENT',
+      'remarks': 'Reverse of ${widget.movement.movementNo}',
+      'reference_doctype': 'ADJUSTMENT',
+      'reference_docno': widget.movement.movementNo,
+    };
     final result = await ref
         .read(inventoryRepositoryProvider)
-        .createStockMovement({
-          'item_id': widget.movement.itemId,
-          'warehouse_id': widget.movement.warehouseId,
-          'quantity': -widget.movement.quantity,
-          'movement_type': 'ADJUSTMENT',
-          'remarks': 'Reverse of ${widget.movement.movementNo}',
-          'reference_doctype': 'ADJUSTMENT',
-          'reference_docno': widget.movement.movementNo,
-        });
+        .createStockMovement(body, idempotencyKey: _idemKeys.keyFor(body));
     if (!mounted) return;
 
     switch (result) {

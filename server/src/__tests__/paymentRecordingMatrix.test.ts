@@ -107,6 +107,7 @@ describe('payment recording matrix', () => {
 
   async function payInvoice(invoiceId: number, paymentDate: string, amount = 100): Promise<number> {
     const res = await request(app).post('/api/payments')
+      .set('Idempotency-Key', `patch-paymentRecording-77-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         customer_id: customerId,
@@ -157,6 +158,7 @@ describe('payment recording matrix', () => {
     ledgerUtils.calculateInvoiceBalance(invoice.invoiceId);
 
     const allocated = await request(app).post(`/api/payments/${paymentId}/allocate`)
+      .set('Idempotency-Key', `patch-paymentRecording-78-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({ allocations: [{ invoice_id: invoice.invoiceId, amount: 100 }] });
     expect([200, 201]).toContain(allocated.status);
@@ -237,6 +239,7 @@ describe('payment recording matrix', () => {
     );
 
     const res = await request(app).post('/api/payments')
+      .set('Idempotency-Key', `patch-paymentRecording-79-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         customer_id: backdatedCustomerId,
@@ -260,6 +263,7 @@ describe('payment recording matrix', () => {
     const before = db.prepare('SELECT COUNT(*) AS count FROM payments').get() as { count: number };
 
     const rejected = await request(app).post('/api/payments')
+      .set('Idempotency-Key', `patch-paymentRecording-80-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         customer_id: customerId,
@@ -272,6 +276,7 @@ describe('payment recording matrix', () => {
     expect(JSON.stringify(rejected.body)).toMatch(/closed|period/i);
 
     const invoiceTime = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', `patch-paymentRecording-81-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         customer_id: customerId,
@@ -343,6 +348,7 @@ describe('payment recording matrix', () => {
     const purchaseId = (db.prepare('SELECT id FROM purchases WHERE purchase_no = ?').get(purchaseNo) as { id: number }).id;
 
     const paid = await request(app).post('/api/payments')
+      .set('Idempotency-Key', `patch-paymentRecording-82-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         supplier_id: supplierId,
@@ -375,6 +381,7 @@ describe('payment recording matrix', () => {
     const before = db.prepare('SELECT COUNT(*) AS count FROM payments').get() as { count: number };
 
     const cashOut = await request(app).post('/api/payments')
+      .set('Idempotency-Key', `patch-paymentRecording-83-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         supplier_id: supplierId,

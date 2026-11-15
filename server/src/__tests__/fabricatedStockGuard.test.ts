@@ -56,6 +56,7 @@ describe('allocator must not fabricate stock', () => {
 
     const res = await request(app)
       .post('/api/invoices')
+      .set('Idempotency-Key', `patch-fabricatedStockG-23-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         customer_id: customerId,
@@ -92,6 +93,7 @@ describe('allocator must not fabricate stock', () => {
 
     const res = await request(app)
       .post('/api/invoices')
+      .set('Idempotency-Key', `patch-fabricatedStockG-24-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         customer_id: customerId,

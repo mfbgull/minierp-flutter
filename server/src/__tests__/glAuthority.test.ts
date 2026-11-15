@@ -55,6 +55,7 @@ describe('GL authority (audit task 34)', () => {
     );
 
     const expense = await request(app).post('/api/expenses')
+      .set('Idempotency-Key', `patch-glAuthority.te-23-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({ expense_category: 'Utilities', amount: 30, expense_date: '2026-03-15' });
     expect([200, 201]).toContain(expense.status);
@@ -65,6 +66,7 @@ describe('GL authority (audit task 34)', () => {
     );
 
     const returned = await request(app).post(`/api/invoices/${taxInvoiced.invoiceId}/return`)
+      .set('Idempotency-Key', `patch-glAuthority.test-49-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         items: [{ invoice_item_id: taxInvoiced.invoiceItemIds[0], return_quantity: 1 }],

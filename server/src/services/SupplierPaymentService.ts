@@ -16,6 +16,7 @@ import { validateSupplierPayment } from './paymentValidation';
 import { assertPaymentMethod, assertPeriodOpen, insertPaymentRow } from './paymentWriterCore';
 import type { PaymentRecordingResult, SupplierPaymentInput } from './paymentRecordingTypes';
 import { BusinessRuleError } from '../utils/businessRuleError';
+import { assertCashTimeline } from './cashBalanceGuard';
 
 export class SupplierPaymentService {
   constructor(private readonly db: Database.Database) {}
@@ -133,6 +134,15 @@ export class SupplierPaymentService {
       paymentDate: input.paymentDate,
       paymentMethod: input.paymentMethod,
       userId: input.userId ?? undefined,
+    });
+    // ACCT-013: the funds check above only guards the payment date. A
+    // backdated payout lowers every later daily balance, so it can overdraw a
+    // day the point-in-time check never looks at. Run the chronological
+    // suffix check AFTER the posting so the new outflow is in the timeline; a
+    // throw rolls the caller's transaction back.
+    assertCashTimeline(this.db, {
+      paymentMethod: input.paymentMethod,
+      fromDate: input.paymentDate,
     });
   }
 

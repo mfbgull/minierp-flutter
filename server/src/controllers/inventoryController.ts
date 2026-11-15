@@ -14,6 +14,54 @@ import logger from '../utils/logger';
 import { errorMessage } from '../utils/errorMessage';
 import { SqlParam } from '../utils/sqlTypes';
 import { BusinessRuleError, handleBusinessError } from '../utils/businessRuleError';
+import {
+  claimIdempotencyKey,
+  hashRequestPayload,
+  startRequiredIdempotentRequest,
+} from '../utils/idempotency';
+
+const STOCK_MOVEMENT_CREATE_SCOPE = 'inventory.stock-movements.create';
+const STOCK_TRANSFER_CREATE_SCOPE = 'inventory.stock-transfers.create';
+
+/**
+ * Enforce the ACCT-008 mandate + replay for the two inventory writes.
+ * Returns `{ done: true }` after writing the error or replay response, so the
+ * caller returns immediately; otherwise returns the key to claim.
+ */
+function beginRequiredInventoryWrite(
+  req: AuthRequest, res: Response, scope: string,
+): { done: true } | { done: false; key: string | null } {
+  const hash = hashRequestPayload(req.body);
+  const start = startRequiredIdempotentRequest(db, req.headers as Record<string, unknown>, scope, hash);
+  if (start.kind === 'error') {
+    res.status(start.status).json({ error: start.message });
+    return { done: true };
+  }
+  if (start.kind === 'replay') {
+    res.set('X-Idempotent-Replay', 'true');
+    res.status(201).json(StockMovementModel.getById(start.resourceId, db));
+    return { done: true };
+  }
+  return { done: false, key: start.key };
+}
+
+/** Same for the transfer route, whose replay body is the `{success,data}` envelope. */
+function beginRequiredTransferWrite(
+  req: AuthRequest, res: Response,
+): { done: true } | { done: false; key: string | null } {
+  const hash = hashRequestPayload(req.body);
+  const start = startRequiredIdempotentRequest(db, req.headers as Record<string, unknown>, STOCK_TRANSFER_CREATE_SCOPE, hash);
+  if (start.kind === 'error') {
+    res.status(start.status).json({ error: start.message });
+    return { done: true };
+  }
+  if (start.kind === 'replay') {
+    res.set('X-Idempotent-Replay', 'true');
+    res.status(201).json({ success: true, data: { out: { id: start.resourceId } }, error: null });
+    return { done: true };
+  }
+  return { done: false, key: start.key };
+}
 
 function getItems(req: Request, res: Response): void {
   try {
@@ -602,6 +650,12 @@ function createStockMovement(req: AuthRequest, res: Response): void {
       return;
     }
 
+    // ACCT-008: a write-off or adjustment moves stock and posts GL. A retry
+    // must replay, never consume the same units twice.
+    const idem = beginRequiredInventoryWrite(req, res, STOCK_MOVEMENT_CREATE_SCOPE);
+    if (idem.done) return;
+    const start = { key: idem.key };
+
     // A movement date selects a period; it may not silently open a future one (PUR-005)
     if (movement_date !== undefined) {
       AccountingService.assertDocumentDateNotFuture(String(movement_date), 'Stock movement');
@@ -641,6 +695,7 @@ function createStockMovement(req: AuthRequest, res: Response): void {
 
     // Log stock movement using activity logger (log the first/primary movement)
     const primaryResult = results[0];
+    if (start.key) claimIdempotencyKey(db, STOCK_MOVEMENT_CREATE_SCOPE, start.key, hashRequestPayload(req.body), primaryResult.id);
     logCRUD(ActionType.STOCK_MOVEMENT, 'StockMovement', primaryResult.id, `${movement_type}: ${quantity} ${item?.unit_of_measure || 'units'} of ${item?.item_name} at ${warehouse?.warehouse_name}${results.length > 1 ? ` (${results.length} batches)` : ''}`, req.user!.id, {
       item_id,
       item_code: item?.item_code,
@@ -690,6 +745,12 @@ function createStockTransfer(req: AuthRequest, res: Response): void {
       res.status(400).json({ error: 'Quantity must be a positive number' });
       return;
     }
+
+    // ACCT-008: a transfer consumes FIFO stock at the source. A retry must
+    // replay, never consume the same units twice.
+    const idem = beginRequiredTransferWrite(req, res);
+    if (idem.done) return;
+    const start = { key: idem.key };
     if (from_warehouse_id === to_warehouse_id) {
       res.status(400).json({ error: 'Source and destination warehouses must differ' });
       return;
@@ -700,6 +761,8 @@ function createStockTransfer(req: AuthRequest, res: Response): void {
       req.user!.id,
       db
     );
+
+    if (start.key) claimIdempotencyKey(db, STOCK_TRANSFER_CREATE_SCOPE, start.key, hashRequestPayload(req.body), result.out.id);
 
     res.status(201).json({
       success: true,

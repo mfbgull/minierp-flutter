@@ -164,6 +164,7 @@ void main() {
     String surface = 'detail',
     bool narrow = false,
     bool urdu = false,
+    Customer? customer,
   }) async {
     tester.view.physicalSize = narrow
         ? const Size(390, 844)
@@ -188,13 +189,15 @@ void main() {
                 : surface == 'history'
                 ? const CustomerPaymentsTab(customerId: 2, sessionId: 3)
                 : surface == 'cash'
-                ? const CustomerUnappliedCashTab(
-                    customer: Customer(
-                      id: 2,
-                      customerCode: 'C2',
-                      customerName: 'Cash customer',
-                      currentBalance: 0,
-                    ),
+                ? CustomerUnappliedCashTab(
+                    customer:
+                        customer ??
+                        const Customer(
+                          id: 2,
+                          customerCode: 'C2',
+                          customerName: 'Cash customer',
+                          currentBalance: 0,
+                        ),
                     sessionId: 3,
                   )
                 : Builder(
@@ -281,6 +284,82 @@ void main() {
       find.text('${urdu.customersMethod}: ${urdu.paymentsMethodCash}'),
       findsOneWidget,
     );
+  });
+  testWidgets('store credit KPI combines the pool with legacy ledger credit', (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      surface: 'cash',
+      customer: const Customer(
+        id: 2,
+        customerCode: 'C2',
+        customerName: 'Walk-in Customer',
+        currentBalance: -50,
+        creditBalance: 0,
+      ),
+    );
+    // Pool 0 + legacy ledger credit 50 = 50, not 0. The Store credit card
+    // pairs its label with the combined value.
+    final card = find.ancestor(
+      of: find.text('Store credit'),
+      matching: find.byType(Card),
+    );
+    expect(
+      find.descendant(of: card, matching: find.text('Rs. 50.00')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets('store credit KPI sums the pool and the ledger half', (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      surface: 'cash',
+      customer: const Customer(
+        id: 2,
+        customerCode: 'C2',
+        customerName: 'Credit customer',
+        currentBalance: -25,
+        creditBalance: 130,
+      ),
+    );
+    // Pool 130 + legacy ledger credit 25 = 155.
+    final card = find.ancestor(
+      of: find.text('Store credit'),
+      matching: find.byType(Card),
+    );
+    expect(
+      find.descendant(of: card, matching: find.text('Rs. 155.00')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets('store credit KPI stays pool-only when the ledger is owed', (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      surface: 'cash',
+      customer: const Customer(
+        id: 2,
+        customerCode: 'C2',
+        customerName: 'Debtor customer',
+        currentBalance: 400,
+        creditBalance: 75,
+      ),
+    );
+    // The customer owes money, so only the pool counts.
+    final card = find.ancestor(
+      of: find.text('Store credit'),
+      matching: find.byType(Card),
+    );
+    expect(
+      find.descendant(of: card, matching: find.text('Rs. 75.00')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
   });
   testWidgets('compact reverse action has a localized accessibility tooltip', (
     tester,

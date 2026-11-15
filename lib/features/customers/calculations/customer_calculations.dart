@@ -133,6 +133,19 @@ num calculateCreditUtilization(num balance, num? creditLimit) {
   return 0;
 }
 
+/// Total credit the business owes the customer (H9).
+///
+/// Credit arrives in two non-overlapping forms: the explicit store-credit
+/// pool ([storeCreditPool], from returns settled as credit) and legacy
+/// ledger credit (a negative balance). They never carry the same money, so
+/// the available figure is their sum. The pool half is spendable through
+/// the store-credit apply endpoint; the ledger half is consumed by the
+/// invoice-creation credit offset.
+num customerAvailableCredit({
+  required num storeCreditPool,
+  required num currentBalance,
+}) => storeCreditPool + (currentBalance < 0 ? -currentBalance : 0);
+
 /// Overdue invoices (status === 'Overdue' and balance > 0).
 List<Invoice> calculateOverdueInvoices(List<Invoice> invoices) {
   return invoices

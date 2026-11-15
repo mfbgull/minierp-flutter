@@ -84,6 +84,7 @@ function glAR(asOf = AS_OF): number {
 
 async function payAmount(invoiceId: number, amount: number, date: string): Promise<void> {
   const res = await request(app).post('/api/payments')
+    .set('Idempotency-Key', `patch-arPartialReturn.-23-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
     .set('Cookie', token)
     .send({
       customer_id: (db.prepare('SELECT customer_id FROM invoices WHERE id = ?').get(invoiceId) as { customer_id: number }).customer_id,

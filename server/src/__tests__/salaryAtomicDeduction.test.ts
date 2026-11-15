@@ -8,7 +8,10 @@ describe('Salary deduction is one idempotent transaction', () => {
   let cookie: string;
   let employeeId: number;
   let loanId: number;
-  const post = (url: string, body: object) => request(app).post(url).set('Cookie', cookie).send(body);
+  // D19: salary pay / owner-equity / purchase writes mandate a key.
+  const post = (url: string, body: object) => request(app).post(url)
+    .set('Idempotency-Key', `sad-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    .set('Cookie', cookie).send(body);
   beforeAll(async () => {
     cookie = await getAuthCookie();
     const capital = await post('/api/owner-equity/capital', { capital_date: '2026-09-01', amount: 10000, payment_method: 'Cash' });

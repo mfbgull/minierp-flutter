@@ -78,6 +78,7 @@ async function stock(
 ): Promise<void> {
   const res = await request(app)
     .post('/api/purchases')
+      .set('Idempotency-Key', `patch-multiOutputPro-37-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
     .set('Cookie', authCookie)
     .send({
       item_id: itemId,
@@ -182,6 +183,7 @@ describe('joint production: cost split, valuation and GL', () => {
 
     const res = await request(app)
       .post('/api/productions')
+      .set('Idempotency-Key', `prod-${Date.now()}-${Math.floor(Math.random()*1e6)}`)
       .set('Cookie', authCookie)
       .send({
         outputs: [
@@ -337,6 +339,7 @@ describe('joint production: guards', () => {
 
     const res = await request(app)
       .post('/api/productions')
+      .set('Idempotency-Key', `prod-${Date.now()}-${Math.floor(Math.random()*1e6)}`)
       .set('Cookie', authCookie)
       .send({
         outputs: [{ item_id: out, quantity: 1 }],
@@ -366,6 +369,7 @@ describe('joint production: guards', () => {
 
     const res = await request(app)
       .post('/api/productions')
+      .set('Idempotency-Key', `prod-${Date.now()}-${Math.floor(Math.random()*1e6)}`)
       .set('Cookie', authCookie)
       .send({
         outputs: [
@@ -385,6 +389,7 @@ describe('joint production: guards', () => {
 
     const res = await request(app)
       .post('/api/productions')
+      .set('Idempotency-Key', `prod-${Date.now()}-${Math.floor(Math.random()*1e6)}`)
       .set('Cookie', authCookie)
       .send({
         outputs: [{ item_id: raw, quantity: 1 }],

@@ -159,6 +159,7 @@ describe('idempotency — Round 1 money handlers', () => {
   describe('payments.supplier', () => {
     async function seedPurchase(): Promise<number> {
       const res = await request(app).post('/api/purchases')
+        .set('Idempotency-Key', `patch-idempotencyRou-31-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
         .set('Cookie', authCookie)
         .send({
           item_id: itemId,

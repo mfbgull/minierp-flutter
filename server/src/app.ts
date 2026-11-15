@@ -7,6 +7,7 @@ import { jsonBodyErrorHandler } from './middleware/jsonBodyErrorHandler';
 import { apiLimiter } from './middleware/rateLimiter';
 import logger from './utils/logger';
 import { requestLogger, errorLogger } from './middleware/requestLogger';
+import { observeClientVersion } from './middleware/clientVersion';
 import { activityLogBackstop } from './middleware/activityLog';
 import db from './config/database';
 
@@ -127,6 +128,10 @@ app.use(activityLogBackstop);
 
 // Request logging middleware
 app.use(requestLogger);
+
+// Client build version: log it, warn when it is below the minimum. Warn
+// only — an old build must never be locked out (see audit/DECISIONS.md).
+app.use(observeClientVersion);
 
 /**
  * Health check endpoint — verifies server liveness AND readiness.

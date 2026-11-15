@@ -31,6 +31,7 @@ async function createInvoiceWithPayment(
 ): Promise<{ id: number; body: Record<string, unknown> }> {
   const invNo = `INV-SPLIT-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
   const res = await request(app).post('/api/invoices')
+    .set('Idempotency-Key', `patch-invoiceSplitStat-56-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
     .set('Cookie', authCookie)
     .send({
       invoice_no: invNo,
@@ -118,6 +119,7 @@ describe('P23: Invoice split payment_status / return_status', () => {
     expect(invBefore.return_status).toBe('None');
 
     const returnRes = await request(app).post(`/api/invoices/${id}/return`)
+      .set('Idempotency-Key', `patch-invoiceSplitStat-57-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Cookie', authCookie)
       .send({
         return_date: '2026-09-20',

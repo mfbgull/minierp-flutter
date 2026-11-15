@@ -16,6 +16,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/date_utils.dart' show isoDate;
 import '../../core/utils/formatters.dart';
+import '../../core/utils/idempotency_key.dart';
 import '../../data/models/purchase.dart' show Purchase;
 import '../../data/models/purchase_order.dart' show PurchaseOrderDetail;
 import '../../data/models/stock_batch.dart' show StockBatch;
@@ -129,6 +130,7 @@ class _PurchaseReturnFormDialog extends ConsumerStatefulWidget {
 class _PurchaseReturnFormDialogState
     extends ConsumerState<_PurchaseReturnFormDialog> {
   final _reasonController = TextEditingController();
+  final _idemKeys = IdempotencyKeyCache(prefix: 'preturn');
 
   /// Per-line return-qty controllers, keyed by source item id — created
   /// lazily once the source detail loads, disposed on close.
@@ -330,6 +332,18 @@ class _PurchaseReturnFormDialogState
       reason: _reasonController.text,
       disposition: _disposition,
       items: items,
+      // An unchanged retry replays; an edited return mints a new key.
+      idempotencyKey: _idemKeys.keyFor({
+        'source_id': widget.source.id,
+        'warehouse_id': _warehouseId,
+        'return_date': isoDate(_returnDate),
+        'reason': _reasonController.text,
+        'disposition': _disposition,
+        'items': [
+          for (final item in items)
+            {'source_item_id': item.sourceItemId, 'quantity': item.quantity},
+        ],
+      }),
     );
     if (!mounted) return;
 

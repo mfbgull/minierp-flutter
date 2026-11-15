@@ -17,6 +17,7 @@ import '../../data/repositories/invoice_repository.dart';
 import '../../widgets/app_toast.dart';
 import '../../l10n/app_localizations.dart';
 import '../payments/unified_payment_labels.dart';
+import 'calculations/customer_calculations.dart' show customerAvailableCredit;
 import '../../widgets/detail_tab_grid.dart';
 import '../../widgets/form_helpers.dart';
 import 'customer_providers.dart';
@@ -102,7 +103,10 @@ class _CustomerUnappliedCashTabState
                 ),
                 _balance(
                   l10n.cashStoreCredit,
-                  widget.customer.creditBalance,
+                  customerAvailableCredit(
+                    storeCreditPool: widget.customer.creditBalance,
+                    currentBalance: widget.customer.currentBalance,
+                  ),
                   narrow
                       ? constraints.maxWidth - 32
                       : (constraints.maxWidth - 56) / 3,

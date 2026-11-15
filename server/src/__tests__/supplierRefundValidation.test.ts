@@ -60,7 +60,7 @@ describe('createSupplierRefund request validation', () => {
   it('rejects a missing credit_note_id with 400', () => {
     const res = invoke({ refund_date: '2026-07-03', amount: 100 });
     expect(res.statusCode).toBe(400);
-    expect(res.body).toEqual({ error: 'A valid credit_note_id is required' });
+    expect(res.body).toEqual({ error: 'A credit_note_id or claim_id is required' });
   });
 
   it('rejects a missing amount with 400 rather than letting NaN reach the model', () => {

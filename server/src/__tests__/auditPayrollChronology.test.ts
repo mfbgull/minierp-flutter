@@ -19,7 +19,10 @@ describe('salary recognition, chronology and D15', () => {
     expect(res.status).toBe(201);
     employee = res.body.data.id;
   });
-  async function post(url: string, body: object) { return request(app).post(url).set('Cookie', cookie).send(body); }
+  // D19: salary pay / owner-equity / purchase writes mandate a key.
+  async function post(url: string, body: object) { return request(app).post(url)
+    .set('Idempotency-Key', `apc-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    .set('Cookie', cookie).send(body); }
   function net(code: string) {
     return Math.round((db.prepare(`SELECT COALESCE(SUM(j.debit-j.credit),0) AS n FROM journal_lines j
       JOIN chart_of_accounts a ON a.id=j.account_id WHERE a.code=? AND j.voided=0`).get(code) as { n: number }).n * 100);

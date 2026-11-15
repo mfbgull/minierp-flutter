@@ -20,6 +20,7 @@ import ledgerUtils from '../utils/ledgerUtils';
 import { parseCurrency, subtractCurrency } from '../utils/currency';
 import { validateCustomerPayment, assertInvoiceAllocation } from './paymentValidation';
 import { assertLegacyPaymentAllowed } from './unappliedPaymentGuard';
+import { assertCashTimeline } from './cashBalanceGuard';
 import { assertPaymentMethod, assertPeriodOpen, insertPaymentRow } from './paymentWriterCore';
 import { beginIdempotentWrite, claimIdempotencyKey } from '../utils/idempotency';
 import type {
@@ -186,6 +187,17 @@ export class PaymentRecordingService {
         customerId: input.customerId,
         userId: input.userId ?? undefined,
       });
+      // ACCT-013: the refund guard above only checks the refund date. A
+      // backdated cash refund lowers every later daily balance, so it can
+      // overdraw a day that check never looks at. Run the chronological
+      // suffix check AFTER the posting; a throw rolls the transaction back.
+      // Bank/card refunds do not touch the drawer, so they are exempt.
+      if (input.paymentMethod.toLowerCase() === 'cash') {
+        assertCashTimeline(this.db, {
+          paymentMethod: input.paymentMethod,
+          fromDate: input.paymentDate,
+        });
+      }
       return;
     }
 

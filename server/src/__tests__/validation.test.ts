@@ -59,6 +59,7 @@ describe('Validation middleware — consistent error envelope', () => {
   it('validates expense create body', async () => {
     const res = await request(app)
       .post('/api/expenses')
+        .set('Idempotency-Key', `patch-validation.tes-44-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
       .set('Authorization', `Bearer ${authToken}`)
       .send({}); // missing required fields
     expect(res.status).toBe(400);

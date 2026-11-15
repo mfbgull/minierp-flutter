@@ -19,6 +19,7 @@ export class BusinessRuleError extends Error {
   constructor(
     public status: number,
     message: string,
+    public readonly details?: unknown,
   ) {
     super(message);
     this.name = 'BusinessRuleError';
@@ -69,11 +70,16 @@ function isStatusBearingError(error: unknown): error is Error & { status: number
  * Returns `{ status, message }` for business-rule violations, or `null`
  * when the error is a genuine server-side failure (should become 500).
  */
-export function classifyError(error: unknown): { status: number; message: string } | null {
+export function classifyError(
+  error: unknown,
+): { status: number; message: string; details?: unknown } | null {
   // --- Typed error classes that already carry their own status ---
   // ReturnError, BusinessRuleError, etc. — honour the embedded status.
   if (isStatusBearingError(error)) {
-    return { status: error.status, message: error.message };
+    const details = (error as { details?: unknown }).details;
+    return details !== undefined
+      ? { status: error.status, message: error.message, details }
+      : { status: error.status, message: error.message };
   }
 
   const msg = error instanceof Error ? error.message : String(error);
@@ -113,7 +119,9 @@ export function handleBusinessError(
 
   if (classified) {
     logger.warn(`${context} — business rule violation: ${classified.message}`);
-    send(classified.status, { error: classified.message });
+    send(classified.status, classified.details !== undefined
+      ? { error: classified.message, details: classified.details }
+      : { error: classified.message });
     return;
   }
 

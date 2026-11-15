@@ -1231,6 +1231,57 @@ function runSupplierPaymentMigration(): void {
 
 // Table rebuild requiring FK off BEFORE the transaction starts; manages its
 // own transaction and always restores foreign_keys=ON.
+// PRET-002: receipts against standalone refund claims have no credit note,
+// so supplier_refunds.credit_note_id drops its NOT NULL.
+function runSupplierRefundCreditNoteNullableRebuild(): void {
+  const notNullCheck = db.prepare(`
+    SELECT COUNT(*) as count FROM pragma_table_info('supplier_refunds')
+    WHERE name='credit_note_id' AND "notnull"=1
+  `).get() as { count: number };
+  if (notNullCheck.count === 0) return;
+
+  logger.info('Making supplier_refunds.credit_note_id nullable...');
+  db.pragma('foreign_keys = OFF');
+  try {
+    db.transaction(() => {
+      db.exec(`
+        CREATE TABLE supplier_refunds_new (
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            refund_no      TEXT NOT NULL UNIQUE,
+            refund_date    TEXT NOT NULL,
+            supplier_id    INTEGER NOT NULL REFERENCES suppliers(id),
+            credit_note_id INTEGER REFERENCES credit_notes(id),
+            return_id      INTEGER REFERENCES purchase_returns(id),
+            amount         NUMERIC(15,3) NOT NULL,
+            payment_method TEXT NOT NULL DEFAULT 'cash',
+            reference_no   TEXT,
+            status         TEXT NOT NULL DEFAULT 'POSTED',
+            voided_at      TEXT,
+            voided_by      INTEGER REFERENCES users(id),
+            voided_reason  TEXT,
+            created_by     INTEGER REFERENCES users(id),
+            created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        INSERT INTO supplier_refunds_new (id, refund_no, refund_date, supplier_id, credit_note_id, return_id, amount, payment_method, reference_no, status, voided_at, voided_by, voided_reason, created_by, created_at)
+          SELECT id, refund_no, refund_date, supplier_id, credit_note_id, return_id, amount, payment_method, reference_no, status, voided_at, voided_by, voided_reason, created_by, created_at FROM supplier_refunds;
+        DROP TABLE supplier_refunds;
+        ALTER TABLE supplier_refunds_new RENAME TO supplier_refunds;
+        CREATE INDEX IF NOT EXISTS idx_supplier_refunds_supplier ON supplier_refunds(supplier_id);
+        CREATE INDEX IF NOT EXISTS idx_supplier_refunds_credit_note ON supplier_refunds(credit_note_id);
+        CREATE INDEX IF NOT EXISTS idx_supplier_refunds_date ON supplier_refunds(refund_date);
+      `);
+    })();
+  } finally {
+    db.pragma('foreign_keys = ON');
+  }
+  if ((db.pragma('foreign_keys', { simple: true }) as number) !== 1) {
+    throw new Error('FATAL: supplier_refunds rebuild failed to restore foreign_keys=ON');
+  }
+  logger.info('✅ supplier_refunds.credit_note_id is now nullable');
+}
+
+// Table rebuild requiring FK off BEFORE the transaction starts; manages its
+// own transaction and always restores foreign_keys=ON.
 function runPaymentsCustomerNullableRebuild(): void {
   const notNullCheck = db.prepare(`
     SELECT COUNT(*) as count FROM pragma_table_info('payments')
@@ -2028,6 +2079,14 @@ export function applyPendingMigrations(): void {
   // (the runLedgered checksum covers first-time databases; this keeps partial
   // states repairable like the runPurchaseReturnsTablesMigration recovery).
   runLedgered('fn.runDispositionAndSupplierRefundsMigration', runDispositionAndSupplierRefundsMigration);
+  // PRET-002: refund claims + allocations, write-off account, nullable
+  // credit_note_id (FK-off rebuild — must not nest in a transaction), and
+  // claim backfill for existing refund_expected returns.
+  runLedgered('add-supplier-refund-claims.sql');
+  runLedgered('fn.runSupplierRefundCreditNoteNullableRebuild', runSupplierRefundCreditNoteNullableRebuild, { noTxn: true });
+  // ACCT-006: backdated-before-receipt sales are accepted with a warning;
+  // the flag feeds the Backdated sales exception report.
+  runLedgered('add-backdated-invoice-flag.sql');
   runLedgered('seed-expense-sequence.sql');
   runLedgered('normalize-expense-statuses.sql');
   runLedgered('normalize-expense-payment-methods.sql');
@@ -2466,6 +2525,7 @@ export function seedDefaultPermissions(): void {
       { name: 'supplier_refunds:read', module: 'supplier_refunds', action: 'read', description: 'View supplier refunds' },
       { name: 'supplier_refunds:create', module: 'supplier_refunds', action: 'create', description: 'Issue supplier refunds' },
       { name: 'supplier_refunds:void', module: 'supplier_refunds', action: 'void', description: 'Void supplier refunds' },
+      { name: 'supplier_refunds:write_off', module: 'supplier_refunds', action: 'write_off', description: 'Write off short-paid refund claims (above Rs 1,000 owner-only)' },
 
       // Expenses
       { name: 'expenses:read', module: 'expenses', action: 'read', description: 'View expenses' },

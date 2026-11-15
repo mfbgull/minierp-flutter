@@ -11,7 +11,7 @@ import {
   IDEMPOTENCY_SCOPES,
   claimIdempotencyKey,
   hashRequestPayload,
-  startIdempotentRequest,
+  startRequiredIdempotentRequest,
 } from '../utils/idempotency';
 import { requireSupplierForPurchase } from '../utils/purchaseValidation';
 import { BusinessRuleError } from '../utils/businessRuleError';
@@ -406,9 +406,9 @@ function createGoodsReceipt(req: AuthRequest, res: Response): void {
 
     // audit-3 task 08: a goods receipt brings stock IN and a payable with
     // it, so a retry after a lost response must replay rather than receive
-    // the same goods twice.
+    // the same goods twice. ACCT-008 / D19: the key is mandatory here.
     const hash = hashRequestPayload(req.body);
-    const start = startIdempotentRequest(db, req.headers, IDEMPOTENCY_SCOPES.PURCHASE_ORDER_RECEIPT, hash);
+    const start = startRequiredIdempotentRequest(db, req.headers, IDEMPOTENCY_SCOPES.PURCHASE_ORDER_RECEIPT, hash);
     if (respondToIdempotencyReplay(res, start, {
       status: 201,
       buildBody: (id) => ({ success: true, idempotentReplay: true, data: { id } }),

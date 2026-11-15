@@ -1,6 +1,7 @@
 import { listPagination, listPageQuery } from '../utils/controllerPagination';
 import {
   IDEMPOTENCY_KEY_HEADER,
+  IDEMPOTENCY_KEY_REQUIRED_MESSAGE,
   IDEMPOTENCY_SCOPES,
   IdempotencyConflictError,
   beginIdempotentWrite,
@@ -166,15 +167,19 @@ function recordSingleItemPurchase(req: AuthRequest, res: Response, idemKey: stri
 
 function recordPurchase(req: AuthRequest, res: Response): void {
   try {
-    // audit-3 task 08: a purchase is the widest blast radius of any keyed
-    // write — rows, stock batches, movements, AP, the ledger and the GL all
-    // land together — so a retry after a lost response must replay rather
-    // than duplicate the lot.
+    // audit-3 task 08 + D19: a purchase is the widest blast radius of any
+    // keyed write — rows, stock batches, movements, AP, the ledger and the GL
+    // all land together — so a retry after a lost response must replay rather
+    // than duplicate the lot. The key is mandatory here (D19).
     let idemKey: string | null;
     try {
       idemKey = normalizeIdempotencyKey(req.headers[IDEMPOTENCY_KEY_HEADER]);
     } catch (keyError) {
       res.status(400).json({ error: (keyError as Error).message });
+      return;
+    }
+    if (idemKey === null) {
+      res.status(400).json({ error: IDEMPOTENCY_KEY_REQUIRED_MESSAGE });
       return;
     }
     const hash = hashRequestPayload(req.body);

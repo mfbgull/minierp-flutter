@@ -19,7 +19,10 @@ const put = (url: string, body: Record<string, unknown>) =>
   request(app).put(url).set('Cookie', [cookie, csrf.cookie].filter(Boolean)).set('x-csrf-token', csrf.token).send(body);
 
 const post = (url: string, body: Record<string, unknown>) =>
-  request(app).post(url).set('Cookie', [cookie, csrf.cookie].filter(Boolean)).set('x-csrf-token', csrf.token).send(body);
+  request(app).post(url)
+    // D19: owner-capital/withdrawal writes mandate a key.
+    .set('Idempotency-Key', `owe-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    .set('Cookie', [cookie, csrf.cookie].filter(Boolean)).set('x-csrf-token', csrf.token).send(body);
 
 const idOf = (res: request.Response): number => (res.body?.data?.id ?? res.body?.id) as number;
 

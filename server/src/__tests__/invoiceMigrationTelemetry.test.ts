@@ -19,7 +19,8 @@ describe('Invoice migration telemetry preserves compatibility', () => {
   afterEach(() => { jest.restoreAllMocks(); });
 
   for (const route of ['/api/invoices', '/api/mobile-invoices/submit']) {
-    it(`${route} accepts keyless and keyed writes and emits countable safe events`, async () => {
+    const mandated = route === '/api/invoices';
+    it(`${route} emits countable safe events; keyless is ${mandated ? 'refused (ACCT-008 D19)' : 'still accepted (D13 exemption)'}`, async () => {
       const info = jest.spyOn(logger, 'info');
       const body = {
         customer_id: customerId, invoice_date: '2026-09-05',
@@ -28,9 +29,9 @@ describe('Invoice migration telemetry preserves compatibility', () => {
       };
       for (const keyed of [false, true]) {
         let operation = request(app).post(route).set('Cookie', cookie);
-        if (keyed) operation = operation.set('Idempotency-Key', `telemetry-${route}-key`);
+        if (keyed) operation = operation.set('Idempotency-Key', `telemetry-${route}-key-${Date.now()}`);
         const response = await operation.send(body);
-        expect(response.status).toBe(201);
+        expect(response.status).toBe(mandated && !keyed ? 400 : 201);
       }
       const events = info.mock.calls.map(([event]) => event).filter(event =>
         typeof event === 'object' && event !== null && 'message' in event && event.message === 'invoice_idempotency_observation');
