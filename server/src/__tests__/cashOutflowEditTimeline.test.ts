@@ -81,6 +81,25 @@ async function createExpense(amount: number, date: string): Promise<number> {
   return data.data.id;
 }
 
+/**
+ * Read every `.ts` file under the given source areas. Used by the guard-rail
+ * tests below to find which files reference a symbol, without nesting loops
+ * inside a test body (keeps each test under the complexity threshold).
+ */
+function findSourceFiles(areas: string[]): Array<{ area: string; file: string; source: string }> {
+  const srcDir = path.join(__dirname, '..');
+  const found: Array<{ area: string; file: string; source: string }> = [];
+  for (const area of areas) {
+    const dir = path.join(srcDir, area);
+    if (!fs.existsSync(dir)) continue;
+    for (const file of fs.readdirSync(dir)) {
+      if (!file.endsWith('.ts')) continue;
+      found.push({ area, file, source: fs.readFileSync(path.join(dir, file), 'utf8') });
+    }
+  }
+  return found;
+}
+
 function snapshot(tables: string[]) {
   const out: Record<string, unknown[]> = {};
   for (const t of tables) {
@@ -258,35 +277,26 @@ describe('cash-timeline guard-rail: every cash-affecting model calls the chronol
     expectAllInvariantsHold('after refused backdated cash refund');
   });
 
-  it('expense GL posts only through the guarded transition, and settlement posts are guarded', () => {
+  it('postExpenseEntry is called only from models/Expense.ts', () => {
+    // Exempt the definition itself; any other caller is a second GL path.
+    const callers = findSourceFiles(['models', 'services', 'controllers', 'routes'])
+      .filter(({ area, file }) => file !== 'accountingService.ts')
+      .filter(({ source }) => source.includes('postExpenseEntry('))
+      .map(({ area, file }) => `${area}/${file}`);
+    expect(callers).toEqual(['models/Expense.ts']);
+  });
+
+  it('Expense.ts pairs postExpenseEntry with assertCashTimeline', () => {
     const srcDir = path.join(__dirname, '..');
-    // postExpenseEntry is the only writer of EXPENSE journal lines. It must
-    // have exactly one caller: the Draft→Recorded/edit transition in
-    // Expense.ts, which sits next to an assertCashTimeline. Any new caller is
-    // a bypass and must be added to the guard list above.
-    const callers: string[] = [];
-    for (const area of ['models', 'services', 'controllers', 'routes']) {
-      const dir = path.join(srcDir, area);
-      if (!fs.existsSync(dir)) continue;
-      for (const file of fs.readdirSync(dir)) {
-        if (!file.endsWith('.ts')) continue;
-        const source = fs.readFileSync(path.join(dir, file), 'utf8');
-        if (file === 'accountingService.ts') continue; // the definition
-        if (source.includes('postExpenseEntry(')) callers.push(`${area}/${file}`);
-      }
-    }
-    if (callers.length !== 1 || callers[0] !== 'models/Expense.ts') {
-      throw new Error(`postExpenseEntry must be called only from models/Expense.ts; found: ${callers.join(', ')}`);
-    }
     const expenseSource = fs.readFileSync(path.join(srcDir, 'models', 'Expense.ts'), 'utf8');
-    if (!expenseSource.includes('postExpenseEntry(') || !expenseSource.includes('assertCashTimeline')) {
-      throw new Error('Expense.ts must pair its postExpenseEntry call with assertCashTimeline');
-    }
-    // Credit-expense settlements are an independent cash outflow.
+    expect(expenseSource).toContain('postExpenseEntry(');
+    expect(expenseSource).toContain('assertCashTimeline');
+  });
+
+  it('ExpensePayment.ts includes assertCashTimeline for credit-expense settlements', () => {
+    const srcDir = path.join(__dirname, '..');
     const settlement = fs.readFileSync(path.join(srcDir, 'models', 'ExpensePayment.ts'), 'utf8');
-    if (!settlement.includes('assertCashTimeline')) {
-      throw new Error('ExpensePayment.ts settles cash but never calls assertCashTimeline');
-    }
+    expect(settlement).toContain('assertCashTimeline');
   });
 
   it('each cash-affecting model and service file references assertCashTimeline', () => {
