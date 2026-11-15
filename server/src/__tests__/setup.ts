@@ -83,11 +83,18 @@ process.on('SIGTERM', () => {
 });
 
 // 5. Apply schema, then gate the suites on the admin seed.
-import { applyPendingMigrations, dbSeedReady } from '../config/database';
+import { applyPendingMigrations, dbSeedReady, default as db } from '../config/database';
 
 beforeAll(async () => {
   applyPendingMigrations();
   await dbSeedReady;
+  // Opt-in rehearsal: run the whole suite with a feature flag forced on.
+  // Used to prove nothing depends on the flag's default-off path. Never
+  // set in CI, so the shipped default stays off.
+  if (process.env.TEST_FORCE_BATCH_LOCATIONS === '1') {
+    db.prepare("INSERT INTO settings (key, value) VALUES ('feature_batch_locations', '1') " +
+      'ON CONFLICT(key) DO UPDATE SET value = excluded.value').run();
+  }
   // 30s, not 15s: under a full-suite run the migration + admin seed can
   // exceed 15s of machine load and time the hook out, failing every test
   // in the suite for reasons unrelated to the code under test.

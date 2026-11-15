@@ -158,7 +158,96 @@ function checksumOfFunction(key: string, fn?: () => void): string {
  * transaction, record with checksum on success. Any failure aborts the
  * process non-zero BEFORE HTTP listen.
  */
-/** `fn.*` ledger key → its body, so verifyMigrationChecksums can re-hash it. */
+/**
+ * Pre-migration safety backup.
+ *
+ * A migration that fails mid-sequence can leave the schema half-applied.
+ * `runLedgered` exits on failure, but nothing restored the database. So take
+ * a snapshot before the migration sequence runs. If the backup fails, refuse
+ * to boot: better to stop with the database intact than to migrate it with no
+ * way back.
+ *
+ * Taken on every boot that has an existing on-disk database, not only when a
+ * migration is pending. "Is anything pending?" cannot be answered without
+ * duplicating the 133-entry boot sequence, and a list that drifts is worse
+ * than a copy that is occasionally redundant. A snapshot of a small ERP
+ * database is cheap; a missing one after a bad migration is not.
+ *
+ * Skipped for an in-memory database and for a database file that does not
+ * exist yet (a fresh install has nothing to lose).
+ *
+ * Returns the backup path, or null when no backup was needed.
+ */
+export function backupBeforeMigration(): string | null {
+  if (isInMemoryDatabase(dbPath)) return null;
+  if (!fs.existsSync(dbPath)) return null;
+
+  const backupDir = path.join(dbDir, 'backups');
+  // Timestamp to the second, plus the reason, so the file says what it is
+  // for. `:` is not safe in a Windows filename, so it becomes `-`.
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const backupPath = path.join(backupDir, `erp-premigration-${stamp}.db`);
+
+  try {
+    // The directory may not exist yet, and its creation can fail (a file
+    // sits at that path, permissions, a full disk). Create and snapshot
+    // inside one try so any failure reaches the same refusal-to-start path.
+    fs.mkdirSync(backupDir, { recursive: true });
+    // VACUUM INTO is synchronous and produces a consistent snapshot of the
+    // whole database. db.backup() is the other option but it returns a
+    // Promise, and this boot path cannot await it.
+    db.exec(`VACUUM INTO ${quoteSqlLiteral(backupPath)}`);
+  } catch (err: unknown) {
+    logger.error(
+      `FATAL: pre-migration backup failed (${errorMessage(err)}). ` +
+        `Refusing to start with pending migrations and no backup.`,
+    );
+    process.exit(1);
+  }
+
+  if (!fs.existsSync(backupPath)) {
+    logger.error('FATAL: pre-migration backup reported success but wrote no file. Refusing to start.');
+    process.exit(1);
+  }
+  logger.info(`📦 pre-migration backup: ${backupPath}`);
+  pruneOldPreMigrationBackups(backupDir);
+  return backupPath;
+}
+
+/** Keep the newest N pre-migration snapshots; delete older ones. */
+const MAX_PRE_MIGRATION_BACKUPS = 10;
+
+function pruneOldPreMigrationBackups(backupDir: string): void {
+  let entries: string[];
+  try {
+    entries = fs
+      .readdirSync(backupDir)
+      .filter((f) => f.startsWith('erp-premigration-') && f.endsWith('.db'))
+      .sort();
+  } catch {
+    return; // nothing to prune
+  }
+  // The ISO timestamp sorts lexicographically, so the list is oldest-first.
+  for (const stale of entries.slice(0, Math.max(0, entries.length - MAX_PRE_MIGRATION_BACKUPS))) {
+    try {
+      fs.rmSync(path.join(backupDir, stale), { force: true });
+    } catch {
+      // Best effort: a snapshot we cannot delete must not fail the boot.
+    }
+  }
+}
+
+/** True when the database path is an in-memory or shared-memory database. */
+function isInMemoryDatabase(p: string): boolean {
+  return p === ':memory:' || p.startsWith('file::memory:') || p.includes('mode=memory');
+}
+
+/** Quote a value for a SQL literal. Only used for a VACUUM INTO path. */
+function quoteSqlLiteral(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+/** `fn.*` ledger key -> its body, so verifyMigrationChecksums can re-hash it. */
 const inlineMigrations = new Map<string, () => void>();
 
 function runLedgered(key: string, fn?: () => void, opts?: { noTxn?: boolean }): void {
@@ -1988,6 +2077,10 @@ export function applyPendingMigrations(): void {
     logger.error(err instanceof Error ? err.message : String(err));
     process.exit(1);
   }
+
+  // Snapshot before the first migration of a boot that has pending work.
+  // Refuses to start if the backup fails.
+  backupBeforeMigration();
 
 
   runLedgered('fn.initializeDatabase', initializeDatabase);

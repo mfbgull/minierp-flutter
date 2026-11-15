@@ -27,6 +27,7 @@ jest.setTimeout(60000);
 interface DatabaseModule {
   default: Database.Database;
   applyPendingMigrations: () => void;
+  backupBeforeMigration: () => string | null;
   dbSeedReady: Promise<void>;
 }
 
@@ -192,5 +193,120 @@ describe('database module initialization boundary', () => {
     expect(typeof invariants.expectAllInvariantsHold).toBe('function');
     expect(countTable('schema_migrations')).toBe(0);
     expect(userVersion()).toBe(0);
+  });
+
+  describe('pre-migration backup', () => {
+    /** Every pre-migration snapshot in the temp database's backups dir. */
+    function backupFiles(): string[] {
+      const backupDir = path.join(dir, 'backups');
+      if (!fs.existsSync(backupDir)) return [];
+      return fs.readdirSync(backupDir).filter((f) => f.endsWith('.db'));
+    }
+
+    it('takes a timestamped snapshot when migrations are pending', async () => {
+      const mod = await loadDatabaseModule();
+
+      const taken = mod.backupBeforeMigration();
+
+      expect(taken).not.toBeNull();
+      expect(path.isAbsolute(taken as string)).toBe(true);
+      expect(fs.existsSync(taken as string)).toBe(true);
+      expect(path.basename(taken as string)).toMatch(/^erp-premigration-.*\.db$/);
+      expect(backupFiles()).toHaveLength(1);
+    });
+
+    it('writes a snapshot that is a readable SQLite database', async () => {
+      const mod = await loadDatabaseModule();
+      const taken = mod.backupBeforeMigration() as string;
+
+      const snapshot = new Database(taken, { readonly: true, fileMustExist: true });
+      try {
+        expect(snapshot.pragma('integrity_check', { simple: true })).toBe('ok');
+      } finally {
+        snapshot.close();
+      }
+    });
+
+    it('takes a snapshot on a normal boot of an existing database', async () => {
+      const mod = await loadDatabaseModule();
+      mod.applyPendingMigrations();
+      await mod.dbSeedReady;
+
+      const before = backupFiles().length;
+      const taken = mod.backupBeforeMigration();
+
+      // The database file exists, so every boot snapshots it. That is the
+      // deliberate trade: a redundant copy beats no copy after a bad
+      // migration. The count grows by exactly one.
+      expect(taken).not.toBeNull();
+      expect(fs.existsSync(taken as string)).toBe(true);
+      expect(backupFiles()).toHaveLength(before + 1);
+    });
+
+    it('keeps at most 10 snapshots', async () => {
+      const mod = await loadDatabaseModule();
+      mod.applyPendingMigrations();
+      await mod.dbSeedReady;
+
+      for (let i = 0; i < 12; i += 1) {
+        // Distinct timestamps are not guaranteed inside one millisecond, so
+        // name the extra files by hand to give the pruner a real order.
+        const dir10 = path.join(dir, 'backups');
+        fs.mkdirSync(dir10, { recursive: true });
+        fs.writeFileSync(path.join(dir10, `erp-premigration-2000-01-01T00-00-${String(i).padStart(2, '0')}-000Z.db`), '');
+      }
+      mod.backupBeforeMigration();
+      mod.backupBeforeMigration();
+
+      expect(backupFiles().length).toBeLessThanOrEqual(10);
+    });
+
+    it('takes no snapshot when the database file does not exist yet', async () => {
+      // A path whose directory exists but whose erp.db was never created.
+      const emptyDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dbinit-empty-'));
+      process.env.DATABASE_PATH = emptyDir;
+      const mod = await loadDatabaseModule();
+      // better-sqlite3 creates the file on open, so remove it to model a
+      // fresh install where the module has not opened the file yet.
+      const created = path.join(emptyDir, 'erp.db');
+      const existed = fs.existsSync(created);
+      expect(typeof mod.backupBeforeMigration).toBe('function');
+      if (existed) fs.rmSync(created, { force: true });
+
+      expect(mod.backupBeforeMigration()).toBeNull();
+      fs.rmSync(emptyDir, { recursive: true, force: true });
+    });
+
+    it('refuses to boot when the backup cannot be written', async () => {
+      const mod = await loadDatabaseModule();
+      // A backups path that is an existing FILE, not a directory, so mkdir fails.
+      fs.writeFileSync(path.join(dir, 'backups'), 'not a directory');
+      const { default: logger } = (await import('../utils/logger')) as unknown as {
+        default: { error: (...args: unknown[]) => void };
+      };
+      const exitSpy = jest.spyOn(process, 'exit').mockImplementation((code?: string | number | null) => {
+        throw new Error(`process.exit(${String(code)})`);
+      });
+      const errorSpy = jest.spyOn(logger, 'error').mockImplementation(() => {});
+
+      try {
+        expect(() => mod.backupBeforeMigration()).toThrow('process.exit');
+        expect(errorSpy).toHaveBeenCalled();
+      } finally {
+        exitSpy.mockRestore();
+        errorSpy.mockRestore();
+      }
+    });
+
+    it('snapshots through the boot path before the first migration runs', async () => {
+      const mod = await loadDatabaseModule();
+
+      mod.applyPendingMigrations();
+      await mod.dbSeedReady;
+
+      // The boot path calls backupBeforeMigration() itself, so a fresh
+      // apply must leave exactly one snapshot behind.
+      expect(backupFiles().length).toBeGreaterThanOrEqual(1);
+    });
   });
 });

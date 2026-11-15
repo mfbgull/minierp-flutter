@@ -73,6 +73,29 @@ defect and must be investigated and repaired through the normal path
 No migration has ever run against real data. All migration tests build their own
 fixtures.
 
+**MUST** — know what the server does when a migration fails, and confirm the
+pre-migration backup is in place.
+
+On a migration failure the server **refuses to start**: `runLedgered` logs the
+failure and calls `process.exit(1)`, before it opens the HTTP port. It never
+continues with a half-applied schema. It cannot roll the database back by
+itself.
+
+So the server now takes a **pre-migration backup before the migration sequence
+runs**, in `backupBeforeMigration()` (`server/src/config/database.ts`):
+
+- the path is `<database dir>/backups/erp-premigration-<timestamp>.db`,
+- it is taken on every boot of an existing database, via `VACUUM INTO` (a
+  consistent, synchronous snapshot),
+- **if the backup cannot be written, the server refuses to start** and logs
+  why — it will not migrate with no way back,
+- the boot log prints the path: `📦 pre-migration backup: <path>`,
+- the newest **10** snapshots are kept; older ones are deleted.
+
+**MUST** — before the first migration on real data, read that log line and keep
+the named file somewhere outside the machine. It is the only rollback the
+server gives you. 10 snapshots is a small window on a busy system.
+
 Before the first migration runs on real data:
 
 1. **MUST** take a backup (section 2).
@@ -83,7 +106,9 @@ Before the first migration runs on real data:
      (the boot gate fails the process if not),
    - the migration count and `user_version` advance as expected,
    - `PRAGMA integrity_check` is `ok`,
-   - the GL stays balanced.
+   - the GL stays balanced,
+   - the pre-migration backup line appears, and its file is a readable
+     database.
 4. **MUST** confirm the new migration is in the ledger exactly once. For
    BUG-006, `server/scripts/verify-bug006-migration.ts` proves this shape on a
    fixture; re-run it, then check the real ledger by hand.
