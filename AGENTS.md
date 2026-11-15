@@ -35,6 +35,12 @@ These rules are inspired by ASD-STE100. They do not require formal compliance wi
 
 For non-production test/dummy records only, treat existing accounting gaps as known legacy noise. Do not repair or repeatedly re-audit them unless explicitly requested. They are not implementation blockers. However, do not weaken integrity checks or tests. Instead, isolate legacy gaps using clean fixtures, fresh test databases, or an explicit allowlist. Ensure all new transactions satisfy accounting invariants and add regression tests. If a gap can be reproduced by current logic, or if any record may be real, stop and investigate.
 
+This rule covers **non-production data only**. It does not apply once real
+production data exists. On production data, every gap is a defect: stop,
+investigate, and repair through the normal reviewed path. The dev database
+(`database/erp.db`) is disposable; reset it rather than reasoning around a gap
+in it.
+
 ## Check before you finish
 
 There is no `package.json` at the repo root; each side has its own commands.
