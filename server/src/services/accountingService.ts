@@ -1621,7 +1621,7 @@ export class AccountingService {
       accountId: cashAcct.id, amount: args.amount, asOfDate: args.paymentDate, label: 'Salary payment',
     });
 
-    return AccountingService.postEntry(db, {
+    const posted = AccountingService.postEntry(db, {
       entry_date: args.paymentDate,
       description: `Salary payment to ${args.employeeName} (${args.employeeCode}) — ${args.amount.toFixed(2)}`,
       reference_type: 'SALARY_PAYMENT',
@@ -1632,6 +1632,30 @@ export class AccountingService {
         { account_id: cashAcct.id, credit: args.amount, description: `Salary paid to ${args.employeeCode}` },
       ],
     });
+    AccountingService.assertCashTimelineAfterOutflow(db, args.paymentMethod, args.paymentDate);
+    return posted;
+  }
+
+  /**
+   * ACCT-013 for salary and loan outflows.
+   *
+   * `assertSufficientFunds` compares against the cumulative balance AT the
+   * payment date, so it is right about its own day and blind to every other
+   * one. A backdated outflow can therefore post while a later day is already
+   * overdrawn. Run the chronological suffix check after the posting so the new
+   * outflow is in the timeline; the caller's transaction rolls back on throw.
+   *
+   * `cashBalanceGuard` imports this module, so a top-level import would be a
+   * cycle. Require it lazily at the call site.
+   */
+  private static assertCashTimelineAfterOutflow(
+    db: Database.Database,
+    paymentMethod: string | undefined,
+    fromDate: string,
+  ): void {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { assertCashTimeline } = require('./cashBalanceGuard') as typeof import('./cashBalanceGuard');
+    assertCashTimeline(db, { paymentMethod, fromDate });
   }
 
   // ------------------------------------------------------------------
@@ -1668,7 +1692,7 @@ export class AccountingService {
       accountId: cashAcct.id, amount: args.amount, asOfDate: args.disbursementDate, label: 'Employee loan',
     });
 
-    return AccountingService.postEntry(db, {
+    const posted = AccountingService.postEntry(db, {
       entry_date: args.disbursementDate,
       description: `Loan to ${args.employeeName} (${args.employeeCode}) — ${args.amount.toFixed(2)}`,
       reference_type: 'LOAN_DISBURSEMENT',
@@ -1679,8 +1703,9 @@ export class AccountingService {
         { account_id: cashAcct.id, credit: args.amount, description: `Cash disbursed to ${args.employeeCode}` },
       ],
     });
+    AccountingService.assertCashTimelineAfterOutflow(db, args.paymentMethod, args.disbursementDate);
+    return posted;
   }
-
   /**
    * Post direct loan repayment. Dr Cash/Bank, Cr 1300 Loan Receivable.
    */

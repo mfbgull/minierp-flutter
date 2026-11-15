@@ -28,10 +28,19 @@ function settleReturn(req: AuthRequest, res: Response): Response | void {
       buildBody: (resourceId) => ({ success: true, message: 'Return settled successfully', idempotentReplay: true, data: { returnId: resourceId } }),
     })) return;
 
-    const result = InvoiceReturnService.settleReturn(returnId, allocations, req.user!.id);
-    if (start.kind === 'proceed' && start.key) {
-      claimIdempotencyKey(db, IDEMPOTENCY_SCOPES.INVOICE_RETURN_SETTLE, start.key, hash, returnId);
-    }
+    const result = db.transaction(() => {
+      // The claim must commit in the SAME transaction as the money movement.
+      // `settleReturn` opens its own transaction, which better-sqlite3 nests
+      // as a savepoint, so both commit or both roll back. Claiming after the
+      // service returned (the old shape) left a crash window where the settle
+      // committed but no key row existed, so a retry paid the customer twice.
+      // Same shape as expenseController's EXPENSE_CREATE claim.
+      const settled = InvoiceReturnService.settleReturn(returnId, allocations, req.user!.id);
+      if (start.kind === 'proceed' && start.key) {
+        claimIdempotencyKey(db, IDEMPOTENCY_SCOPES.INVOICE_RETURN_SETTLE, start.key, hash, returnId);
+      }
+      return settled;
+    })();
     return res.json({ success: true, message: 'Return settled successfully', data: result });
   } catch (error: unknown) {
     if (error instanceof ReturnError) {

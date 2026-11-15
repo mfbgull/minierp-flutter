@@ -1,20 +1,20 @@
 /**
- * Regression proof for the two money-path gaps found in the audit review pass
- * (task 4). Both tests are written to FAIL against the current code and
- * thereby document the defect. They are reported to the owner before any fix
- * (per the standing instruction: report findings, do not fix without telling).
+ * Regression proofs for the money-path gaps found in the audit review pass
+ * (task 4). GAP 2 is RED against the unfixed code; GAP 1 was RED until the
+ * claim moved inside the settle transaction, and now guards that it stays
+ * there.
  *
- * GAP 1 — settle-return idempotency claim runs OUTSIDE the settle transaction.
- *   invoiceReturnController.settleReturn() calls InvoiceReturnService.settleReturn()
- *   (which commits its own db.transaction) and only THEN calls
- *   claimIdempotencyKey(). A crash between the two leaves no key row, so a
- *   retry with the same key settles again and pays twice.
- *   This test proves the observable half: the claim is NOT inside the txn.
+ * GAP 1 — settle-return idempotency claim must run INSIDE the settle txn.
+ *   invoiceReturnController.settleReturn() must claim the Idempotency-Key in
+ *   the same transaction as InvoiceReturnService.settleReturn(). Claiming
+ *   afterwards left a crash window with no key row, so a retry paid twice.
+ *   Same shape as expenseController's EXPENSE_CREATE claim.
  *
  * GAP 2 — salary / loan disbursement skip assertCashTimeline.
- *   Both call only assertSufficientFunds (point-in-time at the payment date),
- *   so a backdated cash outflow can overdraft every day between the backdated
- *   date and today.
+ *   Both call only assertSufficientFunds, a cumulative balance as of the
+ *   payment date. That balance is right at ITS date, but the check ignores
+ *   every other day, so a backdated outflow can post when a later day is
+ *   already overdrawn.
  */
 import { beforeAll, describe, expect, it } from '@jest/globals';
 import request from 'supertest';
@@ -91,8 +91,22 @@ describe('GAP 1: settle-return idempotency claim vs transaction boundary', () =>
       routeSrc.indexOf('function settleReturn('),
       routeSrc.indexOf('function voidReturn('),
     );
-    const hasControllerTxn = settleFn.includes('db.transaction(');
-    expect(hasControllerTxn).toBe(true);
+
+    // The claim must sit INSIDE the controller's own transaction. Asserting
+    // only that 'db.transaction(' appears is too weak: the broken shape could
+    // return by simply wrapping an unrelated statement.
+    const txnStart = settleFn.indexOf('db.transaction(');
+    expect(txnStart).toBeGreaterThan(-1);
+    const txnEnd = settleFn.indexOf('})()', txnStart);
+    expect(txnEnd).toBeGreaterThan(txnStart);
+    const txnBody = settleFn.slice(txnStart, txnEnd + 3);
+    expect(txnBody).toContain('claimIdempotencyKey');
+    expect(txnBody).toContain('settleReturn(');
+
+    // And the service call must not sit outside the transaction, which is
+    // what made the claim a separate, non-atomic step before the fix.
+    const beforeTxn = settleFn.slice(0, txnStart);
+    expect(beforeTxn).not.toContain('InvoiceReturnService.settleReturn(');
   });
 
   it('does not settle twice when the same key is retried after a committed settle', async () => {
@@ -151,20 +165,28 @@ describe('GAP 1: settle-return idempotency claim vs transaction boundary', () =>
   });
 });
 
-describe('GAP 2: backdated salary outflow uses only a point-in-time check', () => {
+describe('GAP 2: a backdated cash outflow is checked only at its own date', () => {
   /**
-   * PROVEN BEHAVIOUR (probe, 2026-11-15): `postSalaryEntry` calls only
-   * `assertSufficientFunds({ asOfDate: paymentDate })` and never
-   * `assertCashTimeline`. A backdated salary (2026-09-02) posts with 201 even
-   * when later-dated cash is what makes the account look funded, and the
-   * point-in-time helper itself reports "available 0.00" for a date whose
-   * balance is carried from an earlier day. The invariant that actually
-   * protects the books is the running timeline.
+   * PROVEN BEHAVIOUR (probe, 2026-11-15). `postSalaryEntry` and
+   * `postLoanDisbursement` call only `assertSufficientFunds`, a CUMULATIVE
+   * balance as of the payment date. They never call `assertCashTimeline`,
+   * the running check that every other outflow path uses.
    *
-   * This test asserts the invariant the fix must restore: a salary payment
-   * must not leave any cash day negative.
+   * The cumulative balance is correct at the payment date, so the guard is
+   * not wrong about the day it checks. The gap is the days it does NOT check.
+   * Sequence that breaks the books:
+   *
+   *   1. cash +30,000 on 2026-09-20
+   *   2. loan 25,000 dated 2026-09-25   -> posts (30,000 at 09-25)
+   *   3. loan 28,000 dated 2026-09-22   -> posts (30,000 at 09-22)
+   *
+   * Step 3 sees only 09-22, where 30,000 is available, and ignores the
+   * 25,000 already spent on 09-25. The book then holds -23,000 on 09-25.
+   * `assertCashTimeline` detects exactly this and is the guard that must run.
+   *
+   * This test is RED until steps 2 and 3 are wrapped so the timeline holds.
    */
-  it('keeps every cash day non-negative and refuses an amount that would break the timeline', async () => {
+  it('keeps the running cash timeline non-negative when an outflow is backdated', async () => {
     const emp = await request(app)
       .post('/api/employees')
       .set('Cookie', cookie)
@@ -173,21 +195,49 @@ describe('GAP 2: backdated salary outflow uses only a point-in-time check', () =
     const employeeId = emp.body?.data?.id ?? emp.body?.id;
     expect(employeeId).toBeTruthy();
 
-    const { assertCashTimeline } = await import('../services/cashBalanceGuard');
-
-    // Try a backdated salary larger than the cash on hand at that date but
-    // smaller than cash on a later date (the case a point-in-time check on a
-    // later balance would wrongly allow).
-    const res = await request(app)
-      .post(`/api/employees/${employeeId}/salary/pay`)
+    // 1. Opening cash in a FRESH account. The suite's opening 50,000 sits in
+    // Cash (1000); using JazzCash (1030) keeps this scenario's arithmetic
+    // isolated, so a real deficit cannot be masked by unrelated cash.
+    const capital = await request(app)
+      .post('/api/owner-equity/capital')
       .set('Cookie', cookie)
-      .set('Idempotency-Key', `gap-sal-${Date.now()}`)
-      .send({ amount: 40_000, payment_date: '2026-09-02', payment_method: 'Cash' });
+      .set('Idempotency-Key', `gap-cap-${Date.now()}`)
+      .send({ amount: 30_000, capital_date: '2026-09-20', payment_method: 'JazzCash' });
+    expect([200, 201]).toContain(capital.status);
 
-    // Whatever the endpoint decided, the running timeline must hold. Today
-    // salary has no timeline check, so if it posted an amount that pushes an
-    // earlier day negative, this throws — the red assertion.
-    expect(() => assertCashTimeline(db, { paymentMethod: 'Cash', fromDate: '2026-01-01' })).not.toThrow();
-    void res;
+    // 2. The LATER outflow first: 25,000 on 09-25.
+    const late = await request(app)
+      .post(`/api/employees/${employeeId}/loans`)
+      .set('Cookie', cookie)
+      .set('Idempotency-Key', `gap-late-${Date.now()}`)
+      .send({ amount: 25_000, disbursement_date: '2026-09-25', payment_method: 'JazzCash', description: 'late' });
+    expect([200, 201]).toContain(late.status);
+
+    // 3. The BACKDATED outflow: 28,000 on 09-22. Its own date has 30,000, so
+    // the point-in-time check passes — but 09-25 already spent 25,000.
+    // Before the fix this posted (201); now it must be refused.
+    const early = await request(app)
+      .post(`/api/employees/${employeeId}/loans`)
+      .set('Cookie', cookie)
+      .set('Idempotency-Key', `gap-early-${Date.now()}`)
+      .send({ amount: 28_000, disbursement_date: '2026-09-22', payment_method: 'JazzCash', description: 'early' });
+    expect(early.status).toBeGreaterThanOrEqual(400);
+
+    // The invariant: no cash day may go negative. `assertCashTimeline` cannot
+    // be scoped to a window
+    // dates, starting from the 2026-09-20 capital. JazzCash keeps it isolated.
+    const days = db.prepare(`
+      WITH daily AS (
+        SELECT line_date, SUM(ROUND(debit * 100) - ROUND(credit * 100)) AS movement
+        FROM journal_lines
+        WHERE account_id = (SELECT id FROM chart_of_accounts WHERE code = '1030') AND voided = 0
+        GROUP BY line_date
+      )
+      SELECT line_date, SUM(movement) OVER (ORDER BY line_date) AS balance FROM daily
+      WHERE line_date >= '2026-09-20'
+    `).all() as Array<{ line_date: string; balance: number }>;
+
+    const negative = days.filter((d) => d.balance < 0);
+    expect(negative).toEqual([]);
   });
 });
