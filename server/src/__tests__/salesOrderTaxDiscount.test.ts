@@ -250,5 +250,96 @@ describe('sales order line tax and discount (BUG-006)', () => {
       expect(row.discount_type).toBe('none');
       expect(Number(row.total_amount)).toBeCloseTo(150, 2);
     });
+
+    it('a fixed discount converts with an exact invoice total', async () => {
+      // 1 x 200, flat 25 -> 175 net, no tax -> 175.00.
+      const created = await createOrder(cookie, customerId, [
+        {
+          item_id: itemId, quantity: 1, unit_price: 200,
+          tax_rate: 0, discount_type: 'flat', discount_value: 25,
+        },
+      ], 'so-conv-flat');
+      const conv = await convert(created.body.id as number, 'so-conv-flat-k');
+      expect(conv.status).toBe(201);
+
+      const inv = db.prepare(
+        `SELECT i.total_amount, ii.discount_type, ii.discount_value
+         FROM invoices i JOIN invoice_items ii ON ii.invoice_id = i.id
+         WHERE i.id = ?`,
+      ).get(conv.body.invoiceId) as {
+        total_amount: number; discount_type: string; discount_value: number;
+      };
+      expect(inv.discount_type).toBe('flat');
+      expect(Number(inv.discount_value)).toBe(25);
+      expect(Number(inv.total_amount)).toBeCloseTo(175, 2);
+    });
+
+    it('a multi-line taxed and discounted order converts to the exact total', async () => {
+      // 210.60 + 175.00 = 385.60, matching the parity table's own example.
+      const created = await createOrder(cookie, customerId, [
+        {
+          item_id: itemId, quantity: 2, unit_price: 100,
+          tax_rate: 17, discount_type: 'percentage', discount_value: 10,
+        },
+        {
+          item_id: itemId, quantity: 1, unit_price: 200,
+          tax_rate: 0, discount_type: 'flat', discount_value: 25,
+        },
+      ], 'so-conv-multi');
+      const conv = await convert(created.body.id as number, 'so-conv-multi-k');
+      expect(conv.status).toBe(201);
+
+      const inv = db.prepare('SELECT total_amount FROM invoices WHERE id = ?')
+        .get(conv.body.invoiceId) as { total_amount: number };
+      const expected = computeInvoiceTotal([
+        { quantity: 2, unit_price: 100, tax_rate: 17, discount_type: 'percentage' as const, discount_value: 10 },
+        { quantity: 1, unit_price: 200, tax_rate: 0, discount_type: 'flat' as const, discount_value: 25 },
+      ]);
+      expect(expected).toBeCloseTo(385.6, 2);
+      // Exact match: the invoice total is the order total is the parity total.
+      expect(Number(inv.total_amount)).toBeCloseTo(expected, 2);
+      expect(Number(created.body.total_amount)).toBeCloseTo(expected, 2);
+    });
+  });
+
+  describe('the server owns the numbers', () => {
+    it('ignores a client-sent total_amount and recomputes from the lines', async () => {
+      // A lying client: one line of 2 x 100 with 17% tax is 234.00, not 1.00.
+      const res = await request(app)
+        .post('/api/sales-orders')
+        .set('Cookie', cookie)
+        .set('Idempotency-Key', 'so-ignore-total')
+        .send({
+          customer_id: customerId,
+          so_date: '2026-11-01',
+          total_amount: 1,
+          items: [{ item_id: itemId, quantity: 2, unit_price: 100, tax_rate: 17 }],
+        });
+      expect(res.status).toBe(201);
+      expect(Number(res.body.total_amount)).toBeCloseTo(234, 2);
+
+      const read = await readOrder(cookie, res.body.id as number);
+      expect(Number(read.total_amount)).toBeCloseTo(234, 2);
+      const line = read.items[0] as Record<string, number | string>;
+      expect(Number(line.amount)).toBeCloseTo(234, 2);
+      expect(Number(line.tax_rate)).toBe(17);
+    });
+
+    it('ignores a client-sent line amount and recomputes from the inputs', async () => {
+      const res = await request(app)
+        .post('/api/sales-orders')
+        .set('Cookie', cookie)
+        .set('Idempotency-Key', 'so-ignore-line-amount')
+        .send({
+          customer_id: customerId,
+          so_date: '2026-11-01',
+          items: [
+            { item_id: itemId, quantity: 1, unit_price: 200, amount: 5, tax_rate: 0, discount_type: 'flat', discount_value: 25 },
+          ],
+        });
+      expect(res.status).toBe(201);
+      const line = (res.body.items as Array<Record<string, number | string>>)[0];
+      expect(Number(line.amount)).toBeCloseTo(175, 2);
+    });
   });
 });

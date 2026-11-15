@@ -58,9 +58,11 @@ class _FakeSalesOrderRepository extends SalesOrderRepository {
 
 Future<void> _openDialog(
   WidgetTester tester,
-  _FakeSalesOrderRepository repo,
-) async {
-  tester.view.physicalSize = const Size(1600, 1000);
+  _FakeSalesOrderRepository repo, {
+  Size size = const Size(1600, 1000),
+  Locale? locale,
+}) async {
+  tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
 
@@ -75,6 +77,7 @@ Future<void> _openDialog(
         warehousesProvider.overrideWith((ref) async => const []),
       ],
       child: MaterialApp(
+        locale: locale,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
@@ -205,5 +208,35 @@ void main() {
     expect(line['tax_rate'], 0);
     expect(line.containsKey('discount_type'), isFalse);
     expect(line.containsKey('discount_value'), isFalse);
+  });
+
+  testWidgets('lays out without overflow at a narrow width', (tester) async {
+    // 1024 x 768 is the smallest sensible desktop window here.
+    final repo = _FakeSalesOrderRepository();
+    await _openDialog(tester, repo, size: const Size(1024, 768));
+    await _fillLine(tester, tax: '17');
+    await tester.pumpAndSettle();
+
+    // A RenderFlex overflow is reported as a test exception. None is allowed.
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const ValueKey('so-line-tax')), findsOneWidget);
+    expect(find.byKey(const ValueKey('so-line-discount-value')), findsOneWidget);
+  });
+
+  testWidgets('lays out in Urdu (RTL) without overflow', (tester) async {
+    final repo = _FakeSalesOrderRepository();
+    await _openDialog(
+      tester,
+      repo,
+      size: const Size(1024, 768),
+      locale: const Locale('ur'),
+    );
+    await _fillLine(tester, tax: '17');
+    await tester.pumpAndSettle();
+
+    final context = tester.element(find.byType(Form));
+    expect(Directionality.of(context), TextDirection.rtl);
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const ValueKey('so-line-tax')), findsOneWidget);
   });
 }
