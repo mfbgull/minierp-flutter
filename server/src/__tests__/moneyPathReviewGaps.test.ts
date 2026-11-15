@@ -16,8 +16,7 @@
  *   so a backdated cash outflow can overdraft every day between the backdated
  *   date and today.
  */
-import { beforeAll, beforeEach, afterEach, describe, expect, it } from '@jest/globals';
-import bcrypt from 'bcrypt';
+import { beforeAll, describe, expect, it } from '@jest/globals';
 import request from 'supertest';
 import app from '../app';
 import db from '../config/database';

@@ -161,7 +161,13 @@ tracking is skipped in invoices, purchase returns, physical counts and reports.
 wanted from day one:
 
 - **If off:** confirm no user expects batch or location tracking. Turning it on
-  later means a data-model change, not just a flag flip.
+  later means a data-model change, not just a flag flip. **Measured 2026-11-15:**
+  flipping the flag on against an existing database makes stock unsellable.
+  `sellableAvailabilityByWarehouseSql` reads `batch_stock_by_location`, and
+  nothing backfills that table for batches created while the flag was off. The
+  full server suite goes from **272/272 suites green** to **38 suites / 122
+  tests failing**, all with `sellable stock N, requested M`. See `docs/bugs.md`
+  BUG-013. Do not flip this flag in place; a backfill migration must ship first.
 - **If on:** set the flag to `'1'` **before** the first real purchase or sale.
   Then verify a small batch-tracked purchase and sale end to end, and confirm
   the stock layers carry a location.

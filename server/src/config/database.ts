@@ -2078,7 +2078,10 @@ export function applyPendingMigrations(): void {
     process.exit(1);
   }
 
-  // Snapshot before the first migration of a boot that has pending work.
+  // Snapshot before the migration sequence. Taken on every boot of an existing
+  // database, not only when work is pending: "is anything pending" cannot be
+  // answered without duplicating the whole sequence below, and a list that
+  // drifts is worse than an occasional redundant copy.
   // Refuses to start if the backup fails.
   backupBeforeMigration();
 

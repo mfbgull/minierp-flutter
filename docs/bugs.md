@@ -640,6 +640,71 @@ suites finish normally on GitHub Actions.
 
 ---
 
+## BUG-013 · Turning on `feature_batch_locations` makes existing stock unsellable
+
+**Status.** OPEN. Reported 2026-11-15 from the flag-on rehearsal. No fix applied
+(pending owner decision — the flag is off in the shipped build).
+
+**Problem.** With `feature_batch_locations = '1'`, the sellable-stock query
+reads `batch_stock_by_location` instead of `stock_batches`:
+
+```
+server/src/models/StockMovement.ts:1082  sellableAvailabilityByWarehouseSql
+  ON  : JOIN batch_stock_by_location bsl … SUM(bsl.quantity_available)
+  OFF : SUM(sb.quantity_remaining) FROM stock_batches
+```
+
+**Cause.** Two facts combine:
+
+1. `syncBatchStockByLocationForNewBatch` (`StockMovement.ts:1040`) seeds a
+   `DEFAULT` location row **only when the flag is already on**. Batches created
+   while the flag was off get no location row.
+2. The migration `add-batch-location-model.sql` creates the table and its
+   triggers but **does not backfill** existing batches (no `INSERT … SELECT`
+   from `stock_batches`).
+
+So a database with batches but no location rows reports **sellable stock 0**.
+A database with partial rows reports a **wrong lower** number.
+
+**Impact.** On a fresh install the flag is seeded `'0'` (off), so the OFF path
+is the only one that works. Flipping the flag on **blocks sales**: every sell
+tries to consume stock the sellable query cannot see. This is a stock-amnesia
+switch, not a safe capability toggle.
+
+**Evidence.** Full server suite with `TEST_FORCE_BATCH_LOCATIONS=1` (opt-in,
+never set in CI — see `server/src/__tests__/setup.ts`):
+
+```
+flag ON : Test Suites: 38 failed, 234 passed, 272 total
+          Tests: 122 failed, 2075 passed, 2197 total
+flag OFF: 272/272 suites, 2190/2190 tests passing (the shipped default)
+```
+
+All 38 failures share one signature, `sellable stock N, requested M` with N
+lower than M:
+
+```
+createInvoice failed: 400 … sellable stock 0, requested 3
+                      … sellable stock 2, requested 4
+```
+
+Failing suites include `accountingInvariants`, `invoiceReturnAcceptance`,
+`paymentRecordingMatrix`, `glLifecycle`, `moneyPaths`, `ledgerIntegrity`,
+`closedPeriodImmutability`, `supplierRefundClaims`, and `stockTransferVoid`.
+All pass with the flag off.
+
+**Fix shape (not applied).** Backfill `batch_stock_by_location` from
+`stock_batches` in a migration, or fall back to `stock_batches` when a batch has
+no location rows. The second is closer to the existing fallback in
+`consumeFromOldestBatches` (`StockMovement.ts:1223`). A decision is needed:
+the two sources disagree today, so a wrong choice silently changes the sellable
+number.
+
+**Scope.** Latent. No production effect while the flag stays off. The shipped
+default must not change until the backfill lands.
+
+---
+
 ## Not bugs — deliberate decisions, recorded so they are not re-litigated
 
 - **PUR-016** — the two live `PURCHASE_ORDER` commitment rows (3,000 supplier 1 /

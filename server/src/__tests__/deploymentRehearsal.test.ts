@@ -261,10 +261,9 @@ describe('deployment rehearsal: one month of operations', () => {
 
     // ── Backup, restore, restore-verify ────────────────────────────────
     const backupDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rehearsal-backup-'));
-    let snapshotPath = '';
+    const snapshotPath = path.join(backupDir, 'rehearsal.db');
     try {
       // Take the snapshot with the same primitive the boot path uses.
-      snapshotPath = path.join(backupDir, 'rehearsal.db');
       db.exec(`VACUUM INTO '${snapshotPath.replace(/'/g, "''")}'`);
       expect(fs.existsSync(snapshotPath)).toBe(true);
 

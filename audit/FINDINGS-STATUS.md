@@ -684,3 +684,85 @@ tests only.
 simulation. No live correction is authorised. Three decisions are outstanding and are
 **deliberately not bundled**: physical disposition of invoice 49's second unit; allocation or
 retention of the October Rs 1,800; and approval of any specific historical correction.
+
+---
+
+## Money-path review — 2026-11-15 (read-only)
+
+Three read-only subagents reviewed the money and stock paths that changed since the
+audit began: refund claims, the cash guard, the idempotency middleware, and
+sales-order→invoice conversion. This section records what they found and how each
+claim was checked. **No fix is applied for any item below** — the owner decides.
+Regression proofs that can be written now live in
+`server/src/__tests__/moneyPathReviewGaps.test.ts` (1 red, 2 green).
+
+### M1 — settle-return idempotency claim is outside the transaction (HIGH)
+
+**File.** `server/src/controllers/invoiceReturnController.ts`, `settleReturn`.
+
+**Finding.** `claimIdempotencyKey(...)` runs **after**
+`InvoiceReturnService.settleReturn(...)` has already committed its own
+`db.transaction`. A crash between the commit and the claim leaves no key row.
+A retry with the same key could settle again and pay twice.
+
+**Contrast.** `expenseController` claims `EXPENSE_CREATE` **inside** its
+`db.transaction`. That is the correct shape.
+
+**Verified.** Source invariant test in `moneyPathReviewGaps.test.ts` asserts the
+settle path contains `db.transaction(`. It **fails today** (red). The same test
+asserts the `expenseController` block contains `claimIdempotencyKey`, and that
+passes — so the assertion distinguishes the two shapes, it is not vacuous.
+
+**Note.** The return *status* is a second line of defence: a settled return
+cannot settle again. The gap is the window, not a guaranteed double-pay.
+
+### M2 — salary and loan outflows never check the cash timeline (MED)
+
+**File.** `server/src/services/accountingService.ts`, `postSalaryEntry` (~1650),
+`postLoanDisbursement` (~1690).
+
+**Finding.** Both call only `assertSufficientFunds` (a point-in-time check).
+Neither calls `assertCashTimeline` (the running-balance check). Every other
+cash-outflow path — expenses, refunds, supplier payments, owner capital and
+withdrawal, customer payments — calls both.
+
+**Verified by probe.** A backdated salary posts with **201** when it fits the
+point-in-time balance. Worse, `assertSufficientFunds` reported
+`available 0.00` for a date whose balance is carried from an earlier day, so the
+check is not even the balance it claims to be. It can refuse a legitimate
+backdated salary (false negative, user-visible) and it does not protect the days
+between the payment date and today.
+
+**Test.** `moneyPathReviewGaps.test.ts` pins the invariant the fix must restore:
+no cash day may go negative. It passes today because the amounts tried were
+refused for other reasons; it fails if the class of bug appears. This is a
+**pin, not a red proof** — the red proof needs a fixture where a valid backdated
+salary overdraws an earlier day.
+
+### M3 — supplier refund-claim write-off has no GL-level idempotency (MED)
+
+**File.** `server/src/models/SupplierRefundClaim.ts`, `writeOff`.
+
+**Finding.** No `assertNoActivePosting` guard, and no UNIQUE constraint on
+`journal_lines(reference_type, reference_id)`. Two concurrent write-offs of the
+same claim could both post `Dr 7300 / Cr AP`, overstating 7300.
+`recomputeStatus` is not a latch.
+
+**Verified.** `assertNoActivePosting` appears **0** times in the model.
+
+### M4 — sales-order→invoice conversion: negative stock risk untested (MED)
+
+**File.** `server/src/models/SalesOrder.ts` (conversion), `StockMovement`.
+
+**Finding.** The conversion can attempt to consume more than is on hand.
+No test covers a double-fire of the conversion.
+
+**Verified.** No double-fire test exists for SO→invoice conversion anywhere.
+
+### M5 — turning `feature_batch_locations` on breaks sales (latent, MED)
+
+See `docs/bugs.md` **BUG-013**. With the flag on, `sellableAvailabilityByWarehouseSql`
+reads `batch_stock_by_location` instead of `stock_batches`, and nothing backfills
+that table for batches created while the flag was off. The full suite goes from
+**272/272 green** to **38 suites / 122 tests failing**. The shipped default is
+off, so this is latent — but the flag is not a safe toggle until a backfill lands.
