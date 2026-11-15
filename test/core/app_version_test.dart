@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:minierp/core/app_version.dart';
+import 'package:minierp_app/core/app_version.dart';
 
 /// `kAppVersion` is a hand-maintained mirror of `pubspec.yaml`. If the two
 /// drift, `X-Client-Version` silently reports the wrong build — make that
