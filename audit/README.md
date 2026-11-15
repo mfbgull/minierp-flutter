@@ -4,6 +4,9 @@ Live documents used by development and CI:
 
 - `DECISIONS.md` — product calls and open decisions (referenced by `AGENTS.md`).
 - `FINDINGS-STATUS.md` — current status of every audit finding.
+- `FIRST-DEPLOYMENT-CHECKLIST.md` — what to verify before the first real
+  (production) data: restore test, migration check, role review, feature-flag
+  defaults, and the remaining deferred items.
 - `fallow-remediation-2026-10-26.md` — active remediation ledger and evidence.
 - `fallow-baselines/` — committed Fallow baselines loaded by `.fallowrc.json`
   and the CI audit gate. Do not remove or regenerate without a deliberate

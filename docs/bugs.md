@@ -333,12 +333,23 @@ next start. Nothing prevents it at write time.
 
 ## BUG-006 · `sales_order_items` has no tax or discount columns
 
-**Status:** `OPEN` — **Severity:** medium-high
+**Status:** `FIXED` — **Severity:** medium-high
+**Found:** 2026-11-14 · **Fixed:** 2026-11-15 · branch `feat/bug-006-so-tax-discount`
 
-SALES-016: a sales order cannot carry per-line tax or discount, so converting one
-to an invoice either drops those values or hard-codes `discount_type: 'none'`.
-This needs a schema migration, so it is separate work and deliberately not folded
-into any behaviour-only change.
+SALES-016: a sales order could not carry per-line tax or discount, so converting
+one to an invoice either dropped those values or hard-coded `discount_type: 'none'`.
+
+Fix: migration `126_sales_order_item_tax_discount.sql` adds `tax_rate`,
+`discount_type` and `discount_value` to `sales_order_items` (additive, defaults
+`0` / `'none'` / `0`, no backfill). The server recomputes every line amount and the
+header total from the sent rate and discount — it never trusts a client total.
+`convertToInvoice` now sends the real per-line values and omits `amount`, because
+`decomposeLineAmount` treats a positive `amount` as a gross override (passing the
+stored tax-inclusive amount double-applied the tax and discount). The Flutter form
+collects a tax rate and a discount (none / amount / percent) per line, and both
+sides round with the same rule.
+
+Tests: 16 server, 7 Dart parity, 3 form widget.
 
 ---
 

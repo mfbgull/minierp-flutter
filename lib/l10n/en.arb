@@ -1053,6 +1053,8 @@
   "commonTotalout": "Total Out",
   "commonQuantity": "Quantity",
   "commonAmount": "Amount",
+  "commonPercent": "Percent",
+  "commonInvalid": "Invalid value",
   "commonDate": "Date",
   "commonStatus": "Status",
   "commonCategory": "Category",

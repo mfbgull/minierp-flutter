@@ -16,6 +16,7 @@ import '../../core/utils/date_utils.dart' show isoDate;
 import '../../core/utils/formatters.dart';
 import '../../core/utils/print_utils.dart' show printPdfBytes;
 import '../../data/models/customer.dart' show Customer;
+import '../../data/models/invoice.dart' show Discount, DiscountType;
 import '../../data/models/item.dart' show Item;
 import '../../data/models/sales_order.dart' show SalesOrderDetail;
 import '../../data/models/warehouse.dart' show Warehouse;
@@ -23,6 +24,9 @@ import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
 import '../../data/repositories/sales_order_repository.dart'
     show salesOrderRepositoryProvider;
 import '../../l10n/app_localizations.dart';
+import '../sales/calculations/sales_order_calculations.dart'
+    show calculateItemTotal, calculateTotal;
+import '../sales/models/sales_forms.dart' show SOFormItem, flatZeroDiscount;
 import '../../widgets/app_toast.dart';
 import '../../widgets/date_picker.dart' show pickDate;
 import '../../widgets/form_field.dart';
@@ -48,20 +52,46 @@ Future<void> showSalesOrderFormDialog(
 class _SoLine {
   _SoLine({this.itemId = ''})
     : quantityController = TextEditingController(),
-      priceController = TextEditingController();
+      priceController = TextEditingController(),
+      taxRateController = TextEditingController(),
+      discountValueController = TextEditingController();
 
   /// Selected item id as a string (the searchable select works on ints).
   String itemId;
 
   final TextEditingController quantityController;
   final TextEditingController priceController;
+  final TextEditingController taxRateController;
+  final TextEditingController discountValueController;
+
+  /// BUG-006: per-line discount kind. `none` sends nothing; the other
+  /// two map to the server's `discount_type`.
+  DiscountType? discountType;
 
   num get quantity => double.tryParse(quantityController.text) ?? 0;
   num get unitPrice => double.tryParse(priceController.text) ?? 0;
+  num get taxRate => double.tryParse(taxRateController.text) ?? 0;
+  num get discountValue =>
+      double.tryParse(discountValueController.text) ?? 0;
+
+  /// The shared calculation shape (mirrors `SOFormItem`) so this row and
+  /// the server use one rounding rule.
+  SOFormItem get formItem => SOFormItem(
+    id: 0,
+    itemId: itemId,
+    quantity: quantity,
+    unitPrice: unitPrice,
+    taxRate: taxRate,
+    discount: discountType == null
+        ? flatZeroDiscount
+        : Discount(type: discountType!, value: discountValue),
+  );
 
   void dispose() {
     quantityController.dispose();
     priceController.dispose();
+    taxRateController.dispose();
+    discountValueController.dispose();
   }
 }
 
@@ -103,11 +133,16 @@ class _SalesOrderFormDialogState extends ConsumerState<SalesOrderFormDialog> {
     _deliveryDate = DateTime.tryParse(detail?.deliveryDate ?? '');
     if (detail != null) {
       for (final item in detail.items) {
-        _lines.add(
-          _SoLine(itemId: item.itemId.toString())
-            ..quantityController.text = numText(item.quantity)
-            ..priceController.text = numText(item.unitPrice),
-        );
+        final line = _SoLine(itemId: item.itemId.toString())
+          ..quantityController.text = numText(item.quantity)
+          ..priceController.text = numText(item.unitPrice)
+          ..taxRateController.text = numText(item.taxRate);
+        // A zero discount is the stored default ('none') — show no kind.
+        if (item.discountValue > 0) {
+          line.discountType = item.discountType;
+          line.discountValueController.text = numText(item.discountValue);
+        }
+        _lines.add(line);
       }
     }
     if (_lines.isEmpty) _lines.add(_SoLine());
@@ -125,10 +160,9 @@ class _SalesOrderFormDialogState extends ConsumerState<SalesOrderFormDialog> {
   List<_SoLine> get _filledLines =>
       _lines.where((line) => line.itemId.isNotEmpty).toList();
 
-  num get _total => _filledLines.fold<num>(
-    0,
-    (sum, line) => sum + line.quantity * line.unitPrice,
-  );
+  num get _total => calculateTotal([
+    for (final line in _filledLines) line.formItem,
+  ]);
 
   Future<void> _pickDate({required bool delivery}) async {
     final picked = await pickDate(
@@ -156,12 +190,21 @@ class _SalesOrderFormDialogState extends ConsumerState<SalesOrderFormDialog> {
       if (notes.isNotEmpty) 'notes': notes,
       // The server replaces the line set wholesale on PUT and validates
       // item_id/quantity/unit_price on create; the ids are not sent.
+      //
+      // BUG-006: tax and discount ride on each line. The server recomputes
+      // every amount from these, so the client never sends a total. A zero
+      // rate / value is sent as 0 / 'none' to match the stored default.
       'items': [
         for (final line in _filledLines)
           {
             'item_id': int.parse(line.itemId),
             'quantity': line.quantity,
             'unit_price': line.unitPrice,
+            'tax_rate': line.taxRate,
+            if (line.discountType != null && line.discountValue > 0) ...{
+              'discount_type': line.discountType!.value,
+              'discount_value': line.discountValue,
+            },
           },
       ],
     };
@@ -295,88 +338,191 @@ class _SalesOrderFormDialogState extends ConsumerState<SalesOrderFormDialog> {
   Widget _lineRow(AppLocalizations l10n, int index) {
     final line = _lines[index];
     final items = ref.watch(soItemsProvider).valueOrNull ?? const <Item>[];
-    final amount = line.quantity * line.unitPrice;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          flex: 3,
-          child: FormFieldShell(
-            label: l10n.fieldsItem,
-            child: SearchableSelect<int>(
-              items: [for (final i in items) i.id],
-              selected: line.itemId.isEmpty ? null : int.tryParse(line.itemId),
-              labelBuilder: (id) {
-                final match = items.where((i) => i.id == id);
-                final item = match.isEmpty ? null : match.first;
-                return item == null
-                    ? '$id'
-                    : '${item.itemCode} — ${item.itemName}';
-              },
-              onChanged: (value) =>
-                  setState(() => line.itemId = value?.toString() ?? ''),
+    // BUG-006: the shared line total (tax and discount included, rounded
+    // like the server) — not a bare qty x price sum.
+    final amount = calculateItemTotal(line.formItem);
+
+    final itemField = FormFieldShell(
+      label: l10n.fieldsItem,
+      child: SearchableSelect<int>(
+        items: [for (final i in items) i.id],
+        selected: line.itemId.isEmpty ? null : int.tryParse(line.itemId),
+        labelBuilder: (id) {
+          final match = items.where((i) => i.id == id);
+          final item = match.isEmpty ? null : match.first;
+          return item == null ? '$id' : '${item.itemCode} — ${item.itemName}';
+        },
+        onChanged: (value) =>
+            setState(() => line.itemId = value?.toString() ?? ''),
+      ),
+    );
+    final quantityField = SizedBox(
+      width: 86,
+      child: TextFormField(
+        key: const ValueKey('so-line-quantity'),
+        controller: line.quantityController,
+        enabled: !_submitting,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        decoration: _decoration(),
+        validator: (value) => (double.tryParse(value ?? '') ?? -1) > 0
+            ? null
+            : l10n.commonRequired,
+        onChanged: (_) => setState(() {}),
+      ),
+    );
+    final priceField = SizedBox(
+      width: 100,
+      child: TextFormField(
+        key: const ValueKey('so-line-price'),
+        controller: line.priceController,
+        enabled: !_submitting,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        decoration: _decoration(),
+        validator: (value) => (double.tryParse(value ?? '') ?? -1) > 0
+            ? null
+            : l10n.commonRequired,
+        onChanged: (_) => setState(() {}),
+      ),
+    );
+    final taxField = SizedBox(
+      width: 76,
+      child: FormFieldShell(
+        label: l10n.fieldsTax,
+        child: TextFormField(
+          key: const ValueKey('so-line-tax'),
+          controller: line.taxRateController,
+          enabled: !_submitting,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: _decoration(),
+          validator: (value) {
+            final rate = double.tryParse(value ?? '') ?? 0;
+            return rate < 0 || rate > 100 ? l10n.commonInvalid : null;
+          },
+          onChanged: (_) => setState(() {}),
+        ),
+      ),
+    );
+    final discountTypeField = SizedBox(
+      width: 124,
+      child: FormFieldShell(
+        label: l10n.fieldsDiscount,
+        child: DropdownButtonFormField<DiscountType?>(
+          initialValue: line.discountType,
+          isDense: true,
+          isExpanded: true,
+          decoration: _decoration(),
+          items: [
+            DropdownMenuItem<DiscountType?>(
+              value: null,
+              child: Text(l10n.commonNone),
             ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 86,
-          child: TextFormField(
-            controller: line.quantityController,
-            enabled: !_submitting,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: _decoration(),
-            validator: (value) => (double.tryParse(value ?? '') ?? -1) > 0
-                ? null
-                : l10n.commonRequired,
-            onChanged: (_) => setState(() {}),
-          ),
-        ),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 100,
-          child: TextFormField(
-            controller: line.priceController,
-            enabled: !_submitting,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: _decoration(),
-            validator: (value) => (double.tryParse(value ?? '') ?? -1) > 0
-                ? null
-                : l10n.commonRequired,
-            onChanged: (_) => setState(() {}),
-          ),
-        ),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 100,
-          child: FormFieldShell(
-            label: l10n.fieldsAmount,
-            child: Container(
-              height: 44,
-              alignment: Alignment.centerRight,
-              padding: const EdgeInsets.only(right: 6),
-              child: Text(
-                Formatters.currency(amount),
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
+            DropdownMenuItem<DiscountType?>(
+              value: DiscountType.flat,
+              child: Text(l10n.commonAmount),
             ),
+            DropdownMenuItem<DiscountType?>(
+              value: DiscountType.percentage,
+              child: Text(l10n.commonPercent),
+            ),
+          ],
+          onChanged: _submitting
+              ? null
+              : (value) => setState(() => line.discountType = value),
+        ),
+      ),
+    );
+    final discountValueField = SizedBox(
+      width: 86,
+      child: FormFieldShell(
+        label: l10n.fieldsAmount,
+        child: TextFormField(
+          key: const ValueKey('so-line-discount-value'),
+          controller: line.discountValueController,
+          enabled: !_submitting || line.discountType == null,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: _decoration(),
+          validator: (value) {
+            final amount = double.tryParse(value ?? '') ?? 0;
+            if (line.discountType == DiscountType.percentage && amount >= 100) {
+              return l10n.commonInvalid;
+            }
+            return null;
+          },
+          onChanged: (_) => setState(() {}),
+        ),
+      ),
+    );
+    final amountField = SizedBox(
+      width: 100,
+      child: FormFieldShell(
+        label: l10n.fieldsAmount,
+        child: Container(
+          height: 44,
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.only(right: 6),
+          child: Text(
+            Formatters.currency(amount),
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontWeight: FontWeight.w600),
           ),
         ),
-        const SizedBox(width: 4),
-        SizedBox(
-          width: 34,
-          child: IconButton(
-            tooltip: l10n.commonRemove,
-            icon: const Icon(Icons.remove_circle_outline, size: 18),
-            onPressed: _submitting || _lines.length <= 1
-                ? null
-                : () => setState(() {
-                    _lines.removeAt(index).dispose();
-                  }),
-          ),
-        ),
-      ],
+      ),
+    );
+    final removeButton = SizedBox(
+      width: 34,
+      child: IconButton(
+        tooltip: l10n.commonRemove,
+        icon: const Icon(Icons.remove_circle_outline, size: 18),
+        onPressed: _submitting || _lines.length <= 1
+            ? null
+            : () => setState(() {
+                _lines.removeAt(index).dispose();
+              }),
+      ),
+    );
+
+    // The seven fields do not fit a narrow window side by side. Below the
+    // width that fits them, wrap them so nothing overflows the dialog.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= 760) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(flex: 3, child: itemField),
+              const SizedBox(width: 8),
+              quantityField,
+              const SizedBox(width: 8),
+              priceField,
+              const SizedBox(width: 8),
+              taxField,
+              const SizedBox(width: 8),
+              discountTypeField,
+              const SizedBox(width: 8),
+              discountValueField,
+              const SizedBox(width: 8),
+              amountField,
+              const SizedBox(width: 4),
+              removeButton,
+            ],
+          );
+        }
+        return Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.end,
+          children: [
+            SizedBox(width: double.infinity, child: itemField),
+            quantityField,
+            priceField,
+            taxField,
+            discountTypeField,
+            discountValueField,
+            amountField,
+            removeButton,
+          ],
+        );
+      },
     );
   }
 
@@ -393,7 +539,7 @@ class _SalesOrderFormDialogState extends ConsumerState<SalesOrderFormDialog> {
 
     return MovableDialog(
       dialogId: 'sales_order_form',
-      maxWidth: 680,
+      maxWidth: 1320,
       maxHeight: 720,
       child: Form(
           key: _formKey,

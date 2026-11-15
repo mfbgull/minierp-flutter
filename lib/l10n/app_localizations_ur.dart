@@ -2760,159 +2760,161 @@ class AppLocalizationsUr extends AppLocalizations {
       'شروع سے اپنی پہلی رپورٹ بنائیں یا شروع کرنے کے لیے ٹیمپلیٹ استعمال کریں۔';
 
   @override
-  String get customreportsbuilderSave => 'Save';
+  String get customreportsbuilderSave => 'محفوظ کریں';
 
   @override
-  String get customreportsbuilderSaved => 'Report saved';
+  String get customreportsbuilderSaved => 'رپورٹ محفوظ ہو گئی';
 
   @override
-  String get customreportsbuilderSaveerror => 'Failed to save report';
+  String get customreportsbuilderSaveerror => 'رپورٹ محفوظ کرنے میں ناکامی';
 
   @override
-  String get customreportsbuilderEntity => 'Entity';
+  String get customreportsbuilderEntity => 'اینٹٹی';
 
   @override
-  String get customreportsbuilderFields => 'Fields';
+  String get customreportsbuilderFields => 'فیلڈز';
 
   @override
-  String get customreportsbuilderColumns => 'Columns';
+  String get customreportsbuilderColumns => 'کالم';
 
   @override
-  String get customreportsbuilderFilters => 'Filters';
+  String get customreportsbuilderFilters => 'فلٹرز';
 
   @override
-  String get customreportsbuilderSort => 'Sort';
+  String get customreportsbuilderSort => 'ترتیب';
 
   @override
-  String get customreportsbuilderComputed => 'Computed';
+  String get customreportsbuilderComputed => 'کمپیوٹڈ';
 
   @override
-  String get customreportsbuilderDragfieldshint => 'Drag fields below';
+  String get customreportsbuilderDragfieldshint => 'نیچے فیلڈز گھسیٹیں';
 
   @override
   String get customreportsbuilderDropfieldshere =>
-      'Drag fields here to add columns';
+      'کالم شامل کرنے کے لیے فیلڈز یہاں گھسیٹیں';
 
   @override
-  String get customreportsbuilderAddfilter => 'Add Filter';
+  String get customreportsbuilderAddfilter => 'فلٹر شامل کریں';
 
   @override
   String get customreportsbuilderNofilters =>
-      'No filters — add one to filter results';
+      'کوئی فلٹر نہیں — نتائج فلٹر کرنے کے لیے ایک شامل کریں';
 
   @override
-  String get customreportsbuilderAddsort => 'Add Sort';
+  String get customreportsbuilderAddsort => 'ترتیب شامل کریں';
 
   @override
   String get customreportsbuilderNosorts =>
-      'No sorts — add one to order results';
+      'کوئی ترتیب نہیں — نتائج ترتیب دینے کے لیے ایک شامل کریں';
 
   @override
-  String get customreportsbuilderAddcomputed => 'Add Computed Column';
+  String get customreportsbuilderAddcomputed => 'کمپیوٹڈ کالم شامل کریں';
 
   @override
   String get customreportsbuilderNocomputed =>
-      'No computed columns — add one for aggregations';
+      'کوئی کمپیوٹڈ کالم نہیں — ایگریگیشن کے لیے ایک شامل کریں';
 
   @override
-  String get customreportsbuilderRun => 'Run Report';
+  String get customreportsbuilderRun => 'رپورٹ چلائیں';
 
   @override
-  String get customreportsbuilderRunerror => 'Failed to run report';
+  String get customreportsbuilderRunerror => 'رپورٹ چلانے میں ناکامی';
 
   @override
-  String get customreportsbuilderPreview => 'Preview';
+  String get customreportsbuilderPreview => 'پیش نظارہ';
 
   @override
   String get customreportsbuilderRuntopreview =>
-      'Click \'Run Report\' to see results';
+      'نتائج دیکھنے کے لیے \'رپورٹ چلائیں\' پر کلک کریں';
 
   @override
   String get customreportsbuilderSelectentityfirst =>
-      'Select an entity to start building your report';
+      'رپورٹ بنانا شروع کرنے کے لیے اینٹٹی منتخب کریں';
 
   @override
-  String get customreportsbuilderChart => 'Chart';
+  String get customreportsbuilderChart => 'چارٹ';
 
   @override
-  String get customreportsbuilderEnablechart => 'Enable chart visualization';
+  String get customreportsbuilderEnablechart => 'چارٹ ویژولائزیشن فعال کریں';
 
   @override
-  String get customreportsbuilderCharttype => 'Chart Type';
+  String get customreportsbuilderCharttype => 'چارٹ کی قسم';
 
   @override
-  String get customreportsbuilderChartbar => 'Bar';
+  String get customreportsbuilderChartbar => 'بار';
 
   @override
-  String get customreportsbuilderChartline => 'Line';
+  String get customreportsbuilderChartline => 'لائن';
 
   @override
-  String get customreportsbuilderChartpie => 'Pie';
+  String get customreportsbuilderChartpie => 'پائی';
 
   @override
-  String get customreportsbuilderChartdoughnut => 'Doughnut';
+  String get customreportsbuilderChartdoughnut => 'ڈونٹ';
 
   @override
-  String get customreportsbuilderLabelfield => 'Label Field';
+  String get customreportsbuilderLabelfield => 'لیبل فیلڈ';
 
   @override
-  String get customreportsbuilderValuefield => 'Value Field';
+  String get customreportsbuilderValuefield => 'ویلیو فیلڈ';
 
   @override
   String get customreportsbuilderChartempty =>
-      'Select label and value fields in the Chart tab to render a chart.';
+      'چارٹ دکھانے کے لیے چارٹ ٹیب میں لیبل اور ویلیو فیلڈز منتخب کریں۔';
 
   @override
-  String get customreportsbuilderGroup => 'Group';
+  String get customreportsbuilderGroup => 'گروپ';
 
   @override
-  String get customreportsbuilderEnablegroupby => 'Enable grouping';
+  String get customreportsbuilderEnablegroupby => 'گروپنگ فعال کریں';
 
   @override
-  String get customreportsbuilderGroupfields => 'Group By Fields';
+  String get customreportsbuilderGroupfields => 'گروپ بہ لحاظ فیلڈز';
 
   @override
   String get customreportsbuilderNogroupfields =>
-      'Select at least one field to group by';
+      'گروپ کرنے کے لیے کم از کم ایک فیلڈ منتخب کریں';
 
   @override
   String get customreportsbuilderGroupbyinfo =>
-      'Add SUM, COUNT, or other aggregate computed columns to show grouped values.';
+      'گروپ شدہ ویلیوز دکھانے کے لیے SUM، COUNT یا دیگر ایگریگیٹ کمپیوٹڈ کالم شامل کریں۔';
 
   @override
-  String get customreportsbuilderAggregates => 'Aggregates';
+  String get customreportsbuilderAggregates => 'ایگریگیٹس';
 
   @override
-  String get customreportsbuilderAddaggregate => 'Add Aggregate';
+  String get customreportsbuilderAddaggregate => 'ایگریگیٹ شامل کریں';
 
   @override
   String get customreportsbuilderNoaggregates =>
-      'No aggregates — add one to compute grouped values';
+      'کوئی ایگریگیٹ نہیں — گروپ شدہ ویلیوز کے لیے ایک شامل کریں';
 
   @override
-  String get customreportsbuilderExportcsv => 'Export as CSV';
+  String get customreportsbuilderExportcsv => 'CSV کے طور پر ایکسپورٹ کریں';
 
   @override
-  String get customreportsbuilderExportpdf => 'Export as PDF';
+  String get customreportsbuilderExportpdf => 'PDF کے طور پر ایکسپورٹ کریں';
 
   @override
-  String get customreportsbuilderSaveastemplate => 'Save as Template';
+  String get customreportsbuilderSaveastemplate =>
+      'ٹیمپلیٹ کے طور پر محفوظ کریں';
 
   @override
-  String get customreportsbuilderShowall => 'Show All';
+  String get customreportsbuilderShowall => 'سب دکھائیں';
 
   @override
-  String get customreportsbuilderHideall => 'Hide All';
+  String get customreportsbuilderHideall => 'سب چھپائیں';
 
   @override
-  String get customreportsbuilderTemplatenameprompt => 'Template name:';
+  String get customreportsbuilderTemplatenameprompt => 'ٹیمپلیٹ کا نام:';
 
   @override
   String get customreportsbuilderTemplatesaved =>
-      'Template saved successfully!';
+      'ٹیمپلیٹ کامیابی سے محفوظ ہو گیا!';
 
   @override
-  String get customreportsbuilderTemplatesaveerror => 'Failed to save template';
+  String get customreportsbuilderTemplatesaveerror =>
+      'ٹیمپلیٹ محفوظ کرنے میں ناکامی';
 
   @override
   String get actionsSave => 'سیو کریں';
@@ -3262,6 +3264,12 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get commonAmount => 'رقم';
+
+  @override
+  String get commonPercent => 'فیصد';
+
+  @override
+  String get commonInvalid => 'غلط قدر';
 
   @override
   String get commonDate => 'تاریخ';
@@ -3833,31 +3841,31 @@ class AppLocalizationsUr extends AppLocalizations {
   String get suppliersAccountsettings => 'اکاؤنٹ کی ترتیبات';
 
   @override
-  String get suppliersAllocatedpurchases => 'Allocated Purchases';
+  String get suppliersAllocatedpurchases => 'تفویض شدہ خریداریاں';
 
   @override
   String get suppliersAllocatedpos => 'تخصیص شدہ پی اوز';
 
   @override
-  String get suppliersAllocationpurchases => 'Purchases';
+  String get suppliersAllocationpurchases => 'خریداریاں';
 
   @override
-  String get suppliersAvailablepurchases => 'Available Purchases';
+  String get suppliersAvailablepurchases => 'دستیاب خریداریاں';
 
   @override
-  String get suppliersAllpurchasesallocated => 'All purchases allocated';
+  String get suppliersAllpurchasesallocated => 'تمام خریداریاں تفویض ہو گئیں';
 
   @override
   String get suppliersNoopenpurchases =>
-      'No open purchases to allocate against';
+      'تفویض کرنے کے لیے کوئی کھلی خریداری نہیں';
 
   @override
   String get suppliersRecordpaymentforpurchase =>
-      'Record payment for this purchase';
+      'اس خریداری کی ادائیگی درج کریں';
 
   @override
   String get suppliersAllocationrequiredpurchases =>
-      'At least one PO or purchase allocation is required';
+      'کم از کم ایک PO یا خریداری کی تفویض درکار ہے';
 
   @override
   String get suppliersAllocation => 'تخصیص';

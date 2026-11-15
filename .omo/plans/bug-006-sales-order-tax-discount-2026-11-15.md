@@ -1,6 +1,12 @@
 # BUG-006 — `sales_order_items` has no tax or discount columns
 
-Plan (2026-11-15). **Proposal only — no code written.**
+Plan (2026-11-15). **Implemented 2026-11-15** on `feat/bug-006-so-tax-discount`.
+
+Delivered: migration `126_sales_order_item_tax_discount.sql`; server recompute in
+`SalesOrderModel`; shared `validateSalesLineTaxDiscount`; conversion carries the
+real per-line rate and discount (and never the stored gross); Dart model fields;
+shared rounding in `sales_order_calculations.dart`; tax/discount inputs in the
+sales-order form; 16 server tests, 7 Dart parity tests, 3 form widget tests.
 
 Source: `docs/bugs.md:334`.
 Buyer: Gull asked for the plan before any code.
