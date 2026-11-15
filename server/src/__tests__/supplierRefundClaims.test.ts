@@ -16,6 +16,7 @@ import db from '../config/database';
 import { createItem, purchaseWithNamedSupplier } from './helpers/invoiceReturnSpec';
 import { SupplierPaymentService } from '../services/SupplierPaymentService';
 import { expectAllInvariantsHold } from './helpers/accountingInvariants';
+import { SupplierRefundClaimModel } from '../models/SupplierRefundClaim';
 
 let cookie: string;
 
@@ -321,6 +322,76 @@ describe('PRET-002 supplier refund claims', () => {
     ]);
     expect(cashBankBalance()).toBeCloseTo(before + 30, 2);
     expectAllInvariantsHold('write-off posted');
+  });
+
+  it('refuses a second write-off of the same claim on the GL layer (no double-post)', async () => {
+    await seedOpeningCash(500);
+    const info = await paidPurchaseWithReturn({ total: 100 });
+    await receipt({ refund_date: '2026-08-05', credit_note_id: info.creditNoteId, amount: 30 },
+      'a1111111-1111-4111-8111-111111111111');
+
+    const first = await request(app)
+      .post(`/api/supplier-refunds/claims/${info.claimId}/write-off`)
+      .set('Cookie', cookie)
+      .set('Idempotency-Key', 'a2222222-2222-4222-8222-222222222222')
+      .send({ reason: 'First write-off' });
+    expect(first.status).toBe(200);
+
+    // A DIFFERENT key, so this is not an idempotent replay: it is a real second
+    // attempt.
+    const second = await request(app)
+      .post(`/api/supplier-refunds/claims/${info.claimId}/write-off`)
+      .set('Cookie', cookie)
+      .set('Idempotency-Key', 'a3333333-3333-4333-8333-333333333333')
+      .send({ reason: 'Second write-off' });
+    expect(second.status).toBeGreaterThanOrEqual(400);
+
+    const posted = db.prepare(`
+      SELECT COUNT(DISTINCT j.reference_id) AS n FROM journal_lines j
+      WHERE j.reference_type = 'REFUND_CLAIM_WRITE_OFF' AND j.voided = 0
+    `).get() as { n: number };
+    expect(posted.n).toBe(1);
+    expectAllInvariantsHold('second write-off refused');
+  });
+
+  it('refuses to post a second write-off when an active GL posting already exists', async () => {
+    await seedOpeningCash(500);
+    const info = await paidPurchaseWithReturn({ total: 100 });
+    await receipt({ refund_date: '2026-08-05', credit_note_id: info.creditNoteId, amount: 30 },
+      'b1111111-1111-4111-8111-111111111111');
+
+    const adminUserId = (db.prepare("SELECT id FROM users WHERE username = 'admin'").get() as { id: number }).id;
+
+    // First write-off posts Dr 7300 / Cr AP and leaves one active posting.
+    SupplierRefundClaimModel.writeOff(info.claimId, adminUserId, { reason: 'first' }, db);
+    const after = db.prepare(`
+      SELECT COUNT(*) AS n FROM journal_lines
+      WHERE reference_type = 'REFUND_CLAIM_WRITE_OFF' AND reference_id = ? AND voided = 0
+    `).get(info.claimId) as { n: number };
+    expect(after.n).toBe(2);
+
+    // Put the claim's balance back so the ONLY thing that can refuse a second
+    // write-off is the GL guard. Without this the status/remaining layer would
+    // refuse first and the test would pass for the wrong reason.
+    db.prepare('UPDATE supplier_refund_claims SET written_off_amount = 0 WHERE id = ?').run(info.claimId);
+
+    // A second write-off must be refused BY writeOff itself (the GL guard),
+    // not by the balance rule, because an active posting already exists.
+    expect(() => SupplierRefundClaimModel.writeOff(info.claimId, adminUserId, { reason: 'second' }, db))
+      .toThrow(/active GL posting already exists/);
+
+    // A reversal VOIDS the posting instead of deleting it, so once the earlier
+    // lines are voided the guard must allow the re-post.
+    db.prepare(`UPDATE journal_lines SET voided = 1
+      WHERE reference_type = 'REFUND_CLAIM_WRITE_OFF' AND reference_id = ?`).run(info.claimId);
+    expect(() => SupplierRefundClaimModel.writeOff(info.claimId, adminUserId, { reason: 'after reversal' }, db))
+      .not.toThrow();
+
+    // NOTE ON COVERAGE LIMIT: a true interleaved double-post (two connections,
+    // both reading `remaining` before either writes) is NOT reachable on this
+    // stack. better-sqlite3 is synchronous and SQLite allows one writer, so the
+    // second writer gets SQLITE_BUSY rather than a duplicate posting. This test
+    // proves the guard contract, not a reproduced race.
   });
 
   it('write-offs above Rs 1,000 are refused to a non-owner even with write-off permission', async () => {

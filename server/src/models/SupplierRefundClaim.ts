@@ -242,6 +242,13 @@ export class SupplierRefundClaimModel {
 
     AccountingService.assertPeriodNotClosed(db, data.write_off_date || claim.claim_date, `Refund claim ${claim.claim_no}`);
 
+    // Two write-offs of the same claim, each with its own Idempotency-Key, would
+    // each post Dr 7300 / Cr AP. The claim row is re-read inside the caller's
+    // transaction, but that alone does not stop a second writer. One active
+    // posting per claim is the rule; a reversal voids and re-posts, so the
+    // check scopes to voided = 0.
+    AccountingService.assertNoActivePosting(db, 'REFUND_CLAIM_WRITE_OFF', id);
+
     const writeOffAccount = AccountingService.getAccountByCode(db, '7300');
     if (!writeOffAccount) {
       throw new Error('Chart of accounts is missing required account: 7300 (Refund Write-offs)');
