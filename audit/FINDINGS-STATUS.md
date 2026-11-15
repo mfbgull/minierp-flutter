@@ -696,73 +696,119 @@ claim was checked. **No fix is applied for any item below** — the owner decide
 Regression proofs that can be written now live in
 `server/src/__tests__/moneyPathReviewGaps.test.ts` (1 red, 2 green).
 
-### M1 — settle-return idempotency claim is outside the transaction (HIGH)
+### M1 — settle-return idempotency claim is outside the transaction (HIGH) — FIXED
 
 **File.** `server/src/controllers/invoiceReturnController.ts`, `settleReturn`.
 
-**Finding.** `claimIdempotencyKey(...)` runs **after**
-`InvoiceReturnService.settleReturn(...)` has already committed its own
-`db.transaction`. A crash between the commit and the claim leaves no key row.
+**Finding.** `claimIdempotencyKey(...)` ran **after**
+`InvoiceReturnService.settleReturn(...)` had already committed its own
+`db.transaction`. A crash between the commit and the claim left no key row.
 A retry with the same key could settle again and pay twice.
 
-**Contrast.** `expenseController` claims `EXPENSE_CREATE` **inside** its
-`db.transaction`. That is the correct shape.
+**Fix (`db6fbce2`).** The service call and the claim now sit in **one**
+`db.transaction(() => { ... })()`, so both commit or both roll back.
+better-sqlite3 nests the service's inner transaction as a savepoint.
+Same shape as `expenseController`'s `EXPENSE_CREATE` claim.
 
-**Verified.** Source invariant test in `moneyPathReviewGaps.test.ts` asserts the
-settle path contains `db.transaction(`. It **fails today** (red). The same test
-asserts the `expenseController` block contains `claimIdempotencyKey`, and that
-passes — so the assertion distinguishes the two shapes, it is not vacuous.
+**Verified.** `moneyPathReviewGaps.test.ts` asserts the claim is **inside** the
+transaction body (`txnBody` contains `claimIdempotencyKey` **and**
+`settleReturn(`), and that the service call does **not** sit before the
+transaction (`beforeTxn` does not contain `InvoiceReturnService.settleReturn(`).
+The test failed before the fix and passes after it.
 
-**Note.** The return *status* is a second line of defence: a settled return
-cannot settle again. The gap is the window, not a guaranteed double-pay.
+### M2 — salary and loan outflows never check the cash timeline (MED) — FIXED
 
-### M2 — salary and loan outflows never check the cash timeline (MED)
+**File.** `server/src/services/accountingService.ts`, `postSalaryEntry`,
+`postLoanDisbursement`.
 
-**File.** `server/src/services/accountingService.ts`, `postSalaryEntry` (~1650),
-`postLoanDisbursement` (~1690).
+**Finding.** Both called only `assertSufficientFunds` (a point-in-time check).
+Neither called `assertCashTimeline` (the running-balance check). Every other
+cash-outflow path calls both.
 
-**Finding.** Both call only `assertSufficientFunds` (a point-in-time check).
-Neither calls `assertCashTimeline` (the running-balance check). Every other
-cash-outflow path — expenses, refunds, supplier payments, owner capital and
-withdrawal, customer payments — calls both.
+**Fix (`db6fbce2`).** Both methods now call a new private static
+`AccountingService.assertCashTimelineAfterOutflow(db, paymentMethod, fromDate)`
+after posting, which lazy-`require`s `cashBalanceGuard` (the two modules import
+each other, so a top-level import would be circular). The caller's transaction
+rolls back when the guard throws. Pattern copied from `SupplierPaymentService`
+(ACCT-013).
 
-**Verified by probe.** A backdated salary posts with **201** when it fits the
-point-in-time balance. Worse, `assertSufficientFunds` reported
-`available 0.00` for a date whose balance is carried from an earlier day, so the
-check is not even the balance it claims to be. It can refuse a legitimate
-backdated salary (false negative, user-visible) and it does not protect the days
-between the payment date and today.
+**Red proof.** `moneyPathReviewGaps.test.ts` GAP-2: JazzCash (1030) is funded
+30,000 on 2026-09-20; a 25,000 loan is dated 09-25 and posts; a 28,000 loan is
+**backdated** to 09-22 and posts, because its own date shows 30,000. Cash on
+09-25 would then be **−23,000**. Removing the guard makes the test fail with
+the 09-25 balance at −23,000; restoring it makes the backdated loan refused with
+`Insufficient funds in Cash on 2026-09-25: balance would be -23000.00. Reverse
+the later spending first.` This is a **real red proof**, not a pin.
 
-**Test.** `moneyPathReviewGaps.test.ts` pins the invariant the fix must restore:
-no cash day may go negative. It passes today because the amounts tried were
-refused for other reasons; it fails if the class of bug appears. This is a
-**pin, not a red proof** — the red proof needs a fixture where a valid backdated
-salary overdraws an earlier day.
+**Correction to the earlier note.** `assertSufficientFunds` uses
+`getAccountBalance`, which **is** cumulative (`SUM(debit-credit)` for
+`line_date <= asOfDate`). The `available 0.00` observation was a probe artifact
+from a malformed payload that tripped a different check. The real defect is the
+**missing timeline check**, not a broken balance read.
 
-### M3 — supplier refund-claim write-off has no GL-level idempotency (MED)
+### M3 — supplier refund-claim write-off has no GL-level idempotency (MED) — FIXED
 
 **File.** `server/src/models/SupplierRefundClaim.ts`, `writeOff`.
 
-**Finding.** No `assertNoActivePosting` guard, and no UNIQUE constraint on
-`journal_lines(reference_type, reference_id)`. Two concurrent write-offs of the
-same claim could both post `Dr 7300 / Cr AP`, overstating 7300.
-`recomputeStatus` is not a latch.
+**Finding.** No `assertNoActivePosting` guard. Two attempts could both post
+`Dr 7300 / Cr AP`, overstating 7300. `recomputeStatus` is not a latch.
 
-**Verified.** `assertNoActivePosting` appears **0** times in the model.
+**Fix (`8e0d9b61`).** `writeOff` now calls
+`AccountingService.assertNoActivePosting(db, 'REFUND_CLAIM_WRITE_OFF', id)`
+before posting. The guard scopes to `voided = 0`, so a reversal (void + re-post)
+still works — the test proves both halves.
 
-### M4 — sales-order→invoice conversion: negative stock risk untested (MED)
+**A UNIQUE index on `journal_lines(reference_type, reference_id)` was NOT added,
+and must not be.** One invoice legitimately posts revenue, tax and COGS as three
+active lines with the same `reference_id`
+(`accountingService.ts` single-INVOICE postings), so that index would break
+invoicing. M3 is fixed at the claim-status layer, not the GL layer.
 
-**File.** `server/src/models/SalesOrder.ts` (conversion), `StockMovement`.
+**Verified.** `supplierRefundClaims.test.ts`: the claim balance is reset so the
+**only** rule that can refuse a second write-off is the GL guard. With the guard
+present the second call throws; with it removed the call does not throw (red
+proven).
 
-**Finding.** The conversion can attempt to consume more than is on hand.
-No test covers a double-fire of the conversion.
+**Coverage limit, stated in the test.** A true interleaved double-post is **not
+reachable on this stack**. better-sqlite3 is synchronous and SQLite permits one
+writer, so a second writer gets `SQLITE_BUSY` rather than a duplicate posting.
+Two connections cannot be used in the test either: the suite's fixture data sits
+inside an uncommitted `SAVEPOINT`, which a second connection cannot read. The
+test therefore proves the guard **contract**, not a reproduced race.
 
-**Verified.** No double-fire test exists for SO→invoice conversion anywhere.
+### M4 — sales-order→invoice conversion: negative stock risk untested (MED) — TESTED
 
-### M5 — turning `feature_batch_locations` on breaks sales (latent, MED)
+**File.** `server/src/models/SalesOrder.ts` (conversion), `salesController.ts`.
+
+**Finding.** The conversion can attempt to consume more than is on hand, and no
+test covered a double-fire of the conversion.
+
+**Fix (`706c21c0`).** No production change was needed. The controller and the
+model both refuse a conversion when the order is already `Invoiced`/`Completed`,
+inside the transaction that flips the status. A double-fire test now covers it:
+two conversions of one order — exactly one returns 201, exactly one invoice
+exists, and stock falls by exactly the ordered quantity.
+
+**Red proof.** Removing both status guards makes **both** conversions return
+201 (two invoices, double deduction); the test fails. Restoring them passes.
+
+### M5 — turning `feature_batch_locations` on breaks sales (latent, MED) — PLAN WRITTEN
 
 See `docs/bugs.md` **BUG-013**. With the flag on, `sellableAvailabilityByWarehouseSql`
 reads `batch_stock_by_location` instead of `stock_batches`, and nothing backfills
 that table for batches created while the flag was off. The full suite goes from
 **272/272 green** to **38 suites / 122 tests failing**. The shipped default is
-off, so this is latent — but the flag is not a safe toggle until a backfill lands.
+off, so this is latent.
+
+**Plan written, no code (`706c21c0`).** Backfill `batch_stock_by_location` from
+`stock_batches`; write location rows regardless of the flag so the flag controls
+only which source is **read**; add a drift check; add a "legacy DB, flip the
+flag, sales still work" test; only then consider the flag as default. The 8.6
+checklist item now depends on this.
+
+**Why the dev DB worked with the flag on.** Two different databases, neither
+exercising the defect. The live `database/erp.db` had **0** stock batches (so
+nothing to lose). The archived stale DB's 5 batches were bought while the flag
+was **already on**, so each got a location row at purchase time. The defect needs
+batches created while the flag was **off**, then a flip to **on** — the exact
+situation of every existing install at migration time.
