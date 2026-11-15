@@ -670,24 +670,31 @@ writes, not to break installed clients. A hard version gate would turn a
 missing header into a total outage. The `X-Min-Client-Version` header lets a
 future UI nudge the user to update without a server-side rejection.
 
-### `/api/mobile-invoices/*` — keyless, observed, natural-key deduped
+### `/api/mobile-invoices/*` — keyless, observed only
 
 **Decision.** This surface stays keyless (D13's promise; the app is not in
-this repo). Two compensating controls replace the key:
+this repo). A keyless submit is **observed** through
+`logKeylessIdempotentWrite` (scope `mobile_invoice_create`), the same Release 1
+telemetry the POS stage-1 path uses. That is the evidence needed before any
+future mandatory-key call.
 
-1. **Observation.** A keyless submit logs through `logKeylessIdempotentWrite`
-   (scope `mobile_invoice_create`), the same Release 1 telemetry the POS
-   stage-1 path uses. This is the evidence for any future mandatory-key call.
-2. **Natural-key duplicate guard.** A keyless submit matches
-   `(customer_id, invoice_date, computed total)` within a 2-minute window on
-   non-cancelled invoices. A match replays the original with
-   `X-Idempotent-Replay: natural-key` instead of double-creating. A different
-   amount does **not** match. This catches the common timeout-retry without
-   any client change.
+**A natural-key duplicate guard was tried and removed (2026-11-14).** The
+first attempt matched `(customer_id, invoice_date, computed total)` inside a
+2-minute window and replayed the original with `X-Idempotent-Replay:
+natural-key`. It broke two existing contracts in the full suite:
 
-The window is short on purpose: two genuinely separate same-day invoices for
-the same customer and amount are possible, so the guard only collapses near-
-simultaneous retries. Tests: `clientVersionObservation.test.ts`.
+- `invoiceIdempotency.test.ts` — a keyed create followed by a **keyless**
+  create with the same body must make a **second** invoice. The guard replayed
+the first.
+- `mobileInvoiceCancelStock.test.ts` — two same-shape submits in one test are
+  two real sales; the guard suppressed the second and left stock unchanged.
+
+The pair `(customer, date, total)` cannot tell a timeout retry from a
+legitimate second invoice. Without a key or a client-supplied request id,
+any such rule either double-creates (no guard) or drops real sales (guard).
+The guard was removed. `clientVersionObservation.test.ts` now pins the
+correct contract: a keyless repeat makes a second invoice, and a keyed +
+keyless pair with the same body makes two.
 
 ### PRET-002 — supplier refunds: one claim object, expected → received
 
@@ -833,3 +840,58 @@ updated `supplierRefund.test.ts`, `idempotencyRound2.test.ts`.
   negative is refused and the whole transaction rolls back. Red-first in
   `cashOutflowEditTimeline.test.ts`; the source-scan tripwire was widened to
   `ExpensePayment`.
+
+## D20 — The fallow gate: no baseline change was needed (2026-11-15)
+
+**Context.** PR #1 (base `main`) failed the `fallow` CI job with
+"14 above threshold". The naive reading — "the branch introduces 14 findings,
+baseline them" — was wrong.
+
+**Finding.** `fallow audit --gate new-only` attributes a finding to the branch
+only when the **function** it names is new relative to the base. On this
+branch exactly **one** function was genuinely introduced: the
+`postExpenseEntry is called only from models/Expense.ts` test in
+`cashOutflowEditTimeline.test.ts`. Its nested `for`/`if continue`/`includes`
+scan gave it cognitive complexity 19 and CRAP 43.1. The other 13 findings are
+inherited: they live in files that are new *as files* but whose functions
+already exist on `main`, so the gate classifies them as legacy.
+
+**Why the "14" was misleading.** `14 above threshold` is the health
+**summary** — the count of every function over the CRAP threshold in the whole
+repo. It is not the gate verdict. `fallow audit` exits 0 once no *introduced*
+function breaches. Reading the summary as the verdict is the trap.
+
+**Action taken.** Extract `findSourceFiles()` so the test body is flat. The
+introduced set then went to 0, and `fallow audit --base <pr-base>` reports
+`✓ No issues in 244 changed files`. **No baseline file was changed.**
+
+**Why this matters.** `server/coverage/coverage-final.json` is gitignored, so a
+baseline saved from this machine would encode a different coverage profile
+than CI's. Three server suites (`supplierRefund`, `unappliedCashMigration`,
+`unappliedCashGl`) take ~11.6 h each under `--coverage` locally but finish
+normally on CI, so local coverage is not CI-equivalent and never can be by
+hand. Saving a baseline from it **shrank** the baseline from 102 files to 35 —
+which would have made CI fail on 79 files that the commit removed. The repo
+rule stands: baseline the legacy backlog, gate only on what is new, and do not
+manufacture a baseline remotely.
+
+**Follow-up refactor targets (deferred, not this PR).** The three worst
+inherited hot spots still have no refactor:
+
+| Function | Where | Why it is a target |
+|---|---|---|
+| `consumeFromOldestBatches` | `server/src/models/StockMovement.ts` | Batch/FEFO loop with many branches; the deepest stock invariant path |
+| `SupplierRefundClaim.create` / `.writeOff` | `server/src/models/SupplierRefundClaim.ts` | Claim lifecycle plus GL posting in one method each |
+| `InvoiceCreationService.transaction` | `server/src/services/InvoiceCreationService.ts` | Shared write path for every invoice surface |
+
+Each has direct edge-case tests, so a refactor can be done safely later:
+`SupplierRefundClaim.create`/`writeOff` cover excess-above-remaining and the
+Rs 1,000 role gate in `supplierRefundClaims.test.ts`;
+`InvoiceCreationService.transaction` covers replay, backdate re-foot and
+unapplied-cash in `invoiceCreationService.test.ts`; `consumeFromOldestBatches`
+is exercised in `models.test.ts` and `batchLocations.test.ts`. Refactor is a
+separate change.
+
+**Also found.** The three suites that hang locally under `--coverage` are a
+local-only problem (jest cannot exit cleanly with coverage in this
+environment). They pass on CI. Worth a follow-up issue, not a blocker.
