@@ -337,8 +337,9 @@ into any behaviour-only change.
 
 ## BUG-008 · No way to void a refund receipt from the app
 
-**Status:** `OPEN` — **Severity:** medium
+**Status:** `FIXED` — `lib/features/purchases/void_refund_dialog.dart` · **Severity:** medium
 **Found:** 2026-11-14 · PRET-002 follow-up
+**Fixed:** 2026-11-14 (`72d18d6f`)
 
 The server can void a supplier refund receipt (`POST /supplier-refunds/:id/void`)
 and correctly refuses the void with `409` plus a structured `details` blocker list
