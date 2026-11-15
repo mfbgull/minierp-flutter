@@ -365,6 +365,32 @@ Supplier refunds and refund-claim writes are already mandatory (PRET-002).
 `POST /api/mobile-invoices/*` stays keyless until the external mobile app
 migrates (D13).
 
+### Migration note — external mobile app must send `Idempotency-Key`
+
+The external mobile app still calls `POST /api/mobile-invoices/*` without a
+key. This is the one surface left keyless on purpose (D13, D19). The server
+observes each keyless submit so the migration can be measured.
+
+**The external app should send an `Idempotency-Key` on every write**, the same
+way the in-repo Flutter desktop and POS clients do. Until it does, a lost
+response on a submit can create a duplicate invoice: the server has no way to
+tell a retry from a genuine second invoice for the same customer, date and
+amount, so it creates both. A natural-key guard was tried and removed for that
+reason — see `audit/DECISIONS.md` D20.
+
+When the app migrates:
+
+- Generate one key per logical submit (a UUID is fine). Send it in the
+  `Idempotency-Key` header.
+- Reuse the same key and the same payload when retrying after a timeout.
+- Send a new key when the user edits and resubmits. Deriving the key from the
+  request body does this automatically.
+- Do not reuse a key across different payloads: the server returns
+  `409 IDEMPOTENCY_CONFLICT`.
+
+Draft endpoints (`/mobile-invoices/draft*`) stay keyless: they write to the
+session draft, not the ledger.
+
 Reuse the same key and payload when retrying a lost response. A changed
 payload under the same key returns 409 `IDEMPOTENCY_CONFLICT`; an unchanged
 retry replays the original result. The mandate check runs before entity

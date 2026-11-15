@@ -170,9 +170,12 @@ guard test widened to match.
 
 ## BUG-004 · C-04 blocked on the inventory batch/lot rewrite
 
-**Status:** `STALE` — blocker landed, and the finding itself is untraceable
+**Status:** `CLOSED` — untraceable, and superseded by the batch/lot rewrite
 **Severity:** medium
-**Checked:** 2026-11-14
+**Checked:** 2026-11-14 · **Closed:** 2026-11-15
+
+Closed. The record is kept, not deleted, so the ID is not reused and the
+reason is on file.
 
 This entry is stale on two counts.
 
@@ -185,9 +188,13 @@ This entry is stale on two counts.
    findings table. No `C-04` row exists to remediate, so there is nothing to
    unblock.
 
-Action: re-derive the underlying concern from the current code before treating
-`C-04` as open work. If no concrete defect is found, delete this entry rather
-than carry an unverifiable ID. No code has been touched.
+Action: the underlying concern is superseded. The batch/lot rewrite landed
+(`batch_stock_by_location`, `stock_reservations`, `invoice_return_batches`,
+`locations`), so the code that `C-04` referred to no longer exists in that
+shape. No concrete defect could be found against the current code, and the ID
+appears in no audit archive or findings table. No code was touched. If a
+concrete defect is ever found, open a new entry with its own evidence rather
+than reopening this ID.
 
 ---
 
@@ -587,6 +594,34 @@ invoice stays deleted) rather than silently consuming a later, differently
 costed layer. Regression:
 `server/src/__tests__/invoiceRestoreBatchFaithful.test.ts` (both cases — the
 cost-faithful success and the refuse-on-consumed case — fail on the old code).
+
+---
+
+## BUG-011 · Local `jest --coverage` run takes ~11.6 h on three suites
+
+**Status:** `OPEN` — **Priority:** low · **Severity:** low (developer experience only)
+**Found:** 2026-11-15 · does not affect CI or production
+
+**Problem.** A local full-suite run with coverage takes ~12 h. Three suites
+account for all of it:
+
+| Suite | Local `--coverage` time |
+|---|---|
+| `src/__tests__/supplierRefund.test.ts` | ~41,873 s |
+| `src/__tests__/unappliedCashMigration.test.ts` | ~41,872 s |
+| `src/__tests__/unappliedCashGl.test.ts` | ~42,144 s |
+
+Every other suite finishes in minutes.
+
+**Cause.** Not yet investigated. The suites pass; the time looks like jest
+failing to exit cleanly while the coverage instrumenter holds the process open
+(open handles / timers), not slow assertions.
+
+**Impact.** Local coverage is not CI-equivalent, so a fallow baseline must not
+be saved from it (see `audit/DECISIONS.md` D20). CI is unaffected — the same
+suites finish normally on GitHub Actions.
+
+**Scope.** Developer experience. No production effect. Low priority.
 
 ---
 

@@ -892,6 +892,16 @@ unapplied-cash in `invoiceCreationService.test.ts`; `consumeFromOldestBatches`
 is exercised in `models.test.ts` and `batchLocations.test.ts`. Refactor is a
 separate change.
 
+**Hard rule.** Save a fallow baseline only from a CI-equivalent run — that is,
+from the coverage file CI itself produces. Never save a baseline from local
+coverage. `server/coverage/coverage-final.json` is gitignored: a local file
+encodes a different profile, and a baseline saved from it silently changes
+which functions count as legacy. On this branch that attempt shrank the
+baseline from 102 files to 35; if it had been committed, CI would have failed
+on 79 files the commit had removed. When a local coverage run is not
+CI-equivalent, do not baseline at all — fix the introduced finding instead
+(which is what happened here).
+
 **Also found.** The three suites that hang locally under `--coverage` are a
 local-only problem (jest cannot exit cleanly with coverage in this
 environment). They pass on CI. Worth a follow-up issue, not a blocker.
