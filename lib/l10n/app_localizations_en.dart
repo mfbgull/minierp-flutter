@@ -3262,6 +3262,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commonAmount => 'Amount';
 
   @override
+  String get commonPercent => 'Percent';
+
+  @override
+  String get commonInvalid => 'Invalid value';
+
+  @override
   String get commonDate => 'Date';
 
   @override

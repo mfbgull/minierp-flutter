@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import { validateSalesDocumentItems, validateSalesWarehouse } from './salesDocumentValidation';
 import { generateDocNo } from '../utils/sequence';
+import { addCurrency, computeInvoiceTotal } from '../utils/currency';
 import { sanitizeSortParams, SALES_ORDER_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import { QuotationWithWarehouse, InvoiceWithUsername } from '../types';
 import InvoiceModel from './Invoice';
@@ -41,6 +42,9 @@ export interface SalesOrderItem {
   delivered_quantity: number;
   unit_price: number;
   amount: number;
+  tax_rate: number;
+  discount_type: 'none' | 'percentage' | 'flat';
+  discount_value: number;
 }
 
 export interface CreateSalesOrderDTO {
@@ -60,6 +64,11 @@ export interface CreateSalesOrderItemDTO {
   item_id: number;
   quantity: number;
   unit_price: number;
+  // BUG-006. Optional so an old client that sends only
+  // {item_id, quantity, unit_price} keeps working unchanged.
+  tax_rate?: number;
+  discount_type?: 'none' | 'percentage' | 'flat';
+  discount_value?: number;
 }
 
 export interface UpdateSalesOrderDTO {
@@ -144,8 +153,18 @@ class SalesOrderModel {
       // Generate sales order number
       const soNo = this.generateSalesOrderNo(db);
 
-      // Calculate total amount
-      const totalAmount = items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+      // Calculate total amount. BUG-006: the server owns this number. It is
+      // recomputed from the line rates and discount values with the shared
+      // currency helper (round at each boundary), never taken from the
+      // client. An old client that sends no tax/discount gets the plain
+      // qty x price sum it always got.
+      const totalAmount = computeInvoiceTotal(items.map(item => ({
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        tax_rate: item.tax_rate,
+        discount_type: item.discount_type ?? 'none',
+        discount_value: item.discount_value,
+      })));
 
       // Insert sales order header
       const soStmt = db.prepare(`
@@ -174,19 +193,27 @@ class SalesOrderModel {
 
       // Insert sales order items
       const itemStmt = db.prepare(`
-        INSERT INTO sales_order_items (so_id, item_id, quantity, unit_price, amount)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sales_order_items
+          (so_id, item_id, quantity, unit_price, tax_rate, discount_type, discount_value, amount)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       for (const item of items) {
-        const lineAmount = item.quantity * item.unit_price;
-
         itemStmt.run(
           salesOrderId,
-            item.item_id,
-            item.quantity,
+          item.item_id,
+          item.quantity,
           item.unit_price,
-          lineAmount
+          item.tax_rate ?? 0,
+          item.discount_type ?? 'none',
+          item.discount_value ?? 0,
+          computeInvoiceTotal([{
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            tax_rate: item.tax_rate,
+            discount_type: item.discount_type ?? 'none',
+            discount_value: item.discount_value,
+          }]),
         );
       }
 
@@ -235,7 +262,8 @@ class SalesOrderModel {
       SELECT
         soi.id, soi.so_id, soi.item_id,
         i.item_code, i.item_name,
-        soi.quantity, soi.delivered_quantity, soi.unit_price, soi.amount
+        soi.quantity, soi.delivered_quantity, soi.unit_price, soi.amount,
+        soi.tax_rate, soi.discount_type, soi.discount_value
       FROM sales_order_items soi
       LEFT JOIN items i ON soi.item_id = i.id
       WHERE soi.so_id = ?
@@ -342,7 +370,8 @@ class SalesOrderModel {
         SELECT
           soi.id, soi.so_id, soi.item_id,
           i.item_code, i.item_name,
-          soi.quantity, soi.delivered_quantity, soi.unit_price, soi.amount
+          soi.quantity, soi.delivered_quantity, soi.unit_price, soi.amount,
+          soi.tax_rate, soi.discount_type, soi.discount_value
         FROM sales_order_items soi
         LEFT JOIN items i ON soi.item_id = i.id
         WHERE soi.so_id = ?
@@ -455,22 +484,33 @@ class SalesOrderModel {
         // Delete existing items
         db.prepare('DELETE FROM sales_order_items WHERE so_id = ?').run(id);
 
-        // Insert new items
+        // Insert new items. BUG-006: same rule as create - the server
+        // recomputes each line and the header total from the rates, and
+        // never trusts a client-sent total.
         let totalAmount = 0;
         const itemStmt = db.prepare(`
-          INSERT INTO sales_order_items (so_id, item_id, quantity, unit_price, amount)
-          VALUES (?, ?, ?, ?, ?)
+          INSERT INTO sales_order_items
+            (so_id, item_id, quantity, unit_price, tax_rate, discount_type, discount_value, amount)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `);
 
         for (const item of items) {
-          const lineAmount = item.quantity * item.unit_price;
-          totalAmount += lineAmount;
-
+          const lineAmount = computeInvoiceTotal([{
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            tax_rate: item.tax_rate,
+            discount_type: item.discount_type ?? 'none',
+            discount_value: item.discount_value,
+          }]);
+          totalAmount = addCurrency(totalAmount, lineAmount);
           itemStmt.run(
             id,
             item.item_id,
             item.quantity,
             item.unit_price,
+            item.tax_rate ?? 0,
+            item.discount_type ?? 'none',
+            item.discount_value ?? 0,
             lineAmount
           );
         }
@@ -635,10 +675,19 @@ class SalesOrderModel {
         item_id: item.item_id,
         quantity: item.quantity,
         unit_price: item.unit_price,
-        amount: item.amount,
-        discount_type: 'none' as const,
+        tax_rate: item.tax_rate,
+        discount_type: item.discount_type,
+        discount_value: item.discount_value,
+        // Do NOT pass the stored line `amount`. decomposeLineAmount treats
+        // a positive `amount` as a gross override, so passing a stored
+        // tax-inclusive amount would re-gross and re-apply tax/discount on
+        // top of it (BUG-006). Send only the inputs; the service derives
+        // the amount.
       })),
-      totalAmount: salesOrder.total_amount,
+      // BUG-006: do NOT send a client total. The service recomputes the
+      // grand total from these lines. Sending the stored header total would
+      // risk a 400 total-mismatch whenever the two rounding paths differ by
+      // a cent, and the header total is itself derived from the same lines.
       afterCreate: (invoiceId, invoiceNo) => {
         db.prepare("UPDATE sales_orders SET status = 'Invoiced', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(id);
         for (const item of salesOrder.items || []) {

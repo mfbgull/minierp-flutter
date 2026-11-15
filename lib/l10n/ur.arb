@@ -1118,6 +1118,8 @@
   "commonTotalout": "کل آؤٹ",
   "commonQuantity": "مقدار",
   "commonAmount": "رقم",
+  "commonPercent": "فیصد",
+  "commonInvalid": "غلط قدر",
   "commonDate": "تاریخ",
   "commonStatus": "حالت",
   "commonCategory": "کیٹیگری",

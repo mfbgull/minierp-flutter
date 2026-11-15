@@ -59,43 +59,57 @@ List<SOFormItem> padItemsToMinimum(List<SOFormItem> items, {int min = 1}) {
 }
 
 num calculateItemDiscount(SOFormItem item) {
-  final subtotal = (item.quantity) * (item.unitPrice);
-  if (item.discount.type == DiscountType.percentage) {
-    return (subtotal * item.discount.value) / 100;
-  }
-  return item.discount.value;
+  final gross = _round2(item.quantity * item.unitPrice);
+  final raw = item.discount.type == DiscountType.percentage
+      ? _round2(gross * item.discount.value / 100)
+      : _round2(item.discount.value);
+  // Mirrors the server's `decomposeLineAmount`: the discount clamps to
+  // the gross, never below 0.
+  return raw > gross ? gross : (raw < 0 ? 0 : raw);
 }
 
 num calculateItemTotal(SOFormItem item) {
-  final subtotal = (item.quantity) * (item.unitPrice);
-  final discount = calculateItemDiscount(item);
-  final afterDiscount = subtotal - discount;
-  final taxAmount = (afterDiscount * (item.taxRate)) / 100;
-  return afterDiscount + taxAmount;
+  final net = _lineNet(item);
+  return _round2(net + _round2(net * item.taxRate / 100));
+}
+
+/// Round to cents — the same rule as the server's `roundCurrency`
+/// (`Math.round((value + Number.EPSILON) * 100) / 100`). The two sides
+/// must agree exactly, or a converted order fails the total check.
+num _round2(num value) => (value * 100).round() / 100;
+
+/// Pre-tax line amount after the item discount, rounded — the base the
+/// tax applies to (server `decomposeLineAmount`).
+num _lineNet(SOFormItem item) {
+  final gross = _round2(item.quantity * item.unitPrice);
+  return _round2(gross - calculateItemDiscount(item));
 }
 
 num calculateSubtotal(List<SOFormItem> items) {
   return items.fold<num>(
     0,
-    (sum, item) => sum + (item.quantity) * (item.unitPrice),
+    (sum, item) => _round2(_round2(sum) + _round2(item.quantity * item.unitPrice)),
   );
 }
 
 num calculateDiscount(List<SOFormItem> items) {
-  return items.fold<num>(0, (sum, item) => sum + calculateItemDiscount(item));
+  return items.fold<num>(
+    0,
+    (sum, item) => _round2(_round2(sum) + calculateItemDiscount(item)),
+  );
 }
 
 num calculateTax(List<SOFormItem> items) {
   return items.fold<num>(0, (sum, item) {
-    final subtotal = (item.quantity) * (item.unitPrice);
-    final discount = calculateItemDiscount(item);
-    final afterDiscount = subtotal - discount;
-    return sum + (afterDiscount * (item.taxRate)) / 100;
+    final net = _lineNet(item);
+    return _round2(_round2(sum) + _round2(net * item.taxRate / 100));
   });
 }
 
+/// Grand total — Σ of the rounded line amounts (server `computeInvoiceTotal`).
 num calculateTotal(List<SOFormItem> items) {
-  return calculateSubtotal(items) -
-      calculateDiscount(items) +
-      calculateTax(items);
+  return items.fold<num>(
+    0,
+    (sum, item) => _round2(_round2(sum) + calculateItemTotal(item)),
+  );
 }

@@ -9,6 +9,7 @@
 //   warehouse_id, source_type, limit — no search/page)
 // - `GET /sales-orders/:id` → **bare object** `{...so, items}`
 
+import 'invoice.dart' show DiscountType;
 import 'json_helpers.dart';
 
 /// A sales order row (list or detail — the detail adds `items` via
@@ -91,6 +92,9 @@ class SalesOrderItem {
     this.deliveredQuantity,
     this.unitPrice = 0,
     this.amount,
+    this.taxRate = 0,
+    this.discountType = DiscountType.flat,
+    this.discountValue = 0,
   });
 
   factory SalesOrderItem.fromJson(Map<String, dynamic> json) => SalesOrderItem(
@@ -102,6 +106,9 @@ class SalesOrderItem {
     deliveredQuantity: asNum(json['delivered_quantity']),
     unitPrice: asNum(json['unit_price']) ?? 0,
     amount: asNum(json['amount']),
+    taxRate: asNum(json['tax_rate']) ?? 0,
+    discountType: DiscountType.fromString(json['discount_type']),
+    discountValue: asNum(json['discount_value']) ?? 0,
   );
 
   final int? id;
@@ -112,6 +119,9 @@ class SalesOrderItem {
   final num? deliveredQuantity;
   final num unitPrice;
   final num? amount;
+  final num taxRate;
+  final DiscountType discountType;
+  final num discountValue;
 }
 
 /// SO detail — the bare `GET /sales-orders/:id` response: the order plus

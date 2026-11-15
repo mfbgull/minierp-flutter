@@ -6332,6 +6332,18 @@ abstract class AppLocalizations {
   /// **'Amount'**
   String get commonAmount;
 
+  /// No description provided for @commonPercent.
+  ///
+  /// In en, this message translates to:
+  /// **'Percent'**
+  String get commonPercent;
+
+  /// No description provided for @commonInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid value'**
+  String get commonInvalid;
+
   /// No description provided for @commonDate.
   ///
   /// In en, this message translates to:
