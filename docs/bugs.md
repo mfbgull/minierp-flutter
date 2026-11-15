@@ -440,7 +440,11 @@ AppRun present, app launches.
 
 ---
 
-## BUG-008 · CI fallow gate ran without coverage — red on every push since 2026-10-26
+## BUG-012 · CI fallow gate ran without coverage — red on every push since 2026-10-26
+
+<!-- Renumbered from a duplicate BUG-008 (2026-11-15). The refund-void item
+     at BUG-008 above is the one PRET-002/FINDINGS-STATUS refers to, so this
+     later, unreferenced item takes the next free number. -->
 
 **Status:** `FIXED` (CI) — `.github/workflows/ci.yml`, fallow job
 **Found:** 2026-10-30 · **Severity:** medium (a quality gate silently dead)
