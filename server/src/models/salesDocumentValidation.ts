@@ -28,6 +28,39 @@ export function validateSalesDocumentItems(db: Database.Database, items: readonl
   }
 }
 
+const DISCOUNT_TYPES = ['none', 'percentage', 'flat'] as const;
+
+/** True when `value` is a finite number. */
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+/** Reject a non-numeric value, or one outside the given range. */
+function requireRange(
+  value: unknown,
+  document: string,
+  field: string,
+  min: number,
+  max: number,
+): void {
+  if (!isFiniteNumber(value)) {
+    throw new Error(`${document} ${field} must be a number`);
+  }
+  if (value < min || value > max) {
+    throw new Error(`${document} ${field} must be between ${min} and ${max}`);
+  }
+}
+
+/** Reject a value that is not a finite number, or is negative. */
+function requireNonNegative(value: unknown, document: string, field: string): void {
+  if (!isFiniteNumber(value)) {
+    throw new Error(`${document} ${field} must be a number`);
+  }
+  if (value < 0) {
+    throw new Error(`${document} ${field} cannot be negative`);
+  }
+}
+
 /**
  * BUG-006: tax and discount come from the client as rates and values; the
  * server recomputes every line amount from them and never trusts a
@@ -35,26 +68,17 @@ export function validateSalesDocumentItems(db: Database.Database, items: readonl
  */
 export function validateSalesLineTaxDiscount(item: SalesLine, document: string): void {
   if (item.tax_rate !== undefined) {
-    if (typeof item.tax_rate !== 'number' || !Number.isFinite(item.tax_rate)) {
-      throw new Error(`${document} tax rate must be a number`);
-    }
-    if (item.tax_rate < 0 || item.tax_rate > 100) {
-      throw new Error(`${document} tax rate must be between 0 and 100`);
-    }
+    requireRange(item.tax_rate, document, 'tax rate', 0, 100);
   }
+
   const discountType = item.discount_type ?? 'none';
-  if (!['none', 'percentage', 'flat'].includes(discountType)) {
+  if (!(DISCOUNT_TYPES as readonly string[]).includes(discountType)) {
     throw new Error(`${document} discount type is invalid`);
   }
-  if (item.discount_value !== undefined) {
-    if (typeof item.discount_value !== 'number' || !Number.isFinite(item.discount_value)) {
-      throw new Error(`${document} discount value must be a number`);
-    }
-    if (item.discount_value < 0) {
-      throw new Error(`${document} discount value cannot be negative`);
-    }
-    if (discountType === 'percentage' && item.discount_value >= 100) {
-      throw new Error(`${document} percentage discount must be below 100`);
-    }
+  if (item.discount_value === undefined) return;
+
+  requireNonNegative(item.discount_value, document, 'discount value');
+  if (discountType === 'percentage' && item.discount_value >= 100) {
+    throw new Error(`${document} percentage discount must be below 100`);
   }
 }
