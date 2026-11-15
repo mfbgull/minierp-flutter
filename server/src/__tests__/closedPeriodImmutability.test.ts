@@ -187,6 +187,31 @@ describe('Closed accounting period immutability (H6)', () => {
     expect(invRow.status).not.toBe('Cancelled');
   });
 
+  it('blocks a backdated sales invoice that lands in a closed period', async () => {
+    const customer = await createCustomer('Closed Period CustBackdate', token);
+    const item = await createItem('Closed Period ItemBackdate', token);
+    await purchaseStock(item, warehouseId, 10, 100, token);
+
+    closePeriodFor('2026-09-10');
+
+    // ACCT-006 allows backdated sales with a warning — but the period lock
+    // stays a hard block. A backdated date inside a closed period must 409,
+    // not post into the closed books.
+    const res = await api('post', '/api/invoices', {
+      customer_id: customer,
+      invoice_date: '2026-09-10',
+      warehouse_id: warehouseId,
+      items: [{ item_id: item, quantity: 1, unit_price: 150, tax_rate: 0 }],
+    });
+    expect(res.status).toBe(409);
+    expect(JSON.stringify(res.body)).toMatch(/closed|period/i);
+
+    const count = db.prepare(
+      `SELECT COUNT(*) AS c FROM invoices WHERE customer_id = ? AND invoice_date = ?`,
+    ).get(customer, '2026-09-10') as { c: number };
+    expect(count.c).toBe(0);
+  });
+
   it('blocks expense edit in closed period', async () => {
     const expenseId = db.prepare(`
       INSERT INTO expenses (expense_no, expense_category, description, amount, expense_date, payment_method, status, created_by)

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../auth/session_events.dart';
 import '../auth/token_storage.dart';
+import '../app_version.dart';
 import 'endpoints.dart' show ApiEndpoints;
 import '../utils/recoverable_failure.dart';
 
@@ -68,7 +69,10 @@ class ApiClient {
     receiveTimeout: const Duration(seconds: 10),
     sendTimeout: const Duration(seconds: 10),
     responseType: ResponseType.json,
-    headers: const {'Accept': 'application/json'},
+    headers: const {
+      'Accept': 'application/json',
+      'X-Client-Version': kAppVersion,
+    },
   );
 
   void _attachInterceptors() {

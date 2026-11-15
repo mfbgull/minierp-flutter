@@ -85,7 +85,16 @@
   "cashConfirmRefund": "نقد واپسی کی تصدیق کریں",
   "cashRefundedSuccess": "نقد رقم واپس کر دی گئی",
   "cashRefundedDetails": "{amount} ادا کیے گئے۔ ادائیگی کا شناختی نمبر: {paymentId}۔",
-  "@cashRefundedDetails": {"placeholders": {"amount": {"type": "String"}, "paymentId": {"type": "String"}}},
+  "@cashRefundedDetails": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "paymentId": {
+        "type": "String"
+      }
+    }
+  },
   "cashInsufficientFunds": "اس واپسی کے لیے نقد یا بینک کا بیلنس ناکافی ہے۔ دوبارہ کوشش سے پہلے طریقہ، تاریخ اور دستیاب رقم کا جائزہ لیں۔",
   "cashInvalidRefund": "اس تاریخ کی قابل واپسی نقد رقم کے اندر، زیادہ سے زیادہ دو اعشاری جگہوں والی مثبت رقم درج کریں۔",
   "cashReverse": "وصولی منسوخ کریں",
@@ -99,11 +108,32 @@
   "cashReversedSuccess": "وصولی منسوخ ہو گئی",
   "cashAlreadyReversed": "یہ وصولی پہلے ہی منسوخ ہے۔ موجودہ حالت کی تصدیق ہو گئی؛ اس کوشش نے اسے دوبارہ منسوخ نہیں کیا۔",
   "cashReversedDetails": "وصولی {paymentNo} منسوخ ہو گئی ہے۔ اصل ریکارڈ تاریخچے میں محفوظ ہے۔",
-  "@cashReversedDetails": {"placeholders": {"paymentNo": {"type": "String"}}},
+  "@cashReversedDetails": {
+    "placeholders": {
+      "paymentNo": {
+        "type": "String"
+      }
+    }
+  },
   "cashDependencySource": "ذریعہ #{sourceId}؛ استعمال شدہ رقم {amount}",
-  "@cashDependencySource": {"placeholders": {"sourceId": {"type": "String"}, "amount": {"type": "String"}}},
+  "@cashDependencySource": {
+    "placeholders": {
+      "sourceId": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
   "cashDependencyInvoice": "انوائس #{invoiceId}",
-  "@cashDependencyInvoice": {"placeholders": {"invoiceId": {"type": "String"}}},
+  "@cashDependencyInvoice": {
+    "placeholders": {
+      "invoiceId": {
+        "type": "String"
+      }
+    }
+  },
   "cashEditReview": "تفصیل تبدیل کریں",
   "cashReceiveAdvance": "پیشگی رقم وصول کریں",
   "cashApply": "نقد رقم انوائسز میں استعمال کریں",
@@ -121,13 +151,31 @@
   "cashChangedBalances": "بقایا بدل گیا ہے۔ تازہ رقم حاصل کر لی گئی ہے؛ دوبارہ تصدیق سے پہلے اپنی اصل تقسیم کا جائزہ لیں۔",
   "cashAppliedSuccess": "نقد رقم استعمال ہو گئی",
   "cashAppliedDetails": "{amount} استعمال ہوئے۔ استعمال کا شناختی نمبر: {applicationId}۔ کوئی نئی ادائیگی وصول نہیں ہوئی۔",
-  "@cashAppliedDetails": {"placeholders": {"amount": {"type": "String"}, "applicationId": {"type": "String"}}},
+  "@cashAppliedDetails": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "applicationId": {
+        "type": "String"
+      }
+    }
+  },
   "cashCreditApply": "اسٹور کریڈٹ انوائسز پر لگائیں",
   "cashCreditApplyHint": "ورن شدہ انوائسز سے اس کسٹمر کا اسٹور کریڈٹ پول استعمال کریں۔ یہ کوئی نئی ادائیگی وصول نہیں کرتا۔",
   "cashCreditEligible": "آپریشن کی تاریخ پر دستیاب اسٹور کریڈٹ",
   "cashCreditAppliedSuccess": "اسٹور کریڈٹ لگایا گیا",
   "cashCreditAppliedDetails": "{amount} استعمال ہوا۔ استعمال کا شناختی نمبر: {applicationId}۔ کوئی نئی ادائیگی وصول نہیں ہوئی۔",
-  "@cashCreditAppliedDetails": {"placeholders": {"amount": {"type": "String"}, "applicationId": {"type": "String"}}},
+  "@cashCreditAppliedDetails": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "applicationId": {
+        "type": "String"
+      }
+    }
+  },
   "cashInvoiceBalance": "انوائس کا بقایا",
   "cashStoreCredit": "اسٹور کریڈٹ",
   "cashHeld": "موجود غیر مختص نقد رقم",
@@ -144,7 +192,16 @@
   "cashOperationDate": "لین دین کی تاریخ",
   "cashReceived": "پیشگی رقم وصول ہوگئی",
   "cashReceivedDetails": "{amount} وصول ہوئے۔ ادائیگی کا شناختی نمبر: {paymentId}۔",
-  "@cashReceivedDetails": {"placeholders": {"amount": {"type": "String"}, "paymentId": {"type": "String"}}},
+  "@cashReceivedDetails": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "paymentId": {
+        "type": "String"
+      }
+    }
+  },
   "cashPendingNotice": "ممکن ہے یہ درخواست پہلے ہی محفوظ ہو چکی ہو۔ اصل رقم، تاریخ، طریقہ اور دوبارہ کوشش کی کلید محفوظ ہیں۔ تصدیق کے لیے محفوظ طریقے سے دوبارہ کوشش کریں؛ نئی درخواست درج نہ کریں۔",
   "cashRecoveryRequired": "نئی درخواست بھیجنے سے پہلے پچھلی درخواست کے نتیجے کی تصدیق ضروری ہے۔ زیرِ التوا درخواست محفوظ رکھیں؛ دوبارہ نئی درخواست درج نہ کریں۔",
   "cashOtherPending": "کسی دوسرے گاہک یا نقد رقم کے عمل کی درخواست زیرِ التوا ہے۔ مزید رقم وصول کرنے سے پہلے اصل درخواست کا نتیجہ معلوم کریں۔",
@@ -165,7 +222,16 @@
   "cashApplyLabel": "انوائس کے لیے استعمال",
   "cashRefundLabel": "نقد رقم کی واپسی",
   "cashPageLabel": "صفحہ {page} از {pages}",
-  "@cashPageLabel": {"placeholders": {"page": {"type": "int"}, "pages": {"type": "int"}}},
+  "@cashPageLabel": {
+    "placeholders": {
+      "page": {
+        "type": "int"
+      },
+      "pages": {
+        "type": "int"
+      }
+    }
+  },
   "dashboardWelcome": "خوش آمدید",
   "dashboardTotalitems": "کل مصنوعات",
   "dashboardWarehousestocks": "ڈبلیو ایچ اسٹاک",
@@ -433,7 +499,6 @@
   "forecastsDashboard": "ڈیمانڈ فورکاسٹ",
   "forecastsDemandtitle": "ڈیمانڈ فورکاسٹ",
   "forecastsDemand": "ڈیمانڈ فورکاسٹ ریکارڈز",
-  "forecastsDemand": "ڈیمانڈ فورکاسٹ ریکارڈز",
   "forecastsForecasttrends": "فورکاسٹ ٹرینڈز",
   "forecastsTrackeditems": "ٹریک کردہ اشیاء",
   "forecastsNeedrestock": "دوبارہ اسٹاک درکار",
@@ -490,7 +555,6 @@
   "forecastsModel": "ماڈل",
   "forecastsSortbymape": "بہترین (سب سے کم MAPE) پہلے",
   "bomBillofmaterials": "بل آف میٹریل",
-  "bomBoms": "BOM ریکارڈز",
   "bomBoms": "BOM ریکارڈز",
   "bomNewbom": "نیا BOM",
   "settingsSettings": "سیٹینگز",
@@ -640,11 +704,29 @@
   "purchasesRefundrefunded": "واپس کر دیا گیا",
   "purchasesRefundnone": "ابھی کوئی ریفنڈ نہیں ہوا",
   "purchasesRefundClaim": "کلیم {claimNo} ({status}) — باقی {remaining}",
-  "@purchasesRefundClaim": {"placeholders": {"claimNo": {"type": "String"}, "status": {"type": "String"}, "remaining": {"type": "String"}}},
+  "@purchasesRefundClaim": {
+    "placeholders": {
+      "claimNo": {
+        "type": "String"
+      },
+      "status": {
+        "type": "String"
+      },
+      "remaining": {
+        "type": "String"
+      }
+    }
+  },
   "purchasesRefundExcess": "زیادہ رقم سپلائر کریڈٹ کے طور پر جمع رکھیں",
   "refundsDueTitle": "واپس ہونے والی رقوم",
   "refundsDueBadge": "واپس ہونے والی رقوم: {amount}",
-  "@refundsDueBadge": {"placeholders": {"amount": {"type": "String"}}},
+  "@refundsDueBadge": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
   "refundsDueHint": "سپلائرز کی واجب الادا رقم۔ ابھی نقد نہیں۔",
   "refundClaimsTitle": "سپلائر ریفنڈ کلیمز",
   "refundClaimsOpenOnly": "صرف کھلے",
@@ -671,18 +753,48 @@
   "refundClaimReceiptStatusPOSTED": "درج شدہ",
   "refundClaimReceiptStatusVOIDED": "منسوخ شدہ",
   "refundClaimRemaining": "باقی: {amount}",
-  "@refundClaimRemaining": {"placeholders": {"amount": {"type": "String"}}},
+  "@refundClaimRemaining": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
   "refundClaimStandalone": "ریفنڈ کلیم درج کریں",
   "refundClaimStandaloneSupplier": "سپلائر",
   "refundClaimStandaloneAmount": "متوقع رقم",
   "refundClaimRemainingPrefill": "باقی {amount}",
-  "@refundClaimRemainingPrefill": {"placeholders": {"amount": {"type": "String"}}},
+  "@refundClaimRemainingPrefill": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
   "refundBlockedTitle": "نقد منفی ہو جائے گا",
   "refundBlockedHint": "پہلے یہ اندراجات واپس کریں، پھر دوبارہ کوشش کریں۔",
   "refundBlockedRow": "{type} بہ تاریخ {date} — {amount}",
-  "@refundBlockedRow": {"placeholders": {"type": {"type": "String"}, "date": {"type": "String"}, "amount": {"type": "String"}}},
+  "@refundBlockedRow": {
+    "placeholders": {
+      "type": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
   "refundBlockedMore": "اور {count} مزید",
-  "@refundBlockedMore": {"placeholders": {"count": {"type": "int"}}},
+  "@refundBlockedMore": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "purchasesProcessreturn": "واپسی پراسیس کریں",
   "purchasesReturnprocessed": "واپسی کامیابی سے ہوگئی",
   "purchasesReturnfailed": "واپسی ناکام ہوگئی",
@@ -741,7 +853,6 @@
   "salesStockvaluation": "اسٹاک ویلیو",
   "salesPrinta4": "A4 پرنٹ کریں",
   "salesReceipt": "رسید",
-  "inventoryItems": "مصنوعات",
   "inventoryItemsin": "مصنوعات",
   "inventoryBacktowarehouses": "واجروں پر واپس",
   "inventoryStockvalue": "اسٹاک ویلیو",
@@ -2370,5 +2481,60 @@
   "reportsCompanyInvoiceReturn": "انوائس واپسی",
   "reportsCompanyPurchaseDoc": "خریداری",
   "reportsCompanyGoodsReceipt": "گڈز رسید",
-  "reportsCompanyPurchaseReturn": "خریداری واپسی"
+  "reportsCompanyPurchaseReturn": "خریداری واپسی",
+  "customreportsbuilderAddaggregate": "ایگریگیٹ شامل کریں",
+  "customreportsbuilderAddcomputed": "کمپیوٹڈ کالم شامل کریں",
+  "customreportsbuilderAddfilter": "فلٹر شامل کریں",
+  "customreportsbuilderAddsort": "ترتیب شامل کریں",
+  "customreportsbuilderAggregates": "ایگریگیٹس",
+  "customreportsbuilderChart": "چارٹ",
+  "customreportsbuilderChartbar": "بار",
+  "customreportsbuilderChartdoughnut": "ڈونٹ",
+  "customreportsbuilderChartempty": "چارٹ دکھانے کے لیے چارٹ ٹیب میں لیبل اور ویلیو فیلڈز منتخب کریں۔",
+  "customreportsbuilderChartline": "لائن",
+  "customreportsbuilderChartpie": "پائی",
+  "customreportsbuilderCharttype": "چارٹ کی قسم",
+  "customreportsbuilderColumns": "کالم",
+  "customreportsbuilderComputed": "کمپیوٹڈ",
+  "customreportsbuilderDragfieldshint": "نیچے فیلڈز گھسیٹیں",
+  "customreportsbuilderDropfieldshere": "کالم شامل کرنے کے لیے فیلڈز یہاں گھسیٹیں",
+  "customreportsbuilderEnablechart": "چارٹ ویژولائزیشن فعال کریں",
+  "customreportsbuilderEnablegroupby": "گروپنگ فعال کریں",
+  "customreportsbuilderEntity": "اینٹٹی",
+  "customreportsbuilderExportcsv": "CSV کے طور پر ایکسپورٹ کریں",
+  "customreportsbuilderExportpdf": "PDF کے طور پر ایکسپورٹ کریں",
+  "customreportsbuilderFields": "فیلڈز",
+  "customreportsbuilderFilters": "فلٹرز",
+  "customreportsbuilderGroup": "گروپ",
+  "customreportsbuilderGroupbyinfo": "گروپ شدہ ویلیوز دکھانے کے لیے SUM، COUNT یا دیگر ایگریگیٹ کمپیوٹڈ کالم شامل کریں۔",
+  "customreportsbuilderGroupfields": "گروپ بہ لحاظ فیلڈز",
+  "customreportsbuilderHideall": "سب چھپائیں",
+  "customreportsbuilderLabelfield": "لیبل فیلڈ",
+  "customreportsbuilderNoaggregates": "کوئی ایگریگیٹ نہیں — گروپ شدہ ویلیوز کے لیے ایک شامل کریں",
+  "customreportsbuilderNocomputed": "کوئی کمپیوٹڈ کالم نہیں — ایگریگیشن کے لیے ایک شامل کریں",
+  "customreportsbuilderNofilters": "کوئی فلٹر نہیں — نتائج فلٹر کرنے کے لیے ایک شامل کریں",
+  "customreportsbuilderNogroupfields": "گروپ کرنے کے لیے کم از کم ایک فیلڈ منتخب کریں",
+  "customreportsbuilderNosorts": "کوئی ترتیب نہیں — نتائج ترتیب دینے کے لیے ایک شامل کریں",
+  "customreportsbuilderPreview": "پیش نظارہ",
+  "customreportsbuilderRun": "رپورٹ چلائیں",
+  "customreportsbuilderRunerror": "رپورٹ چلانے میں ناکامی",
+  "customreportsbuilderRuntopreview": "نتائج دیکھنے کے لیے 'رپورٹ چلائیں' پر کلک کریں",
+  "customreportsbuilderSave": "محفوظ کریں",
+  "customreportsbuilderSaveastemplate": "ٹیمپلیٹ کے طور پر محفوظ کریں",
+  "customreportsbuilderSaved": "رپورٹ محفوظ ہو گئی",
+  "customreportsbuilderSaveerror": "رپورٹ محفوظ کرنے میں ناکامی",
+  "customreportsbuilderSelectentityfirst": "رپورٹ بنانا شروع کرنے کے لیے اینٹٹی منتخب کریں",
+  "customreportsbuilderShowall": "سب دکھائیں",
+  "customreportsbuilderSort": "ترتیب",
+  "customreportsbuilderTemplatenameprompt": "ٹیمپلیٹ کا نام:",
+  "customreportsbuilderTemplatesaved": "ٹیمپلیٹ کامیابی سے محفوظ ہو گیا!",
+  "customreportsbuilderTemplatesaveerror": "ٹیمپلیٹ محفوظ کرنے میں ناکامی",
+  "customreportsbuilderValuefield": "ویلیو فیلڈ",
+  "suppliersAllocatedpurchases": "تفویض شدہ خریداریاں",
+  "suppliersAllocationpurchases": "خریداریاں",
+  "suppliersAllocationrequiredpurchases": "کم از کم ایک PO یا خریداری کی تفویض درکار ہے",
+  "suppliersAllpurchasesallocated": "تمام خریداریاں تفویض ہو گئیں",
+  "suppliersAvailablepurchases": "دستیاب خریداریاں",
+  "suppliersNoopenpurchases": "تفویض کرنے کے لیے کوئی کھلی خریداری نہیں",
+  "suppliersRecordpaymentforpurchase": "اس خریداری کی ادائیگی درج کریں"
 }

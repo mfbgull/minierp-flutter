@@ -650,6 +650,45 @@ from observational to mandatory only when all three hold:
 has read zero for a full quarter, or when the same finding is closed for every
 other write. Record the removal in this section, not silently.
 
+### Client version header and release order (2026-11-14)
+
+**Decision.** The desktop client sends `X-Client-Version` on every request
+(`lib/core/app_version.dart`, wired in `ApiClient._baseOptions`). The server
+logs it and warns when the build is below `MIN_CLIENT_VERSION`
+(`server/src/middleware/clientVersion.ts`). The check is **warn only** — the
+server never rejects on version, so an old build degrades to a log line and
+an `X-Min-Client-Version` response header rather than a lockout.
+
+**Release order.** The client release ships **before or with** the server
+mandate. A desktop build that predates the ACCT-008 key expansion sends no
+`Idempotency-Key` on the newly mandated writes and would 400. Shipping the
+client first removes that window; the version header makes any straggler
+visible in the logs, which is POS stage-2 criterion 2.
+
+**Why warn, not block.** The mandate exists to stop duplicate financial
+writes, not to break installed clients. A hard version gate would turn a
+missing header into a total outage. The `X-Min-Client-Version` header lets a
+future UI nudge the user to update without a server-side rejection.
+
+### `/api/mobile-invoices/*` — keyless, observed, natural-key deduped
+
+**Decision.** This surface stays keyless (D13's promise; the app is not in
+this repo). Two compensating controls replace the key:
+
+1. **Observation.** A keyless submit logs through `logKeylessIdempotentWrite`
+   (scope `mobile_invoice_create`), the same Release 1 telemetry the POS
+   stage-1 path uses. This is the evidence for any future mandatory-key call.
+2. **Natural-key duplicate guard.** A keyless submit matches
+   `(customer_id, invoice_date, computed total)` within a 2-minute window on
+   non-cancelled invoices. A match replays the original with
+   `X-Idempotent-Replay: natural-key` instead of double-creating. A different
+   amount does **not** match. This catches the common timeout-retry without
+   any client change.
+
+The window is short on purpose: two genuinely separate same-day invoices for
+the same customer and amount are possible, so the guard only collapses near-
+simultaneous retries. Tests: `clientVersionObservation.test.ts`.
+
 ### PRET-002 — supplier refunds: one claim object, expected → received
 
 - **Entry points.** The purchase-return flow is primary: when a return is
@@ -787,7 +826,10 @@ updated `supplierRefund.test.ts`, `idempotencyRound2.test.ts`.
   refundable-balance recompute already restores the cap when a refund voids.
   The claim-lifecycle rule lands with PRET-002.
 - **Same-day ordering.** Daily-bucket running balance unchanged; matches D2.
-- **Residual, documented.** Backdated CREATION of cash outflows (withdrawal,
-  expense) still uses only the point-in-time check; D2/D19 scope edits,
-  voids and reversals. Creation-path tightening is left for a future
-  decision.
+- **Residual, closed.** Backdated CREATION of cash outflows (withdrawal,
+  expense, credit-expense settlement) originally used only the point-in-time
+  check. It now runs `assertCashTimeline` after the GL posting on the create
+  path too, so a backdated create that would drive a later daily balance
+  negative is refused and the whole transaction rolls back. Red-first in
+  `cashOutflowEditTimeline.test.ts`; the source-scan tripwire was widened to
+  `ExpensePayment`.
