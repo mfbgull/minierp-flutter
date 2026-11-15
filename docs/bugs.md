@@ -693,15 +693,55 @@ Failing suites include `accountingInvariants`, `invoiceReturnAcceptance`,
 `closedPeriodImmutability`, `supplierRefundClaims`, and `stockTransferVoid`.
 All pass with the flag off.
 
-**Fix shape (not applied).** Backfill `batch_stock_by_location` from
-`stock_batches` in a migration, or fall back to `stock_batches` when a batch has
-no location rows. The second is closer to the existing fallback in
-`consumeFromOldestBatches` (`StockMovement.ts:1223`). A decision is needed:
-the two sources disagree today, so a wrong choice silently changes the sellable
-number.
+**Fix plan (not applied — plan only).** The user asked for a plan, no code yet.
+
+**Why the dev DB worked with the flag on earlier.** Two different databases:
+
+| Database | Batches | `batch_stock_by_location` rows | Flag | Result |
+|---|---|---|---|---|
+| live `database/erp.db` (fresh) | 0 | 0 | 0 | nothing to lose |
+| archive `/tmp/devdb-archive-20261115/erp.db.stale-verif-drift` | 5 | 5 | 1 | worked |
+| a DB with batches created while the flag was **off** | >0 | 0 | 1 | **sellable stock 0 — broken** |
+
+The archived DB worked because its batches were bought while the flag was
+**already on**, so `syncBatchStockByLocationForNewBatch` wrote a location row per
+batch at purchase time. The live dev DB worked because it holds **no stock at
+all**. Neither case exercises the defect. The defect needs batches created while
+the flag was off, then a flip to on — which is exactly what the migration does
+for every existing install.
+
+**Plan, in order.**
+
+1. **Backfill migration** (`add-batch-location-backfill.sql`, new number). For
+every `stock_batches` row with `quantity_remaining > 0` (or non-zero physical)
+that has no `batch_stock_by_location` row, insert one against the warehouse's
+`DEFAULT` location, with `quantity_physical = quantity_remaining`,
+`quantity_reserved = 0`, `quantity_available = quantity_remaining`. Use
+`INSERT … SELECT … WHERE NOT EXISTS` so a re-run is safe. Registered in
+`config/database.ts`. This is the fix for existing databases.
+
+2. **Write location rows regardless of the flag.** In
+`syncBatchStockByLocationForNewBatch` (`StockMovement.ts:1040`), remove the early
+`if (!isFeatureEnabled(...)) return`. Writing the row costs one insert and makes
+the two sources agree at all times. The flag then controls only which source is
+**read**, never whether the second source is **maintained**.
+
+3. **Drift check.** Add an invariant check that, for every warehouse,
+`SUM(stock_batches.quantity_remaining)` equals `SUM(batch_stock_by_location.
+quantity_available)` over the same batch set. Wire it into the accounting
+invariants run so a divergence fails a test, not a customer sale.
+
+4. **Test: legacy DB with batches, flip the flag on, sales still work.** Seed
+batches with the flag **off** (the real legacy shape), then set the flag to `'1'`
+in the same test, then sell. Assert the sale succeeds and the sellable number
+matches the pre-flip number. This is the regression the current suite cannot
+see, because `setup.ts` sets the flag **before** any batch exists.
+
+5. **Only after 1–4 pass**: consider making the flag the default. Until then the
+shipped default stays **off**.
 
 **Scope.** Latent. No production effect while the flag stays off. The shipped
-default must not change until the backfill lands.
+default must not change until the backfill and step 4 land.
 
 ---
 

@@ -16,6 +16,7 @@ import request from 'supertest';
 import app from '../app';
 import db from '../config/database';
 import { createCustomer, createItem, getAuthCookie, purchaseStock } from './helpers/invoiceReturnSpec';
+import { expectAllInvariantsHold } from './helpers/accountingInvariants';
 import { computeInvoiceTotal } from '../utils/currency';
 
 const IDEMPOTENCY_KEY = 'so-tax-discount-key';
@@ -299,6 +300,45 @@ describe('sales order line tax and discount (BUG-006)', () => {
       // Exact match: the invoice total is the order total is the parity total.
       expect(Number(inv.total_amount)).toBeCloseTo(expected, 2);
       expect(Number(created.body.total_amount)).toBeCloseTo(expected, 2);
+    });
+  });
+
+  describe('double-fire conversion (M4)', () => {
+    it('converts once and deducts stock once when two conversions race the same order', async () => {
+      const created = await createOrder(cookie, customerId, [
+        { item_id: itemId, quantity: 3, unit_price: 100 },
+      ], 'so-double-fire');
+      const soId = created.body.id as number;
+
+      const stockBefore = (db.prepare(
+        'SELECT COALESCE(SUM(quantity_remaining), 0) AS q FROM stock_batches WHERE item_id = ?',
+      ).get(itemId) as { q: number }).q;
+
+      // Two conversions of the same order. The controller reads the SO status
+      // inside its transaction and refuses the second once the first flips it
+      // to 'Invoiced'. Whichever order they run in, only one invoice and one
+      // stock deduction may result.
+      const first = await request(app).post(`/api/sales-orders/${soId}/convert`)
+        .set('Cookie', cookie).set('Idempotency-Key', 'so-double-fire-a').send({});
+      const second = await request(app).post(`/api/sales-orders/${soId}/convert`)
+        .set('Cookie', cookie).set('Idempotency-Key', 'so-double-fire-b').send({});
+
+      expect([first.status, second.status].filter((s) => s === 201)).toHaveLength(1);
+      expect([first.status, second.status]).toContain(400);
+
+      const invoices = db.prepare(
+        "SELECT COUNT(*) AS n FROM invoices WHERE so_id = ? AND status <> 'Cancelled'",
+      ).get(soId) as { n: number };
+      expect(invoices.n).toBe(1);
+
+      const stockAfter = (db.prepare(
+        'SELECT COALESCE(SUM(quantity_remaining), 0) AS q FROM stock_batches WHERE item_id = ?',
+      ).get(itemId) as { q: number }).q;
+      expect(stockBefore - stockAfter).toBeCloseTo(3, 3);
+
+      const so = db.prepare('SELECT status FROM sales_orders WHERE id = ?').get(soId) as { status: string };
+      expect(so.status).toBe('Invoiced');
+      expectAllInvariantsHold('double-fire conversion');
     });
   });
 

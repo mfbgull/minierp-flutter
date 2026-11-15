@@ -193,6 +193,7 @@ export function backupBeforeMigration(): string | null {
     // sits at that path, permissions, a full disk). Create and snapshot
     // inside one try so any failure reaches the same refusal-to-start path.
     fs.mkdirSync(backupDir, { recursive: true });
+    assertEnoughDiskSpaceForBackup(backupDir);
     // VACUUM INTO is synchronous and produces a consistent snapshot of the
     // whole database. db.backup() is the other option but it returns a
     // Promise, and this boot path cannot await it.
@@ -209,6 +210,7 @@ export function backupBeforeMigration(): string | null {
     logger.error('FATAL: pre-migration backup reported success but wrote no file. Refusing to start.');
     process.exit(1);
   }
+  writeDailyBackupCopy(backupPath, backupDir, stamp);
   logger.info(`📦 pre-migration backup: ${backupPath}`);
   pruneOldPreMigrationBackups(backupDir);
   return backupPath;
@@ -216,6 +218,56 @@ export function backupBeforeMigration(): string | null {
 
 /** Keep the newest N pre-migration snapshots; delete older ones. */
 const MAX_PRE_MIGRATION_BACKUPS = 10;
+
+/**
+ * Refuse to start when the backup volume has less free space than the source
+ * database needs, plus 20% headroom. A full disk mid-`VACUUM INTO` gives a
+ * terse SQLite error; this gives one an operator can act on.
+ */
+function assertEnoughDiskSpaceForBackup(backupDir: string): void {
+  const sourceSize = fs.statSync(dbPath).size;
+  const needed = Math.ceil(sourceSize * 1.2);
+  let free: number;
+  try {
+    const stats = fs.statfsSync(backupDir);
+    free = stats.bavail * stats.bsize;
+  } catch {
+    // statfsSync is not available everywhere. A missing reading must not block
+    // a backup: VACUUM INTO itself still fails loudly on a full disk.
+    return;
+  }
+  if (free < needed) {
+    throw new Error(
+      `not enough free disk space for the pre-migration backup: ` +
+        `${Math.round(needed / 1024 / 1024)} MB needed, ` +
+        `${Math.round(free / 1024 / 1024)} MB free at ${backupDir}`,
+    );
+  }
+}
+
+/**
+ * Keep one snapshot per day, in addition to the newest N. A bad release is
+ * usually found the next day, after the newest-10 window has rotated past the
+ * good snapshot. The daily copy is hard-linked when the filesystem allows it,
+ * so it costs no extra disk; it falls back to a copy.
+ */
+const DAILY_BACKUP_PREFIX = 'erp-daily-';
+
+function writeDailyBackupCopy(backupPath: string, backupDir: string, stamp: string): void {
+  const day = stamp.slice(0, 10);
+  const dailyPath = path.join(backupDir, `${DAILY_BACKUP_PREFIX}${day}.db`);
+  if (fs.existsSync(dailyPath)) return;
+  try {
+    fs.linkSync(backupPath, dailyPath);
+  } catch {
+    try {
+      fs.copyFileSync(backupPath, dailyPath);
+    } catch {
+      // A daily copy is a convenience, not a safety net: the snapshot above
+      // already succeeded. Never fail the boot for it.
+    }
+  }
+}
 
 function pruneOldPreMigrationBackups(backupDir: string): void {
   let entries: string[];

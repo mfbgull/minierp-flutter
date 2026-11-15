@@ -90,11 +90,35 @@ runs**, in `backupBeforeMigration()` (`server/src/config/database.ts`):
 - **if the backup cannot be written, the server refuses to start** and logs
   why — it will not migrate with no way back,
 - the boot log prints the path: `📦 pre-migration backup: <path>`,
-- the newest **10** snapshots are kept; older ones are deleted.
+- **the volume must have room first.** The server checks free space and refuses
+  to start with a readable reason (`not enough free disk space for the
+  pre-migration backup: N MB needed, M MB free`) instead of a terse SQLite
+  error part-way through,
+- the newest **10** snapshots are kept, and **one snapshot per day**
+  (`erp-daily-<date>.db`) is kept alongside them; older rolling snapshots are
+  deleted.
 
 **MUST** — before the first migration on real data, read that log line and keep
 the named file somewhere outside the machine. It is the only rollback the
 server gives you. 10 snapshots is a small window on a busy system.
+
+**MUST — off-machine backup.** Keeping snapshots on the same disk is not a
+backup. If the disk dies, the database and every snapshot die with it. Before
+the first migration on real data you **MUST** copy at least one snapshot off
+the machine:
+
+- a second physical or network drive, a NAS, or an encrypted cloud bucket,
+- the copy **MUST** be readable: open it and run `PRAGMA integrity_check` on it
+  (or `node scripts/restore-smoke.js <copy>`), not just confirm the file exists,
+- record where the off-machine copy lives, so the next person can find it,
+- keep it current: a copy from three months ago is not a rollback point for
+  today's failure.
+
+In addition to the newest 10 snapshots, the server keeps **one snapshot per
+day** (`erp-daily-<YYYY-MM-DD>.db`, hard-linked so it costs no extra disk). A
+bad release is usually found the next day, after the rolling window has already
+rotated past the good snapshot. Those daily files are also what you copy
+off-machine.
 
 Before the first migration runs on real data:
 

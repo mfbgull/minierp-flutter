@@ -196,11 +196,11 @@ describe('database module initialization boundary', () => {
   });
 
   describe('pre-migration backup', () => {
-    /** Every pre-migration snapshot in the temp database's backups dir. */
+    /** Only the rotating pre-migration series; daily copies are separate. */
     function backupFiles(): string[] {
       const backupDir = path.join(dir, 'backups');
       if (!fs.existsSync(backupDir)) return [];
-      return fs.readdirSync(backupDir).filter((f) => f.endsWith('.db'));
+      return fs.readdirSync(backupDir).filter((f) => f.startsWith('erp-premigration-') && f.endsWith('.db'));
     }
 
     it('takes a timestamped snapshot when migrations are pending', async () => {
@@ -259,6 +259,78 @@ describe('database module initialization boundary', () => {
       mod.backupBeforeMigration();
 
       expect(backupFiles().length).toBeLessThanOrEqual(10);
+    });
+
+    it('keeps one snapshot per day in addition to the newest 10', async () => {
+      const mod = await loadDatabaseModule();
+      mod.applyPendingMigrations();
+      await mod.dbSeedReady;
+
+      const taken = mod.backupBeforeMigration() as string;
+      const backupDir = path.join(dir, 'backups');
+      const day = path.basename(taken).replace('erp-premigration-', '').slice(0, 10);
+      const dailyPath = path.join(backupDir, `erp-daily-${day}.db`);
+
+      expect(fs.existsSync(dailyPath)).toBe(true);
+      // The daily file must be a usable snapshot, not an empty marker.
+      const snapshot = new Database(dailyPath, { readonly: true, fileMustExist: true });
+      try {
+        expect(snapshot.pragma('integrity_check', { simple: true })).toBe('ok');
+      } finally {
+        snapshot.close();
+      }
+
+      // It survives pruning of the newest-10 window: daily files are a
+      // separate series. Fill the window, prune, and the daily copy stays.
+      for (let i = 0; i < 12; i += 1) {
+        fs.writeFileSync(
+          path.join(backupDir, `erp-premigration-2000-01-01T00-00-${String(i).padStart(2, '0')}-000Z.db`),
+          '',
+        );
+      }
+      mod.backupBeforeMigration();
+      mod.backupBeforeMigration();
+      expect(fs.existsSync(dailyPath)).toBe(true);
+    });
+
+    it('refuses to boot when the backup volume is too small', async () => {
+      const mod = await loadDatabaseModule();
+      mod.applyPendingMigrations();
+      await mod.dbSeedReady;
+
+      // Pretend the volume is almost full. The check must abort the backup and
+      // reach the same refusal-to-start path as any other backup failure: exit
+      // 1, and no new snapshot.
+      const statfsSpy = jest.spyOn(fs, 'statfsSync').mockReturnValue(
+        { bavail: 1, bsize: 1 } as unknown as ReturnType<typeof fs.statfsSync>,
+      );
+      const exitSpy = jest.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+      const before = backupFiles().length;
+      try {
+        mod.backupBeforeMigration();
+        expect(exitSpy).toHaveBeenCalledWith(1);
+        expect(backupFiles().length).toBe(before);
+      } finally {
+        statfsSpy.mockRestore();
+        exitSpy.mockRestore();
+      }
+    });
+
+    it('still backs up when the free-space reading is unavailable', async () => {
+      const mod = await loadDatabaseModule();
+      mod.applyPendingMigrations();
+      await mod.dbSeedReady;
+
+      // statfsSync is absent on some platforms. A missing reading must not
+      // block a backup: VACUUM INTO still fails loudly on a truly full disk.
+      const statfsSpy = jest.spyOn(fs, 'statfsSync').mockImplementation(() => {
+        throw new Error('ENOSYS: statfs not available');
+      });
+      try {
+        expect(mod.backupBeforeMigration()).not.toBeNull();
+      } finally {
+        statfsSpy.mockRestore();
+      }
     });
 
     it('takes no snapshot when the database file does not exist yet', async () => {
