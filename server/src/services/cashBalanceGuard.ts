@@ -10,4 +10,3 @@
  * `cashOutflowEditTimeline.test.ts` keeps seeing `assertCashTimeline` here.
  */
 export { assertCashTimeline } from './cashTimeline';
-export type { CashOrBankCode } from './cashTimeline';
