@@ -52,6 +52,11 @@ it('confines every audit SQLite constructor to its fresh fixture before opening 
         console.log('AUDIT_FIXTURE_CONFINEMENT_PASS');
       }
       verifySession().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => {
+        // Drain the activity-log queue BEFORE closing the handle. The flush
+        // timer is unref()'d and can fire after close(), which writes
+        // "database connection is not open" to stderr and fails the assertion
+        // below on a loaded machine. flushLogs() is the house drain call.
+        require(path.join(root, 'server/src/services/activityLogger')).flushLogs();
         db.close();
         if (cleanup) cleanup();
       });

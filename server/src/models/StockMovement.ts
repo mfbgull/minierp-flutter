@@ -1232,6 +1232,41 @@ class StockMovementModel {
     if (featureOn) {
       const batchRows = selectLocationBatches(db, itemId, warehouseId, asOf, useFEFO);
 
+      // BUG-013: a batch with no location coverage is not gone, it is simply not
+      // yet location-tracked (a flag flip, or a row written by a path that did
+      // not refresh the location table). The flag chooses which source is READ;
+      // it must never make stock disappear. Add such batches at their master
+      // quantity. Done in JS so the location query and its FEFO rules are
+      // untouched; consumeBatchesByLocation already decrements the master row
+      // and only touches location rows that exist.
+      const missing = db.prepare(`
+        SELECT sb.id, sb.unit_cost, sb.received_date, sb.expiry_date,
+               sb.quantity_remaining AS qty_avail
+        FROM stock_batches sb
+        WHERE sb.item_id = ? AND sb.warehouse_id = ?
+          AND sb.quantity_remaining > 0
+          AND NOT EXISTS (
+            SELECT 1 FROM batch_stock_by_location bsl
+            WHERE bsl.batch_id = sb.id AND bsl.quantity_available > 0
+          )
+          ${useFEFO ? "AND COALESCE(sb.halted, 0) = 0 AND (sb.expiry_date IS NULL OR sb.expiry_date >= @asOf)" : ''}
+      `).all(itemId, warehouseId, { asOf }) as LocationBatchRow[];
+      if (missing.length > 0) {
+        batchRows.push(...missing);
+        // Keep the documented order: dated expiry first (soonest first), then
+        // undated, then FIFO by receipt date and id.
+        batchRows.sort((a, b) => {
+          const aDated = a.expiry_date ? 0 : 1;
+          const bDated = b.expiry_date ? 0 : 1;
+          if (aDated !== bDated) return aDated - bDated;
+          if (a.expiry_date && b.expiry_date && a.expiry_date !== b.expiry_date) {
+            return a.expiry_date < b.expiry_date ? -1 : 1;
+          }
+          if (a.received_date !== b.received_date) return a.received_date < b.received_date ? -1 : 1;
+          return a.id - b.id;
+        });
+      }
+
       // Check if stock exists but all batches/locations are blocked/expired.
       if (batchRows.length === 0 && availableQty > 0) {
         assertNoBlockedStockOnly(db, itemId, warehouseId, quantity);
