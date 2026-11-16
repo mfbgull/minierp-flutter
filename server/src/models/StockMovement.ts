@@ -1161,7 +1161,9 @@ class StockMovementModel {
     const batchSellable = featureOn
       ? `SELECT item_id, warehouse_id, SUM(sellable) AS sellable
          FROM (
-           -- Batches mirrored to the location table: read the bins.
+           -- Batches mirrored to the location table: read the bins. This is the
+           -- authoritative source for MIRRORED units, grouped by the BIN's
+           -- warehouse — the bin, not the batch, says where stock sits.
            SELECT sb.item_id, l.warehouse_id, SUM(bsl.quantity_available) AS sellable
            FROM stock_batches sb
            JOIN batch_stock_by_location bsl ON sb.id = bsl.batch_id
@@ -1172,17 +1174,22 @@ class StockMovementModel {
              AND (sb.expiry_date IS NULL OR sb.expiry_date >= date('now'))
            GROUP BY sb.item_id, l.warehouse_id
            UNION ALL
-           -- BUG-013: a batch with NO location row is untracked, not gone. Read
-           -- it from the batch total so a partial rollout cannot hide stock.
-           SELECT sb.item_id, sb.warehouse_id, SUM(sb.quantity_remaining) AS sellable
+           -- BUG-013: units NOT mirrored in any bin are untracked, not gone.
+           -- Coverage is PER UNIT, not per batch: a partly covered batch keeps
+           -- the mirrored part in the branch above and the remainder here. A
+           -- per-batch NOT EXISTS test would drop those remainder units.
+           SELECT sb.item_id, sb.warehouse_id,
+                  SUM(MAX(sb.quantity_remaining - COALESCE(cov.mirrored, 0), 0)) AS sellable
            FROM stock_batches sb
+           LEFT JOIN (
+             SELECT bsl.batch_id, SUM(bsl.quantity_available) AS mirrored
+             FROM batch_stock_by_location bsl
+             WHERE bsl.quantity_available > 0
+             GROUP BY bsl.batch_id
+           ) cov ON cov.batch_id = sb.id
            WHERE sb.quantity_remaining > 0
              AND (sb.halted = 0 OR sb.halted IS NULL)
              AND (sb.expiry_date IS NULL OR sb.expiry_date >= date('now'))
-             AND NOT EXISTS (
-               SELECT 1 FROM batch_stock_by_location b0
-               WHERE b0.batch_id = sb.id AND b0.quantity_available > 0
-             )
            GROUP BY sb.item_id, sb.warehouse_id
          )
          GROUP BY item_id, warehouse_id`
@@ -1202,16 +1209,45 @@ class StockMovementModel {
       FROM items i
       JOIN stock_balances sb_q ON sb_q.item_id = i.id
       LEFT JOIN (
-        -- Deduct exactly the batches the branch above already counted, so the
-        -- residual is only genuinely UNBATCHED stock. Which batches those are
-        -- depends on the flag: off → every batch, on → covered and uncovered
-        -- both count as sellable, so deduct every batch in both states. The
-        -- flag-on branch counts covered batches from bins and uncovered from
-        -- the batch total, which together is every batch.
-        SELECT sb.item_id, sb.warehouse_id, SUM(sb.quantity_remaining) AS total
-        FROM stock_batches sb
-        WHERE sb.quantity_remaining > 0
-        GROUP BY sb.item_id, sb.warehouse_id
+        -- Deduct exactly the stock the batch branch above does NOT report, so
+        -- the residual is only genuinely UNBATCHED stock.
+        --
+        -- Two traps, both hit in practice:
+        -- Warehouse attribution: the branch counts mirrored units under the
+        --    BIN's warehouse and unmirrored units under the BATCH's warehouse,
+        --    so the unmirrored total must use sb.warehouse_id, not a single
+        --    batch total grepped by one warehouse.
+        --  * Excluded batches. An expired or halted batch is filtered out of
+        --    the branch, so its units must STILL be deducted here. Otherwise
+        --    balances minus deducted leaves them in the residual and an expired
+        --    batch is sellable again. The deduction is therefore unfiltered.
+        SELECT item_id, warehouse_id, SUM(mirrored) AS total
+        FROM (
+          -- Mirrored units belong to the bin's warehouse.
+          SELECT sb.item_id, l.warehouse_id, SUM(bsl.quantity_available) AS mirrored
+          FROM stock_batches sb
+          JOIN batch_stock_by_location bsl ON sb.id = bsl.batch_id
+          JOIN locations l ON bsl.location_id = l.id
+          WHERE bsl.quantity_available > 0
+          GROUP BY sb.item_id, l.warehouse_id
+          UNION ALL
+          -- Unmirrored units belong to the batch's own warehouse. This is
+          -- quantity_remaining minus mirrored_in_this_batch, computed without
+          -- the branch's eligibility filters so an expired or halted batch
+          -- still reduces the residual instead of reappearing as sellable.
+          SELECT sb.item_id, sb.warehouse_id,
+                 SUM(MAX(sb.quantity_remaining - COALESCE(cov.mirrored, 0), 0)) AS mirrored
+          FROM stock_batches sb
+          LEFT JOIN (
+            SELECT bsl.batch_id, SUM(bsl.quantity_available) AS mirrored
+            FROM batch_stock_by_location bsl
+            WHERE bsl.quantity_available > 0
+            GROUP BY bsl.batch_id
+          ) cov ON cov.batch_id = sb.id
+          WHERE sb.quantity_remaining > 0
+          GROUP BY sb.item_id, sb.warehouse_id
+        )
+        GROUP BY item_id, warehouse_id
       ) ba ON ba.item_id = i.id AND ba.warehouse_id = sb_q.warehouse_id
       GROUP BY i.id, sb_q.warehouse_id
       HAVING MAX(COALESCE(sb_q.quantity, 0) - COALESCE(ba.total, 0), 0) > 0
