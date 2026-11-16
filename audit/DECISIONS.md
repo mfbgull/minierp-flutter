@@ -1033,6 +1033,62 @@ sentence "the flag never chooses which source is WRITTEN" already predicted:
    master batch down and left the destination bin holding the units. Both
    location writes are now unconditional, matching the ungated create.
 
-Defect 2 was invisible to the per-batch drift check because the source bin
-under-reported by exactly what the destination bin over-reported. The drift
-check now judges per item+warehouse and per location bin as well.
+## D24 — BUG-013: the flag defect is a PATTERN, not one site
+
+**Date.** 2026-11-16. **Status.** DECIDED (implemented). **Supersedes** the
+"correct everywhere EXCEPT one site" verdict in D23's audit table.
+
+**Trigger.** D23 closed with one site fixed and a table that marked the other
+nine "correct". The table was built by reading each site, not by running it. A
+structural guard and a per-path matrix then found **six** gated writes, not one.
+
+**The six sites.** Every one is the same shape: the master write runs
+unconditionally, the location write sits behind the flag.
+
+| # | Site | Found by |
+|---|---|---|
+| 1 | `invoiceReturnService.reverseBatchRestore` | the void rehearsal (D23) |
+| 2 | `StockMovement.voidTransfer` (~2024, ~2054) | `batchLocationPathMatrix.test.ts` |
+| 3 | `StockMovement.recordExpiryTransfer` drain | `batchLocationPathMatrix.test.ts` |
+| 4 | `StockMovement.recordDamageTransfer` drain | `batchLocationPathMatrix.test.ts` |
+| 5 | `PurchaseReturn.drawSourceBatchLocations` (variable-gated) | `bug014PurchaseReturn.test.ts` |
+| 6 | `PurchaseReturn.restoreConsumedReturnBatch` + legacy restock | `bug014PurchaseReturn.test.ts` |
+
+`Invoice.restoreSaleBatchQuantities` and `Invoice.reconsumeRestoredInvoiceItems`
+(a seventh and eighth) were found by `bug014InvoiceDeleteRestore.test.ts` and
+`bug014ReverseStock.test.ts`.
+
+**Decision 1 — fix every site, allow-list none.** The guard must pass with ZERO
+exceptions. An allow-list would have hidden exactly the sites the guard exists to
+catch, and a reviewer cannot tell a legitimate exception from the next defect.
+
+**Decision 2 — read a missing location row as "not tracked yet", never "gone".**
+A batch with no bin row is a pre-flag-on batch. The repair is a get-or-create of
+the DEFAULT bin (`StockMovementModel.mirrorBatchLocationDelta`), applied
+unconditionally, clamped at zero because the table CHECKs the physical quantity.
+
+**Decision 3 — do not throw on the flag-OFF path.** `drawSourceBatchLocations`
+may throw when the bins are authoritative and a shortfall is unexplained, but
+only under the flag. With the flag off the bins are not authoritative, so a
+shortfall drains the DEFAULT bin instead. Throwing there would regress a working
+purchase return.
+
+**Decision 4 — the guard reads the source, it does not read a list.**
+`batchLocationWriteGuard.test.ts` tokenises brace depth, tracks the stack of
+enclosing flag blocks — including the `const on = isFeatureEnabled(...)` alias
+form, which is how the fifth site hid — and fails on a table write inside one. A
+second test fails if a file that mentions the flag is missing from the scanned
+set, so a new branching file cannot slip past.
+
+**The ninth characteristic — coverage is per unit.** The UNION ALL fix in D23
+treated coverage as per batch. `batchLocationDoubleCount.test.ts` proved three
+consequences: a partly covered batch's unmirrored units vanish; a bin in another
+warehouse is deducted from the wrong warehouse and counted twice; and a
+expired batch filtered out of the branch returns through the residual. The
+deduction is now per unit, split by the same two attributions the branch counts,
+and unfiltered.
+
+**Why the D23 table was wrong.** "Correct" was a claim about intent, read from
+the code. "Six sites found" is a claim about behaviour, produced by running the
+paths under both flag states and by a guard that cannot be argued with. Trust the
+second kind. Record a verdict only next to the check that produced it.
