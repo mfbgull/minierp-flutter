@@ -117,7 +117,12 @@ void main() {
         await tester.tap(find.text('Open'));
         await tester.pumpAndSettle();
 
-        final reason = find.byType(TextField).first;
+        // The reason field is the LAST TextField in every dialog under test:
+        // the write-off dialog also carries an amount and a date ahead of it,
+        // the void dialog carries the reason alone. Selecting by position
+        // (rather than by a label finder) is what the wire-level proof needs —
+        // the point is the key on the request, not the field layout.
+        final reason = find.byType(TextField).last;
         final submit = find
             .byWidgetPredicate((widget) => widget is FilledButton)
             .last;

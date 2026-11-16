@@ -120,11 +120,10 @@ function supplierLedgerAsOf(supplierId: number, date: string): number {
   `).get(supplierId, date) as { v: number }).v;
 }
 
-describe('GLM-REVIEW red findings (F-2, F-3)', () => {
-  // it.failing: this is a known defect (audit/GLM-REVIEW.md F-2), tagged so
-  // the suite is green while the test stays visible. It flips to a real
-  // failure the moment the finding is fixed — delete the wrapper then.
-  it.failing('F-2: voiding a return whose claim carries a write-off is refused, not silently orphaned', async () => {
+describe('GLM-REVIEW findings (F-2 fixed, F-3 parked)', () => {
+  // F-2 is fixed (7a96e6d8 refused cancel of a written-off claim) — this is
+  // now a normal regression guard for that fix.
+  it('F-2: voiding a return whose claim carries a write-off is refused, not silently orphaned', async () => {
     await seedOpeningCash(6000);
     const info = await paidPurchase(5000);
     const { returnId, claimId } = await returnAgainstPurchase(info);
@@ -147,8 +146,9 @@ describe('GLM-REVIEW red findings (F-2, F-3)', () => {
     expect(voided.status).toBeGreaterThanOrEqual(400);
   });
 
-  // it.failing: known defect (audit/GLM-REVIEW.md F-3) — see the wrapper
-  // note on F-2 above.
+  // it.failing: known defect (audit/GLM-REVIEW.md F-3) — parked pending the
+  // dating decision. It flips to a real failure the moment F-3 is fixed;
+  // delete the wrapper then.
   it.failing('F-3: a voided receipt keeps GL AP and the supplier ledger in agreement at every as-of date', async () => {
     await seedOpeningCash(10000);
     const info = await paidPurchase(100);

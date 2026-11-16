@@ -15,18 +15,26 @@ ledger. Older phase records below are dated evidence, not a new release assessme
 
 ## Finding-tagged tests (skipped / expected-failure)
 
-Six tests deliberately exercise known, unfixed findings. Each is tagged with its
-finding ID so it stays visible and flips to a real failure when the finding is
-fixed. `scripts/check.sh` prints the count (see "Finding-tagged test count").
+Five tests deliberately exercise known, unfixed findings (four UX + F-3). Each is
+tagged with its finding ID so it stays visible and flips to a real failure when the
+finding is fixed. `scripts/check.sh` prints the count (see "Finding-tagged test
+count").
+
+F-2 was un-parked on 2026-11-16: `7a96e6d8` fixed it (a claim with a standing
+write-off can no longer be cancelled), so its `it.failing` wrapper was removed and
+the test is now a normal passing regression guard. Red-first proof for the
+un-park: with the `cancel` guard in `SupplierRefundClaim.ts` temporarily reverted,
+the un-parked case failed `Expected: >= 400 / Received: 200`; with the guard
+restored it passes.
 
 | Finding | Test | Tag | Fails today because |
 |---|---|---|---|
-| F-2 (GLM-REVIEW) | `server/src/__tests__/moneyPathFindingsRed.test.ts` | `it.failing` with `F-2:` in the name | Voiding a return whose claim carries a write-off returns 200 (orphans the 7300/AP posting); expected ≥400. |
 | F-3 (GLM-REVIEW) | `server/src/__tests__/moneyPathFindingsRed.test.ts` | `it.failing` with `F-3:` in the name | GL AP vs supplier subledger differ by 3,000 at as-of 2026-11-05 (`Expected: 0, Received: 3000`). |
 | UX-3 (GLM-UX-REVIEW) | `test/features/supplier_refund_message_test.dart` | `skip: true`, `RED-BY-DESIGN … UX-3` | The refund-amount error contains "quantity" (`Found 1 widget with text containing quantity`). |
 | UX-6 (GLM-UX-REVIEW) | `test/widgets/cash_blockers_localization_test.dart` | `skip: true`, `RED-BY-DESIGN … UX-6` | The blocker row leaks `receipt_overpayment` and raw ISO `2026-11-15`. |
 | UX-11 (GLM-UX-REVIEW) | `test/features/sales_order_form_loading_test.dart` | `skip: true`, `RED-BY-DESIGN … UX-11` | A failed customer load renders as an empty picker; `Found 0 widgets with text containing Failed`. |
 | UX-13 (GLM-UX-REVIEW) | `test/features/sales_order_discount_validation_test.dart` | `skip: true`, `RED-BY-DESIGN … UX-13` | A flat discount above the line total passes validation (`errorText` is `null`). |
+
 
 ## Phase 0 baseline
 
