@@ -27,6 +27,10 @@ import logger from '../utils/logger';
 import { roundCurrency, toMinorUnits } from '../utils/currency';
 import { BusinessRuleError } from '../utils/businessRuleError';
 import activityLogger, { ActionType, LogLevel } from './activityLogger';
+// D21: cashTimeline is a leaf module (it imports nothing from this service),
+// so this is a normal top-level import — the lazy require this cycle once
+// forced is gone.
+import { assertCashTimeline, cashOrBankAccountCode } from './cashTimeline';
 
 /** First line with a positive debit — used for the legacy header's debit_account column. */
 function firstAccountIdWithDebit(lines: JournalLineInput[]): string {
@@ -882,13 +886,9 @@ export class AccountingService {
   static _cashOrBankAccountCode(
     paymentMethod?: string
   ): '1000' | '1010' | '1020' | '1030' | '1040' {
-    if (!paymentMethod) return '1000';
-    const m = paymentMethod.toLowerCase().trim();
-    if (m === 'cash') return '1000';
-    if (m === 'easypaisa') return '1020';
-    if (m === 'jazzcash') return '1030';
-    if (m === 'upaisa') return '1040';
-    return '1010';
+    // Single source of truth lives in cashTimeline.ts (D21); kept as a
+    // static so every existing caller is unchanged.
+    return cashOrBankAccountCode(paymentMethod);
   }
 
   // ------------------------------------------------------------------
@@ -1632,30 +1632,8 @@ export class AccountingService {
         { account_id: cashAcct.id, credit: args.amount, description: `Salary paid to ${args.employeeCode}` },
       ],
     });
-    AccountingService.assertCashTimelineAfterOutflow(db, args.paymentMethod, args.paymentDate);
+    assertCashTimeline(db, { paymentMethod: args.paymentMethod, fromDate: args.paymentDate });
     return posted;
-  }
-
-  /**
-   * ACCT-013 for salary and loan outflows.
-   *
-   * `assertSufficientFunds` compares against the cumulative balance AT the
-   * payment date, so it is right about its own day and blind to every other
-   * one. A backdated outflow can therefore post while a later day is already
-   * overdrawn. Run the chronological suffix check after the posting so the new
-   * outflow is in the timeline; the caller's transaction rolls back on throw.
-   *
-   * `cashBalanceGuard` imports this module, so a top-level import would be a
-   * cycle. Require it lazily at the call site.
-   */
-  private static assertCashTimelineAfterOutflow(
-    db: Database.Database,
-    paymentMethod: string | undefined,
-    fromDate: string,
-  ): void {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { assertCashTimeline } = require('./cashBalanceGuard') as typeof import('./cashBalanceGuard');
-    assertCashTimeline(db, { paymentMethod, fromDate });
   }
 
   // ------------------------------------------------------------------
@@ -1703,7 +1681,7 @@ export class AccountingService {
         { account_id: cashAcct.id, credit: args.amount, description: `Cash disbursed to ${args.employeeCode}` },
       ],
     });
-    AccountingService.assertCashTimelineAfterOutflow(db, args.paymentMethod, args.disbursementDate);
+    assertCashTimeline(db, { paymentMethod: args.paymentMethod, fromDate: args.disbursementDate });
     return posted;
   }
   /**
