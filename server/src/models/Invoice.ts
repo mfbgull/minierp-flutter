@@ -649,32 +649,33 @@ class InvoiceModel {
         const restoreSaleBatch = (movement: typeof saleMovements[number]): void => {
           if (movement.batch_id !== null) {
             const restoreQty = roundQty(Math.abs(movement.quantity) * ratio);
-            if (isFeatureEnabled(db, 'feature_batch_locations')) {
-              // Restore to target warehouse default location (explicit or original)
-              const targetWarehouseId = explicitWarehouseId ?? movement.warehouse_id;
-              const locRow = db.prepare(`
-                SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
-              `).get(targetWarehouseId) as { id: number } | undefined;
-              if (locRow) {
-                db.prepare(`
-                  INSERT INTO batch_stock_by_location (batch_id, location_id, quantity_physical, quantity_reserved, quantity_available)
-                  VALUES (?, ?, ?, 0, ?)
-                  ON CONFLICT(batch_id, location_id) DO UPDATE SET
-                    quantity_physical = quantity_physical + excluded.quantity_physical,
-                    quantity_available = quantity_available + excluded.quantity_available
-                `).run(movement.batch_id, locRow.id, restoreQty, restoreQty);
+            // BUG-014: the location restore is UNGATED, so it matches the
+            // ungated `UPDATE stock_batches` below. Gating it left the mirror
+            // behind whenever the flag was off, and a later flip showed the
+            // sold units as still gone.
+            const targetWarehouseId = explicitWarehouseId ?? movement.warehouse_id;
+            const locRow = db.prepare(`
+              SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
+            `).get(targetWarehouseId) as { id: number } | undefined;
+            if (locRow) {
+              db.prepare(`
+                INSERT INTO batch_stock_by_location (batch_id, location_id, quantity_physical, quantity_reserved, quantity_available)
+                VALUES (?, ?, ?, 0, ?)
+                ON CONFLICT(batch_id, location_id) DO UPDATE SET
+                  quantity_physical = quantity_physical + excluded.quantity_physical,
+                  quantity_available = quantity_available + excluded.quantity_available
+              `).run(movement.batch_id, locRow.id, restoreQty, restoreQty);
 
-                // Record the restoration for audit — identified by the
-                // invoice itself (there is no separate return header table).
-                const invRow = db.prepare(`
-                  SELECT id FROM invoices WHERE invoice_no = ? LIMIT 1
-                `).get(invoiceNo) as { id: number } | undefined;
-                if (invRow) {
-                  db.prepare(`
-                    INSERT INTO invoice_return_batches (invoice_id, batch_id, location_id, quantity, reference_doctype, reference_docno)
-                    VALUES (?, ?, ?, ?, 'RETURN', ?)
-                  `).run(invRow.id, movement.batch_id, locRow.id, restoreQty, invoiceNo);
-                }
+              // Record the restoration for audit — identified by the
+              // invoice itself (there is no separate return header table).
+              const invRow = db.prepare(`
+                SELECT id FROM invoices WHERE invoice_no = ? LIMIT 1
+              `).get(invoiceNo) as { id: number } | undefined;
+              if (invRow) {
+                db.prepare(`
+                  INSERT INTO invoice_return_batches (invoice_id, batch_id, location_id, quantity, reference_doctype, reference_docno)
+                  VALUES (?, ?, ?, ?, 'RETURN', ?)
+                `).run(invRow.id, movement.batch_id, locRow.id, restoreQty, invoiceNo);
               }
             }
 
@@ -804,13 +805,13 @@ class InvoiceModel {
               `(need ${qty}, have ${avail?.quantity_available ?? 0}) — the returned stock was consumed after the delete`
             );
           }
-          db.prepare(`
-            UPDATE batch_stock_by_location
-            SET quantity_physical = quantity_physical - ?
-            WHERE batch_id = ? AND location_id = ?
-          `).run(qty, batchId, locRow.id);
         }
       }
+      // BUG-014: the mirror draw-down is UNGATED, so it matches the ungated
+      // `stock_batches` draw-down below. The guard above stays flag-gated
+      // because it is a READ of the location source; the WRITE must happen
+      // either way or the bin keeps stock its batch no longer has.
+      StockMovementModel.mirrorBatchLocationDelta(batchId, warehouseId, -qty, db);
       const batchRow = db.prepare(`SELECT quantity_remaining FROM stock_batches WHERE id = ?`)
         .get(batchId) as { quantity_remaining: number } | undefined;
       if (!batchRow || roundQty(batchRow.quantity_remaining) < qty) {

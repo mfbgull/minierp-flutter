@@ -1068,6 +1068,46 @@ class StockMovementModel {
     `).run(itemId, itemId);
   }
 
+  /**
+   * Move a batch's DEFAULT-bin mirror row by `delta`, creating it if absent.
+   *
+   * BUG-014: four paths wrote `batch_stock_by_location` INSIDE an
+   * `isFeatureEnabled('feature_batch_locations')` branch while the matching
+   * `stock_batches` write sat outside it. With the flag off the batch moved and
+   * the mirror did not, so a later flag flip showed stock in a bin that held
+   * nothing. The flag chooses which source is READ, never which is WRITTEN.
+   *
+   * Quantities clamp at zero: a reversal may restore less than the bin holds
+   * when part of the batch was sold, and the table has a CHECK that the
+   * physical quantity is not negative. Callers pass a signed delta.
+   */
+  static mirrorBatchLocationDelta(
+    batchId: number,
+    warehouseId: number,
+    delta: number,
+    db: Database.Database,
+  ): void {
+    const locRow = db.prepare(`
+      SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
+    `).get(warehouseId) as { id: number } | undefined;
+    if (!locRow) return;
+    // Get-or-create first, so a batch that never had a row still gets one.
+    db.prepare(`
+      INSERT OR IGNORE INTO batch_stock_by_location
+        (batch_id, location_id, quantity_physical, quantity_reserved, quantity_available)
+      VALUES (?, ?, 0, 0, 0)
+    `).run(batchId, locRow.id);
+    // MAX(0, ...) on both columns: the driver cannot express it in one UPDATE
+    // without repeating the expression, and the CHECK forbids a negative.
+    db.prepare(`
+      UPDATE batch_stock_by_location
+      SET quantity_physical  = MAX(0, quantity_physical + ?),
+          quantity_available = MAX(0, quantity_available + ?),
+          updated_at = CURRENT_TIMESTAMP
+      WHERE batch_id = ? AND location_id = ?
+    `).run(delta, delta, batchId, locRow.id);
+  }
+
   static syncBatchStockByLocationForNewBatch(batchId: number, warehouseId: number, quantity: number, db: Database.Database): void {
     // Deliberately NOT gated on feature_batch_locations. The flag chooses which
     // source the sellable query READS; it must never decide whether the second
@@ -1611,14 +1651,14 @@ class StockMovementModel {
       const remarks = (data.remarks || `Expiry transfer: batch ${batch.batch_no} expired on ${batch.expiry_date ?? 'unknown'}`) + systemRemark;
 
       // 1. Drain the source batch's location rows BEFORE the OUT leg so the
-      //    extension-column resync inside recordMovement sees the truth.
-      if (isFeatureEnabled(db, 'feature_batch_locations')) {
-        db.prepare(`
-          UPDATE batch_stock_by_location
-          SET quantity_physical = 0, quantity_available = 0, updated_at = CURRENT_TIMESTAMP
-          WHERE batch_id = ?
-        `).run(batch.id);
-      }
+      //    extension-column resync inside recordMovement sees the truth. This
+      //    is UNGATED: the batch-level OUT leg below is ungated, so the mirror
+      //    must move with it regardless of the flag (BUG-013).
+      db.prepare(`
+        UPDATE batch_stock_by_location
+        SET quantity_physical = 0, quantity_available = 0, updated_at = CURRENT_TIMESTAMP
+        WHERE batch_id = ?
+      `).run(batch.id);
       // 2. OUT leg (negative) at the source warehouse.
       const out = this.recordMovement({
         item_id: batch.item_id,
@@ -1719,13 +1759,12 @@ class StockMovementModel {
       const systemRemark = userId === null ? ' source=SYSTEM' : '';
       const remarks = (data.remarks || `Damage transfer: batch ${batch.batch_no}`) + systemRemark;
 
-      if (isFeatureEnabled(db, 'feature_batch_locations')) {
-        db.prepare(`
-          UPDATE batch_stock_by_location
-          SET quantity_physical = 0, quantity_available = 0, updated_at = CURRENT_TIMESTAMP
-          WHERE batch_id = ?
-        `).run(batch.id);
-      }
+      // UNGATED for the same reason as the expiry transfer above (BUG-013).
+      db.prepare(`
+        UPDATE batch_stock_by_location
+        SET quantity_physical = 0, quantity_available = 0, updated_at = CURRENT_TIMESTAMP
+        WHERE batch_id = ?
+      `).run(batch.id);
 
       const out = this.recordMovement({
         item_id: batch.item_id,
@@ -1897,6 +1936,16 @@ class StockMovementModel {
       // Zero the written-off batch (the caller's responsibility per the
       // stock_batches ownership rule — recordMovement never writes it).
       db.prepare(`UPDATE stock_batches SET quantity_remaining = 0 WHERE id = ?`).run(targetBatchId);
+
+      // BUG-013: the batch-level zeroing above is UNGATED, so the location
+      // mirror must be zeroed unconditionally too. recordMovement only resyncs
+      // the extension columns when the flag is on, so with the flag off this
+      // batch would keep a location row claiming stock that no longer exists.
+      db.prepare(`
+        UPDATE batch_stock_by_location
+        SET quantity_physical = 0, quantity_available = 0, updated_at = CURRENT_TIMESTAMP
+        WHERE batch_id = ?
+      `).run(targetBatchId);
 
       // 3. GL posting: Dr <loss> / Cr inventory_asset at batch cost.
       const postWriteOffLoss = (): number | null => {
