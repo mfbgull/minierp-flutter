@@ -521,13 +521,18 @@ class PurchaseRepository {
 
   /// Write off an uncollected claim balance (Dr 7300 / Cr AP). A reason is
   /// mandatory; above Rs 1,000 the server requires the admin role.
+  ///
+  /// [idempotencyKey] is mandatory: the server refuses this route (400)
+  /// without the header, so an un-keyed call can never post.
   Future<ApiResult<void>> writeOffClaim(
     int id, {
     required String reason,
+    required String idempotencyKey,
     num? amount,
     String? writeOffDate,
   }) => _api.postEnvelope<void>(
     '${ApiEndpoints.supplierRefunds}/claims/$id/write-off',
+    headers: {'Idempotency-Key': idempotencyKey},
     body: {
       'reason': reason.trim(),
       'amount': ?amount,
@@ -538,12 +543,19 @@ class PurchaseRepository {
 
   /// Void a refund receipt (`POST /supplier-refunds/:id/void`). A void that
   /// would overdraw cash is refused with 409 and a `cashBlockers` list.
-  Future<ApiResult<void>> voidRefund(int id, {required String reason}) =>
-      _api.postEnvelope<void>(
-        '${ApiEndpoints.supplierRefunds}/$id/void',
-        body: {'reason': reason.trim()},
-        parse: (_) {},
-      );
+  ///
+  /// [idempotencyKey] is mandatory: the server refuses this route (400)
+  /// without the header, so an un-keyed call can never post.
+  Future<ApiResult<void>> voidRefund(
+    int id, {
+    required String reason,
+    required String idempotencyKey,
+  }) => _api.postEnvelope<void>(
+    '${ApiEndpoints.supplierRefunds}/$id/void',
+    headers: {'Idempotency-Key': idempotencyKey},
+    body: {'reason': reason.trim()},
+    parse: (_) {},
+  );
 }
 
 final purchaseRepositoryProvider = Provider<PurchaseRepository>(

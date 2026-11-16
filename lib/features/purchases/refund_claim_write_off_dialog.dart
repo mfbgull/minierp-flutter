@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/formatters.dart';
+import '../../core/utils/idempotency_key.dart';
 import '../../data/repositories/api_result.dart';
 import '../../data/repositories/purchase_repository.dart'
     show RefundClaim, purchaseRepositoryProvider;
@@ -52,6 +53,11 @@ class _WriteOffDialog extends ConsumerStatefulWidget {
 
 class _WriteOffDialogState extends ConsumerState<_WriteOffDialog> {
   final _reasonController = TextEditingController();
+
+  /// The write-off route mandates an Idempotency-Key. A retry of the same
+  /// reason replays the original key; editing the reason mints a new one.
+  final _idempotency = IdempotencyKeyCache(prefix: 'claim-writeoff');
+
   bool _busy = false;
   String? _error;
 
@@ -81,11 +87,17 @@ class _WriteOffDialogState extends ConsumerState<_WriteOffDialog> {
 
     final result = await ref
         .read(purchaseRepositoryProvider)
-        .writeOffClaim(widget.claim.id, reason: reason);
+        .writeOffClaim(
+          widget.claim.id,
+          reason: reason,
+          idempotencyKey: _idempotency.keyFor({'reason': reason}),
+        );
     if (!mounted) return;
 
     switch (result) {
       case ApiSuccess():
+        // The write posted; a later intentional write-off is a new operation.
+        _idempotency.reset();
         showAppToast(
           context,
           '${l10n.refundClaimWriteOff} — '

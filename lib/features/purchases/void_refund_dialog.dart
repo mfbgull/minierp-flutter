@@ -9,6 +9,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/utils/idempotency_key.dart';
 import '../../data/repositories/api_result.dart';
 import '../../data/repositories/purchase_repository.dart'
     show purchaseRepositoryProvider;
@@ -48,6 +49,11 @@ class _VoidRefundDialog extends ConsumerStatefulWidget {
 
 class _VoidRefundDialogState extends ConsumerState<_VoidRefundDialog> {
   final _reasonController = TextEditingController();
+
+  /// The void route mandates an Idempotency-Key. A retry of the same reason
+  /// replays the original key; editing the reason mints a new one.
+  final _idempotency = IdempotencyKeyCache(prefix: 'refund-void');
+
   bool _busy = false;
   String? _error;
 
@@ -77,11 +83,17 @@ class _VoidRefundDialogState extends ConsumerState<_VoidRefundDialog> {
 
     final result = await ref
         .read(purchaseRepositoryProvider)
-        .voidRefund(widget.refundId, reason: reason);
+        .voidRefund(
+          widget.refundId,
+          reason: reason,
+          idempotencyKey: _idempotency.keyFor({'reason': reason}),
+        );
     if (!mounted) return;
 
     switch (result) {
       case ApiSuccess():
+        // The void posted; a later intentional void is a new operation.
+        _idempotency.reset();
         showAppToast(context, l10n.purchasesReturnvoided);
         Navigator.of(context).pop(true);
       case ApiFailure(:final error):
