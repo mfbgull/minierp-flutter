@@ -3,6 +3,7 @@ import AccountingService from '../services/accountingService';
 import SupplierLedgerModel from './SupplierLedger';
 import { generateDocNo } from '../utils/sequence';
 import { roundCurrency, addCurrency } from '../utils/currency';
+import { BusinessRuleError } from '../utils/businessRuleError';
 
 /**
  * SupplierRefundClaimModel — PRET-002 one-claim-object lifecycle for money
@@ -178,9 +179,12 @@ export class SupplierRefundClaimModel {
     return this.getById(claimId, db) as RefundClaimRow;
   }
 
-  /** Cancel a claim. Refused while live receipts are allocated to it —
+  /** Cancel a claim. Refused while live receipts are allocated to it --
    * void those first (a purchase-return void hits the same rule via
-   * PurchaseReturnModel.voidReturn). */
+   * PurchaseReturnModel.voidReturn). Also refused while a write-off
+   * stands: the write-off posted Dr 7300 / Cr AP, and cancelling the
+   * claim would leave that entry orphaned and drop the uncollected
+   * remainder from refundsDue with no offsetting record. */
   static cancel(id: number, userId: number, reason: string, db: Database.Database): RefundClaimRow {
     const claim = this.getById(id, db);
     if (!claim) throw new Error('Refund claim not found');
@@ -191,6 +195,17 @@ export class SupplierRefundClaimModel {
     if (liveReceipts > 0) {
       throw new Error(
         `Refund claim ${claim.claim_no} has ${liveReceipts} recorded receipt(s) — void the receipts first`
+      );
+    }
+    // A standing write-off cannot be cancelled away: the expense and its
+    // AP movement are real postings. Reversing a write-off is not built,
+    // so the claim must stay open while one exists.
+    if (claim.written_off_amount > 0) {
+      throw new BusinessRuleError(
+        409,
+        `Refund claim ${claim.claim_no} has a write-off of ` +
+        `${claim.written_off_amount.toFixed(2)} — it cannot be cancelled. ` +
+        `Reversing a write-off is not supported.`,
       );
     }
 

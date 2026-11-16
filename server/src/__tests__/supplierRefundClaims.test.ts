@@ -694,4 +694,89 @@ describe('PRET-002 supplier refund claims', () => {
     expect(bogus.status).toBe(200);
     expect(bogus.body.data).toEqual([]);
   });
+
+});
+
+describe('F-2 — a written-off claim must not be cancellable', () => {
+  /** GL total for one account code, active lines only. */
+  function glBalance(code: string): number {
+    return (db.prepare(`
+      SELECT COALESCE(SUM(j.debit - j.credit), 0) AS amount
+      FROM journal_lines j JOIN chart_of_accounts a ON a.id = j.account_id
+      WHERE a.code = ? AND j.voided = 0
+    `).get(code) as { amount: number }).amount;
+  }
+
+  it('refuses to void the return while the claim keeps a write-off posting', async () => {
+    await seedOpeningCash(6000);
+    const info = await paidPurchaseWithReturn({ total: 5000 });
+
+    // Partial write-off of 2,000: Dr 7300 / Cr AP, mandatory reason.
+    const writeOffBefore = glBalance('7300');
+    const wrote = await request(app)
+      .post(`/api/supplier-refunds/claims/${info.claimId}/write-off`)
+      .set('Cookie', cookie)
+      .set('Idempotency-Key', `f2-writeoff-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .send({ reason: 'Supplier went dark on 2,000', amount: 2000 });
+    expect(wrote.status).toBe(200);
+
+    // The write-off moved the 7300 balance by exactly its amount. Compare a
+    // delta: 7300 is a live expense account and already holds a balance from
+    // other fixtures in this shared database.
+    expect(glBalance('7300') - writeOffBefore).toBeCloseTo(2000, 2);
+
+    // Voids the return -> cancels the claim. With the write-off still
+    // posted, this must be REFUSED: cancelling the claim would orphan the
+    // Dr 7300 / Cr AP entry and drop the 3,000 remainder from refundsDue
+    // with no offsetting record.
+    const voided = await request(app)
+      .post(`/api/purchase-returns/${info.returnId}/void`)
+      .set('Cookie', cookie)
+      .set('Idempotency-Key', `f2-void-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .send({ reason: 'Created in error' });
+    expect(voided.status).toBe(409);
+
+    // The claim is untouched, the write-off still stands, and the
+    // remainder is still reported as due.
+    const claim = db.prepare(
+      'SELECT status, written_off_amount, amount, received_amount FROM supplier_refund_claims WHERE id = ?'
+    ).get(info.claimId) as {
+      status: string; written_off_amount: number; amount: number; received_amount: number;
+    };
+    expect(claim.status).not.toBe('CANCELLED');
+    expect(claim.written_off_amount).toBeCloseTo(2000, 2);
+
+    // The write-off lines are still active: the guard left the posting alone.
+    const activeWriteOff = db.prepare(
+      `SELECT COUNT(*) AS n FROM journal_lines
+       WHERE reference_type = 'REFUND_CLAIM_WRITE_OFF' AND voided = 0`
+    ).get() as { n: number };
+    expect(activeWriteOff.n).toBeGreaterThan(0);
+
+    const due = await request(app).get('/api/supplier-refunds/claims/due').set('Cookie', cookie);
+    expect(due.status).toBe(200);
+    expect(due.body.total_due).toBeCloseTo(3000, 2);
+
+    expectAllInvariantsHold('write-off blocks the return void');
+  });
+
+  it('permits voiding the return when the claim has no write-off', async () => {
+    // The guard must be scoped to a standing write-off, not to every claim.
+    await seedOpeningCash(6000);
+    const info = await paidPurchaseWithReturn({ total: 5000 });
+
+    const voided = await request(app)
+      .post(`/api/purchase-returns/${info.returnId}/void`)
+      .set('Cookie', cookie)
+      .set('Idempotency-Key', `f2-clean-void-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
+      .send({ reason: 'Created in error' });
+    expect(voided.status).toBe(200);
+
+    const claim = db.prepare(
+      'SELECT status FROM supplier_refund_claims WHERE id = ?'
+    ).get(info.claimId) as { status: string };
+    expect(claim.status).toBe('CANCELLED');
+
+    expectAllInvariantsHold('clean return void');
+  });
 });
