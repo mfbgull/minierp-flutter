@@ -167,6 +167,65 @@ describe('BUG-013: legacy batches survive a feature_batch_locations flip', () =>
     expect(Number(rows.q)).toBeCloseTo(Number(firstRun.quantity_available), 3);
   });
 
+  it('backfills a batch inserted by hand, with no location row at all', () => {
+    // The strongest legacy fixture: a batch row no current code path could
+    // produce, inserted straight into stock_batches with no batch-location
+    // write at all — what an older build left on disk. The API-driven cases
+    // above start from a batch the fixed write path already mirrored and then
+    // strip the row, so they cannot prove the migration alone repairs a
+    // database this code never touched.
+    setFeatureEnabled(db, 'feature_batch_locations', false);
+
+    const warehouse = { id: Number(
+      db.prepare(
+        `INSERT INTO warehouses (warehouse_code, warehouse_name, is_active) VALUES (?, ?, 1)`,
+      ).run(`LEGACY-WH-${Date.now()}-${Math.floor(process.hrtime()[1])}`, 'Legacy WH').lastInsertRowid,
+    ) };
+    // This warehouse has no DEFAULT location: a pre-existing warehouse that
+    // predates the seed, which is the other half of the migration. The
+    // migration must create it, not just fill the batch row.
+    const defaultLoc = db.prepare(
+      "SELECT COUNT(*) AS n FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT'",
+    ).get(warehouse.id) as { n: number };
+    expect(defaultLoc.n).toBe(0);
+
+    const itemId = Number(
+      db.prepare(
+        `INSERT INTO items (item_code, item_name, unit_of_measure, standard_cost, is_active)
+         VALUES (?, 'Hand Inserted Item', 'PCS', 12, 1)`,
+      ).run(`LEGACY-HAND-${Date.now()}-${Math.floor(process.hrtime()[1])}`).lastInsertRowid,
+    );
+    const batchId = Number(
+      db.prepare(
+        `INSERT INTO stock_batches (batch_no, item_id, warehouse_id, source_type, source_id,
+                                    quantity_original, quantity_remaining, unit_cost, received_date)
+         VALUES (?, ?, ?, 'OPENING', 0, 15, 15, 12, '2026-01-01')`,
+      ).run(`LEGACY-B-${Date.now()}-${Math.floor(process.hrtime()[1])}`, itemId, warehouse.id).lastInsertRowid,
+    );
+    const before = db.prepare('SELECT COUNT(*) AS n FROM batch_stock_by_location WHERE batch_id = ?')
+      .get(batchId) as { n: number };
+    expect(before.n).toBe(0);
+
+    runMigrationFile('127_backfill_batch_stock_by_location.sql');
+
+    // The migration created the missing DEFAULT location AND the batch row.
+    const locRow = db.prepare(
+      `SELECT bsl.quantity_physical, bsl.quantity_available
+       FROM batch_stock_by_location bsl
+       JOIN locations l ON bsl.location_id = l.id
+       WHERE bsl.batch_id = ? AND l.warehouse_id = ? AND l.location_code = 'DEFAULT'`,
+    ).get(batchId, warehouse.id) as { quantity_physical: number; quantity_available: number } | undefined;
+    expect(locRow).toBeTruthy();
+    expect(Number(locRow?.quantity_physical)).toBeCloseTo(15, 3);
+    expect(Number(locRow?.quantity_available)).toBeCloseTo(15, 3);
+
+    // And the hand-inserted batch is now visible to the flag-on read.
+    setFeatureEnabled(db, 'feature_batch_locations', true);
+    expect(sellableFromLocationTable(itemId)).toBeCloseTo(15, 3);
+    expect(batchLocationDriftImbalances(db)).toEqual([]);
+    setFeatureEnabled(db, 'feature_batch_locations', false);
+  });
+
   it('repairs a MIXED state: batches with and without location rows', async () => {
     // The dangerous half-migrated shape: an install that ran the batch-location
     // model but only sometimes wrote location rows. The flag-on read path walks

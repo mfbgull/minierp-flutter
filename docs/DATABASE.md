@@ -534,3 +534,43 @@ Cr 2000 AP); write-offs post `REFUND_CLAIM_WRITE_OFF` (Dr 7300 Refund
 Write-offs / Cr AP) with a supplier-ledger mirror. Migration: claims +
 allocations + account 7300 + backfill of legacy `refund_expected` returns,
 with a FK-off rebuild making `supplier_refunds.credit_note_id` nullable.
+
+---
+
+## BUG-013: batch-location backfill (migration 127)
+
+`127_backfill_batch_stock_by_location.sql` repairs databases that ran the
+batch-location model (`add-batch-location-model.sql`) while the
+`feature_batch_locations` flag was off. The model created
+`batch_stock_by_location` but nothing filled it, so turning the flag on made
+every sell read zero stock.
+
+The migration does three things, in this order:
+
+1. Seeds a DEFAULT `locations` row for every warehouse that lacks one, because
+   the backfill joins on it (`Warehouse.create` now does this at write time).
+2. Inserts one DEFAULT-location row per `stock_batches` row that has none,
+   carrying `quantity_remaining`.
+3. Corrects stale DEFAULT rows — a half-migrated install can hold a row whose
+   quantity is 0 while the batch still has stock. Only the physical/available
+   pair is set, and only when `quantity_reserved = 0`, so a live reservation is
+   left alone.
+
+It also brings `stock_balances.quantity_available` up to the real batch totals,
+because the flag-on read path reads that column, not the location table.
+
+**Filename.** The name names the main repair. Renaming it would change the
+checksum, and `schema_migrations` records the checksum of every applied
+migration (`runLedgered` in `config/database.ts`). A rename would make an
+already-migrated database re-run the file. Keep the name.
+
+**Shipping together.** The data repair is SQL, in this migration. The write-path
+fix — the un-gated `batch_stock_by_location` writes — is TypeScript
+(`StockMovement.mirrorBatchLocationDelta` and its callers), so it cannot sit in
+the same `.sql` file. What must ship together is the release: the migration
+repairs existing rows, and the code keeps new rows in step. Both are in this
+change, so one release covers both. The migration is idempotent, so running it
+before or after the code deploy is safe.
+
+**Flag default.** The flag stays OFF by default. Turn it on only after the
+backfill has run on the target database.
