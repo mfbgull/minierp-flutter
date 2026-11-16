@@ -769,8 +769,12 @@ flag OFF: all suites pass (the shipped default)
 All 38 failures shared one signature, `sellable stock N, requested M` with N
 lower than M.
 
-**Still open.** Step 5 — make the flag the default — waits on a clean full
-flag-ON suite. Flag-ON is opt-in; the shipped default is OFF.
+**Still open.** Step 5 — make the flag the default — now has its clean full
+flag-ON suite: 282/282 suites, 2261/2261 tests, on `aa969be2`. The same head
+passes flag-OFF with identical counts, so turning the flag on changes nothing for
+a migrated database. The remaining work before the default flips is operational:
+run migration 127 on the target database, then set the flag. Until that happens
+the shipped default stays **OFF** — the flag is opt-in and never set in CI.
 
 **Problem.** With `feature_batch_locations = '1'`, the sellable-stock query
 reads `batch_stock_by_location` instead of `stock_batches`:
