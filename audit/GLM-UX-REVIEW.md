@@ -5,6 +5,9 @@ Scope: read-only review of the Flutter client for the recently built refund-clai
 supplier-refund, refund-receipts, write-off, void, cash-blocker and sales-order
 surfaces, plus their l10n strings (en/ur).
 Reviewer: GLM. No code changed.
+Follow-up (2026-11-16, Task 3): confirmation tests were added and the two
+blocking findings (UX-1, UX-2/UX-4) were fixed. See "Finding confirmation status"
+below. That section is the only later addition; the findings above are unchanged.
 
 ## Method and limits
 
@@ -243,6 +246,24 @@ Suggested fix: include the toggle in the payload hash.
 - Risks: UX-7 (wording), UX-6 (raw enums/dates render identically in ur),
   UX-15 (hard-coded left alignment).
 - Not rendered at runtime; no RTL screenshot review was performed.
+
+## Finding confirmation status (2026-11-16)
+
+Task 3 asked for a failing test or an explicit "unconfirmed" mark for every
+MEDIUM+ finding. Red tests are committed failing on purpose; the branch must not
+merge without fixing them or deleting them deliberately.
+
+| Finding | Severity | Test | Status |
+|---|---|---|---|
+| UX-1 ("Open only" filter sent `status: null` in both chip states) | High | `test/features/refund_claims_screen_filter_test.dart` + server test in `supplierRefundClaims.test.ts` | **CONFIRMED and FIXED (green).** Red first (`Actual: <null>`), then fixed: the screen sends `EXPECTED,PARTIAL` when the chip is on and no status when off. Server `SupplierRefundClaimModel.list` now takes a comma-separated whitelisted status set (IN clause from placeholders only; unknown status → 400). Also fixed the invalidate-args mismatch at the old line 350. Server 18/18, Flutter test green. |
+| UX-2 (write-off dialog sent no `Idempotency-Key`) | High | `test/features/refund_claim_write_off_idempotency_test.dart` | **CONFIRMED and FIXED (green).** Red first with `Idempotency-Key: <null>` on the wire — this proves the earlier "no keyless caller exists" report WRONG. `writeOffClaim` now requires the key; the dialog sends it and rotates it when the amount or date is edited. |
+| UX-4 (write-off dialog could not set a partial amount or the posting date) | Medium | same test as UX-2 | **CONFIRMED and FIXED (green).** The dialog now carries an amount field (prefilled with the remainder) and a write-off date (prefilled with the claim date); the "edited amount rotates key" assertion pins it. |
+| UX-3 (refund-amount errors reuse return-quantity strings) | Medium | `test/features/supplier_refund_message_test.dart` | **CONFIRMED red by design.** The error contains "quantity" on a refund form. |
+| UX-6 (cash-blocker rows render the raw `reference_type` enum and raw ISO date in both languages) | Medium | `test/widgets/cash_blockers_localization_test.dart` | **CONFIRMED red by design.** `receipt_overpayment` and `2026-11-15` leak into the sentence. |
+| UX-11 (failed option fetch renders as an empty picker, no message) | Medium | `test/features/sales_order_form_loading_test.dart` | **CONFIRMED red by design.** `valueOrNull ?? []` swallows the provider error; no "Failed" is surfaced. |
+| UX-13 (flat discount above the line total passes local validation) | Medium | `test/features/sales_order_discount_validation_test.dart` | **CONFIRMED red by design.** The discount field's `errorText` is null when a flat 150 discount meets a 100 line. |
+| UX-5 (product gap — wording of the write-off explanation) | Medium | — | **UNCONFIRMED** — product wording decision, not a defect. |
+| UX-7 (Urdu wording) | Medium | — | **UNCONFIRMED** — language decision. |
 
 ## What was not run
 

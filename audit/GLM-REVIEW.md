@@ -230,6 +230,45 @@ date. The extraction landed by Task 2 in this same worktree; see the commit.
 
 ---
 
+## Finding confirmation status (2026-11-16)
+
+Task 3 asked for every MEDIUM+ finding to get a failing test or an "unconfirmed"
+mark. This table is the result. Red tests are committed failing on purpose — the
+branch must not merge without fixing them or deleting them deliberately.
+
+| Finding | Severity | Test | Status |
+|---|---|---|---|
+| F-2 (cancel/void a written-off claim orphans the 7300/AP posting) | Medium | `server/src/__tests__/moneyPathFindingsRed.test.ts` — `F-2: voiding a return whose claim carries a write-off is refused, not silently orphaned` | **CONFIRMED red by design.** The void returns 200 today (expected ≥400), so the write-off posting is orphaned and the uncollected remainder disappears from `refundsDue`. Fixture needs `seedOpeningCash(6000)` to pay the 5,000 purchase. The fix touches `PurchaseReturn.ts` (another agent's file) — deliberately not attempted. |
+| F-3 (voided receipt leaves GL AP and the supplier subledger split between receipt and void dates) | Medium | `moneyPathFindingsRed.test.ts` — `F-3: a voided receipt keeps GL AP and the supplier ledger in agreement at every as-of date` | **CONFIRMED red by design, delta now measured.** At as-of 2026-11-05 GL AP (account 2000) and the supplier subledger differ by exactly 3,000 (the receipt amount). The codebase's own rule (`ledgerUtils.reverseLedgerEntry`) is same-date reversal; `SupplierRefundModel.void` appends the reversal dated today. The end-of-chain sanity half passes and must keep passing after the fix. |
+| F-1 (`SupplierRefundClaims` one-active-posting guard vs ledger export) | Low/Medium | — | **UNCONFIRMED.** The existing tests at `supplierRefundClaims.test.ts:329` and `:385` deliberately pin the one-active-posting rule, so a red test would contradict a pin rather than a defect. Product decision: relax the guard and update the pins, or fix the `:218-219` docstring. |
+| F-4 … F-8 | Low | — | Not actioned (below the MEDIUM threshold of Task 3). |
+
+## Per-endpoint Idempotency-Key caller audit (Task 1 follow-up)
+
+Every Flutter caller of a key-MANDATORY server endpoint was checked and each now
+has a test in `test/features/money_submission_idempotency_test.dart` (retry keeps
+the key, edited amount rotates it) unless noted.
+
+| Server endpoint | Key mode | Flutter coverage |
+|---|---|---|
+| `POST /supplier-refunds/claims/:id/write-off` | mandated | `refund_claim_write_off_idempotency_test.dart` — this test proved the earlier "no keyless caller exists" report WRONG: the dialog sent `Idempotency-Key: <null>`. Fixed. |
+| `POST /invoices` | **optional** (verified `invoiceController.ts:237,263` — key accepted, not mandated; client always sends it, pinned by P11) | covered |
+| `POST /sales/invoices/:id/returns` (inline return) | mandated | covered ('sales return') |
+| `POST /invoices/:id/return` (invoice-return dialog) | mandated | covered ('receipt') |
+| `POST /supplier-payments` | mandated | covered |
+| `POST /supplier-refunds` | mandated | covered ('supplier refund') |
+| `POST /employees/salary-payments` | mandated | covered ('salary', 'salary with deduction') |
+| `POST /owner-equity/capital` | mandated | covered ('capital') |
+| `POST /owner-equity/withdrawals` | mandated | covered ('withdrawal') |
+| `POST /purchase-orders/:id/receive` | mandated | covered ('receipt' path) |
+| `POST /inventory/stock-adjustments` | mandated | covered ('stock adjustment') — added |
+| `POST /inventory/stock-transfers` | mandated | covered ('stock transfer') — added |
+| `POST /purchases/:id/returns` | mandated | covered ('purchase return') — added |
+| `POST /productions` | mandated | `production/production_form_dialog_test.dart` — added |
+| `POST /expenses/payments` | **optional** (verified) | out of mandate scope |
+| `POST /supplier-bills`, `POST /supplier-prepayments` | mandated | covered ('supplier bill payment', 'supplier advance application') |
+| `POST /supplier-refunds/claims` (create) | mandated (repository param compile-required) | no UI caller — nothing to test |
+
 ## What was checked and found sound (so the next reader does not redo it)
 
 - **Refund receipt create is atomic.** Controller wraps model create + key claim
