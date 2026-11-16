@@ -51,7 +51,6 @@ import StockMovementModel from '../models/StockMovement';
 import ledgerUtils from '../utils/ledgerUtils';
 import { decomposeLineAmount, parseCurrency, roundCurrency } from '../utils/currency';
 import { todayLocal, AR_OUTSTANDING } from '../utils/reportSql';
-import { isFeatureEnabled } from '../utils/featureFlags';
 import { logCRUD, newCorrelationId } from './activityLogger';
 import { hasStoreCreditConsumption } from './storeCreditOwnership';
 
@@ -1574,39 +1573,28 @@ function reverseBatchRestore(
   if (totalSold <= 0) return;
   const ratio = Math.min(args.restockQty / totalSold, 1);
 
-  const batchFeatureOn = isFeatureEnabled(db, 'feature_batch_locations');
   for (const movement of saleMovements) {
     if (movement.batch_id === null) continue;
     const restoreQty = Math.abs(movement.quantity) * ratio;
     if (restoreQty <= 0) continue;
 
-    // BUG-013: always decrement the master batch layer, and additionally the
-    // location row when the batch has one. The flag must not choose WHICH
+    // BUG-013/BUG-014: always decrement the master batch layer, and always
+    // decrement the location row alongside it. The flag must not choose WHICH
     // source is written — only the two writes together keep invariant E
     // (stock_balances == SUM(quantity_remaining)) true under either flag.
+    // Gating the location half is what left a bin holding stock its batch no
+    // longer had, which the per-batch drift check catches.
     db.prepare(`
       UPDATE stock_batches
       SET quantity_remaining = MAX(0, quantity_remaining - ?)
       WHERE id = ?
     `).run(restoreQty, movement.batch_id);
 
-    if (batchFeatureOn) {
-      // The return restored every batch to the chosen warehouse's DEFAULT
-      // location (explicit warehouse) or to the sale movement's own
-      // warehouse DEFAULT location (implicit).
-      const targetWarehouseId = args.returnWarehouseId ?? movement.warehouse_id;
-      const locRow = db.prepare(`
-        SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
-      `).get(targetWarehouseId) as { id: number } | undefined;
-      if (locRow) {
-        db.prepare(`
-          UPDATE batch_stock_by_location
-          SET quantity_physical = MAX(0, quantity_physical - ?),
-              quantity_available = MAX(0, quantity_available - ?)
-          WHERE batch_id = ? AND location_id = ?
-        `).run(restoreQty, restoreQty, movement.batch_id, locRow.id);
-      }
-    }
+    // The return restored every batch to the chosen warehouse's DEFAULT
+    // location (explicit warehouse) or to the sale movement's own warehouse
+    // DEFAULT location (implicit). Create the row if it was never tracked.
+    const targetWarehouseId = args.returnWarehouseId ?? movement.warehouse_id;
+    StockMovementModel.mirrorBatchLocationDelta(movement.batch_id, targetWarehouseId, -restoreQty, db);
   }
 }
 
