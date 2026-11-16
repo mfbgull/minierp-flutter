@@ -2067,6 +2067,9 @@ class AppLocalizationsUr extends AppLocalizations {
       '1,000 روپے سے زیادہ معافی کے لیے مالک درکار ہے';
 
   @override
+  String get refundClaimWriteOffAmountInvalid => 'درست رقم درج کریں';
+
+  @override
   String get refundClaimCancel => 'کلیم منسوخ کریں';
 
   @override

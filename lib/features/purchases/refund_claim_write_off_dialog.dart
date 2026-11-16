@@ -6,6 +6,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/utils/date_utils.dart' show isoDate;
 import '../../core/utils/formatters.dart';
 import '../../core/utils/idempotency_key.dart';
 import '../../data/repositories/api_result.dart';
@@ -13,6 +14,7 @@ import '../../data/repositories/purchase_repository.dart'
     show RefundClaim, purchaseRepositoryProvider;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
+import '../../widgets/date_picker.dart' show pickDate;
 import '../../widgets/form_field.dart' show FormFieldShell;
 import '../../widgets/form_helpers.dart' show ErrorBanner, formInputDecoration;
 
@@ -52,18 +54,33 @@ class _WriteOffDialog extends ConsumerStatefulWidget {
 }
 
 class _WriteOffDialogState extends ConsumerState<_WriteOffDialog> {
+  final _idemKeys = IdempotencyKeyCache(prefix: 'claim-write-off');
+  late final TextEditingController _amountController;
   final _reasonController = TextEditingController();
-
-  /// The write-off route mandates an Idempotency-Key. A retry of the same
-  /// reason replays the original key; editing the reason mints a new one.
-  final _idempotency = IdempotencyKeyCache(prefix: 'claim-writeoff');
-
+  final _dateController = TextEditingController();
+  late DateTime _writeOffDate;
   bool _busy = false;
   String? _error;
 
   @override
+  void initState() {
+    super.initState();
+    // Prefill with the full remainder (the server's default) so a partial
+    // write-off is one edit away, and start from the claim's own date — the
+    // server posts there otherwise, which dead-ends in a closed period.
+    _amountController = TextEditingController(
+      text: widget.claim.remaining.toString(),
+    );
+    _writeOffDate =
+        DateTime.tryParse(widget.claim.claimDate) ?? DateTime.now();
+    _dateController.text = isoDate(_writeOffDate);
+  }
+
+  @override
   void dispose() {
+    _amountController.dispose();
     _reasonController.dispose();
+    _dateController.dispose();
     super.dispose();
   }
 
@@ -72,11 +89,26 @@ class _WriteOffDialogState extends ConsumerState<_WriteOffDialog> {
     isAdmin: widget.isAdmin,
   );
 
+  Future<void> _pickDate() async {
+    final picked = await pickDate(context, initialDate: _writeOffDate);
+    if (picked != null) {
+      setState(() {
+        _writeOffDate = picked;
+        _dateController.text = isoDate(_writeOffDate);
+      });
+    }
+  }
+
   Future<void> _submit() async {
     final l10n = AppLocalizations.of(context)!;
     final reason = _reasonController.text.trim();
     if (reason.isEmpty) {
       setState(() => _error = l10n.refundClaimWriteOffReasonRequired);
+      return;
+    }
+    final amount = num.tryParse(_amountController.text.trim());
+    if (amount == null || amount <= 0) {
+      setState(() => _error = l10n.refundClaimWriteOffAmountInvalid);
       return;
     }
 
@@ -85,23 +117,32 @@ class _WriteOffDialogState extends ConsumerState<_WriteOffDialog> {
       _error = null;
     });
 
+    // The key is derived from the exact body sent: an unchanged retry
+    // replays, editing the amount rotates it into a new operation.
+    final body = <String, dynamic>{
+      'reason': reason,
+      'amount': amount,
+      'write_off_date': isoDate(_writeOffDate),
+    };
     final result = await ref
         .read(purchaseRepositoryProvider)
         .writeOffClaim(
           widget.claim.id,
           reason: reason,
-          idempotencyKey: _idempotency.keyFor({'reason': reason}),
+          amount: amount,
+          writeOffDate: isoDate(_writeOffDate),
+          idempotencyKey: _idemKeys.keyFor(body),
         );
     if (!mounted) return;
 
     switch (result) {
       case ApiSuccess():
         // The write posted; a later intentional write-off is a new operation.
-        _idempotency.reset();
+        _idemKeys.reset();
         showAppToast(
           context,
           '${l10n.refundClaimWriteOff} — '
-          '${Formatters.currency(widget.claim.remaining)}',
+          '${Formatters.currency(amount)}',
         );
         Navigator.of(context).pop(true);
       case ApiFailure(:final error):
@@ -148,6 +189,31 @@ class _WriteOffDialogState extends ConsumerState<_WriteOffDialog> {
               const SizedBox(height: 10),
               ErrorBanner(message: _error!),
             ],
+            const SizedBox(height: 12),
+            FormFieldShell(
+              label: l10n.fieldsAmount,
+              required: true,
+              child: TextField(
+                controller: _amountController,
+                enabled: !_busy && !blocked,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                onSubmitted: (_) => blocked ? null : _submit(),
+                decoration: formInputDecoration(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            FormFieldShell(
+              label: l10n.fieldsDate,
+              child: TextField(
+                controller: _dateController,
+                enabled: !_busy && !blocked,
+                readOnly: true,
+                onTap: blocked ? null : _pickDate,
+                decoration: formInputDecoration(),
+              ),
+            ),
             const SizedBox(height: 12),
             FormFieldShell(
               label: l10n.refundClaimWriteOffReason,

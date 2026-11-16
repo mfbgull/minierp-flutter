@@ -43,17 +43,21 @@ class _RefundClaimsScreenState extends ConsumerState<RefundClaimsScreen> {
   /// Open-only by default: a RECEIVED or CANCELLED claim needs no action.
   bool _openOnly = true;
 
+  /// The server takes a comma-separated status set, which is how the
+  /// "open" OR-filter is expressed without a second fetch.
+  static const String _openStatuses = 'EXPECTED,PARTIAL';
+
+  ({String? status, int page, int limit}) get _claimsArgs => (
+    status: _openOnly ? _openStatuses : null,
+    page: _page,
+    limit: _limit,
+  );
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final user = ref.watch(authProvider).user;
-    // The server filters on a single status, so "open" is two page-fetches
-    // merged here rather than a server-side OR.
-    final provider = refundClaimsProvider((
-      status: _openOnly ? null : null,
-      page: _page,
-      limit: _limit,
-    ));
+    final provider = refundClaimsProvider(_claimsArgs);
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.refundClaimsTitle)),
@@ -346,9 +350,7 @@ class _RefundClaimsScreenState extends ConsumerState<RefundClaimsScreen> {
         }
     }
     if (mounted) {
-      ref.invalidate(
-        refundClaimsProvider((status: null, page: _page, limit: _limit)),
-      );
+      ref.invalidate(refundClaimsProvider(_claimsArgs));
     }
   }
 }

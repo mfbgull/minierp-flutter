@@ -3992,6 +3992,12 @@ abstract class AppLocalizations {
   /// **'Write-offs above Rs 1,000 need an owner'**
   String get refundClaimWriteOffAdminOnly;
 
+  /// No description provided for @refundClaimWriteOffAmountInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid write-off amount'**
+  String get refundClaimWriteOffAmountInvalid;
+
   /// No description provided for @refundClaimCancel.
   ///
   /// In en, this message translates to:

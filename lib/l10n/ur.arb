@@ -742,6 +742,7 @@
   "refundClaimWriteOffReason": "وجہ",
   "refundClaimWriteOffReasonRequired": "کلیم معاف کرنے کے لیے وجہ درکار ہے",
   "refundClaimWriteOffAdminOnly": "1,000 روپے سے زیادہ معافی کے لیے مالک درکار ہے",
+  "refundClaimWriteOffAmountInvalid": "درست رقم درج کریں",
   "refundClaimCancel": "کلیم منسوخ کریں",
   "refundClaimCancelReason": "وجہ",
   "refundClaimViewReceipts": "رسیدیں دیکھیں",

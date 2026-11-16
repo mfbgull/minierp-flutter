@@ -15,6 +15,9 @@ import 'package:minierp_app/features/suppliers/supplier_bill_dialog.dart';
 import 'package:minierp_app/data/models/supplier_bill.dart';
 import 'package:minierp_app/features/suppliers/supplier_advance_dialog.dart';
 import 'package:minierp_app/data/models/supplier_prepayment.dart';
+import 'package:minierp_app/features/inventory/stock_adjustment_dialog.dart';
+import 'package:minierp_app/features/inventory/stock_transfer_dialog.dart';
+import 'package:minierp_app/features/purchases/purchase_return_form_dialog.dart';
 import 'package:minierp_app/widgets/searchable_select.dart';
 
 import '../test_helpers.dart';
@@ -75,6 +78,31 @@ void main() {
           refundable: 200,
         ),
         child: const Text('Open refund'),
+      ),
+    ),
+    'stock adjustment': Builder(
+      builder: (context) => TextButton(
+        onPressed: () => showStockAdjustmentDialog(context),
+        child: const Text('Open stock dialog'),
+      ),
+    ),
+    'stock transfer': Builder(
+      builder: (context) => TextButton(
+        onPressed: () => showStockTransferDialog(context),
+        child: const Text('Open stock dialog'),
+      ),
+    ),
+    'purchase return': Builder(
+      builder: (context) => TextButton(
+        onPressed: () => showPurchaseReturnFormDialog(
+          context,
+          source: const ReturnSource.purchase(
+            id: 1,
+            no: 'PUR-1',
+            warehouseId: 1,
+          ),
+        ),
+        child: const Text('Open return'),
       ),
     ),
   };
@@ -145,8 +173,46 @@ void main() {
             'success': true,
             'data': [
               {'id': 1, 'warehouse_code': 'WH-1', 'warehouse_name': 'Main'},
+              {'id': 2, 'warehouse_code': 'WH-2', 'warehouse_name': 'Second'},
             ],
           },
+          // Stock adjustment / transfer pickers.
+          '/inventory/items': pagedEnvelope([
+            {'id': 1, 'item_code': 'ITM-1', 'item_name': 'Test item'},
+          ]),
+          // Purchase-return source detail (bare object) and its line's
+          // live stock so the returnable cap stays open.
+          '/purchases/1': {
+            'id': 1,
+            'purchase_no': 'PUR-1',
+            'purchase_date': '2026-09-01',
+            'item_id': 1,
+            'item_code': 'ITM-1',
+            'item_name': 'Test item',
+            'unit_of_measure': 'Nos',
+            'quantity': 10,
+            'unit_cost': 10,
+            'total_cost': 100,
+            'paid_amount': 100,
+            'balance_amount': 0,
+            'warehouse_id': 1,
+            'warehouse_name': 'Main',
+            'returned_quantity': 0,
+          },
+          '/inventory/items/1': {
+            'id': 1,
+            'item_code': 'ITM-1',
+            'item_name': 'Test item',
+            'stock_by_warehouse': [
+              {
+                'warehouse_id': 1,
+                'warehouse_code': 'WH-1',
+                'warehouse_name': 'Main',
+                'quantity': 10,
+              },
+            ],
+          },
+          '/inventory/stock-batches': [],
           '/owner-equity/payment-method-options': {
             'success': true,
             'data': <Object?>[],
@@ -178,6 +244,38 @@ void main() {
           await tester.tap(find.text('Open refund'));
           await tester.pumpAndSettle();
         }
+        if (entry.key == 'stock adjustment' || entry.key == 'stock transfer') {
+          await tester.tap(find.text('Open stock dialog'));
+          await tester.pumpAndSettle();
+        }
+        if (entry.key == 'purchase return') {
+          await tester.tap(find.text('Open return'));
+          await tester.pumpAndSettle();
+        }
+        if (entry.key == 'stock adjustment') {
+          await tester.tap(find.byType(SearchableSelect<int>).at(0));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('ITM-1 — Test item').last);
+          await tester.pumpAndSettle();
+          await tester.tap(find.byType(SearchableSelect<int>).at(1));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Main').last);
+          await tester.pumpAndSettle();
+        }
+        if (entry.key == 'stock transfer') {
+          await tester.tap(find.byType(SearchableSelect<int>).at(0));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('ITM-1 — Test item').last);
+          await tester.pumpAndSettle();
+          await tester.tap(find.byType(SearchableSelect<int>).at(1));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Main').last);
+          await tester.pumpAndSettle();
+          await tester.tap(find.byType(SearchableSelect<int>).at(2));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Second').last);
+          await tester.pumpAndSettle();
+        }
         if (entry.key == 'sales return') {
           await tester.tap(
             find.byWidgetPredicate((widget) => widget is SearchableSelect<int>),
@@ -192,20 +290,24 @@ void main() {
           await tester.tap(find.textContaining('VENDOR-1').last);
           await tester.pumpAndSettle();
         }
+        // The receipt and the purchase return cap their quantity, so they
+        // enter smaller values; the cap must stay open for both submits.
+        final firstQty = {'receipt': '5', 'purchase return': '5'}[entry.key] ?? '100';
+        final editedQty = {'receipt': '6', 'purchase return': '6'}[entry.key] ?? '150';
         final amount = entry.key == 'supplier advance application'
           ? find.byWidgetPredicate((widget) => widget is TextField && widget.decoration?.labelText == 'Amount')
           : find.byType(TextField).first;
         final submit = find
             .byWidgetPredicate((widget) => widget is FilledButton)
             .last;
-        await tester.enterText(amount, entry.key == 'receipt' ? '5' : '100');
+        await tester.enterText(amount, firstQty);
         await tester.ensureVisible(submit);
         await tester.tap(submit);
         await tester.pumpAndSettle();
         await tester.ensureVisible(submit);
         await tester.tap(submit);
         await tester.pumpAndSettle();
-        await tester.enterText(amount, entry.key == 'receipt' ? '6' : '150');
+        await tester.enterText(amount, editedQty);
         await tester.ensureVisible(submit);
         await tester.tap(submit);
         await tester.pumpAndSettle();

@@ -2066,6 +2066,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Write-offs above Rs 1,000 need an owner';
 
   @override
+  String get refundClaimWriteOffAmountInvalid =>
+      'Enter a valid write-off amount';
+
+  @override
   String get refundClaimCancel => 'Cancel claim';
 
   @override

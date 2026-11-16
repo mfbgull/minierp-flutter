@@ -658,6 +658,7 @@
   "refundClaimWriteOffReason": "Reason",
   "refundClaimWriteOffReasonRequired": "A reason is required to write off a claim",
   "refundClaimWriteOffAdminOnly": "Write-offs above Rs 1,000 need an owner",
+  "refundClaimWriteOffAmountInvalid": "Enter a valid write-off amount",
   "refundClaimCancel": "Cancel claim",
   "refundClaimCancelReason": "Reason",
   "refundClaimViewReceipts": "View receipts",

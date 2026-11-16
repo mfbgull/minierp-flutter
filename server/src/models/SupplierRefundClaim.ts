@@ -27,6 +27,15 @@ import { BusinessRuleError } from '../utils/businessRuleError';
  * Runs inside the caller's transaction where one exists.
  */
 
+/** The full claim lifecycle — the whitelist for the list filter's
+ * comma-separated `status` form. */
+export const CLAIM_STATUS_WHITELIST = [
+  'EXPECTED',
+  'PARTIAL',
+  'RECEIVED',
+  'CANCELLED',
+] as const;
+
 export interface CreateRefundClaimDTO {
   supplier_id: number;
   claim_date: string;         // YYYY-MM-DD
@@ -109,8 +118,23 @@ export class SupplierRefundClaimModel {
       params.push(filters.supplier_id);
     }
     if (filters.status) {
-      where += ' AND c.status = ?';
-      params.push(filters.status);
+      // `status` accepts one lifecycle state or a comma-separated set
+      // (the claims screen's "open only" sends `EXPECTED,PARTIAL` — the
+      // server has no OR filter, so the set form is how the client asks
+      // for one). Values are whitelisted; the IN is built from
+      // placeholders only, never from the request string.
+      const wanted = String(filters.status)
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const invalid = wanted.find(
+        (s) => !(CLAIM_STATUS_WHITELIST as readonly string[]).includes(s),
+      );
+      if (invalid) {
+        throw new Error(`Unknown claim status filter: ${invalid}`);
+      }
+      where += ` AND c.status IN (${wanted.map(() => '?').join(', ')})`;
+      params.push(...wanted);
     }
 
     const total = (db.prepare(
