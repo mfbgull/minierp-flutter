@@ -657,9 +657,13 @@ step 5 below (make it the default) remains open.
 | DEFAULT location on warehouse create | `Warehouse.create` + migration 127 seed |
 | Read-path fallback when the mirror lags | `StockMovement.resolveAvailableQuantity` |
 | Sellable query keeps batches with no location row | `StockMovement.consumeFromOldestBatches` (merges uncovered batches) |
-| Drift invariant (over-report) | `batchLocationDriftImbalances` |
+| Sellable query (flag on) reads covered AND uncovered batches | `StockMovement.sellableAvailabilityByWarehouseSql` (UNION ALL) |
+| Transfer void keeps both stock sources in step | `StockMovement.voidTransfer` — **found by the per-path A-J matrix** |
+| Drift invariant (over-report) | `batchLocationDriftImbalances` (per batch, per item+warehouse, per bin) |
 | Regression: void a return under both flag states | `src/__tests__/batchLocationVoidInvariants.test.ts` |
 | Regression: legacy flip, mixed state, idempotency | `src/__tests__/batchLocationBackfill.test.ts` |
+| Regression: every flag-branching write path, both flag states, A-J | `src/__tests__/batchLocationPathMatrix.test.ts` |
+| Regression: one item split across a covered and an uncovered warehouse | `src/__tests__/batchLocationWarehouseScope.test.ts` |
 
 **A fifth characteristic, found while rehearsing.** The defect is not only a
 *read* problem. The void path `reverseBatchRestore` branched on the flag and
@@ -679,15 +683,41 @@ never a wrong one. `batchLocationBackfill.test.ts` seeds the mixed state on
 purpose (two batches with no row, one with a stale zero row) and asserts an
 exact match after the migration.
 
-**Drift check granularity.** `batchLocationDriftImbalances` groups **per
-batch** (`GROUP BY sb.id`) and sums that batch's location rows, flagging only
-over-report (bins > master). Per batch is strictly stronger than per item: item
-totals are a many-to-one roll-up of batch totals, so a correct batch set implies
-a correct item set. Per-location is inside the `SUM`. Under-report (a hidden
-batch) is handled by the read-path fallback, not the invariant, because a
-legacy batch with no location row is legitimate history — it must not fail the
-gate. The one-directional rule is deliberate: only over-report can sell stock
-that does not exist.
+**Drift check granularity.** `batchLocationDriftImbalances` judges at **three
+levels**, because each hides a different swap:
+
+| Level | Query compares | Catches |
+|---|---|---|
+| Per batch | Σ bin `quantity_available` vs `quantity_remaining` | one batch over-reporting |
+| Per item+warehouse | Σ bins vs Σ batches for the item in that warehouse | two batches cancelling out |
+| Per location bin | `physical` vs `available + reserved` | a bin whose columns disagree |
+
+Only over-report is flagged. Under-report (a hidden batch) is handled by the
+read-path fallback, not the invariant, because a legacy batch with no location
+row is legitimate history — it must not fail the gate. The per-batch query is
+an INNER JOIN: an uncovered batch is simply not judged here.
+
+**A seventh characteristic — the flag-on sellable query, partial coverage.**
+The flag-on branch of `sellableAvailabilityByWarehouseSql` read ONLY
+`batch_stock_by_location`. That was masked while a whole warehouse had no
+location rows (the `batchRows.length === 0` fallback caught it), but a PARTIAL
+set — one covered batch, several uncovered — fell through both paths and was
+refused. The flag-on branch is now a UNION ALL of location-covered batches and
+uncovered batches read from `sb.quantity_remaining`. The residual (unbatched)
+deduction subtracts every batch in both flag states, so it cannot double-count.
+Found by `batchLocationWarehouseScope.test.ts`.
+
+**An eighth characteristic — `voidTransfer` gated its bin writes.** The same
+shape as the fifth: `voidTransfer` wrote `batch_stock_by_location` only under
+`if (isFeatureEnabled(...))`, but `recordTransfer` creates those rows ungated.
+A flag-OFF void therefore removed the master batch quantity and left the
+destination bin holding the units. Both location writes are now unconditional.
+
+This one was invisible to the per-batch drift check: the source bin
+under-reported by exactly what the destination bin over-reported, so the batch
+totals still agreed. That is why the drift check now judges per item+warehouse
+and per bin. Found by `batchLocationPathMatrix.test.ts`, and pinned red-first in
+`batchLocationVoidInvariants.test.ts`.
 
 **Evidence (pre-fix, for the record).** Full server suite with
 `TEST_FORCE_BATCH_LOCATIONS=1` (opt-in, never set in CI):
