@@ -379,34 +379,44 @@ function drawFromSourceBatches(
     const take = roundQty(Math.min(remainingToDraw, roundQty(Number(batch.quantity_remaining))));
     if (take <= 0) continue;
 
+    // BUG-014: the bin drain runs on EVERY flag state, so it matches the
+    // ungated `UPDATE stock_batches` below. With the flag ON the sweep is
+    // strict (it throws when the bins cannot cover) because those bins are
+    // authoritative there. With the flag OFF the sweep is best-effort: bins
+    // are only a mirror, and a return must not start failing because a legacy
+    // batch has no bin rows yet. Any shortfall is left to the DEFAULT-bin
+    // helper below.
     const drawSourceBatchLocations = (): void => {
-      if (batchLocationsEnabled) {
-        const locRows = db.prepare(`
-          SELECT bsl.id, bsl.quantity_available, bsl.location_id
-          FROM batch_stock_by_location bsl
-          JOIN locations l ON bsl.location_id = l.id
-          WHERE bsl.batch_id = ? AND l.warehouse_id = ?
-            AND bsl.quantity_available > 0
-          ORDER BY l.created_at ASC, bsl.id ASC
-        `).all(batchId, warehouseId) as Array<{ id: number; quantity_available: number; location_id: number }>;
+      const locRows = db.prepare(`
+        SELECT bsl.id, bsl.quantity_available, bsl.location_id
+        FROM batch_stock_by_location bsl
+        JOIN locations l ON bsl.location_id = l.id
+        WHERE bsl.batch_id = ? AND l.warehouse_id = ?
+          AND bsl.quantity_available > 0
+        ORDER BY l.created_at ASC, bsl.id ASC
+      `).all(batchId, warehouseId) as Array<{ id: number; quantity_available: number; location_id: number }>;
 
-        let locRemaining = take;
-        for (const loc of locRows) {
-          if (locRemaining <= 0) break;
-          const locTake = roundQty(Math.min(locRemaining, roundQty(loc.quantity_available)));
-          db.prepare(`
-            UPDATE batch_stock_by_location
-            SET quantity_physical = quantity_physical - ?
-            WHERE id = ?
-          `).run(locTake, loc.id);
-          locRemaining -= locTake;
-        }
-        if (locRemaining > 0) {
+      let locRemaining = take;
+      for (const loc of locRows) {
+        if (locRemaining <= 0) break;
+        const locTake = roundQty(Math.min(locRemaining, roundQty(loc.quantity_available)));
+        db.prepare(`
+          UPDATE batch_stock_by_location
+          SET quantity_physical = quantity_physical - ?
+          WHERE id = ?
+        `).run(locTake, loc.id);
+        locRemaining -= locTake;
+      }
+      if (locRemaining > 0) {
+        if (batchLocationsEnabled) {
           throw new Error(
             `Insufficient batch_stock_by_location for ${line.item_name}: ` +
             `required ${take}, only ${roundQty(take - locRemaining).toFixed(3)} available in source batch locations`
           );
         }
+        // Flag OFF: drain the DEFAULT bin by the shortfall, creating it if
+        // absent so the mirror still records the removal.
+        StockMovementModel.mirrorBatchLocationDelta(batchId, warehouseId, -locRemaining, db);
       }
     };
     drawSourceBatchLocations();
@@ -859,22 +869,35 @@ class PurchaseReturnModel {
           const restoreConsumedReturnBatch = (c: typeof consumed[number]): void => {
             db.prepare(`UPDATE stock_batches SET quantity_remaining = MAX(0, quantity_remaining + ?) WHERE id = ?`)
               .run(c.quantity, c.batch_id);
-            // New path: restore to batch_stock_by_location using recorded location
-            if (isFeatureEnabled(db, 'feature_batch_locations')) {
-              const prb = db.prepare(`
-                SELECT location_id FROM purchase_return_batches
-                WHERE return_line_id = ? AND batch_id = ?
-                LIMIT 1
-              `).get(line.id, c.batch_id) as { location_id: number } | undefined;
-              if (prb?.location_id) {
+            // BUG-014: restore to the recorded bin UNGATED, so the mirror moves
+            // with the batch above. Gating it left the bin behind when the flag
+            // was off. When no bin was recorded, fall back to the warehouse's
+            // DEFAULT bin — the same get-or-create the other fixed paths use.
+            const prb = db.prepare(`
+              SELECT location_id FROM purchase_return_batches
+              WHERE return_line_id = ? AND batch_id = ?
+              LIMIT 1
+            `).get(line.id, c.batch_id) as { location_id: number } | undefined;
+            if (prb?.location_id) {
+              const locRow = db.prepare(`
+                SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
+              `).get(header.warehouse_id) as { id: number } | undefined;
+              // Reuse the row's bin when it still exists; otherwise DEFAULT.
+              const targetLocationId = (db.prepare('SELECT id FROM locations WHERE id = ?')
+                .get(prb.location_id) as { id: number } | undefined)
+                ? prb.location_id
+                : locRow?.id;
+              if (targetLocationId) {
                 db.prepare(`
                   INSERT INTO batch_stock_by_location (batch_id, location_id, quantity_physical, quantity_reserved, quantity_available)
                   VALUES (?, ?, ?, 0, ?)
                   ON CONFLICT(batch_id, location_id) DO UPDATE SET
                     quantity_physical = quantity_physical + excluded.quantity_physical,
                     quantity_available = quantity_available + excluded.quantity_available
-                `).run(c.batch_id, prb.location_id, c.quantity, c.quantity);
+                `).run(c.batch_id, targetLocationId, c.quantity, c.quantity);
               }
+            } else {
+              StockMovementModel.mirrorBatchLocationDelta(c.batch_id, header.warehouse_id, c.quantity, db);
             }
           };
           for (const c of consumed) {
@@ -891,20 +914,9 @@ class PurchaseReturnModel {
             if (latest) {
               db.prepare(`UPDATE stock_batches SET quantity_remaining = quantity_remaining + ? WHERE id = ?`)
                 .run(line.quantity, latest.id);
-              if (isFeatureEnabled(db, 'feature_batch_locations')) {
-                const defLoc = db.prepare(`
-                  SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
-                `).get(header.warehouse_id) as { id: number } | undefined;
-                if (defLoc) {
-                  db.prepare(`
-                    INSERT INTO batch_stock_by_location (batch_id, location_id, quantity_physical, quantity_reserved, quantity_available)
-                    VALUES (?, ?, ?, 0, ?)
-                    ON CONFLICT(batch_id, location_id) DO UPDATE SET
-                      quantity_physical = quantity_physical + excluded.quantity_physical,
-                      quantity_available = quantity_available + excluded.quantity_available
-                  `).run(latest.id, defLoc.id, line.quantity, line.quantity);
-                }
-              }
+              // BUG-014: the legacy path has no recorded bin, so create/credit
+              // the warehouse DEFAULT bin ungated, matching the batch write.
+              StockMovementModel.mirrorBatchLocationDelta(latest.id, header.warehouse_id, line.quantity, db);
             }
           };
           restoreLegacyReturnStock();
