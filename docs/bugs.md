@@ -642,8 +642,64 @@ suites finish normally on GitHub Actions.
 
 ## BUG-013 · Turning on `feature_batch_locations` makes existing stock unsellable
 
-**Status.** FIXED on the working branch (2026-11-16). Flag still ships OFF;
-step 5 below (make it the default) remains open.
+**Status.** FIXED on `main` (2026-11-16, head `f4088c6f`). Flag still ships
+OFF; step 5 below (make it the default) remains open.
+
+**The six write sites the flag had corrupted.** The flag chooses which stock
+source is READ. It must never choose which source is WRITTEN. Six writes had
+that shape and are now ungated — every one moves BOTH sources in every flag
+state:
+
+| # | Site | What it did |
+|---|---|---|
+| 1 | `StockMovement.syncBatchStockByLocationForNewBatch` | wrote the bin only when the flag was on |
+| 2 | `StockMovement.consumeLegacyBatches` | decremented the master batch, left the bin holding units |
+| 3 | `StockMovement` backdated fallback (ACCT-006, ~line 1378) | same shape |
+| 4 | `invoiceReturnService.reverseBatchRestore` | decremented the master batch unconditionally, drew the bin down only flag-on |
+| 5 | `StockMovement.voidTransfer` (two writes) | removed the master quantity, left the destination bin holding units |
+| 6 | `StockMovement.recordExpiryTransfer` / `recordDamageTransfer` | location drain gated on the flag |
+
+The shared fix is `StockMovement.mirrorBatchLocationDelta(batchId, warehouseId,
+delta, db)`, which creates the bin row if the batch was never tracked. It ships
+in the first commit that uses it.
+
+**The sellable-query defects (three).** The flag-on branch of
+`sellableAvailabilityByWarehouseSql` read only `batch_stock_by_location`. Three
+faults were found and fixed:
+
+1. **Coverage was Boolean, not per unit.** A partly covered batch was excluded
+   from the uncovered branch while the residual deducted the whole batch, so its
+   unmirrored units were counted zero times and vanished from sellable stock.
+2. **Warehouse attribution mismatch.** The residual grouped by the batch's own
+   warehouse, the bin branch by the bin's warehouse. A batch whose bin points
+   elsewhere was deducted from the wrong warehouse and counted TWICE (7 units
+   reported as 14).
+3. **The residual mirrored the branch's filters.** An expired or halted batch
+   was filtered out of the branch but not from the residual, and became sellable
+   again.
+
+The deduction is now per unit, split by the same two attributions the branch
+uses, and unfiltered. Found by `batchLocationDoubleCount.test.ts`.
+
+**Migration 127 (`127_backfill_batch_stock_by_location.sql`).** Registered at
+`config/database.ts:2469`. From a pre-migration install it does three things:
+seeds a DEFAULT `locations` row for any warehouse missing one; inserts one
+DEFAULT-location row per batch carrying its `quantity_remaining`; corrects any
+stale DEFAULT row whose physical quantity disagrees with its batch; and brings
+`stock_balances` physical/available up to the batch total. Idempotent. The
+filename must NOT change — `schema_migrations` records its checksum, so a rename
+re-runs an already-migrated database. See `docs/DATABASE.md`.
+
+**Legacy-upgrade rehearsal.** `bug013LegacyUpgradeRehearsal.test.ts` takes a
+populated database in the pre-migration shape (batches present, no location
+rows, mirrors zeroed), upgrades it through migration 127 **as a file**, then
+runs a sale, a return, a transfer and a void through the public API. Invariants
+A–J hold and the per-bin drift check is empty. Row counts, before → after:
+batches 2 → 2, batchesWithoutLocation 2 → 0, batchLocations 0 → 2, zeroBalances
+2 → 0, batchQty 35 → 35, locationQty 0 → 35.
+
+**What is still open.** The flag default stays **OFF**. The 8.6 exit criteria
+(remove the old columns) are not met — see the list below — so the columns stay.
 
 **What shipped.**
 
@@ -670,6 +726,7 @@ step 5 below (make it the default) remains open.
 | Regression: delete-then-restore draws both sources down | `src/__tests__/bug014ReverseStock.test.ts` |
 | Regression: purchase return moves both sources, both flag states | `src/__tests__/bug014PurchaseReturn.test.ts` |
 | Regression: a hand-inserted legacy batch is repaired | `src/__tests__/batchLocationBackfill.test.ts` |
+| Rehearsal: a legacy DB upgraded through migration 127, then a month of operations | `src/__tests__/bug013LegacyUpgradeRehearsal.test.ts` |
 
 **A fifth characteristic, found while rehearsing.** The defect is not only a
 *read* problem. The void path `reverseBatchRestore` branched on the flag and

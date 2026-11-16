@@ -1092,3 +1092,66 @@ and unfiltered.
 the code. "Six sites found" is a claim about behaviour, produced by running the
 paths under both flag states and by a guard that cannot be argued with. Trust the
 second kind. Record a verdict only next to the check that produced it.
+
+## D25 — BUG-013: what is fixed, what is open, and the evidence for each (2026-11-16)
+
+**Context.** D23 and D24 each recorded a verdict about the same defect from a
+different angle: D23 named one site, D24 corrected that to a pattern of six.
+This entry is the status of the work, not another reading of the code. It exists
+so a later reader does not have to re-derive which parts are done.
+
+**Fixed — six write sites.** Every write to `stock_batches` or
+`batch_stock_by_location` now moves BOTH sources in every flag state. The shared
+fix is `StockMovement.mirrorBatchLocationDelta(batchId, warehouseId, delta, db)`,
+which creates the bin row when the batch was never tracked (a missing bin row
+means "not tracked yet", never "gone").
+
+| # | Site | Shape of the defect |
+|---|---|---|
+| 1 | `syncBatchStockByLocationForNewBatch` | wrote the bin only flag-on |
+| 2 | `consumeLegacyBatches` | master decremented, bin kept the units |
+| 3 | backdated fallback (ACCT-006, ~1378) | same shape |
+| 4 | `invoiceReturnService.reverseBatchRestore` | master unconditional, bin flag-on |
+| 5 | `voidTransfer` (two writes) | master removed, destination bin kept the units |
+| 6 | `recordExpiryTransfer` / `recordDamageTransfer` | location drain flag-gated |
+
+**Fixed — three sellable-query defects.** The flag-on branch of
+`sellableAvailabilityByWarehouseSql` read only the bin table. (1) Coverage was
+Boolean, so a partly covered batch's unmirrored units vanished. (2) The residual
+grouped by the batch's warehouse while the branch grouped by the bin's, so a
+batch whose bin points elsewhere was counted twice. (3) The residual mirrored
+the branch's filters, so an expired batch returned through the residual. The
+deduction is now per unit, split by the same two attributions, and unfiltered.
+
+**Fixed — migration 127.** `127_backfill_batch_stock_by_location.sql` (registered
+`config/database.ts:2469`) seeds missing DEFAULT locations, inserts one DEFAULT
+row per batch, repairs stale rows, and raises the `stock_balances` mirrors. It is
+idempotent, and its filename must not change: `schema_migrations` stores its
+checksum, so a rename re-runs an already-migrated database.
+
+**Evidence.** The full server suite is green on the final head `f4088c6f` in both
+flag states: 282/282 suites, 2261/2261 tests. The flag-ON run is opt-in
+(`TEST_FORCE_BATCH_LOCATIONS=1`) and never runs in CI.
+`bug013LegacyUpgradeRehearsal.test.ts` upgrades a populated pre-migration
+database through migration 127 as a file, then sells, returns, transfers and
+voids with invariants A–J holding and the per-bin drift check empty. Red-first:
+with the migration call removed, the two migration cases fail. Row counts before
+→ after: batches 2 → 2, batchesWithoutLocation 2 → 0, batchLocations 0 → 2,
+zeroBalances 2 → 0, batchQty 35 → 35, locationQty 0 → 35.
+
+**Still open.**
+
+1. **The flag default stays OFF.** The seed at `add-batch-location-model.sql:24`
+   is still `'0'`. Turning it on is an operational step per database, taken only
+   after migration 127 has run there.
+2. **Task 8.6 exit criteria are NOT met.** Criterion 4 in particular is unmet:
+   `CompanyReport.ts:154`, `Dashboard.ts`, `PhysicalCount.ts`, `Production.ts`
+   and `Item.ts` still read `stock_batches.warehouse_id` or
+   `stock_balances.quantity`. The old columns must not be dropped.
+3. **Drift is verified on the rehearsal fixture, not on the live databases.**
+   Run `GET /inventory/batch-reconciliation` after the migration reaches each
+   database and confirm zero rows.
+
+**Decision — record the status next to the artifact that proves it.** Each line
+above names the file or the command that produced it. A status without its
+check is a claim, and D23/D24 are the cost of writing one.

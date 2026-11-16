@@ -792,19 +792,27 @@ exists, and stock falls by exactly the ordered quantity.
 **Red proof.** Removing both status guards makes **both** conversions return
 201 (two invoices, double deduction); the test fails. Restoring them passes.
 
-### M5 — turning `feature_batch_locations` on breaks sales (latent, MED) — PLAN WRITTEN
+### M5 — turning `feature_batch_locations` on breaks sales (latent, MED) — FIXED
 
 See `docs/bugs.md` **BUG-013**. With the flag on, `sellableAvailabilityByWarehouseSql`
-reads `batch_stock_by_location` instead of `stock_batches`, and nothing backfills
-that table for batches created while the flag was off. The full suite goes from
+read `batch_stock_by_location` instead of `stock_batches`, and nothing backfilled
+that table for batches created while the flag was off. The full suite went from
 **272/272 green** to **38 suites / 122 tests failing**. The shipped default is
-off, so this is latent.
+off, so it was latent.
 
-**Plan written, no code (`706c21c0`).** Backfill `batch_stock_by_location` from
-`stock_batches`; write location rows regardless of the flag so the flag controls
-only which source is **read**; add a drift check; add a "legacy DB, flip the
-flag, sales still work" test; only then consider the flag as default. The 8.6
-checklist item now depends on this.
+**Fixed 2026-11-16 (head `f4088c6f`).** Six write sites no longer gate on the
+flag; the flag-on sellable query reads covered AND uncovered batches and its
+residual deduction is per unit and unfiltered; migration
+`127_backfill_batch_stock_by_location.sql` backfills existing databases; a
+structural guard fails any future write placed behind the flag; and a legacy
+database upgrades through the migration and then sells, returns, transfers and
+voids with invariants A–J holding and zero per-bin drift. Full suite green in
+both flag states: **282/282 suites, 2261/2261 tests**.
+
+**Still open.** The flag default stays OFF. Task 8.6 (drop the old columns) is
+not met — five read sites still use `stock_batches.warehouse_id` or
+`stock_balances.quantity`. Drift is verified on the rehearsal fixture, not yet on
+the live databases. See `audit/DECISIONS.md` D25 and `docs/bugs.md` BUG-013.
 
 **Why the dev DB worked with the flag on.** Two different databases, neither
 exercising the defect. The live `database/erp.db` had **0** stock batches (so
