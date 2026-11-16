@@ -1119,15 +1119,33 @@ class StockMovementModel {
     const featureOn = isFeatureEnabled(db, 'feature_batch_locations');
 
     const batchSellable = featureOn
-      ? `SELECT sb.item_id, l.warehouse_id, SUM(bsl.quantity_available) AS sellable
-         FROM stock_batches sb
-         JOIN batch_stock_by_location bsl ON sb.id = bsl.batch_id
-         JOIN locations l ON bsl.location_id = l.id
-         WHERE bsl.quantity_available > 0
-           AND (sb.halted = 0 OR sb.halted IS NULL)
-           AND COALESCE(bsl.status_override, 'ACTIVE') = 'ACTIVE'
-           AND (sb.expiry_date IS NULL OR sb.expiry_date >= date('now'))
-         GROUP BY sb.item_id, l.warehouse_id`
+      ? `SELECT item_id, warehouse_id, SUM(sellable) AS sellable
+         FROM (
+           -- Batches mirrored to the location table: read the bins.
+           SELECT sb.item_id, l.warehouse_id, SUM(bsl.quantity_available) AS sellable
+           FROM stock_batches sb
+           JOIN batch_stock_by_location bsl ON sb.id = bsl.batch_id
+           JOIN locations l ON bsl.location_id = l.id
+           WHERE bsl.quantity_available > 0
+             AND (sb.halted = 0 OR sb.halted IS NULL)
+             AND COALESCE(bsl.status_override, 'ACTIVE') = 'ACTIVE'
+             AND (sb.expiry_date IS NULL OR sb.expiry_date >= date('now'))
+           GROUP BY sb.item_id, l.warehouse_id
+           UNION ALL
+           -- BUG-013: a batch with NO location row is untracked, not gone. Read
+           -- it from the batch total so a partial rollout cannot hide stock.
+           SELECT sb.item_id, sb.warehouse_id, SUM(sb.quantity_remaining) AS sellable
+           FROM stock_batches sb
+           WHERE sb.quantity_remaining > 0
+             AND (sb.halted = 0 OR sb.halted IS NULL)
+             AND (sb.expiry_date IS NULL OR sb.expiry_date >= date('now'))
+             AND NOT EXISTS (
+               SELECT 1 FROM batch_stock_by_location b0
+               WHERE b0.batch_id = sb.id AND b0.quantity_available > 0
+             )
+           GROUP BY sb.item_id, sb.warehouse_id
+         )
+         GROUP BY item_id, warehouse_id`
       : `SELECT sb.item_id, sb.warehouse_id, SUM(sb.quantity_remaining) AS sellable
          FROM stock_batches sb
          WHERE sb.quantity_remaining > 0
@@ -1144,15 +1162,21 @@ class StockMovementModel {
       FROM items i
       JOIN stock_balances sb_q ON sb_q.item_id = i.id
       LEFT JOIN (
+        -- Deduct exactly the batches the branch above already counted, so the
+        -- residual is only genuinely UNBATCHED stock. Which batches those are
+        -- depends on the flag: off → every batch, on → covered and uncovered
+        -- both count as sellable, so deduct every batch in both states. The
+        -- flag-on branch counts covered batches from bins and uncovered from
+        -- the batch total, which together is every batch.
         SELECT sb.item_id, sb.warehouse_id, SUM(sb.quantity_remaining) AS total
-        FROM stock_batches sb WHERE sb.quantity_remaining > 0
+        FROM stock_batches sb
+        WHERE sb.quantity_remaining > 0
         GROUP BY sb.item_id, sb.warehouse_id
       ) ba ON ba.item_id = i.id AND ba.warehouse_id = sb_q.warehouse_id
       GROUP BY i.id, sb_q.warehouse_id
       HAVING MAX(COALESCE(sb_q.quantity, 0) - COALESCE(ba.total, 0), 0) > 0
     `;
   }
-
   /**
    * Per-item sellable availability (summed across warehouses) as a SQL
    * subquery fragment usable in LEFT JOINs by the items list query.
@@ -1252,6 +1276,11 @@ class StockMovementModel {
           ${useFEFO ? "AND COALESCE(sb.halted, 0) = 0 AND (sb.expiry_date IS NULL OR sb.expiry_date >= @asOf)" : ''}
       `).all(itemId, warehouseId, { asOf }) as LocationBatchRow[];
       if (missing.length > 0) {
+        logger.warn(
+          `[BatchLocations] ${missing.length} batch(es) for item ${itemId} in warehouse ${warehouseId} ` +
+          `carry stock but no location row; selling them from the batch total (BUG-013 guard). ` +
+          `This means the location table is behind — run the backfill if it persists.`
+        );
         batchRows.push(...missing);
         // Keep the documented order: dated expiry first (soonest first), then
         // undated, then FIFO by receipt date and id.
@@ -1997,8 +2026,10 @@ class StockMovementModel {
               UPDATE stock_batches SET quantity_remaining = quantity_remaining + ? WHERE id = ?
             `).run(Math.abs(leg.quantity), leg.batch_id);
             if (restoredBatchId === null) restoredBatchId = leg.batch_id;
-            // New path: restore to default location of source warehouse
-            if (isFeatureEnabled(db, 'feature_batch_locations')) {
+            // BUG-013: the batch_stock_by_location row is written by the
+            // UNGATED create path, so the void must maintain it ungated too.
+            // The flag chooses which source is READ, never which is WRITTEN.
+            {
               const srcLoc = db.prepare(`
                 SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
               `).get(outLeg.warehouse_id) as { id: number } | undefined;
@@ -2024,8 +2055,8 @@ class StockMovementModel {
           db.prepare(`
             UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?
           `).run(qty, inLeg.batch_id);
-          // New path: subtract from default location of destination warehouse
-          if (isFeatureEnabled(db, 'feature_batch_locations')) {
+          // BUG-013: mirror of the source-side restore above — unconditional.
+          {
             const dstLoc = db.prepare(`
               SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
             `).get(inLeg.warehouse_id) as { id: number } | undefined;

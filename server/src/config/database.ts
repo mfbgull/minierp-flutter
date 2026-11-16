@@ -259,12 +259,18 @@ function writeDailyBackupCopy(backupPath: string, backupDir: string, stamp: stri
   if (fs.existsSync(dailyPath)) return;
   try {
     fs.linkSync(backupPath, dailyPath);
-  } catch {
+  } catch (linkError: unknown) {
     try {
       fs.copyFileSync(backupPath, dailyPath);
-    } catch {
+      logger.warn(
+        `Daily snapshot copy fell back to a file copy (hard link failed: ${errorMessage(linkError)}): ${dailyPath}`
+      );
+    } catch (copyError: unknown) {
       // A daily copy is a convenience, not a safety net: the snapshot above
-      // already succeeded. Never fail the boot for it.
+      // already succeeded. Never fail the boot for it, but never hide it.
+      logger.warn(
+        `Daily snapshot copy failed (snapshot itself is safe at ${backupPath}): ${errorMessage(copyError)}`
+      );
     }
   }
 }

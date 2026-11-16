@@ -244,7 +244,7 @@ export function batchLocationDriftImbalances(db = defaultDb): Violation[] {
     "SELECT value FROM settings WHERE key = 'feature_batch_locations'",
   ).get() as { value: string } | undefined)?.value === '1';
   if (!flagOn) return [];
-  return db.prepare(`
+  const perBatch = db.prepare(`
     SELECT sb.id AS label,
            SUM(bsl.quantity_available) - sb.quantity_remaining AS diff
     FROM stock_batches sb
@@ -252,6 +252,30 @@ export function batchLocationDriftImbalances(db = defaultDb): Violation[] {
     GROUP BY sb.id
     HAVING SUM(bsl.quantity_available) - sb.quantity_remaining > 0.005
   `).all() as unknown as Violation[];
+
+  // Per item+warehouse. The per-batch check can pass while two batches of the
+  // same item disagree and cancel out, so total item stock is judged on its own.
+  const perItem = db.prepare(`
+    SELECT sb.item_id || '/' || sb.warehouse_id AS label,
+           SUM(bsl.quantity_available) - SUM(sb.quantity_remaining) AS diff
+    FROM stock_batches sb
+    JOIN batch_stock_by_location bsl ON bsl.batch_id = sb.id
+    GROUP BY sb.item_id, sb.warehouse_id
+    HAVING SUM(bsl.quantity_available) - SUM(sb.quantity_remaining) > 0.005
+  `).all() as unknown as Violation[];
+
+  // Per location bin. One bin can over-report while another under-reports it,
+  // and the per-batch sum would hide that swap. Judged on PHYSICAL quantity:
+  // `quantity_available` is derived (physical − reserved), so it can never
+  // disagree with its own physical. The physical is what a picker sees.
+  const perLocation = db.prepare(`
+    SELECT bsl.location_id || '/' || bsl.quantity_physical AS label,
+           bsl.quantity_physical - bsl.quantity_available - bsl.quantity_reserved AS diff
+    FROM batch_stock_by_location bsl
+    WHERE ABS(bsl.quantity_physical - bsl.quantity_available - bsl.quantity_reserved) > 0.005
+  `).all() as unknown as Violation[];
+
+  return [...perBatch, ...perItem, ...perLocation];
 }
 
 const GL_ACCOUNT_ID = (code: string, db = defaultDb): number | undefined =>

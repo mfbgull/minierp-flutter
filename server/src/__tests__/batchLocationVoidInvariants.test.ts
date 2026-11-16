@@ -41,6 +41,10 @@ let cookie = '';
 let customerId = 0;
 const FLAG = 'feature_batch_locations';
 
+function warehouseIds(): number[] {
+  return (db.prepare('SELECT id FROM warehouses ORDER BY id').all() as Array<{ id: number }>).map((r) => r.id);
+}
+
 function firstWarehouseId(): number {
   const row = db.prepare('SELECT id FROM warehouses ORDER BY id LIMIT 1').get() as { id: number } | undefined;
   if (!row) throw new Error('void-invariants: no warehouse seeded');
@@ -140,6 +144,71 @@ describe('BUG-013: a voided return keeps invariants A-J under either flag', () =
       expect(String(retRow.status).toUpperCase()).toBe('VOIDED');
       const inv = db.prepare('SELECT id FROM invoices WHERE id = ?').get(invoiceId) as { id: number };
       expect(inv.id).toBe(invoiceId);
+    });
+  }
+
+  // The same defect existed on the transfer-void path: `voidTransfer` gated
+  // its `batch_stock_by_location` writes on the flag, but the transfer that
+  // CREATED those rows is ungated. A flag-OFF void therefore drew the master
+  // batch down and left the destination's location row holding the units —
+  // invisible until drift is measured per batch, which is exactly what this
+  // case does.
+  for (const flagOn of [false, true]) {
+    it(`draws the destination location row down when voiding a transfer with the flag ${flagOn ? 'ON' : 'OFF'}`, async () => {
+      setFeatureEnabled(db, FLAG, flagOn);
+      const [fromWh, toWh] = warehouseIds();
+      const itemId = await createItem(`XFER-VOID-${flagOn ? 'ON' : 'OFF'}`, cookie);
+      await purchaseStock(itemId, fromWh, 8, 50, cookie, '2026-10-01');
+
+      const created = await request(app)
+        .post('/api/inventory/stock-transfers')
+        .set('Cookie', cookie)
+        .set('Idempotency-Key', nextIdemKey(`xfer-void-${flagOn}`))
+        .send({
+          item_id: itemId,
+          from_warehouse_id: fromWh,
+          to_warehouse_id: toWh,
+          quantity: 3,
+          transfer_date: '2026-10-02',
+          notes: `transfer-void invariant (${flagOn ? 'ON' : 'OFF'})`,
+        });
+      expect([200, 201]).toContain(created.status);
+
+      const movementNo = (
+        db.prepare(
+          `SELECT movement_no FROM stock_movements
+           WHERE item_id = ? AND warehouse_id = ? AND movement_type = 'TRANSFER'
+           ORDER BY id ASC LIMIT 1`,
+        ).get(itemId, fromWh) as { movement_no: string } | undefined
+      )?.movement_no;
+      expect(movementNo).toBeTruthy();
+
+      const voided = await request(app)
+        .post(`/api/inventory/stock-transfers/${movementNo}/void`)
+        .set('Cookie', cookie)
+        .set('Idempotency-Key', nextIdemKey(`xfer-void-call-${flagOn}`))
+        .send({ reason: `void transfer (${flagOn ? 'ON' : 'OFF'})` });
+      expect([200, 201, 204]).toContain(voided.status);
+
+      // Every batch of this item must have its location coverage agree with
+      // its own remaining quantity — measured per batch, so a swap between
+      // the source and destination batches cannot hide in the total.
+      const mismatches = db
+        .prepare(
+          `SELECT sb.id AS batch_id,
+                  sb.quantity_remaining AS master_qty,
+                  COALESCE((SELECT SUM(bsl.quantity_available) FROM batch_stock_by_location bsl
+                            WHERE bsl.batch_id = sb.id), 0) AS loc_qty
+           FROM stock_batches sb
+           WHERE sb.item_id = ?`,
+        )
+        .all(itemId) as Array<{ batch_id: number; master_qty: number; loc_qty: number }>;
+      for (const row of mismatches) {
+        expect({ batch_id: row.batch_id, diff: Number(row.loc_qty) - Number(row.master_qty) })
+          .toEqual({ batch_id: row.batch_id, diff: 0 });
+      }
+
+      expectAllInvariantsHold(`transfer-void-flag-${flagOn ? 'on' : 'off'}`, db);
     });
   }
 });

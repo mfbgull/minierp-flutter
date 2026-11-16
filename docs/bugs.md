@@ -656,6 +656,7 @@ step 5 below (make it the default) remains open.
 | Keep them in step on a voided return | `invoiceReturnService.reverseBatchRestore` — **found by the void rehearsal** |
 | DEFAULT location on warehouse create | `Warehouse.create` + migration 127 seed |
 | Read-path fallback when the mirror lags | `StockMovement.resolveAvailableQuantity` |
+| Sellable query keeps batches with no location row | `StockMovement.consumeFromOldestBatches` (merges uncovered batches) |
 | Drift invariant (over-report) | `batchLocationDriftImbalances` |
 | Regression: void a return under both flag states | `src/__tests__/batchLocationVoidInvariants.test.ts` |
 | Regression: legacy flip, mixed state, idempotency | `src/__tests__/batchLocationBackfill.test.ts` |

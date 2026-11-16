@@ -35,8 +35,23 @@ let dir: string;
 let previousPath: string | undefined;
 let loaded: DatabaseModule | undefined;
 
+// Warnings the code under test emits. loadDatabaseModule() resets the module
+// registry, so a spy made here would be discarded; instead a doMock factory
+// installed below hands every fresh logger instance this collector.
+const warningsSink: string[] = [];
+
 async function loadDatabaseModule(): Promise<DatabaseModule> {
   jest.resetModules();
+  jest.doMock('../utils/logger', () => {
+    const real = jest.requireActual('../utils/logger') as { default: Record<string, unknown> };
+    const logger = Object.create(real.default) as Record<string, unknown>;
+    const passthrough = (level: string) => (...args: unknown[]) => {
+      if (level === 'warn' || level === 'error') warningsSink.push(args.map(String).join(' '));
+    };
+    logger.warn = passthrough('warn');
+    logger.error = passthrough('error');
+    return { default: logger, __esModule: true };
+  });
   loaded = (await import('../config/database')) as unknown as DatabaseModule;
   return loaded;
 }
@@ -317,12 +332,18 @@ describe('database module initialization boundary', () => {
     });
 
     it('falls back to a copy when the backup directory cannot hard-link', async () => {
+      warningsSink.length = 0;
       const mod = await loadDatabaseModule();
       mod.applyPendingMigrations();
       await mod.dbSeedReady;
 
       const backupDir = path.join(dir, 'backups');
       fs.mkdirSync(backupDir, { recursive: true });
+      // The boot above already wrote today's daily copy, so writeDailyBackupCopy
+      // would return early. Remove it so the fallback path is actually taken.
+      for (const f of fs.readdirSync(backupDir)) {
+        if (f.startsWith('erp-daily-')) fs.rmSync(path.join(backupDir, f), { force: true });
+      }
       // Force linkSync to fail, as a backup volume without hard links does.
       const realLink = fs.linkSync;
       (fs as unknown as { linkSync: typeof fs.linkSync }).linkSync = (() => {
@@ -333,6 +354,8 @@ describe('database module initialization boundary', () => {
       try {
         const taken = mod.backupBeforeMigration() as string;
         const day = path.basename(taken).replace('erp-premigration-', '').slice(0, 10);
+        // The fallback must be visible in the log, not silent.
+        expect(warningsSink.join('\n')).toContain('hard link failed');
         const dailyPath = path.join(backupDir, `erp-daily-${day}.db`);
 
         // The boot did not fail, and the day file is a real copy.

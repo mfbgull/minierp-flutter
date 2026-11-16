@@ -1004,3 +1004,35 @@ location decrement stays as an additional guarded write.
 buy, sell, return, settle, void, then assert invariants A–J once per flag state
 in the same file. Proven red-first: flag-OFF passed, flag-ON failed with
 `Expected 8, Received 4` against the old branching code.
+
+**A read-path corollary, found by the full flag-ON suite.** The write-path fix
+alone is not enough. The flag-on sellable query walked
+`batch_stock_by_location` with an INNER JOIN, so a batch with NO location row was
+invisible. That was masked while the whole warehouse had no location rows (the
+`batchRows.length === 0` fallback caught it), but a PARTIAL set — one covered
+batch, several uncovered — fell through both paths and refused the sale.
+
+Fix: `consumeFromOldestBatches` merges in batches that carry
+`quantity_remaining > 0` but no location coverage, at their master quantity, and
+re-sorts into the documented expiry/FIFO order. The flag still chooses which
+source is READ; a missing row now means "not tracked yet", never "gone".
+
+**Two more write paths, found by the per-path A-J matrix.** A matrix that runs
+every flag-branching stock write under both flag states found two defects the
+sentence "the flag never chooses which source is WRITTEN" already predicted:
+
+1. `sellableAvailabilityByWarehouseSql` (flag on) read ONLY
+   `batch_stock_by_location`. A batch with no location row was invisible to
+   `getSellableAvailability` even though `consumeFromOldestBatches` could sell
+   it. Rewritten as a UNION ALL of (a) location-covered batches read from bins
+   and (b) uncovered batches read from `sb.quantity_remaining`. The residual
+   (unbatched) branch deducts EVERY batch in both flag states, so it never
+   double-counts.
+2. `voidTransfer` gated its `batch_stock_by_location` writes on the flag, but
+   the transfer that CREATED those rows is ungated. A flag-OFF void drew the
+   master batch down and left the destination bin holding the units. Both
+   location writes are now unconditional, matching the ungated create.
+
+Defect 2 was invisible to the per-batch drift check because the source bin
+under-reported by exactly what the destination bin over-reported. The drift
+check now judges per item+warehouse and per location bin as well.
