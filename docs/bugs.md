@@ -664,6 +664,12 @@ step 5 below (make it the default) remains open.
 | Regression: legacy flip, mixed state, idempotency | `src/__tests__/batchLocationBackfill.test.ts` |
 | Regression: every flag-branching write path, both flag states, A-J | `src/__tests__/batchLocationPathMatrix.test.ts` |
 | Regression: one item split across a covered and an uncovered warehouse | `src/__tests__/batchLocationWarehouseScope.test.ts` |
+| Regression: a partly covered batch, a bin in another warehouse, one row per pair | `src/__tests__/batchLocationDoubleCount.test.ts` |
+| Guard: no write to the batch tables behind the flag (zero exceptions) | `src/__tests__/batchLocationWriteGuard.test.ts` |
+| Regression: invoice delete restores the bin mirror | `src/__tests__/bug014InvoiceDeleteRestore.test.ts` |
+| Regression: delete-then-restore draws both sources down | `src/__tests__/bug014ReverseStock.test.ts` |
+| Regression: purchase return moves both sources, both flag states | `src/__tests__/bug014PurchaseReturn.test.ts` |
+| Regression: a hand-inserted legacy batch is repaired | `src/__tests__/batchLocationBackfill.test.ts` |
 
 **A fifth characteristic, found while rehearsing.** The defect is not only a
 *read* problem. The void path `reverseBatchRestore` branched on the flag and
@@ -704,8 +710,9 @@ location rows (the `batchRows.length === 0` fallback caught it), but a PARTIAL
 set — one covered batch, several uncovered — fell through both paths and was
 refused. The flag-on branch is now a UNION ALL of location-covered batches and
 uncovered batches read from `sb.quantity_remaining`. The residual (unbatched)
-deduction subtracts every batch in both flag states, so it cannot double-count.
-Found by `batchLocationWarehouseScope.test.ts`.
+deduction subtracts the same two groups the branch counts, split per unit and
+per warehouse, so it cannot double-count. Found by
+`batchLocationWarehouseScope.test.ts`.
 
 **An eighth characteristic — `voidTransfer` gated its bin writes.** The same
 shape as the fifth: `voidTransfer` wrote `batch_stock_by_location` only under
@@ -718,6 +725,38 @@ under-reported by exactly what the destination bin over-reported, so the batch
 totals still agreed. That is why the drift check now judges per item+warehouse
 and per bin. Found by `batchLocationPathMatrix.test.ts`, and pinned red-first in
 `batchLocationVoidInvariants.test.ts`.
+
+**A ninth characteristic — coverage is per unit, and the residual branch must
+agree with the branch it deducts from.** The UNION ALL fix above treated
+coverage as per batch: one `NOT EXISTS` test asked "does this batch have any bin
+row?". A PARTLY covered batch — some units mirrored, the rest not — was
+therefore excluded from the uncovered branch, while the residual deducted the
+WHOLE batch. The unmirrored units were counted zero times and silently vanished
+from sellable stock. The mirror case was worse: the residual deducted
+`SUM(quantity_remaining)` grouped by `sb.warehouse_id`, but the bin branch
+grouped by the BIN's warehouse, so a batch whose bin points elsewhere was
+deducted from the wrong warehouse and the difference was counted TWICE (7 units
+reported as 14). A third trap: the residual's deduction mirrored the branch's
+eligibility filters, so an expired batch was filtered out of the branch but not
+deducted from the residual, and became sellable again.
+
+The deduction is now per unit, split by the same two attributions the branch
+uses, and unfiltered so an excluded batch still reduces the residual. Found by
+`batchLocationDoubleCount.test.ts`.
+
+**A sixth site — `invoiceReturnService.reverseBatchRestore`.** Same shape as the
+fifth: the master batch decremented unconditionally, the bin only when the flag
+was on. Found by the structural guard
+`batchLocationWriteGuard.test.ts`.
+
+**Structural guard.** `batchLocationWriteGuard.test.ts` reads the source and
+fails when an INSERT/UPDATE/DELETE against `stock_batches` or
+`batch_stock_by_location` sits inside an
+`if (isFeatureEnabled(..., 'feature_batch_locations'))` block — including the
+`const on = isFeatureEnabled(...); if (on)` alias form. A second test walks the
+tree and fails if a file that mentions the flag is missing from the scanned
+list. It passes with ZERO exceptions; every gated write it found was fixed,
+never allow-listed.
 
 **Evidence (pre-fix, for the record).** Full server suite with
 `TEST_FORCE_BATCH_LOCATIONS=1` (opt-in, never set in CI):
