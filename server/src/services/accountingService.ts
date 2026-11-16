@@ -1653,7 +1653,7 @@ export class AccountingService {
     paymentMethod: string | undefined,
     fromDate: string,
   ): void {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { assertCashTimeline } = require('./cashBalanceGuard') as typeof import('./cashBalanceGuard');
     assertCashTimeline(db, { paymentMethod, fromDate });
   }
