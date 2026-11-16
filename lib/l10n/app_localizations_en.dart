@@ -1987,6 +1987,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get purchasesRefundamount => 'Refund Amount';
 
   @override
+  String get purchasesRefundamountinvalid => 'Enter a valid refund amount';
+
+  @override
+  String get purchasesRefundamountexceeds =>
+      'Refund amount exceeds the refundable amount';
+
+  @override
   String get purchasesRefundmethod => 'Payment Method';
 
   @override
@@ -2134,6 +2141,60 @@ class AppLocalizationsEn extends AppLocalizations {
   String refundBlockedMore(int count) {
     return 'and $count more';
   }
+
+  @override
+  String get cashBlockerTypeExpensepayment => 'Expense payment';
+
+  @override
+  String get cashBlockerTypeExpense => 'Expense';
+
+  @override
+  String get cashBlockerTypeSupplierrefund => 'Supplier refund';
+
+  @override
+  String get cashBlockerTypeRefundreceipt => 'Supplier refund receipt';
+
+  @override
+  String get cashBlockerTypeRefundclaimwriteoff => 'Refund claim write-off';
+
+  @override
+  String get cashBlockerTypeOwnerwithdrawal => 'Owner withdrawal';
+
+  @override
+  String get cashBlockerTypeOwnercapital => 'Owner capital';
+
+  @override
+  String get cashBlockerTypeSupplierpayment => 'Supplier payment';
+
+  @override
+  String get cashBlockerTypeCustomerrefund => 'Customer refund';
+
+  @override
+  String get cashBlockerTypeSalarypayment => 'Salary payment';
+
+  @override
+  String get cashBlockerTypeSupplierprepayment => 'Supplier prepayment';
+
+  @override
+  String get cashBlockerTypeLoandisbursement => 'Loan disbursement';
+
+  @override
+  String get cashBlockerTypeLoanrepayment => 'Loan repayment';
+
+  @override
+  String get cashBlockerTypePurchase => 'Purchase';
+
+  @override
+  String get cashBlockerTypeOpeningbalance => 'Opening balance';
+
+  @override
+  String get cashBlockerTypeManualjournal => 'Manual journal';
+
+  @override
+  String get cashBlockerTypeCreditoffset => 'Credit offset';
+
+  @override
+  String get cashBlockerTypeOther => 'Other entry';
 
   @override
   String get purchasesProcessreturn => 'Process Return';

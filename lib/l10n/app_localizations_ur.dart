@@ -1988,6 +1988,13 @@ class AppLocalizationsUr extends AppLocalizations {
   String get purchasesRefundamount => 'واپسی کی رقم';
 
   @override
+  String get purchasesRefundamountinvalid => 'درست واپسی رقم درج کریں';
+
+  @override
+  String get purchasesRefundamountexceeds =>
+      'واپسی کی رقم قابلِ واپسی رقم سے زیادہ ہے';
+
+  @override
   String get purchasesRefundmethod => 'ادائیگی کا طریقہ';
 
   @override
@@ -2135,6 +2142,60 @@ class AppLocalizationsUr extends AppLocalizations {
   String refundBlockedMore(int count) {
     return 'اور $count مزید';
   }
+
+  @override
+  String get cashBlockerTypeExpensepayment => 'اخراجات کی ادائیگی';
+
+  @override
+  String get cashBlockerTypeExpense => 'اخراجات';
+
+  @override
+  String get cashBlockerTypeSupplierrefund => 'سپلائر ریفنڈ';
+
+  @override
+  String get cashBlockerTypeRefundreceipt => 'سپلائر ریفنڈ کی رسید';
+
+  @override
+  String get cashBlockerTypeRefundclaimwriteoff => 'ریفنڈ کلیم رائٹ آف';
+
+  @override
+  String get cashBlockerTypeOwnerwithdrawal => 'مالک کی نکاسی';
+
+  @override
+  String get cashBlockerTypeOwnercapital => 'مالک کا سرمایہ';
+
+  @override
+  String get cashBlockerTypeSupplierpayment => 'سپلائر ادائیگی';
+
+  @override
+  String get cashBlockerTypeCustomerrefund => 'کسٹمر ریفنڈ';
+
+  @override
+  String get cashBlockerTypeSalarypayment => 'تنخواہ کی ادائیگی';
+
+  @override
+  String get cashBlockerTypeSupplierprepayment => 'سپلائر پیشگی ادائیگی';
+
+  @override
+  String get cashBlockerTypeLoandisbursement => 'قرض کی تقسیم';
+
+  @override
+  String get cashBlockerTypeLoanrepayment => 'قرض کی واپسی';
+
+  @override
+  String get cashBlockerTypePurchase => 'خریداری';
+
+  @override
+  String get cashBlockerTypeOpeningbalance => 'ابتدائی بیلنس';
+
+  @override
+  String get cashBlockerTypeManualjournal => 'دستی جرنل';
+
+  @override
+  String get cashBlockerTypeCreditoffset => 'کریڈٹ ایڈجسٹمنٹ';
+
+  @override
+  String get cashBlockerTypeOther => 'دیگر اندراج';
 
   @override
   String get purchasesProcessreturn => 'واپسی پراسیس کریں';
