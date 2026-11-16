@@ -1,24 +1,21 @@
 /**
- * RED tests for audit/GLM-REVIEW.md findings F-2 and F-3 (2026-11-16).
+ * Findings from audit/GLM-REVIEW.md (2026-11-16): F-2 and F-3.
  *
- * These tests deliberately FAIL against the current code. They document the
- * failing scenarios so the fix work can go red → green. Do not merge as-is
- * without either fixing the findings or consciously deleting the tests:
+ * - F-2 (Medium) — FIXED in 7a96e6d8. Cancelling a written-off claim,
+ *   directly or through a purchase-return void, used to orphan the write-off's
+ *   Dr 7300 / Cr AP posting and silently drop the uncollected remainder. The
+ *   guard (SupplierRefundClaimModel.cancel) now refuses while
+ *   written_off_amount > 0. The F-2 case below is a normal regression guard:
+ *   it passes today and fails if that guard is removed or weakened.
  *
- * - F-2 (Medium): cancelling a written-off claim — directly or through a
- *   purchase-return void — orphans the write-off's Dr 7300 / Cr AP posting
- *   and silently drops the uncollected remainder. The guard
- *   (SupplierRefundClaimModel.cancel) only refuses while LIVE RECEIPTS are
- *   allocated. Fix options per the review: refuse cancel/void while
- *   written_off_amount > 0, or reverse the write-off with the cancel.
- *   NOTE: the void path lives in PurchaseReturn.ts (currently another
- *   agent's file) — the fix must be coordinated there.
- *
- * - F-3 (Medium): SupplierRefundModel.void appends its supplier-ledger
- *   reversal dated "today" (new Date().toISOString(), UTC) while the GL
- *   lines are voided retroactively — for any as-of date between the receipt
- *   and the void, GL AP and the supplier subledger disagree. The codebase's
- *   own rule (ledgerUtils.reverseLedgerEntry) is same-date reversal.
+ * - F-3 (Medium) — parked, pending Gull's dating decision. SupplierRefundModel
+ *   .void appends its supplier-ledger reversal dated "today"
+ *   (new Date().toISOString(), UTC) while the GL lines are voided
+ *   retroactively, so for any as-of date between the receipt and the void, GL
+ *   AP and the supplier subledger disagree. The codebase's own rule
+ *   (ledgerUtils.reverseLedgerEntry) is same-date reversal. The F-3 case below
+ *   is wrapped in `it.failing` so the suite stays green while the defect is
+ *   visible; remove the wrapper when the dating decision is implemented.
  */
 import { beforeAll, beforeEach, afterEach, describe, expect, it } from '@jest/globals';
 import request from 'supertest';
@@ -123,7 +120,7 @@ function supplierLedgerAsOf(supplierId: number, date: string): number {
 describe('GLM-REVIEW findings (F-2 fixed, F-3 parked)', () => {
   // F-2 is fixed (7a96e6d8 refused cancel of a written-off claim) — this is
   // now a normal regression guard for that fix.
-  it('F-2: voiding a return whose claim carries a write-off is refused, not silently orphaned', async () => {
+  it('F-2: voiding a return whose claim carries a write-off is refused with 409', async () => {
     await seedOpeningCash(6000);
     const info = await paidPurchase(5000);
     const { returnId, claimId } = await returnAgainstPurchase(info);
@@ -136,19 +133,82 @@ describe('GLM-REVIEW findings (F-2 fixed, F-3 parked)', () => {
       .send({ amount: 2000, reason: 'supplier unreachable' });
     expect(writeOff.status).toBe(200);
 
-    // Void the return. No receipts exist, so cancel's only guard passes.
-    // Expected: refusal (the write-off posting must not be orphaned and the
-    // remaining 3000 must not vanish from refundsDue unaccounted).
+    // Void the return. No receipts exist, so the receipts guard passes; the
+    // write-off guard must still refuse. Exact 409 — a bare >= 400 would also
+    // accept an unrelated 500 or an auth failure and prove nothing.
     const voided = await request(app)
       .post(`/api/purchase-returns/${returnId}/void`)
       .set('Cookie', cookie)
       .send({ reason: 'goods never left stock' });
-    expect(voided.status).toBeGreaterThanOrEqual(400);
+    expect(voided.status).toBe(409);
+    // The refusal names the business rule, not a generic crash.
+    expect(String(voided.body.error)).toMatch(/write-off/i);
+    expect(String(voided.body.error)).toMatch(/cannot be cancelled/i);
+
+    // Unchanged state: the claim is still open with the write-off posted, the
+    // remainder is still reported as due, and the write-off lines are active.
+    const claim = db.prepare(
+      'SELECT status, written_off_amount, amount, received_amount FROM supplier_refund_claims WHERE id = ?'
+    ).get(claimId) as {
+      status: string; written_off_amount: number; amount: number; received_amount: number;
+    };
+    expect(claim.status).not.toBe('CANCELLED');
+    expect(claim.written_off_amount).toBeCloseTo(2000, 2);
+
+    const activeWriteOff = db.prepare(
+      `SELECT COUNT(*) AS n FROM journal_lines
+       WHERE reference_type = 'REFUND_CLAIM_WRITE_OFF' AND voided = 0`
+    ).get() as { n: number };
+    expect(activeWriteOff.n).toBeGreaterThan(0);
+
+    const due = await request(app)
+      .get('/api/supplier-refunds/claims/due')
+      .set('Cookie', cookie);
+    expect(due.status).toBe(200);
+    // The claim is still reported due with the remainder intact:
+    // 5000 claim − 0 received − 2000 written off = 3000.
+    const claimDue = (due.body.data as Array<{
+      id: number; amount: number; received_amount: number; written_off_amount: number;
+    }>).find((row) => row.id === claimId);
+    expect(claimDue).toBeDefined();
+    expect(claimDue!.amount - claimDue!.received_amount - claimDue!.written_off_amount)
+      .toBeCloseTo(3000, 2);
   });
 
-  // it.failing: known defect (audit/GLM-REVIEW.md F-3) — parked pending the
-  // dating decision. It flips to a real failure the moment F-3 is fixed;
-  // delete the wrapper then.
+  // Scoped control: the guard keys on the standing write-off, not on every
+  // claim. Without a write-off the return void still cancels the claim — so a
+  // regression that over-broadens the guard (refusing every void) is caught.
+  it('F-2 control: a claim with no write-off still cancels on return void', async () => {
+    await seedOpeningCash(6000);
+    const info = await paidPurchase(5000);
+    const { returnId, claimId } = await returnAgainstPurchase(info);
+
+    const voided = await request(app)
+      .post(`/api/purchase-returns/${returnId}/void`)
+      .set('Cookie', cookie)
+      .send({ reason: 'goods never left stock' });
+    expect(voided.status).toBe(200);
+
+    const claim = db.prepare(
+      'SELECT status FROM supplier_refund_claims WHERE id = ?'
+    ).get(claimId) as { status: string };
+    expect(claim.status).toBe('CANCELLED');
+  });
+
+  // it.failing: parked pending Gull's F-3 dating decision. It flips to a real
+  // failure the moment F-3 is fixed; remove the wrapper then.
+  //
+  // Verified 2026-11-16 (isolated test-only worktree, glm-f3-probe): the void
+  // request below needs NO Idempotency-Key. `POST /api/supplier-refunds/:id/void`
+  // (routes/supplierRefunds.ts:34) calls no idempotency helper — there is no
+  // SUPPLIER_REFUND_VOID scope, and voidSupplierRefund
+  // (controllers/supplierRefundController.ts:162) only reaches
+  // startRequiredIdempotentRequest's siblings CREATE / CLAIM_CREATE /
+  // CLAIM_WRITE_OFF. Run unwrapped, the void returned HTTP 200 with no header,
+  // and the FIRST failing assertion is the as-of GL/subledger comparison
+  // (Expected 0, Received 3000) — not a masked HTTP 400. The earlier claim
+  // that 653dfe43 proves this route key-mandatory was wrong (that commit is
+  // Flutter-only and its message is inaccurate about the server).
   it.failing('F-3: a voided receipt keeps GL AP and the supplier ledger in agreement at every as-of date', async () => {
     await seedOpeningCash(10000);
     const info = await paidPurchase(100);
@@ -180,7 +240,8 @@ describe('GLM-REVIEW findings (F-2 fixed, F-3 parked)', () => {
     const receiptId = receipt.body.data?.id ?? receipt.body.id;
 
     // Void "today" (2026-11-16): GL lines void retroactively; the ledger
-    // reversal is appended dated today.
+    // reversal is appended dated today. No Idempotency-Key: this route does
+    // not require one (verified — see the header comment above).
     const voided = await request(app)
       .post(`/api/supplier-refunds/${receiptId}/void`)
       .set('Cookie', cookie)
