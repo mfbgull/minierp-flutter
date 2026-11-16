@@ -50,9 +50,14 @@ void main() {
         '10',
       );
       // Flat discount of 150 against a 100 line.
-      await tester.tap(
-        find.byType(DropdownButtonFormField<DiscountType?>).first,
-      );
+      // The dropdown sits below the 600px test viewport; without
+      // ensureVisible the tap misses silently and the menu never opens
+      // (found during green-up via a scratch probe — see
+      // /home/fawad/logs/ux-redfirst-chronology.md). Plumbing only: the
+      // assertions below are the original pinned contract, unchanged.
+      final dropdown = find.byType(DropdownButtonFormField<DiscountType?>).first;
+      await tester.ensureVisible(dropdown);
+      await tester.tap(dropdown);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Amount').last);
       await tester.pumpAndSettle();
@@ -82,9 +87,5 @@ void main() {
             'not sent to the server',
       );
     },
-    // RED-BY-DESIGN — UX-13 (audit/GLM-UX-REVIEW.md): a flat discount above
-    // the line total still passes local validation. Un-skip when UX-13 is
-    // fixed. FAILURE_WHEN_FIXED.
-    skip: true,
   );
 }
