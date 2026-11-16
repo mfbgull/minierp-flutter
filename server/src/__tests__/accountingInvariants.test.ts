@@ -1456,6 +1456,9 @@ function plantBatch(itemId: number, warehouseId: number, qty: number, unitCost: 
 }
 
 function purgePlantedStock(itemId: number): void {
+  // BUG-013: every batch now carries a location row, and the FK is the safety
+  // net that stops an orphaned row. Remove the child rows first.
+  db.prepare('DELETE FROM batch_stock_by_location WHERE batch_id IN (SELECT id FROM stock_batches WHERE item_id = ?)').run(itemId);
   db.prepare('DELETE FROM stock_batches WHERE item_id = ?').run(itemId);
   db.prepare('DELETE FROM stock_balances WHERE item_id = ?').run(itemId);
 }

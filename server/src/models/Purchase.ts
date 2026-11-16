@@ -252,6 +252,13 @@ class PurchaseModel {
     );
     const outputBatchId = Number(batchResult.lastInsertRowid);
 
+    // BUG-013: keep batch_stock_by_location in step from the moment the batch
+    // exists. Not gated on feature_batch_locations — the flag chooses which
+    // source is READ, never whether the second source is maintained. Without
+    // this, a batch bought while the flag was off has no location row, and a
+    // later flag flip makes the sellable query report 0 for it.
+    StockMovementModel.syncBatchStockByLocationForNewBatch(outputBatchId, warehouse_id, quantity, db);
+
     // Record stock movement linked to the new batch
     const movementNo = this.generateMovementNo(db);
     db.prepare(`

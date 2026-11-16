@@ -33,7 +33,8 @@ import {
   purchaseStock,
   settleReturn,
 } from './helpers/invoiceReturnSpec';
-import { expectAllInvariantsHold } from './helpers/accountingInvariants';
+import { expectAllInvariantsHold, batchLocationDriftImbalances } from './helpers/accountingInvariants';
+import { setFeatureEnabled } from '../utils/featureFlags';
 
 const SERVER_ROOT = path.resolve(__dirname, '..', '..');
 
@@ -303,6 +304,89 @@ describe('deployment rehearsal: one month of operations', () => {
       fs.rmSync(backupDir, { recursive: true, force: true });
     }
   }, 180_000);
+});
+
+/**
+ * Second rehearsal (BUG-013): an EXISTING database that already holds batches
+ * is flipped to `feature_batch_locations = 1`.
+ *
+ * The first rehearsal starts from an empty database with the flag already in
+ * its shipped state, so it can never catch the flam-amnesia defect: there were
+ * no pre-existing batches to lose. This one models the real upgrade — batches
+ * bought by an older build, then the flag turned on — and proves a sale still
+ * works for the real quantity.
+ *
+ * The legacy shape is produced the honest way: buy with the flag OFF, then
+ * strip the flag-only mirrors (drop the location rows, zero
+ * stock_balances.quantity_available) so the database looks exactly like one an
+ * older build left behind. The backfill migration then has to repair it.
+ */
+describe('deployment rehearsal: a legacy database arrives with batches, then the flag is turned on', () => {
+  const LEGACY_ITEM = 'Rehearsal Legacy Batch Item';
+  const runMigration127 = (): void => {
+    db.exec(fs.readFileSync(path.join(__dirname, '..', 'migrations', '127_backfill_batch_stock_by_location.sql'), 'utf8'));
+  };
+
+  it('keeps the stock sellable after the flag flip, for the right quantity', async () => {
+    const cookie = await getAuthCookie();
+    const customer = await createCustomer('Legacy Rehearsal Co', cookie);
+    const item = await createItem(LEGACY_ITEM, cookie);
+    const wh = firstWarehouseId();
+
+    // ── The legacy shape: stock bought while the flag was off ──────────
+    setFeatureEnabled(db, 'feature_batch_locations', false);
+    await purchaseStock(item, wh, 60, 90, cookie, '2026-09-03');
+    await purchaseStock(item, wh, 40, 95, cookie, '2026-09-09');
+
+    // Drop everything the flag-only maintenance would have written, so the
+    // database matches one that never ran it.
+    db.prepare(`
+      DELETE FROM batch_stock_by_location
+      WHERE batch_id IN (SELECT id FROM stock_batches WHERE item_id = ?)
+    `).run(item);
+    db.prepare(
+      'UPDATE stock_balances SET quantity_available = 0, quantity_physical = 0 WHERE item_id = ? AND warehouse_id = ?',
+    ).run(item, wh);
+    const legacyBatches = db.prepare(
+      'SELECT COUNT(*) AS c FROM stock_batches WHERE item_id = ? AND quantity_remaining > 0',
+    ).get(item) as { c: number };
+    expect(legacyBatches.c).toBe(2);
+    expect(batchLocationDriftImbalances(db)).toEqual([]); // flag is off: not judged
+
+    // ── The upgrade: run the backfill, then flip the flag ──────────────
+    runMigration127();
+    setFeatureEnabled(db, 'feature_batch_locations', true);
+
+    // The two sources must agree the moment the flag comes on. Before the
+    // fix this was where every sale broke.
+    expect(batchLocationDriftImbalances(db)).toEqual([]);
+
+    // ── Sell from the flipped database ─────────────────────────────────
+    const res = await request(app)
+      .post('/api/invoices')
+      .set('Cookie', cookie)
+      .set('Idempotency-Key', nextIdemKey('legacy-rehearsal'))
+      .send({
+        customer_id: customer,
+        invoice_date: '2026-09-20',
+        warehouse_id: wh,
+        items: [{ item_id: item, quantity: 25, unit_price: 200 }],
+      });
+    if (res.status !== 201) {
+      throw new Error(`sale from a flipped legacy database failed: ${res.status} ${JSON.stringify(res.body)}`);
+    }
+
+    // 25 of the original 100 consumed, from real batches, at real cost.
+    const remaining = (db.prepare(
+      'SELECT COALESCE(SUM(quantity_remaining), 0) AS q FROM stock_batches WHERE item_id = ?',
+    ).get(item) as { q: number }).q;
+    expect(Number(remaining)).toBeCloseTo(75, 3);
+    expect(batchLocationDriftImbalances(db)).toEqual([]);
+    expectAllInvariantsHold('sold from a flipped legacy database');
+
+    // Restore the shipped default so this spec cannot leak the flag on.
+    setFeatureEnabled(db, 'feature_batch_locations', false);
+  }, 120_000);
 });
 
 afterAll(() => {

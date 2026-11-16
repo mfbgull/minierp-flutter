@@ -642,8 +642,65 @@ suites finish normally on GitHub Actions.
 
 ## BUG-013 · Turning on `feature_batch_locations` makes existing stock unsellable
 
-**Status.** OPEN. Reported 2026-11-15 from the flag-on rehearsal. No fix applied
-(pending owner decision — the flag is off in the shipped build).
+**Status.** FIXED on the working branch (2026-11-16). Flag still ships OFF;
+step 5 below (make it the default) remains open.
+
+**What shipped.**
+
+| Part | Where |
+|---|---|
+| Backfill + stale-row repair migration | `server/src/migrations/127_backfill_batch_stock_by_location.sql` |
+| Write location rows regardless of the flag | `StockMovement.syncBatchStockByLocationForNewBatch` (ungated) |
+| Keep location rows in step on the flag-OFF consume path | `StockMovement.consumeLegacyBatches` (`MAX(0, physical - ?)`, ungated) |
+| Keep them in step on the ACCT-006 backdated fallback | `StockMovement` (~line 1378) |
+| Keep them in step on a voided return | `invoiceReturnService.reverseBatchRestore` — **found by the void rehearsal** |
+| DEFAULT location on warehouse create | `Warehouse.create` + migration 127 seed |
+| Read-path fallback when the mirror lags | `StockMovement.resolveAvailableQuantity` |
+| Drift invariant (over-report) | `batchLocationDriftImbalances` |
+| Regression: void a return under both flag states | `src/__tests__/batchLocationVoidInvariants.test.ts` |
+| Regression: legacy flip, mixed state, idempotency | `src/__tests__/batchLocationBackfill.test.ts` |
+
+**A fifth characteristic, found while rehearsing.** The defect is not only a
+*read* problem. The void path `reverseBatchRestore` branched on the flag and
+wrote ONE source (flag on → bins, flag off → master batches). With the flag ON,
+voiding a return removed units from `stock_balances` while
+`stock_batches.quantity_remaining` kept them, breaking invariant E with
+`diff: -4`. The flag must never choose WHICH source is written — only which is
+READ. Fixed and pinned red-first.
+
+**Mixed-state answer (item 4).** A half-migrated database can hold a batch whose
+location row exists but carries the wrong quantity (stale). The insert half of
+migration 127 skips an existing row by design, so on its own it would leave that
+split in place. Migration 127 therefore also **corrects** any DEFAULT-location
+row whose physical quantity disagrees with the batch. After one run every batch
+has exactly one DEFAULT row carrying its real remaining quantity, or none —
+never a wrong one. `batchLocationBackfill.test.ts` seeds the mixed state on
+purpose (two batches with no row, one with a stale zero row) and asserts an
+exact match after the migration.
+
+**Drift check granularity.** `batchLocationDriftImbalances` groups **per
+batch** (`GROUP BY sb.id`) and sums that batch's location rows, flagging only
+over-report (bins > master). Per batch is strictly stronger than per item: item
+totals are a many-to-one roll-up of batch totals, so a correct batch set implies
+a correct item set. Per-location is inside the `SUM`. Under-report (a hidden
+batch) is handled by the read-path fallback, not the invariant, because a
+legacy batch with no location row is legitimate history — it must not fail the
+gate. The one-directional rule is deliberate: only over-report can sell stock
+that does not exist.
+
+**Evidence (pre-fix, for the record).** Full server suite with
+`TEST_FORCE_BATCH_LOCATIONS=1` (opt-in, never set in CI):
+
+```
+flag ON : 38 failed suites, 122 failed tests
+flag OFF: all suites pass (the shipped default)
+```
+
+All 38 failures shared one signature, `sellable stock N, requested M` with N
+lower than M.
+
+**Still open.** Step 5 — make the flag the default — waits on a clean full
+flag-ON suite. Flag-ON is opt-in; the shipped default is OFF.
 
 **Problem.** With `feature_batch_locations = '1'`, the sellable-stock query
 reads `batch_stock_by_location` instead of `stock_batches`:

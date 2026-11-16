@@ -20,7 +20,9 @@ describe('reservation and journal audit invariants', () => {
     db.prepare("INSERT OR IGNORE INTO locations(warehouse_id,location_code,location_name) VALUES(?,'DEFAULT','Audit bin')").run(warehouse);
     location = (db.prepare("SELECT id FROM locations WHERE warehouse_id=? AND location_code='DEFAULT'").get(warehouse) as { id: number }).id;
     batch = (db.prepare('SELECT id FROM stock_batches WHERE item_id=?').get(item) as { id: number }).id;
-    db.prepare('INSERT INTO batch_stock_by_location(batch_id,location_id,quantity_physical,quantity_reserved,quantity_available) VALUES(?,?,10,0,10)').run(batch, location);
+    // BUG-013: the batch now carries a location row from the moment it is
+    // created, so pin its quantity instead of inserting a duplicate.
+    db.prepare('INSERT OR REPLACE INTO batch_stock_by_location(batch_id,location_id,quantity_physical,quantity_reserved,quantity_available) VALUES(?,?,10,0,10)').run(batch, location);
   });
   it.each([1, undefined])('F-071/F-072 reserve replay and release apply one location delta (line=%s)', async line => {
     const body = { item_id: item, warehouse_id: warehouse, batch_id: batch, location_id: location, quantity_reserved: 3,

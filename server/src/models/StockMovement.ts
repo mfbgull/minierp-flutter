@@ -153,7 +153,19 @@ function resolveAvailableQuantity(
     ? (balanceRow ? roundQty(parseFloat(String(balanceRow.quantity_available ?? 0))) : 0)
     : (balanceRow ? roundQty(parseFloat(String(balanceRow.quantity))) : 0);
 
-  if (featureOn && qtyLessThan(availableQty, requiredQty)) {
+  if (featureOn) {
+    // BUG-013. The flag-on read trusts stock_balances.quantity_available, a
+    // mirror that only the flag-on write path maintains. On any database where
+    // the mirror lagged — a flag flip, a batch written by a path that did not
+    // refresh it, a legacy row — the mirror is LOWER than the truth and the
+    // sale is refused with "sellable stock 0".
+    //
+    // Fall back to the batch-level total whenever the location table covers
+    // less than the mirror claims. A location table that covers MORE than the
+    // mirror (a block, a reservation) is left alone: the finer-grained number
+    // must still gate the sale. This only ever raises the figure toward the
+    // batch total, which the drift invariant independently caps at the real
+    // quantity, so it cannot offer phantom stock.
     const coverage = db.prepare(`
       SELECT COALESCE(SUM(bsl.quantity_available), 0) as covered
       FROM batch_stock_by_location bsl
@@ -161,7 +173,8 @@ function resolveAvailableQuantity(
       JOIN stock_batches sb ON sb.id = bsl.batch_id
       WHERE l.warehouse_id = ? AND sb.item_id = ?
     `).get(warehouseId, itemId) as { covered: number };
-    if (roundQty(coverage.covered) < requiredQty) {
+    const covered = roundQty(coverage.covered);
+    if (qtyLessThan(covered, availableQty) || qtyLessThan(availableQty, requiredQty)) {
       availableQty = balanceRow ? roundQty(parseFloat(String(balanceRow.quantity))) : 0;
     }
   }
@@ -388,6 +401,17 @@ function consumeLegacyBatches(
       WHERE id = ?
     `).run(consumeFromThis, batch.id);
 
+    // BUG-013: keep the location rows in step on the legacy path too. The
+    // flag-on read path trusts batch_stock_by_location, so a flag flip after a
+    // period of flag-off trading would leave every consumed batch
+    // over-reported and offer phantom stock. Unconditional: a no-op when the
+    // batch has no location rows (the flag-OFF-only legacy shape).
+    db.prepare(`
+      UPDATE batch_stock_by_location
+      SET quantity_physical = MAX(0, quantity_physical - ?)
+      WHERE batch_id = ?
+    `).run(consumeFromThis, batch.id);
+
     consumption.push({ batchId: batch.id, consumed: consumeFromThis, unitCost: batch.unit_cost });
     remaining -= consumeFromThis;
   }
@@ -516,6 +540,14 @@ class StockMovementModel {
         return resolvedBatchId;
       };
       const resolvedBatchId = createIncomingCostLayer();
+      // BUG-013: keep batch_stock_by_location in step with stock_batches from
+      // the moment a batch exists. This is the shared batch-creation path for
+      // purchases, openings and adjustments. The flag must not gate this write:
+      // if it did, a batch created while the flag was off would be invisible to
+      // the sellable query the moment the flag was turned on.
+      if (resolvedBatchId && qty > 0) {
+        this.syncBatchStockByLocationForNewBatch(resolvedBatchId, data.warehouse_id, qty, db);
+      }
 
       const movementStmt = db.prepare(`
         INSERT INTO stock_movements (
@@ -1037,7 +1069,12 @@ class StockMovementModel {
   }
 
   static syncBatchStockByLocationForNewBatch(batchId: number, warehouseId: number, quantity: number, db: Database.Database): void {
-    if (!isFeatureEnabled(db, 'feature_batch_locations')) return;
+    // Deliberately NOT gated on feature_batch_locations. The flag chooses which
+    // source the sellable query READS; it must never decide whether the second
+    // source is MAINTAINED. Gating this write is what made a flag flip lose
+    // every existing batch (BUG-013): rows only appeared for batches bought
+    // while the flag was already on. Writing one extra row keeps the two
+    // sources in step at all times, so a flip is safe.
     const locRow = db.prepare(`
       SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
     `).get(warehouseId) as { id: number } | undefined;
@@ -1347,6 +1384,12 @@ class StockMovementModel {
       const take = roundQty(Math.min(remaining, roundQty(Number(batch.quantity_remaining))));
       db.prepare(`
         UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?
+      `).run(take, batch.id);
+      // BUG-013: mirror the consume on the location rows (no-op when absent).
+      db.prepare(`
+        UPDATE batch_stock_by_location
+        SET quantity_physical = MAX(0, quantity_physical - ?)
+        WHERE batch_id = ?
       `).run(take, batch.id);
       consumption.push({ batchId: batch.id, consumed: take, unitCost: batch.unit_cost });
       remaining -= take;

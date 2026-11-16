@@ -176,6 +176,9 @@ function restoreConsumption(
         qty, qty, cost
       );
       batchId = inserted.lastInsertRowid as number;
+      // BUG-013: the recreated batch needs its location row, or the flag-on
+      // sellable query cannot see it.
+      StockMovementModel.syncBatchStockByLocationForNewBatch(batchId, m.warehouse_id, qty, db);
     }
 
     // Positive (inbound) compensating movement; history untouched.

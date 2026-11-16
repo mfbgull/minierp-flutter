@@ -42,7 +42,16 @@ class WarehouseModel {
       INSERT INTO warehouses (warehouse_code, warehouse_name, location)
       VALUES (?, ?, ?)
     `).run(data.warehouse_code, data.warehouse_name, data.location || null);
-    return result.lastInsertRowid as number;
+    const id = result.lastInsertRowid as number;
+    // BUG-013: every warehouse needs its DEFAULT location. The migration seeds
+    // one for the warehouses that existed when it ran; a warehouse created
+    // later had none, so no batch in it got a location row and — with the flag
+    // on — nothing in that warehouse was sellable.
+    db.prepare(`
+      INSERT OR IGNORE INTO locations (warehouse_id, location_code, location_name)
+      VALUES (?, 'DEFAULT', ?)
+    `).run(id, data.warehouse_name);
+    return id;
   }
 
   static update(db: Database.Database, id: number, data: { warehouse_code: string; warehouse_name: string; location?: string; is_active?: number }): void {

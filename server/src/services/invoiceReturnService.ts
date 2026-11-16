@@ -1580,6 +1580,16 @@ function reverseBatchRestore(
     const restoreQty = Math.abs(movement.quantity) * ratio;
     if (restoreQty <= 0) continue;
 
+    // BUG-013: always decrement the master batch layer, and additionally the
+    // location row when the batch has one. The flag must not choose WHICH
+    // source is written — only the two writes together keep invariant E
+    // (stock_balances == SUM(quantity_remaining)) true under either flag.
+    db.prepare(`
+      UPDATE stock_batches
+      SET quantity_remaining = MAX(0, quantity_remaining - ?)
+      WHERE id = ?
+    `).run(restoreQty, movement.batch_id);
+
     if (batchFeatureOn) {
       // The return restored every batch to the chosen warehouse's DEFAULT
       // location (explicit warehouse) or to the sale movement's own
@@ -1588,19 +1598,14 @@ function reverseBatchRestore(
       const locRow = db.prepare(`
         SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
       `).get(targetWarehouseId) as { id: number } | undefined;
-      if (!locRow) continue;
-      db.prepare(`
-        UPDATE batch_stock_by_location
-        SET quantity_physical = MAX(0, quantity_physical - ?),
-            quantity_available = MAX(0, quantity_available - ?)
-        WHERE batch_id = ? AND location_id = ?
-      `).run(restoreQty, restoreQty, movement.batch_id, locRow.id);
-    } else {
-      db.prepare(`
-        UPDATE stock_batches
-        SET quantity_remaining = MAX(0, quantity_remaining - ?)
-        WHERE id = ?
-      `).run(restoreQty, movement.batch_id);
+      if (locRow) {
+        db.prepare(`
+          UPDATE batch_stock_by_location
+          SET quantity_physical = MAX(0, quantity_physical - ?),
+              quantity_available = MAX(0, quantity_available - ?)
+          WHERE batch_id = ? AND location_id = ?
+        `).run(restoreQty, restoreQty, movement.batch_id, locRow.id);
+      }
     }
   }
 }

@@ -58,7 +58,7 @@ describe('audited count and production economics', () => {
     if (locations) {
       // Explicit location fixture: direct purchases do not assign bins.
       db.prepare("INSERT OR IGNORE INTO locations(warehouse_id,location_code,location_name) VALUES(?,'DEFAULT','Count bin')").run(warehouse);
-      db.prepare(`INSERT INTO batch_stock_by_location(batch_id,location_id,quantity_physical,quantity_reserved,quantity_available)
+      db.prepare(`INSERT OR REPLACE INTO batch_stock_by_location(batch_id,location_id,quantity_physical,quantity_reserved,quantity_available)
         SELECT b.id,l.id,b.quantity_remaining,0,b.quantity_remaining FROM stock_batches b JOIN locations l ON l.warehouse_id=b.warehouse_id
         WHERE b.item_id=? AND l.location_code='DEFAULT'`).run(item);
       db.prepare('UPDATE stock_balances SET quantity_physical=quantity,quantity_available=quantity,quantity_reserved=0 WHERE item_id=?').run(item);
@@ -101,7 +101,7 @@ describe('audited count and production economics', () => {
     db.prepare('UPDATE items SET standard_cost=10 WHERE id=?').run(item);
     await purchaseStock(item, warehouse, 2, 10, cookie);
     db.prepare("INSERT OR IGNORE INTO locations(warehouse_id,location_code,location_name) VALUES(?,'DEFAULT','Surplus bin')").run(warehouse);
-    db.prepare(`INSERT INTO batch_stock_by_location(batch_id,location_id,quantity_physical,quantity_reserved,quantity_available)
+    db.prepare(`INSERT OR REPLACE INTO batch_stock_by_location(batch_id,location_id,quantity_physical,quantity_reserved,quantity_available)
       SELECT b.id,l.id,b.quantity_remaining,0,b.quantity_remaining FROM stock_batches b JOIN locations l ON l.warehouse_id=b.warehouse_id
       WHERE b.item_id=? AND l.location_code='DEFAULT'`).run(item);
     db.prepare('UPDATE stock_balances SET quantity_physical=quantity,quantity_available=quantity,quantity_reserved=0 WHERE item_id=?').run(item);

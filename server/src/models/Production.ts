@@ -470,7 +470,12 @@ class ProductionModel {
             WHERE source_type = 'PRODUCTION' AND source_id = ? AND item_id = ?
           `).get(productionId, line.item_id) as { id: number } | undefined;
           const outputBatchId = batchRecord?.id;
-          if (outputBatchId) outputBatchIds.push(outputBatchId);
+          if (outputBatchId) {
+            // BUG-013: a produced batch must get its location row too, or the
+            // flag-on sellable query cannot see it.
+            StockMovementModel.syncBatchStockByLocationForNewBatch(outputBatchId, warehouse_id, lineQty, db);
+            outputBatchIds.push(outputBatchId);
+          }
           if (index === 0 && outputBatchId) primaryBatchIds.push(outputBatchId);
 
           db.prepare(`

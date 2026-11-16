@@ -750,6 +750,14 @@ class PurchaseOrderModel {
         // Zero the batch layers (retained for audit).
         for (const batch of batches) {
           db.prepare(`UPDATE stock_batches SET quantity_remaining = 0 WHERE id = ?`).run(batch.id);
+          // BUG-013: the location rows are a peer source, not a mirror. Zeroing
+          // only the batch leaves the location row claiming stock that no
+          // longer exists, so a flag-on sale would offer phantom units.
+          db.prepare(`
+            UPDATE batch_stock_by_location
+            SET quantity_physical = 0, quantity_reserved = 0
+            WHERE batch_id = ?
+          `).run(batch.id);
         }
 
         // Draw down stock balance at the receipt warehouse.
@@ -1051,6 +1059,11 @@ class PurchaseOrderModel {
           ItemModel.batchExpiryDate(db, poItem.item_id, poItem.expiry_date)
         );
         const batchId = batchResult.lastInsertRowid as number;
+        // BUG-013: a goods-receipt batch must get its location row too, or the
+        // flag-on sellable query cannot see it.
+        StockMovementModel.syncBatchStockByLocationForNewBatch(
+          batchId, warehouse_id, receiptItem.received_quantity, db,
+        );
 
         // Create stock movement using atomic movement number generation
         const movementNo = StockMovementModel.generateMovementNo(db);

@@ -905,3 +905,102 @@ CI-equivalent, do not baseline at all — fix the introduced finding instead
 **Also found.** The three suites that hang locally under `--coverage` are a
 local-only problem (jest cannot exit cleanly with coverage in this
 environment). They pass on CI. Worth a follow-up issue, not a blocker.
+
+
+## D21 — Tech debt: the lazy `require` between `accountingService` and `cashBalanceGuard` (2026-11-15)
+
+**Context.** ACCT-013 added a chronological cash guard. `AccountingService`
+must call it, and `cashBalanceGuard` needs the account-balance helper that
+lives in `accountingService`. A plain top-level import in either direction
+closes a cycle, so `AccountingService.assertCashTimelineAfterOutflow` uses a
+lazy `require('./cashBalanceGuard')` inside the method body. `SupplierPaymentService`
+does the same for the ACCT-013 guard.
+
+**Decision.** Keep the lazy require for now. Log it as tech debt. Do NOT fix
+it in this change.
+
+**Why it is debt.** The call is invisible to a top-level read. A future edit
+can move the require, hoist it, or convert the file to ESM and break the guard
+at runtime only. Tests would still pass if the guard were silently skipped,
+because the error is thrown from inside the same transaction.
+
+**Suggested fix (a separate change).** Extract the timeline check into a small
+shared module that neither service owns — for example
+`services/cashTimeline.ts` exporting `assertCashTimeline(db, paymentMethod,
+fromDate)`. Both services then import it normally, no cycle, no lazy require.
+`cashBalanceGuard` keeps only the running-balance SQL, or moves into that
+module too.
+
+**Not a blocker.** The dependency is real and acyclic at runtime. The debt is
+readability and future fragility, not a present defect.
+
+
+## D22 — "Pre-existing failure" claims require a clean-worktree baseline
+
+**Date.** 2026-11-16. **Status.** DECIDED (process rule).
+
+**Trigger.** While fixing BUG-013 I twice reported a failing suite as
+"pre-existing" after running it with `git stash push`. Both claims were wrong:
+
+- `git stash` leaves **untracked** files in place. The new migration `127` and
+  the new test files stayed, so the "clean HEAD" run was not clean.
+- `database.ts` remained modified in one run, so migration 127 was still
+  registered and still applied.
+
+**Established facts (clean worktree, `git worktree add --detach`).**
+
+| Suite | `c0f465c8` flag-OFF | `5e38a321` flag-OFF | my branch flag-OFF |
+|---|---|---|---|
+| `maintenance-reconciliation-cli` | PASS | PASS | was FAIL → fixed |
+| `auditStockRemediation` (F-024 ×2) | PASS | PASS | was FAIL → fixed |
+
+So neither suite was ever pre-existing-broken. I broke both:
+
+1. `maintenance-reconciliation-cli.test.ts` — I added
+   `DELETE FROM batch_stock_by_location` to a spec that builds its **own**
+   minimal schema with no such table → `SqliteError: no such table`.
+2. `auditStockRemediation.test.ts` F-024 — the fixture's plain
+   `INSERT INTO batch_stock_by_location` collided with the row BUG-013's
+   ungated write now creates → `UNIQUE constraint failed`. Same class as
+   `auditReservationHeaders`, fixed the same way (`INSERT OR REPLACE`).
+
+**Rule.** Measure every baseline in a clean git worktree
+(`git worktree add --detach <path> <commit>`), never via `git stash`. A failing
+test is not "pre-existing" until it reproduces there. Report the commit and the
+worktree path with the claim.
+
+## D23 — BUG-013: the flag never chooses WHICH source is written
+
+**Date.** 2026-11-16. **Status.** DECIDED (implemented).
+
+**Rule.** `feature_batch_locations` chooses which source the sellable query
+**READS** (`stock_balances` mirrors vs `batch_stock_by_location` bins). It must
+never decide whether a source is **MAINTAINED**. Every write path writes BOTH
+`stock_batches.quantity_remaining` and `batch_stock_by_location.quantity_physical`
+unconditionally; the location write is additional, not alternative.
+
+**Audit of every write path that touches `feature_batch_locations`.** Result:
+the pattern is correct everywhere EXCEPT one site, which was the BUG-013 defect.
+
+| Site | Writes master | Writes location | Verdict |
+|---|---|---|---|
+| `StockMovement.recordMovement` → `syncBatchStockByLocationForNewBatch` | yes | yes (ungated) | correct |
+| `StockMovement.consumeLegacyBatches` / backdated fallback | yes | yes (ungated decrement) | correct |
+| `StockMovement` expiry-transfer drain (`~1543`) | yes (zero) | yes (zero) | correct |
+| `StockMovement` damage-transfer drain (`~1650`) | yes (zero) | yes (zero) | correct |
+| `StockMovement` transfer-void restore (`~1958`, `~1993`) | yes (outside branch) | yes (additional) | correct |
+| `Invoice.restoreSaleBatchQuantities` (`~652`) | yes (outside branch) | yes (additional) | correct |
+| `invoiceReturnService.reverseBatchRestore` | **no when flag ON** | **no when flag OFF** | **BUG — fixed** |
+| `syncStockBalancesExtension` | n/a (derived mirror) | reads bins | correct, gated by design |
+| `PurchaseReturn` / `StockReservation` / `physicalCountLayers` | n/a | gated reads/guards | correct |
+
+**The defect.** `reverseBatchRestore` used `if (batchFeatureOn) {location} else
+{master}`. With the flag ON, voiding a return removed units from
+`stock_balances` while `stock_batches.quantity_remaining` kept them → invariant E
+broke with `diff: -4`. Fix: the master decrement moved OUT of the branch; the
+location decrement stays as an additional guarded write.
+
+**Regression test.** `server/src/__tests__/batchLocationVoidInvariants.test.ts` —
+buy, sell, return, settle, void, then assert invariants A–J once per flag state
+in the same file. Proven red-first: flag-OFF passed, flag-ON failed with
+`Expected 8, Received 4` against the old branching code.

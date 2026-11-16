@@ -410,6 +410,7 @@ describe('StockMovementModel', () => {
 
       // Ensure a clean stock_balance entry
       db.prepare(`DELETE FROM stock_balances WHERE item_id = ? AND warehouse_id = ?`).run(testItemId, testWhId);
+      db.prepare(`DELETE FROM batch_stock_by_location WHERE batch_id IN (SELECT id FROM stock_batches WHERE item_id = ? AND warehouse_id = ?)`).run(testItemId, testWhId);
       db.prepare(`DELETE FROM stock_batches WHERE item_id = ? AND warehouse_id = ?`).run(testItemId, testWhId);
       db.prepare(`INSERT INTO stock_balances (item_id, warehouse_id, quantity) VALUES (?, ?, 0)`).run(testItemId, testWhId);
     });
@@ -418,6 +419,7 @@ describe('StockMovementModel', () => {
       // Clean up - must delete stock_movements first to avoid FK constraints on batch_id
       db.prepare(`DELETE FROM stock_movements WHERE item_id = ?`).run(testItemId);
       db.prepare(`DELETE FROM stock_balances WHERE item_id = ?`).run(testItemId);
+      db.prepare(`DELETE FROM batch_stock_by_location WHERE batch_id IN (SELECT id FROM stock_batches WHERE item_id = ?)`).run(testItemId);
       db.prepare(`DELETE FROM stock_batches WHERE item_id = ?`).run(testItemId);
       ItemModel.delete(testItemId, 1, db);
     });
@@ -464,6 +466,7 @@ describe('StockMovementModel', () => {
     it('throws error when batch stock is insufficient', () => {
       // Clean up old test data (stock_movements first — FK to stock_batches)
       db.prepare(`DELETE FROM stock_movements WHERE item_id = ?`).run(testItemId);
+      db.prepare(`DELETE FROM batch_stock_by_location WHERE batch_id IN (SELECT id FROM stock_batches WHERE item_id = ?)`).run(testItemId);
       db.prepare(`DELETE FROM stock_batches WHERE item_id = ?`).run(testItemId);
       db.prepare(`UPDATE stock_balances SET quantity = 10 WHERE item_id = ?`).run(testItemId);
 
@@ -492,6 +495,7 @@ describe('StockMovementModel', () => {
     it('FEFO: consumes nearest-expiry batch first when has_expiry=1', () => {
       // Clean slate
       db.prepare('DELETE FROM stock_movements WHERE item_id = ?').run(testItemId);
+      db.prepare(`DELETE FROM batch_stock_by_location WHERE batch_id IN (SELECT id FROM stock_batches WHERE item_id = ?)`).run(testItemId);
       db.prepare('DELETE FROM stock_batches WHERE item_id = ?').run(testItemId);
 
       // Update item to have expiry tracking
@@ -523,6 +527,7 @@ describe('StockMovementModel', () => {
 
     it('FEFO: skips halted batches', () => {
       db.prepare('DELETE FROM stock_movements WHERE item_id = ?').run(testItemId);
+      db.prepare(`DELETE FROM batch_stock_by_location WHERE batch_id IN (SELECT id FROM stock_batches WHERE item_id = ?)`).run(testItemId);
       db.prepare('DELETE FROM stock_batches WHERE item_id = ?').run(testItemId);
       db.prepare('UPDATE items SET has_expiry = 1 WHERE id = ?').run(testItemId);
 
@@ -552,6 +557,7 @@ describe('StockMovementModel', () => {
 
     it('FEFO: excludes expired batches (expiry_date < today)', () => {
       db.prepare('DELETE FROM stock_movements WHERE item_id = ?').run(testItemId);
+      db.prepare(`DELETE FROM batch_stock_by_location WHERE batch_id IN (SELECT id FROM stock_batches WHERE item_id = ?)`).run(testItemId);
       db.prepare('DELETE FROM stock_batches WHERE item_id = ?').run(testItemId);
       db.prepare('UPDATE items SET has_expiry = 1 WHERE id = ?').run(testItemId);
 
@@ -580,6 +586,7 @@ describe('StockMovementModel', () => {
 
     it('FEFO: throws when all batches are halted/expired but stock_balances > 0', () => {
       db.prepare('DELETE FROM stock_movements WHERE item_id = ?').run(testItemId);
+      db.prepare(`DELETE FROM batch_stock_by_location WHERE batch_id IN (SELECT id FROM stock_batches WHERE item_id = ?)`).run(testItemId);
       db.prepare('DELETE FROM stock_batches WHERE item_id = ?').run(testItemId);
       db.prepare('UPDATE items SET has_expiry = 1 WHERE id = ?').run(testItemId);
 
@@ -603,6 +610,7 @@ describe('StockMovementModel', () => {
 
     it('FEFO: NULL expiry dates consumed after dated ones', () => {
       db.prepare('DELETE FROM stock_movements WHERE item_id = ?').run(testItemId);
+      db.prepare(`DELETE FROM batch_stock_by_location WHERE batch_id IN (SELECT id FROM stock_batches WHERE item_id = ?)`).run(testItemId);
       db.prepare('DELETE FROM stock_batches WHERE item_id = ?').run(testItemId);
       db.prepare('UPDATE items SET has_expiry = 1 WHERE id = ?').run(testItemId);
 
@@ -630,6 +638,7 @@ describe('StockMovementModel', () => {
 
     it('legacy: uses standard_cost when no batch rows exist', () => {
       db.prepare('DELETE FROM stock_movements WHERE item_id = ?').run(testItemId);
+      db.prepare(`DELETE FROM batch_stock_by_location WHERE batch_id IN (SELECT id FROM stock_batches WHERE item_id = ?)`).run(testItemId);
       db.prepare('DELETE FROM stock_batches WHERE item_id = ?').run(testItemId);
       db.prepare('UPDATE items SET has_expiry = 0 WHERE id = ?').run(testItemId);
 
@@ -678,6 +687,7 @@ describe('StockMovementModel', () => {
       db.prepare(`DELETE FROM purchase_return_batches`).run();
       db.prepare(`UPDATE purchases SET batch_id = NULL WHERE batch_id IN (SELECT id FROM stock_batches WHERE item_id = ?)`).run(itemId);
       db.prepare(`UPDATE productions SET batch_id = NULL WHERE batch_id IN (SELECT id FROM stock_batches WHERE item_id = ?)`).run(itemId);
+      db.prepare(`DELETE FROM batch_stock_by_location WHERE batch_id IN (SELECT id FROM stock_batches WHERE item_id = ?)`).run(itemId);
       db.prepare(`DELETE FROM stock_batches WHERE item_id = ?`).run(itemId);
       // payments.supplier_id FK — clear supplier-linked payments before the supplier.
       db.prepare(`DELETE FROM purchase_allocations WHERE payment_id IN (SELECT id FROM payments WHERE supplier_id = ?)`).run(supplierId);
@@ -983,6 +993,7 @@ describe('StockMovementModel', () => {
       testWhId2 = 1;
 
       db.prepare(`DELETE FROM stock_balances WHERE item_id = ? AND warehouse_id = ?`).run(testItemId2, testWhId2);
+      db.prepare(`DELETE FROM batch_stock_by_location WHERE batch_id IN (SELECT id FROM stock_batches WHERE item_id = ? AND warehouse_id = ?)`).run(testItemId2, testWhId2);
       db.prepare(`DELETE FROM stock_batches WHERE item_id = ? AND warehouse_id = ?`).run(testItemId2, testWhId2);
       db.prepare(`INSERT INTO stock_balances (item_id, warehouse_id, quantity) VALUES (?, ?, 0)`).run(testItemId2, testWhId2);
     });
@@ -990,6 +1001,7 @@ describe('StockMovementModel', () => {
     afterAll(() => {
       db.prepare(`DELETE FROM stock_movements WHERE item_id = ?`).run(testItemId2);
       db.prepare(`DELETE FROM stock_balances WHERE item_id = ?`).run(testItemId2);
+      db.prepare(`DELETE FROM batch_stock_by_location WHERE batch_id IN (SELECT id FROM stock_batches WHERE item_id = ?)`).run(testItemId2);
       db.prepare(`DELETE FROM stock_batches WHERE item_id = ?`).run(testItemId2);
       ItemModel.delete(testItemId2, 1, db);
     });

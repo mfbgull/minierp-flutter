@@ -11,6 +11,8 @@
 import { beforeAll, beforeEach, afterEach, describe, expect, it } from '@jest/globals';
 import bcrypt from 'bcrypt';
 import request from 'supertest';
+import fs from 'fs';
+import path from 'path';
 import app from '../app';
 import db from '../config/database';
 import { createItem, purchaseWithNamedSupplier } from './helpers/invoiceReturnSpec';
@@ -352,6 +354,32 @@ describe('PRET-002 supplier refund claims', () => {
     `).get() as { n: number };
     expect(posted.n).toBe(1);
     expectAllInvariantsHold('second write-off refused');
+  });
+
+  it('runs the active-posting check inside the same transaction as the posting', () => {
+    // The double-post test above proves the OUTCOME. This proves the MECHANISM:
+    // the guard must run in the same transaction as the GL insert, or a second
+    // writer can slip between the check and the post (check-then-act race).
+    // Read the controller source and assert the call sits inside
+    // db.transaction(...), exactly as the D19/M1 fix pattern requires.
+    const src = fs.readFileSync(
+      path.join(__dirname, '..', 'controllers', 'supplierRefundClaimController.ts'),
+      'utf8',
+    );
+    const txnStart = src.indexOf('const writtenOff = db.transaction(');
+    expect(txnStart).toBeGreaterThan(-1);
+    const modelCall = src.indexOf('SupplierRefundClaimModel.writeOff(', txnStart);
+    expect(modelCall).toBeGreaterThan(txnStart);
+
+    // The model itself must call the guard before posting.
+    const modelSrc = fs.readFileSync(
+      path.join(__dirname, '..', 'models', 'SupplierRefundClaim.ts'),
+      'utf8',
+    );
+    const guard = modelSrc.indexOf("assertNoActivePosting(db, 'REFUND_CLAIM_WRITE_OFF'");
+    const post = modelSrc.indexOf("reference_type: 'REFUND_CLAIM_WRITE_OFF'", guard);
+    expect(guard).toBeGreaterThan(-1);
+    expect(post).toBeGreaterThan(guard);
   });
 
   it('refuses to post a second write-off when an active GL posting already exists', async () => {

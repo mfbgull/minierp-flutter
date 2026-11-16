@@ -226,6 +226,34 @@ export function stockImbalances(db = defaultDb): Violation[] {
 // Invariants F–I: GL ↔ operational-balance reconciliation
 // ============================================================================
 
+/**
+ * BUG-013 drift check: batch_stock_by_location must never claim MORE than the
+ * batches really hold.
+ *
+ * Over-reporting is the dangerous direction — the flag-on read path would then
+ * offer stock that does not exist. Under-reporting is tolerated: it is
+ * harmless because `resolveAvailableQuantity` falls back to the batch total
+ * whenever the location table covers less than `stock_batches` holds, so a
+ * lagging mirror can no longer refuse a legitimate sale.
+ *
+ * Only judged with the flag on: with the flag off the location rows are
+ * informational and a historical batch legitimately has none.
+ */
+export function batchLocationDriftImbalances(db = defaultDb): Violation[] {
+  const flagOn = (db.prepare(
+    "SELECT value FROM settings WHERE key = 'feature_batch_locations'",
+  ).get() as { value: string } | undefined)?.value === '1';
+  if (!flagOn) return [];
+  return db.prepare(`
+    SELECT sb.id AS label,
+           SUM(bsl.quantity_available) - sb.quantity_remaining AS diff
+    FROM stock_batches sb
+    JOIN batch_stock_by_location bsl ON bsl.batch_id = sb.id
+    GROUP BY sb.id
+    HAVING SUM(bsl.quantity_available) - sb.quantity_remaining > 0.005
+  `).all() as unknown as Violation[];
+}
+
 const GL_ACCOUNT_ID = (code: string, db = defaultDb): number | undefined =>
   (db.prepare('SELECT id FROM chart_of_accounts WHERE code = ?').get(code) as { id: number } | undefined)?.id;
 
@@ -439,5 +467,6 @@ export function expectAllInvariantsHold(context: string, db = defaultDb): void {
   expect(creditSourceConsumptionImbalances(db)).toEqual([]);
   expect(creditSourceBoundsImbalances(db)).toEqual([]);
   expect(receiptAllocationImbalances(db)).toEqual([]);
+  expect(batchLocationDriftImbalances(db)).toEqual([]);
   void context;
 }

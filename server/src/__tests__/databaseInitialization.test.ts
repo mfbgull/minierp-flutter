@@ -293,6 +293,61 @@ describe('database module initialization boundary', () => {
       expect(fs.existsSync(dailyPath)).toBe(true);
     });
 
+    it('does not overwrite the day file when a second boot happens the same day', async () => {
+      const mod = await loadDatabaseModule();
+      mod.applyPendingMigrations();
+      await mod.dbSeedReady;
+
+      const first = mod.backupBeforeMigration() as string;
+      const backupDir = path.join(dir, 'backups');
+      const day = path.basename(first).replace('erp-premigration-', '').slice(0, 10);
+      const dailyPath = path.join(backupDir, `erp-daily-${day}.db`);
+      expect(fs.existsSync(dailyPath)).toBe(true);
+
+      // Mark the day file so an overwrite is detectable by content.
+      fs.writeFileSync(dailyPath, 'DAY-ONE-CONTENT');
+      const beforeMtime = fs.statSync(dailyPath).mtimeMs;
+
+      // A second same-day boot takes its own pre-migration snapshot, but the
+      // day file is left exactly as it was.
+      const second = mod.backupBeforeMigration() as string;
+      expect(second).not.toBe(first);
+      expect(fs.readFileSync(dailyPath, 'utf8')).toBe('DAY-ONE-CONTENT');
+      expect(fs.statSync(dailyPath).mtimeMs).toBe(beforeMtime);
+    });
+
+    it('falls back to a copy when the backup directory cannot hard-link', async () => {
+      const mod = await loadDatabaseModule();
+      mod.applyPendingMigrations();
+      await mod.dbSeedReady;
+
+      const backupDir = path.join(dir, 'backups');
+      fs.mkdirSync(backupDir, { recursive: true });
+      // Force linkSync to fail, as a backup volume without hard links does.
+      const realLink = fs.linkSync;
+      (fs as unknown as { linkSync: typeof fs.linkSync }).linkSync = (() => {
+        const e = new Error('EXDEV: cross-device link not permitted');
+        (e as NodeJS.ErrnoException).code = 'EXDEV';
+        throw e;
+      }) as typeof fs.linkSync;
+      try {
+        const taken = mod.backupBeforeMigration() as string;
+        const day = path.basename(taken).replace('erp-premigration-', '').slice(0, 10);
+        const dailyPath = path.join(backupDir, `erp-daily-${day}.db`);
+
+        // The boot did not fail, and the day file is a real copy.
+        expect(fs.existsSync(dailyPath)).toBe(true);
+        const snapshot = new Database(dailyPath, { readonly: true, fileMustExist: true });
+        try {
+          expect(snapshot.pragma('integrity_check', { simple: true })).toBe('ok');
+        } finally {
+          snapshot.close();
+        }
+      } finally {
+        (fs as unknown as { linkSync: typeof fs.linkSync }).linkSync = realLink;
+      }
+    });
+
     it('refuses to boot when the backup volume is too small', async () => {
       const mod = await loadDatabaseModule();
       mod.applyPendingMigrations();
