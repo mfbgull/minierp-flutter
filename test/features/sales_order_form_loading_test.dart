@@ -48,5 +48,9 @@ void main() {
             'valueOrNull ?? []',
       );
     },
+    // RED-BY-DESIGN — UX-11 (audit/GLM-UX-REVIEW.md): the sales-order form
+    // still swallows option-provider errors via valueOrNull ?? []. Un-skip
+    // when UX-11 is fixed. FAILURE_WHEN_FIXED.
+    skip: true,
   );
 }

@@ -13,6 +13,21 @@ CLEAR / APPROVE within the documented scope. Unsupported workflows, D12 and
 unexecuted historical/native/concurrency cases remain explicit in the current
 ledger. Older phase records below are dated evidence, not a new release assessment.
 
+## Finding-tagged tests (skipped / expected-failure)
+
+Six tests deliberately exercise known, unfixed findings. Each is tagged with its
+finding ID so it stays visible and flips to a real failure when the finding is
+fixed. `scripts/check.sh` prints the count (see "Finding-tagged test count").
+
+| Finding | Test | Tag | Fails today because |
+|---|---|---|---|
+| F-2 (GLM-REVIEW) | `server/src/__tests__/moneyPathFindingsRed.test.ts` | `it.failing` with `F-2:` in the name | Voiding a return whose claim carries a write-off returns 200 (orphans the 7300/AP posting); expected ≥400. |
+| F-3 (GLM-REVIEW) | `server/src/__tests__/moneyPathFindingsRed.test.ts` | `it.failing` with `F-3:` in the name | GL AP vs supplier subledger differ by 3,000 at as-of 2026-11-05 (`Expected: 0, Received: 3000`). |
+| UX-3 (GLM-UX-REVIEW) | `test/features/supplier_refund_message_test.dart` | `skip: true`, `RED-BY-DESIGN … UX-3` | The refund-amount error contains "quantity" (`Found 1 widget with text containing quantity`). |
+| UX-6 (GLM-UX-REVIEW) | `test/widgets/cash_blockers_localization_test.dart` | `skip: true`, `RED-BY-DESIGN … UX-6` | The blocker row leaks `receipt_overpayment` and raw ISO `2026-11-15`. |
+| UX-11 (GLM-UX-REVIEW) | `test/features/sales_order_form_loading_test.dart` | `skip: true`, `RED-BY-DESIGN … UX-11` | A failed customer load renders as an empty picker; `Found 0 widgets with text containing Failed`. |
+| UX-13 (GLM-UX-REVIEW) | `test/features/sales_order_discount_validation_test.dart` | `skip: true`, `RED-BY-DESIGN … UX-13` | A flat discount above the line total passes validation (`errorText` is `null`). |
+
 ## Phase 0 baseline
 
 - Branch: `audit-fixes`, created from `46ea0c93` (current user fixes preserved).

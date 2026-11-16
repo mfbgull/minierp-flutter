@@ -131,7 +131,7 @@ export class SupplierRefundClaimModel {
         (s) => !(CLAIM_STATUS_WHITELIST as readonly string[]).includes(s),
       );
       if (invalid) {
-        throw new Error(`Unknown claim status filter: ${invalid}`);
+        throw new BusinessRuleError(400, `Unknown claim status filter: ${invalid}`);
       }
       where += ` AND c.status IN (${wanted.map(() => '?').join(', ')})`;
       params.push(...wanted);

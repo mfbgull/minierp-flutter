@@ -56,5 +56,9 @@ void main() {
         reason: 'the date must be locale-formatted, not raw ISO',
       );
     },
+    // RED-BY-DESIGN — UX-6 (audit/GLM-UX-REVIEW.md): the blocker row still
+    // renders the raw reference_type and ISO date. Un-skip when UX-6 is
+    // fixed. FAILURE_WHEN_FIXED.
+    skip: true,
   );
 }

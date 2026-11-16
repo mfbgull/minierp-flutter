@@ -651,6 +651,21 @@ describe('PRET-002 supplier refund claims', () => {
       .get('/api/supplier-refunds/claims?status=EXPECTED;DROP')
       .set('Cookie', cookie);
     expect(bogus.status).toBe(400);
+    expect(String(bogus.body.error)).toMatch(/Unknown claim status/i);
+
+    // A known status set returns a valid, filtered page — the count matches
+    // the rows returned, and every returned row carries a requested status.
+    // This distinguishes "no rows for this filter" from "bad request".
+    const none = await request(app)
+      .get('/api/supplier-refunds/claims?status=CANCELLED&limit=200')
+      .set('Cookie', cookie);
+    expect(none.status).toBe(200);
+    const noneRows = none.body.data as Array<{ id: number; status: string }>;
+    expect(Array.isArray(noneRows)).toBe(true);
+    expect(noneRows.every((row) => row.status === 'CANCELLED')).toBe(true);
+    expect(none.body.pagination.total).toBe(noneRows.length);
+    // The cancelled claim above is in this set; the open one is not.
+    expect(noneRows.some((row) => row.id === info.claimId)).toBe(true);
   });
 
   it('cancelling a claim that holds receipts is refused', async () => {
