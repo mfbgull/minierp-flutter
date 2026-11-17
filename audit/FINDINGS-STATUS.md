@@ -265,10 +265,9 @@ ledger. Older phase records below are dated evidence, not a new release assessme
 
 ## Finding-tagged tests (skipped / expected-failure)
 
-Five tests deliberately exercise known, unfixed findings (four UX + F-3). Each is
-tagged with its finding ID so it stays visible and flips to a real failure when the
-finding is fixed. `scripts/check.sh` prints the count (see "Finding-tagged test
-count").
+Only F-3 remains parked. Each parked test is tagged with its finding ID so it
+stays visible and flips to a real failure when the finding is fixed.
+`scripts/check.sh` prints the count (see "Finding-tagged test count").
 
 F-2 was un-parked on 2026-11-16: `7a96e6d8` fixed it (a claim with a standing
 write-off can no longer be cancelled), so its `it.failing` wrapper was removed and
@@ -277,13 +276,21 @@ un-park: with the `cancel` guard in `SupplierRefundClaim.ts` temporarily reverte
 the un-parked case failed `Expected: >= 400 / Received: 200`; with the guard
 restored it passes.
 
+UX-3, UX-6, UX-11 and UX-13 were fixed and un-parked by the merged UX-review line
+(PR4, head `ea8f79cd`, merged as `d1075cd2` on 2026-11-17): their
+`skip: true, RED-BY-DESIGN` wrappers were removed and the tests now run as
+ordinary passing regressions. Evidence on current main (`91df221c`): the
+`scripts/check.sh` finding-tag audit reports flutter RED-BY-DESIGN files=0, and
+all four test files pass in the post-merge gates (1219 passed + 1 pre-existing
+non-finding skip).
+
 | Finding | Test | Tag | Fails today because |
 |---|---|---|---|
-| F-3 (GLM-REVIEW) | `server/src/__tests__/moneyPathFindingsRed.test.ts` | `it.failing` with `F-3:` in the name | GL AP vs supplier subledger differ by 3,000 at as-of 2026-11-05 (`Expected: 0, Received: 3000`). |
-| UX-3 (GLM-UX-REVIEW) | `test/features/supplier_refund_message_test.dart` | `skip: true`, `RED-BY-DESIGN … UX-3` | The refund-amount error contains "quantity" (`Found 1 widget with text containing quantity`). |
-| UX-6 (GLM-UX-REVIEW) | `test/widgets/cash_blockers_localization_test.dart` | `skip: true`, `RED-BY-DESIGN … UX-6` | The blocker row leaks `receipt_overpayment` and raw ISO `2026-11-15`. |
-| UX-11 (GLM-UX-REVIEW) | `test/features/sales_order_form_loading_test.dart` | `skip: true`, `RED-BY-DESIGN … UX-11` | A failed customer load renders as an empty picker; `Found 0 widgets with text containing Failed`. |
-| UX-13 (GLM-UX-REVIEW) | `test/features/sales_order_discount_validation_test.dart` | `skip: true`, `RED-BY-DESIGN … UX-13` | A flat discount above the line total passes validation (`errorText` is `null`). |
+| F-3 (GLM-REVIEW) | `server/src/__tests__/moneyPathFindingsRed.test.ts` | `it.failing` with `F-3:` in the name | GL AP vs supplier subledger differ by 3,000 at as-of 2026-11-05 (`Expected: 0, Received: 3000`). Fix assigned to PI on PR9 (F-3 dating decision, Option A); the parked test is unparked only on a fix-containing integration branch after approved integration. |
+| UX-3 (GLM-UX-REVIEW) | `test/features/supplier_refund_message_test.dart` | FIXED — un-parked by PR4 (`d1075cd2`) | None: refund amounts get their own refund-specific error strings, not return-quantity messages. Runs as an ordinary passing test. |
+| UX-6 (GLM-UX-REVIEW) | `test/widgets/cash_blockers_localization_test.dart` | FIXED — un-parked by PR4 (`d1075cd2`) | None: cash-blocker rows render localized type labels and formatted dates, not raw enums or ISO dates. Runs as an ordinary passing test. |
+| UX-11 (GLM-UX-REVIEW) | `test/features/sales_order_form_loading_test.dart` | FIXED — un-parked by PR4 (`d1075cd2`) | None: option-provider errors surface with loading feedback. Runs as an ordinary passing test. |
+| UX-13 (GLM-UX-REVIEW) | `test/features/sales_order_discount_validation_test.dart` | FIXED — un-parked by PR4 (`d1075cd2`) | None: a flat discount above the line total is rejected. Runs as an ordinary passing test. |
 
 
 ## Phase 0 baseline
@@ -1905,3 +1912,13 @@ situation of every existing install at migration time.
   SUCCESS, fallow SUCCESS, flutter SUCCESS (3/3). Full gate slot
   RELEASED after this report; PI's PR9 (F-3) rebase onto `91df221c`
   unblocked from GLM's side.
+
+- **NEXT ASSIGNMENT (2026-11-17, coordinator msg_b8bcc0316969): PR9 (F-3
+  fix line, PI) — rebase onto `91df221c` in PI's own worktree,
+  read-only/source prep only, NO test runs until GLM's post-PR7 gate
+  finished (it has: exit 0 at `91df221c`, see above); no fixes/code
+  beyond the previously reviewed candidate.** GLM owns the
+  `moneyPathFindingsRed.test.ts` unpark edit, only on a fix-containing
+  integration branch, after approved integration, observed passing, with
+  the header comment updated in the same edit; PI must not edit it.
+  PR5 remains LAST in merge order; PR10/S-4 deferred.
