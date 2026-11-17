@@ -554,6 +554,15 @@ class _SalesOrderFormDialogState extends ConsumerState<SalesOrderFormDialog> {
       warehousesAsync,
       itemsAsync,
     ].where((v) => v.hasError).map((v) => v.error).firstOrNull;
+    // UX-11 (loading): a pending provider must not render like an empty
+    // list either. Loading feedback shows only while a provider is pending
+    // with no data yet — a background refetch (e.g. after retry) keeps the
+    // previous data on screen instead of flickering the bar back in.
+    final optionsLoading = [
+      customersAsync,
+      warehousesAsync,
+      itemsAsync,
+    ].any((v) => v.isLoading && v.valueOrNull == null);
     final customerIds = [for (final c in customers) c.id];
     final warehouseIds = [for (final w in warehouses) w.id];
 
@@ -583,6 +592,11 @@ class _SalesOrderFormDialogState extends ConsumerState<SalesOrderFormDialog> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      if (optionsLoading)
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 8),
+                          child: LinearProgressIndicator(minHeight: 3),
+                        ),
                       if (optionError != null) ...[
                         ScreenErrorPanel(
                           message: optionError.toString(),
