@@ -542,6 +542,10 @@ class ProductionModel {
             `).run(line.item_id, warehouse_id, lineQty);
           }
 
+          // S-3: refresh the extension mirror after the stock_balances row and
+          // the output bin row both exist. Ungated; the flag selects reads only.
+          StockMovementModel.syncStockBalancesExtension(line.item_id, warehouse_id, db);
+
           StockMovementModel.refreshItemStockMirror(line.item_id, db);
         }
       };
