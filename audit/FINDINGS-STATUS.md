@@ -1356,3 +1356,24 @@ situation of every existing install at migration time.
   **PENDING — not counted as green until they resolve** (no guessed green).
   PR7 leaves quality-gate OPEN status only when the remote changed-base
   audit confirms.
+
+- **F3 status change: OPEN → DECIDED / implementation-pending (Gull
+  msg_ca9008067d4f).** Decision recorded in DECISIONS.md: existing VOID =
+  correction of an incorrect receipt entry; ORIGINAL RECEIPT DATE on both the
+  GL and the supplier ledger; audit trail preserved; existing period lock
+  respected — closed-period ordinary void BLOCKED. A later actual cash return
+  is a separate reversal workflow, out of scope for this fix; controlled
+  prior-period correction also separate. PI assigned: fresh branch,
+  SupplierRefund.ts + F3 server regressions, real-HTTP red-first (as-of/date,
+  closed-period guard, cash guard, A–J), revert-proof. GLM independently
+  reviews PI's money diff read-only before any merge. Status stays
+  implementation-pending — NOT FIXED until evidence lands.
+
+- **Test ownership coordination: `server/src/__tests__/moneyPathFindingsRed.test.ts`.**
+  The parked F-3 case (wrapped in `it.failing`, header documents the pending
+  dating decision) lives on the GLM line (glm/ux-review-tests, glm/warning-ui,
+  glm/ux-fixes). GLM owns this existing parked test; GLM will not edit it
+  concurrently with PI's fresh-branch work. Proposed single-owner unpark: PI's
+  branch owns the FIX + new regressions; once the fix is integrated, GLM
+  unparks the F-3 case on the GLM line (removes the `it.failing` wrapper) as
+  the one owner/branch — pending Gull's confirmation.

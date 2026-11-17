@@ -1759,3 +1759,24 @@ the split source was not independent. The final atomic commit is
 `7416280e` (`fix/r1r2r4-warn-reserve`), currently under PI's exclusive full
 server gate. GLM's read-only final review of that commit:
 `/home/fawad/logs/glm-cross-review-migration128-final.md`.
+
+## F3 — refund-claim void money-dating: DECIDED by Gull (2026-11-17, msg_ca9008067d4f)
+
+**Decision (Option A as framed in the owner note):** an existing VOID is a
+correction of an incorrect receipt entry. Both the GL and the supplier ledger
+date the reversal at the **ORIGINAL RECEIPT DATE**. The audit trail is
+preserved and the existing period lock is respected: a closed-period ordinary
+void is **BLOCKED**. A later actual cash return belongs to a separate reversal
+workflow and is NOT part of this fix. Controlled prior-period correction
+remains a separate mechanism.
+
+- Provenance: Gull msg_ca9008067d4f; corrected owner note
+  `/home/fawad/logs/f3-money-dating-owner-decision.md`; verified mixed
+  behavior at SupplierRefund.ts 372/387/401 (commit `7416280e`).
+- Implementation: assigned to PI on a fresh branch — SupplierRefund.ts + F3
+  server regressions, real-HTTP red-first (as-of/date, closed-period guard,
+  cash guard, invariants A–J), revert-proof.
+- Status: **DECIDED / implementation-pending** — NOT FIXED until evidence
+  (red-first tests + review land).
+- Scope guards: no new current-date reversal feature/UI; existing tested
+  candidates PR4/PR7/PR8 stay frozen.
