@@ -256,23 +256,25 @@ describe('S-3: stock_balances extension mirror parity on ADD paths', () => {
   });
 
   /**
-   * UNCONFIRMED PROBE — separate reservation-only stale mirror (NOT S-3).
+   * CHARACTERIZATION of an OPEN DEFECT — separate reservation-only stale mirror
+   * (NOT S-3). RUNTIME-CONFIRMED, not unconfirmed.
    *
-   * Reproducible note for a later finding: `StockReservationModel
-   * .changeLocationReserved` updates `batch_stock_by_location.quantity_reserved`
-   * but never refreshes the `stock_balances` extension mirror. So after ONLY a
-   * reservation (no ADD path runs afterwards) the bin truth and the mirror
-   * disagree: bins read reserved=4 / available=6 while the mirror still reads
-   * reserved=0 / available=10.
+   * Reproducible: `StockReservationModel.changeLocationReserved` updates
+   * `batch_stock_by_location.quantity_reserved` but never refreshes the
+   * `stock_balances` extension mirror. After ONLY a reservation (no ADD path
+   * runs afterwards) the bin truth and the mirror disagree: bins read
+   * reserved=4 / available=6 while the mirror still reads reserved=0 /
+   * available=10. Confirmed through the real route POST
+   * /api/inventory/reservations with flag ON.
    *
    * This is the reservation write path, NOT one of S-3's three ADD paths and
    * NOT the S-1 consume/release path. It is left UNFIXED in this branch (no
-   * StockReservation production edits here). The probe below asserts the
-   * CURRENT, WRONG behaviour so the gap is captured as evidence rather than
-   * silently dropped; flip these assertions to EQUALITY when the separate
-   * finding is fixed.
+   * StockReservation production edits here) — the reservation writer is NOT
+   * fixed. The probe below asserts the CURRENT, WRONG behaviour as
+   * characterisation only; it is NOT an intended regression contract. When the
+   * separate finding is fixed, flip these assertions to EQUALITY.
    */
-  it('PROBE (unconfirmed, separate finding): a reservation alone leaves the mirror stale', async () => {
+  it('CHARACTERIZATION (open defect, separate finding): a reservation alone leaves the mirror stale', async () => {
     setFeatureEnabled(db, 'feature_batch_locations', true);
     const itemId = await createItem('S3 reservation-probe item', cookie);
     await drivePurchase(itemId, whId, 10);
