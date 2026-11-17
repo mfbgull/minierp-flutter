@@ -1283,3 +1283,28 @@ situation of every existing install at migration time.
   Standing rule reaffirmed: historical as-of reporting must compare the
   DATED ledger, never `current_balance`. This entry corrects the note only;
   prior accepted decisions are untouched.
+
+- **PR7 quality gate: OPEN — fallow complexity findings on `7416280e`
+  (2026-11-17, Gull msg_7f9b07a53f34).** Both PR7 fallow jobs FAIL at exact
+  `7416280e` (jobs 133827661652/133827684740): the gate reached a structural
+  verdict — `✗ complexity: 4 findings · 6 changed files` — new-vs-base
+  findings in `server/src/models/StockMovement.ts` (×3) and
+  `server/src/services/InvoiceCreationService.ts` (×1). Routed to PI: exact
+  CI investigation + **behavior-preserving refactor** (GLM cross-reviews the
+  refactor diff read-only when it arrives; no stock edits by GLM).
+  **CORRECTION ON RECORD (owner explicit rule):** renewing the local fallow
+  baseline to absorb new findings is **FORBIDDEN**, as is lowering
+  thresholds or allowlisting new findings — GLM's earlier suggestion to
+  "renew the baseline" is retracted and must not be repeated. A changed-base
+  audit matching CI is allowed for DIAGNOSIS only, never to produce a new
+  baseline.
+- **Local verification limitation on the earlier focused run (disclosed).**
+  The coordinator's independent focused run at `7416280e`
+  (batchLocationWarningPrecision + idempotencyResponseWarningsUpgrade +
+  accounting invariants — 3 suites / 50 tests, exit 0) and PI's full server
+  gate (287 suites / 2307 tests, exit 0) remain valid as TEST evidence, but
+  that worktree ran a **zero-changes** fallow audit (no diff vs its own
+  HEAD), so it did NOT prove the PR's structural gate — which is exactly the
+  check CI's changed-base audit performs and which PR7 currently FAILS.
+  PR7 therefore remains quality-gate OPEN until PI's refactor lands and CI
+  passes.
