@@ -384,6 +384,7 @@ function selectLegacyBatches(
 function consumeLegacyBatches(
   db: Database.Database,
   itemId: number,
+  warehouseId: number,
   batches: LegacyBatchRow[],
   roundedQty: number
 ): ConsumptionEntry[] {
@@ -406,11 +407,33 @@ function consumeLegacyBatches(
     // period of flag-off trading would leave every consumed batch
     // over-reported and offer phantom stock. Unconditional: a no-op when the
     // batch has no location rows (the flag-OFF-only legacy shape).
-    db.prepare(`
-      UPDATE batch_stock_by_location
-      SET quantity_physical = MAX(0, quantity_physical - ?)
-      WHERE batch_id = ?
-    `).run(consumeFromThis, batch.id);
+    //
+    // S-2: the WHERE must name the warehouse AND drain bin by bin. A
+    // `WHERE batch_id = ?` takes the full `consumeFromThis` out of EVERY bin
+    // row — split 5 + 5, sell 3, and both bins read 2 (physical 4) while the
+    // master batch says 7 — and reaches bins in another warehouse. The order
+    // matches consumeBatchesByLocation above so the two paths agree on which
+    // bin moves.
+    const locRows = db.prepare(`
+      SELECT bsl.id, bsl.quantity_physical
+      FROM batch_stock_by_location bsl
+      JOIN locations l ON bsl.location_id = l.id
+      WHERE bsl.batch_id = ? AND l.warehouse_id = ?
+        AND bsl.quantity_physical > 0
+      ORDER BY l.created_at ASC, bsl.id ASC
+    `).all(batch.id, warehouseId) as Array<{ id: number; quantity_physical: number }>;
+
+    let locRemaining = consumeFromThis;
+    for (const loc of locRows) {
+      if (locRemaining <= 0) break;
+      const take = roundQty(Math.min(locRemaining, roundQty(loc.quantity_physical)));
+      db.prepare(`
+        UPDATE batch_stock_by_location
+        SET quantity_physical = MAX(0, quantity_physical - ?)
+        WHERE id = ?
+      `).run(take, loc.id);
+      locRemaining -= take;
+    }
 
     consumption.push({ batchId: batch.id, consumed: consumeFromThis, unitCost: batch.unit_cost });
     remaining -= consumeFromThis;
@@ -483,7 +506,7 @@ function consumeLegacyStock(
     return [{ batchId: null, consumed: quantity, unitCost: fallbackCost }];
   }
 
-  return consumeLegacyBatches(db, itemId, batches, roundedQty);
+  return consumeLegacyBatches(db, itemId, warehouseId, batches, roundedQty);
 }
 
 class StockMovementModel {
