@@ -25,32 +25,42 @@ beforeEach(() => { db.exec('SAVEPOINT f3_void_case'); });
 afterEach(() => { db.exec('ROLLBACK TO f3_void_case; RELEASE f3_void_case'); });
 
 const RECEIPT_DATE = '2026-03-15';
+const RETURN_DATE = '2026-03-10';
+/** Between the purchase and the receipt — a date a caller may ask about. */
+const INTERMEDIATE_DATE = '2026-03-12';
 
-/** As-of GL movement on an account code: sum(debit-credit) over unvoided lines
- *  whose entry date is on or before the given date. */
-function glAsOf(code: string, asOf: string): number {
-  const acct = db.prepare<[string], { id: number }>('SELECT id FROM chart_of_accounts WHERE code = ?').get(code);
-  if (!acct) throw new Error(`Missing account ${code}`);
-  const row = db.prepare<[number, string], { total: number }>(`
-    SELECT COALESCE(SUM(jl.debit - jl.credit), 0) AS total
-    FROM journal_lines jl
-    JOIN journal_entries je ON je.id = jl.journal_entry_id
-    WHERE jl.account_id = ? AND jl.voided = 0 AND je.entry_date <= ?
-  `).get(acct.id, asOf);
-  return row?.total ?? 0;
+/** Scoped GL AP (account 2000) balance attributable to ONE supplier's
+ *  documents, read as-of a date. Liability increases on credit, so the AP
+ *  balance is credit - debit. Voided lines are excluded, matching the
+ *  unvoided supplier ledger. Scope = the reference set this supplier owns.
+ *
+ *  Scoping matters: a global account-2000 total also counts other suppliers'
+ *  rows, so it cannot prove THIS supplier's two stores agree. */
+function glApScopedAsOf(refs: Array<{ type: string; id: number }>, asOf: string): number {
+  const acct = db.prepare<[string], { id: number }>('SELECT id FROM chart_of_accounts WHERE code = ?').get('2000');
+  if (!acct) throw new Error('Missing account 2000');
+  let total = 0;
+  for (const r of refs) {
+    const row = db.prepare<[number, string, number, string], { total: number }>(`
+      SELECT COALESCE(SUM(jl.credit - jl.debit), 0) AS total
+      FROM journal_lines jl
+      JOIN journal_entries je ON je.id = jl.journal_entry_id
+      WHERE jl.account_id = ? AND jl.voided = 0 AND jl.reference_type = ? AND jl.reference_id = ?
+        AND je.entry_date <= ?
+    `).get(acct.id, r.type, r.id, asOf);
+    total += row?.total ?? 0;
+  }
+  return total;
 }
 
-/** Dated, unvoided supplier-ledger transactions for a supplier, as of a date. */
-function supplierLedgerAsOf(supplierId: number, asOf: string) {
-  return db.prepare<[number, string], {
-    id: number; transaction_date: string; transaction_type: string;
-    debit: number; credit: number;
-  }>(`
-    SELECT id, transaction_date, transaction_type, debit, credit
+/** This supplier's dated, unvoided ledger net (debit - credit) as-of a date. */
+function ledgerNetAsOf(supplierId: number, asOf: string): number {
+  const row = db.prepare<[number, string], { total: number }>(`
+    SELECT COALESCE(SUM(debit - credit), 0) AS total
     FROM supplier_ledger
     WHERE supplier_id = ? AND voided = 0 AND reversed_by IS NULL AND transaction_date <= ?
-    ORDER BY id
-  `).all(supplierId, asOf);
+  `).get(supplierId, asOf);
+  return row?.total ?? 0;
 }
 
 async function makeRefundReceipt(supplierName: string, itemName: string): Promise<{
@@ -118,50 +128,66 @@ describe('F-3: supplier refund void dates both stores on the original receipt da
     const { refundId, supplierId } = await makeRefundReceipt('F3 supplier A', 'F3 item A');
 
     // Receipt posted: supplier ledger carries a debit on the receipt date.
-    const beforeVoid = supplierLedgerAsOf(supplierId, '2099-12-31');
-    expect(beforeVoid.some((r) => r.transaction_type === 'REFUND_RECEIPT' && r.transaction_date === RECEIPT_DATE)).toBe(true);
+    const rowsBefore = db.prepare<[number], { transaction_type: string; transaction_date: string }>(
+      'SELECT transaction_type, transaction_date FROM supplier_ledger WHERE supplier_id = ? ORDER BY id'
+    ).all(supplierId);
+    expect(rowsBefore.some((r) => r.transaction_type === 'REFUND_RECEIPT' && r.transaction_date === RECEIPT_DATE)).toBe(true);
 
     const voidRes = await request(app).post(`/api/supplier-refunds/${refundId}/void`)
       .set('Cookie', cookie).send({ reason: 'entered in error' });
     expect(voidRes.status).toBe(200);
 
-    const reversal = db.prepare<[number], { transaction_date: string; transaction_type: string; credit: number }>(`
-      SELECT transaction_date, transaction_type, credit FROM supplier_ledger
-      WHERE supplier_id = ? AND transaction_type LIKE '%VOID%' ORDER BY id DESC LIMIT 1
+    const reversal = db.prepare<[number], { transaction_date: string; transaction_type: string }>(`
+      SELECT transaction_date, transaction_type FROM supplier_ledger
+      WHERE supplier_id = ? AND transaction_type = 'REFUND_RECEIPT_VOID' ORDER BY id DESC LIMIT 1
     `).get(supplierId);
     expect(reversal).toBeDefined();
     // THE F-3 ASSERTION: original receipt date, not the wall-clock date.
     expect(reversal!.transaction_date).toBe(RECEIPT_DATE);
   });
 
-  it('agrees across receipt / intermediate / current as-of dates', async () => {
-    const { refundId, supplierId } = await makeRefundReceipt('F3 supplier B', 'F3 item B');
+  it('keeps the scoped GL AP and the dated supplier ledger in agreement at every as-of date', async () => {
+    const { refundId, supplierId, purchaseId } = await makeRefundReceipt('F3 supplier B', 'F3 item B');
+
+    // Baseline before the void: the receipt is posted, so the supplier's
+    // ledger sits at (allocation-only net + receipt).
+    const baselineAtReceipt = ledgerNetAsOf(supplierId, RECEIPT_DATE);
 
     const voidRes = await request(app).post(`/api/supplier-refunds/${refundId}/void`)
       .set('Cookie', cookie).send({ reason: 'entered in error' });
     expect(voidRes.status).toBe(200);
 
-    const before = '2026-03-14';     // before the receipt
-    const atReceipt = RECEIPT_DATE;  // on the receipt date
-    const now = '2099-12-31';        // well after
+    // Every document reference this supplier owns and that touches AP 2000.
+    const refs = [
+      { type: 'PURCHASE', id: purchaseId },
+      { type: 'PAYMENT', id: db.prepare<[number], { id: number }>(
+        'SELECT payment_id AS id FROM purchase_allocations WHERE purchase_id = ? LIMIT 1'
+      ).get(purchaseId)!.id },
+      { type: 'PURCHASE_RETURN', id: db.prepare<[number], { id: number }>(
+        'SELECT id FROM purchase_returns WHERE source_id = ? LIMIT 1'
+      ).get(purchaseId)!.id },
+      { type: 'REFUND_RECEIPT', id: refundId },
+    ];
 
-    // No ledger movement survives before the receipt date.
-    expect(supplierLedgerAsOf(supplierId, before).filter((r) => r.transaction_type.includes('REFUND'))).toHaveLength(0);
-    // Receipt + reversal both live on the receipt date, so they cancel there.
-    const atDate = supplierLedgerAsOf(supplierId, atReceipt).filter((r) => r.transaction_type.includes('REFUND'));
-    expect(atDate.map((r) => r.transaction_type).sort()).toEqual(['REFUND_RECEIPT', 'REFUND_RECEIPT_VOID']);
-    expect(atDate.every((r) => r.transaction_date === RECEIPT_DATE)).toBe(true);
-    // Net movement on the refund side is zero at every later date.
-    const netAt = atDate.reduce((s, r) => s + r.debit - r.credit, 0);
-    expect(netAt).toBe(0);
+    // before receipt -> on receipt -> between receipt and "today" -> today/after.
+    // At each date the scoped GL AP must equal the dated supplier ledger.
+    for (const asOf of [RETURN_DATE, RECEIPT_DATE, INTERMEDIATE_DATE, '2099-12-31']) {
+      expect({ asOf, gl: glApScopedAsOf(refs, asOf) }).toEqual({ asOf, gl: ledgerNetAsOf(supplierId, asOf) });
+    }
 
-    // GL AP (2000) is likewise flat: receipt and reversal both on the receipt date.
-    expect(glAsOf('2000', before)).toBe(glAsOf('2000', now));
+    // Receipt and reversal cancel on the receipt date: after the void the
+    // receipt-date balance falls back to the pre-receipt baseline, and every
+    // later date equals that same baseline too.
+    const preReceiptBaseline = ledgerNetAsOf(supplierId, RETURN_DATE);
+    expect(ledgerNetAsOf(supplierId, RECEIPT_DATE)).toBe(preReceiptBaseline);
+    expect(ledgerNetAsOf(supplierId, INTERMEDIATE_DATE)).toBe(preReceiptBaseline);
+    expect(ledgerNetAsOf(supplierId, '2099-12-31')).toBe(preReceiptBaseline);
+    expect(baselineAtReceipt).not.toBe(preReceiptBaseline);
     expectAllInvariantsHold('after F-3 void');
   });
 
   it('refuses to void a receipt in a closed period and changes nothing', async () => {
-    const { refundId, supplierId } = await makeRefundReceipt('F3 supplier C', 'F3 item C');
+    const { refundId, supplierId, refundNo } = await makeRefundReceipt('F3 supplier C', 'F3 item C');
 
     // Close the month of the receipt, then attempt the void. The receipt is
     // already posted, so the period starts open and is then closed.
@@ -181,7 +207,10 @@ describe('F-3: supplier refund void dates both stores on the original receipt da
 
     const voidRes = await request(app).post(`/api/supplier-refunds/${refundId}/void`)
       .set('Cookie', cookie).send({ reason: 'late void' });
-    expect([400, 409]).toContain(voidRes.status);
+    // Exact existing contract: 409 with the closed-period message.
+    expect(voidRes.status).toBe(409);
+    expect(voidRes.body.error).toContain(`Supplier refund ${refundNo} is dated ${RECEIPT_DATE} inside closed accounting period`);
+    expect(voidRes.body.error).toContain('edit/delete blocked');
     expect(db.prepare('SELECT status FROM supplier_refunds WHERE id = ?').get(refundId)).toEqual({ status: 'POSTED' });
     expect(db.prepare('SELECT * FROM journal_lines ORDER BY id').all()).toEqual(linesBefore);
     expect(db.prepare('SELECT * FROM supplier_ledger ORDER BY id').all()).toEqual(ledgerBefore);
@@ -189,16 +218,24 @@ describe('F-3: supplier refund void dates both stores on the original receipt da
   });
 
   it('voids once and makes a second void a no-op', async () => {
-    const { refundId } = await makeRefundReceipt('F3 supplier D', 'F3 item D');
+    const { refundId, purchaseId } = await makeRefundReceipt('F3 supplier D', 'F3 item D');
 
     const first = await request(app).post(`/api/supplier-refunds/${refundId}/void`)
       .set('Cookie', cookie).send({ reason: 'once' });
     expect(first.status).toBe(200);
+    const linesAfterFirst = db.prepare('SELECT * FROM journal_lines ORDER BY id').all();
     const ledgerAfterFirst = db.prepare('SELECT * FROM supplier_ledger ORDER BY id').all();
+    const allocAfterFirst = db.prepare('SELECT * FROM purchase_allocations ORDER BY id').all();
 
     const second = await request(app).post(`/api/supplier-refunds/${refundId}/void`)
       .set('Cookie', cookie).send({ reason: 'twice' });
-    expect(second.status).toBeGreaterThanOrEqual(400);
+    // Exact existing state-guard contract: 400 "Only POSTED refunds can be voided".
+    expect(second.status).toBe(400);
+    expect(second.body.error).toBe('Only POSTED refunds can be voided');
+    // No store moved: the state guard fires before any write.
+    expect(db.prepare('SELECT * FROM journal_lines ORDER BY id').all()).toEqual(linesAfterFirst);
     expect(db.prepare('SELECT * FROM supplier_ledger ORDER BY id').all()).toEqual(ledgerAfterFirst);
+    expect(db.prepare('SELECT * FROM purchase_allocations ORDER BY id').all()).toEqual(allocAfterFirst);
+    expect(purchaseId).toBeGreaterThan(0);
   });
 });
