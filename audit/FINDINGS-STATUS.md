@@ -1422,3 +1422,26 @@ situation of every existing install at migration time.
   validation-pending: NOT fully fixed until PI's refined tests pass the
   full server gate. Parked moneyPathFindingsRed.test.ts untouched (unpark
   only after approved integration, observed passing).
+
+- **F3 batched update (2026-11-17, Gull msg_f49350c2f842): PI test
+  refinement `7dc3deab` reviewed — approve-with-limits; ONE test-only date
+  defect before the gate.** Full review:
+  `/home/fawad/logs/glm-f3-test-refinement-review-7dc3deab.md`. [SOURCE]:
+  test-only (SupplierRefund.ts diff EMPTY — approved source fix at
+  `859831aa` unchanged). The refinement closes the earlier test gap:
+  `glApScopedAsOf` scopes GL AP 2000 to the supplier's own document refs
+  (PURCHASE/PAYMENT/PURCHASE_RETURN/REFUND_RECEIPT) and asserts
+  `gl === ledgerNetAsOf` at every sampled as-of date against the WHOLE
+  dated ledger net (unfiltered); exact 409 closed-period refusal (message
+  + row-equality on journal_lines/supplier_ledger/status) and exact 400
+  double-void (message + three stores row-equal); `.not.toBe` anti-vacuity
+  baseline guard. DEFECT (coordinator's, verified at exact SHA):
+  `INTERMEDIATE_DATE = '2026-03-12'` is BEFORE `RECEIPT_DATE = '2026-03-15'`
+  — the loop's "between receipt and today" claim is false; no sample
+  exists in (receipt, today). Receipt-date cancellation assertions still
+  catch wrong-dating, but the claimed mid-window coverage does not exist.
+  Fix: `INTERMEDIATE_DATE = '2026-03-20'` (test-only, one line, comment
+  updated), then focused test → PI's exclusive full server gate +
+  changed-base audit. F3 remains **implementation-pending-full-gate** —
+  not fixed until that gate passes; no final green claimed. Parked GLM
+  test untouched; frozen PR4/PR8 untouched.
