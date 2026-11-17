@@ -6,7 +6,7 @@ import ledgerUtils from '../utils/ledgerUtils';
 import { PaymentRecordingService } from './PaymentRecordingService';
 import { addCurrency, computeInvoiceGrandTotal, parseCurrency, subtractCurrency } from '../utils/currency';
 import { isValidPaymentMethod } from './cashService';
-import { claimIdempotencyKey, findIdempotencyRecord } from '../utils/idempotency';
+import { claimIdempotencyKey, findIdempotencyRecord, findIdempotencyWarnings } from '../utils/idempotency';
 import { generateDocNo } from '../utils/sequence';
 import { BusinessRuleError } from '../utils/businessRuleError';
 import { recordLedgerCreditDraws, recordStoreCreditDraws } from './storeCreditOwnership';
@@ -215,10 +215,6 @@ export class InvoiceCreationService {
         })),
       }, input.userId);
 
-      if (input.idempotency) {
-        claimIdempotencyKey(this.db, input.idempotency.scope, input.idempotency.key, input.idempotency.hash, invoiceId);
-      }
-
       const lineWarehouses = this.resolveLineWarehouses(input.items, input.warehouseId);
 
       const { itemResults, consumptions, cogsAmount, warnings, backdatedBeforeReceipt } =
@@ -240,6 +236,14 @@ export class InvoiceCreationService {
       ledgerUtils.rebuildLedgerBalances(input.customerId, this.db);
       ledgerUtils.recalcCustomerBalanceFromLedger(input.customerId, this.db);
       if (input.draftId) this.db.prepare('DELETE FROM invoice_drafts WHERE id = ?').run(input.draftId);
+      if (input.idempotency) {
+        // BUG-013 R1/R2: record the warnings with the key inside the same
+        // transaction, so a retry of a LOST response returns the same notices
+        // the first caller was sent instead of an empty list.
+        claimIdempotencyKey(
+          this.db, input.idempotency.scope, input.idempotency.key, input.idempotency.hash, invoiceId, warnings,
+        );
+      }
       return { invoiceId, invoiceNo, totalAmount, paidAmount, balanceAmount, taxAmount: InvoiceModel.getInvoiceTaxTotal(this.db, invoiceId), cogsAmount: parseCurrency(cogsAmount), paymentId, paymentNo, replayed: false, items: itemResults, warnings };
     });
 
@@ -375,7 +379,12 @@ export class InvoiceCreationService {
       const existing = findIdempotencyRecord(this.db, input.idempotency.scope, input.idempotency.key);
       if (existing) {
         if (existing.request_hash !== input.idempotency.hash) throw new InvoiceCreationIdempotencyError();
-        if (existing.resource_id !== null) return this.resultFromExisting(existing.resource_id, true);
+        if (existing.resource_id !== null) {
+          return this.resultFromExisting(
+            existing.resource_id, true,
+            findIdempotencyWarnings(this.db, input.idempotency.scope, input.idempotency.key),
+          );
+        }
       }
     }
 
@@ -410,10 +419,10 @@ export class InvoiceCreationService {
     }
   }
 
-  private resultFromExisting(invoiceId: number, replayed: boolean): InvoiceCreationResult {
+  private resultFromExisting(invoiceId: number, replayed: boolean, warnings: string[] = []): InvoiceCreationResult {
     const row = this.db.prepare('SELECT id, invoice_no, total_amount, paid_amount, balance_amount FROM invoices WHERE id = ?').get(invoiceId) as ExistingInvoiceRow | undefined;
     if (!row) throw new Error(`Invoice ${invoiceId} not found for idempotency replay`);
-    return { invoiceId: row.id, invoiceNo: row.invoice_no, totalAmount: numberValue(row.total_amount), paidAmount: numberValue(row.paid_amount), balanceAmount: numberValue(row.balance_amount), taxAmount: 0, cogsAmount: 0, paymentId: null, paymentNo: null, replayed, items: [], warnings: [] };
+    return { invoiceId: row.id, invoiceNo: row.invoice_no, totalAmount: numberValue(row.total_amount), paidAmount: numberValue(row.paid_amount), balanceAmount: numberValue(row.balance_amount), taxAmount: 0, cogsAmount: 0, paymentId: null, paymentNo: null, replayed, items: [], warnings };
   }
 }
 

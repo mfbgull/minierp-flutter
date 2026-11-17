@@ -147,6 +147,70 @@ function itemName(db: Database.Database, itemId: number): string {
     | undefined)?.item_name ?? `item ${itemId}`;
 }
 
+/** BUG-013 R1: the one warning text for selling held-damaged stock. */
+function damagedWarning(db: Database.Database, itemId: number): string {
+  return (
+    `Item ${itemName(db, itemId)}: sold stock held in a DAMAGED location — ` +
+    `confirm the goods are fit for the agreed scrap or reduced price.`
+  );
+}
+
+/**
+ * Push a warning once. A multi-batch sale runs the per-batch loop several
+ * times; two damaged batches must not repeat the same line to the cashier.
+ */
+function pushUniqueWarning(warnings: string[], message: string): void {
+  if (!warnings.includes(message)) warnings.push(message);
+}
+
+/**
+ * BUG-013: drain ONE batch's sellable bins by AVAILABLE (physical - reserved)
+ * for the pre-receipt fallback, which predates the location allocator. Caps at
+ * the bin's available so a reservation survives, skips non-sellable bins so a
+ * blocked bin is never eaten, and returns the same R1/R2 warnings the main
+ * path raises.
+ */
+function consumeFallbackBins(
+  db: Database.Database,
+  batchId: number,
+  warehouseId: number,
+  take: number,
+  itemId: number
+): string[] {
+  const warnings: string[] = [];
+  const bins = db.prepare(`
+    SELECT bsl.id, bsl.quantity_available, bsl.status_override
+    FROM batch_stock_by_location bsl
+    JOIN locations l ON bsl.location_id = l.id
+    WHERE bsl.batch_id = ? AND l.warehouse_id = ?
+      AND bsl.quantity_available > 0
+      AND ${sellableStatusClause('bsl.status_override')}
+    ORDER BY l.created_at ASC, bsl.id ASC
+  `).all(batchId, warehouseId) as Array<{ id: number; quantity_available: number; status_override: string | null }>;
+
+  const sellableAvailable = roundQty(bins.reduce((s, b) => s + roundQty(b.quantity_available), 0));
+  let remaining = take;
+  let hitDamaged = false;
+  for (const bin of bins) {
+    if (remaining <= 0) break;
+    const amount = roundQty(Math.min(remaining, roundQty(bin.quantity_available)));
+    if (amount > 0 && bin.status_override === 'DAMAGED') hitDamaged = true;
+    db.prepare('UPDATE batch_stock_by_location SET quantity_physical = MAX(0, quantity_physical - ?) WHERE id = ?')
+      .run(amount, bin.id);
+    remaining -= amount;
+  }
+
+  if (hitDamaged) warnings.push(damagedWarning(db, itemId));
+  if (bins.length > 0 && qtyLessThan(sellableAvailable, take)) {
+    warnings.push(
+      `Item ${itemName(db, itemId)}: only ${sellableAvailable} unit(s) are available in the location ledger ` +
+      `for this batch, but ${take} were sold — the remainder came from the batch total. ` +
+      `Run the batch-location backfill to reconcile.`
+    );
+  }
+  return warnings;
+}
+
 /**
  * Sellable quantity for the item in the warehouse.
  *
@@ -316,19 +380,16 @@ function consumeBatchesByLocation(
     `).all(batch.id, warehouseId) as Array<{ id: number; quantity_available: number; status_override: string | null; created_at: string }>;
 
     // BUG-013 R1 (flag ON): selling from a DAMAGED bin is allowed, but never
-    // silent — the caller shows the same warning the legacy path raises.
-    if (locRows.some((l) => l.status_override === 'DAMAGED')) {
-      warnings.push(
-        `Item ${itemName(db, itemId)}: sold stock held in a DAMAGED location — ` +
-        `confirm the goods are fit for the agreed scrap or reduced price.`
-      );
-    }
+    // silent. The warning is raised from the bins the take ACTUALLY hit — a
+    // DAMAGED bin the allocator never reached must not cry wolf.
+    let hitDamaged = false;
 
     let batchRemaining = consumeFromThis;
     for (const loc of locRows) {
       if (batchRemaining <= 0) break;
       const locAvail = roundQty(loc.quantity_available);
       const take = roundQty(Math.min(batchRemaining, locAvail));
+      if (take > 0 && loc.status_override === 'DAMAGED') hitDamaged = true;
       db.prepare(`
         UPDATE batch_stock_by_location
         SET quantity_physical = quantity_physical - ?, quantity_reserved = quantity_reserved
@@ -336,6 +397,8 @@ function consumeBatchesByLocation(
       `).run(take, loc.id);
       batchRemaining -= take;
     }
+
+    if (hitDamaged) pushUniqueWarning(warnings, damagedWarning(db, itemId));
 
     // Also decrement master batch for backward compatibility
     db.prepare(`
@@ -436,7 +499,6 @@ function consumeLegacyBatches(
     // and the legacy master-quantity rule stands.
     const binAgg = db.prepare(`
       SELECT COUNT(*) AS c,
-             COALESCE(SUM(bsl.quantity_available), 0) AS avail,
              COALESCE(SUM(bsl.quantity_reserved), 0) AS reserved,
              -- Only the UNRESERVED part of a non-sellable bin is lost stock.
              -- A reserved unit is already subtracted below, so subtracting
@@ -477,7 +539,10 @@ function consumeLegacyBatches(
       ORDER BY l.created_at ASC, bsl.id ASC
     `).all(batch.id, warehouseId) as Array<{ id: number; quantity_available: number; status_override: string | null; created_at: string }>;
 
-    const binAvailable = roundQty(Number(binAgg.avail));
+    // R2 compares the take against the SELLABLE bins' availability only. A
+    // BLOCKED/EXPIRED bin is not stock the sale can have drawn on, so its
+    // availability must not mask a real mirror shortfall.
+    const binAvailable = roundQty(locRows.reduce((s, l) => s + roundQty(l.quantity_available), 0));
     const consumeFromThis = roundQty(Math.min(remaining, sellableHere));
 
     db.prepare(`
@@ -486,34 +551,34 @@ function consumeLegacyBatches(
       WHERE id = ?
     `).run(consumeFromThis, batch.id);
 
-    if (locRows.some((l) => l.status_override === 'DAMAGED')) {
-      warnings.push(
-        `Item ${itemName(db, itemId)}: sold stock held in a DAMAGED location — ` +
-        `confirm the goods are fit for the agreed scrap or reduced price.`
-      );
-    }
-
-    // R2: the bin layer under-covered this batch. Warn with the available
-    // quantity; the master batch still backs the unit, so this is mirror lag
-    // (never a true shortage — that already threw above).
-    if (binCount > 0 && qtyLessThan(binAvailable, consumeFromThis)) {
-      warnings.push(
-        `Item ${itemName(db, itemId)}: only ${binAvailable} unit(s) are available in the location ledger ` +
-        `for this batch, but ${consumeFromThis} were sold — the remainder came from the batch total. ` +
-        `Run the batch-location backfill to reconcile.`
-      );
-    }
-
     let locRemaining = consumeFromThis;
+    let hitDamaged = false;
     for (const loc of locRows) {
       if (locRemaining <= 0) break;
       const take = roundQty(Math.min(locRemaining, roundQty(loc.quantity_available)));
+      if (take > 0 && loc.status_override === 'DAMAGED') hitDamaged = true;
       db.prepare(`
         UPDATE batch_stock_by_location
         SET quantity_physical = MAX(0, quantity_physical - ?)
         WHERE id = ?
       `).run(take, loc.id);
       locRemaining -= take;
+    }
+
+    // R1: warn only when the take actually reached a DAMAGED bin, and once
+    // per sale (deduped by the caller-visible text), not once per batch.
+    if (hitDamaged) pushUniqueWarning(warnings, damagedWarning(db, itemId));
+
+    // R2: the bin layer under-covered this batch. Warn with the available
+    // quantity; the master batch still backs the unit, so this is mirror lag
+    // (never a true shortage — that already threw above).
+    if (binCount > 0 && qtyLessThan(binAvailable, consumeFromThis)) {
+      pushUniqueWarning(
+        warnings,
+        `Item ${itemName(db, itemId)}: only ${binAvailable} unit(s) are available in the location ledger ` +
+        `for this batch, but ${consumeFromThis} were sold — the remainder came from the batch total. ` +
+        `Run the batch-location backfill to reconcile.`
+      );
     }
 
     consumption.push({ batchId: batch.id, consumed: consumeFromThis, unitCost: batch.unit_cost });
@@ -1544,9 +1609,9 @@ class StockMovementModel {
     db: Database.Database,
     saleDate: string
   ): { consumption: ConsumptionEntry[]; backdatedBeforeReceipt: boolean; firstReceiptDate: string | null; warnings: string[] } {
-    const fallback = this.preReceiptFallback(db, itemId, warehouseId, quantity, saleDate);
-    if (fallback !== null) return { ...fallback, backdatedBeforeReceipt: true, warnings: [] };
     const warnings: string[] = [];
+    const fallback = this.preReceiptFallback(db, itemId, warehouseId, quantity, saleDate, warnings);
+    if (fallback !== null) return { ...fallback, backdatedBeforeReceipt: true, warnings: fallback.warnings };
     return {
       consumption: this.consumeFromOldestBatches(itemId, warehouseId, quantity, db, saleDate, warnings),
       backdatedBeforeReceipt: false,
@@ -1567,8 +1632,9 @@ class StockMovementModel {
     itemId: number,
     warehouseId: number,
     quantity: number,
-    saleDate: string
-  ): { consumption: ConsumptionEntry[]; firstReceiptDate: string | null } | null {
+    saleDate: string,
+    warnings: string[] = []
+  ): { consumption: ConsumptionEntry[]; firstReceiptDate: string | null; warnings: string[] } | null {
     const roundedQty = roundQty(quantity);
     const useFEFO = (db.prepare('SELECT has_expiry FROM items WHERE id = ?').get(itemId) as
       | { has_expiry: number }
@@ -1598,7 +1664,11 @@ class StockMovementModel {
           SELECT MIN(received_date) AS d FROM stock_batches
           WHERE item_id = ? AND warehouse_id = ? AND quantity_remaining > 0
         `).get(itemId, warehouseId) as { d: string | null }).d;
-        return { consumption: consumeBatchesByLocation(db, itemId, warehouseId, withLocations, roundedQty, []), firstReceiptDate };
+        return {
+          consumption: consumeBatchesByLocation(db, itemId, warehouseId, withLocations, roundedQty, warnings),
+          firstReceiptDate,
+          warnings,
+        };
       }
       // No location rows: fall through to the batch-level path (API-purchased
       // batches predate the location layer).
@@ -1636,15 +1706,15 @@ class StockMovementModel {
         UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?
       `).run(take, batch.id);
       // BUG-013: mirror the consume on the location rows (no-op when absent).
-      db.prepare(`
-        UPDATE batch_stock_by_location
-        SET quantity_physical = MAX(0, quantity_physical - ?)
-        WHERE batch_id = ?
-      `).run(take, batch.id);
+      // The bin is drained by AVAILABLE and only when sellable, so the
+      // fallback cannot eat a blocked bin or a reservation. A DAMAGED bin the
+      // take actually reached raises the same warning the main path raises.
+      const batchWarnings = consumeFallbackBins(db, batch.id, warehouseId, take, itemId);
+      for (const w of batchWarnings) pushUniqueWarning(warnings, w);
       consumption.push({ batchId: batch.id, consumed: take, unitCost: batch.unit_cost });
       remaining -= take;
     }
-    return { consumption, firstReceiptDate: batches[0].received_date };
+    return { consumption, firstReceiptDate: batches[0].received_date, warnings };
   }
 
     /**
