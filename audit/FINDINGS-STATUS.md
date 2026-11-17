@@ -1717,3 +1717,27 @@ situation of every existing install at migration time.
   (branch not checked out anywhere), `glm-warnui` for `glm/warning-ui`.
   Targeted tests after each rebase (no full-suite reruns without cause;
   the exclusive post-merge check.sh runner is a single agent per Gull).
+
+- **PR3 MERGED (merge commit `bf96ee1f`, 2026-11-17T10:26:01Z, all six
+  reviewed-head CI checks green) — GLM PR4 rebase COMPLETE, candidate
+  awaiting lease inspection.** Rebuilt in GLM's own worktree
+  (`glm-pr4-rebase`): local `glm/ux-review-tests` was stale at `2e4a101a`;
+  aligned to the reviewed remote head `0186b8d9` then rebased onto
+  `bf96ee1f`. Result: **9/9 commits replayed, ZERO conflicts, new tip
+  `ea8f79cd`**; `git range-diff` shows all 9 commits "=" (patch-identical),
+  and a diff-of-patch-bodies check is EMPTY — the reviewed candidate is
+  byte-preserved. Preservation verified in the tree: PI's write-off
+  idempotency/open-only-filter/manual-fields fix (commit 1), F-2 as
+  ordinary passing tests + exact-409 case, **F-3 still parked in
+  `it.failing`** (fix-containing integration not on this line), GLM UX
+  fixes and PRET-002 tests intact. Targeted regressions ONLY (PI owns the
+  exclusive full gate): server `supplierRefundClaims` +
+  `moneyPathFindingsRed` (parked F-3 semantics) + `moneyPathReviewGaps` +
+  `moneyPaths` — 4 suites / 29 tests PASS (41.6s); Flutter 10 touched test
+  files — 34 tests, ALL PASS (1m47s); `l10n-drift` clean (0 fallback gap,
+  0 orphaned). NOT RUN (intentionally): full server suite, full Flutter
+  suite, `scripts/check.sh` — PI exclusively owns the post-merge full
+  gate per Gull. Worktree clean (node_modules/.dart_tool correctly
+  ignored on this line — unlike the S-3 verify worktree noted earlier).
+  **NOT PUSHED**: awaiting the coordinator's inspection and the exact
+  old-head lease `0186b8d9…`; PR8 rebase DEFERRED until PR4 merges.
