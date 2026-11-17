@@ -1685,3 +1685,35 @@ situation of every existing install at migration time.
     SEPARATELY UNRESOLVED.
   - Full slots free; no extra broad tests; no baseline changes;
     no ready/merge.
+
+- **Sequential ready/merge APPROVED by Gull (2026-11-17,
+  msg_7a814f5add58); GLM post-PR3 responsibilities prepared.** The
+  coordinator owns the merge sequence (PR3 first at reviewed `971c4f5b`);
+  GLM must NOT independently merge any PR. GLM owns, AFTER PR3 merges and
+  the coordinator's merged SHA is known (no dependent mutation before
+  that): rebasing PR4 (`glm/ux-review-tests` @ `0186b8d9`) and warning
+  PR8 (`glm/warning-ui` @ `52447ccc`, stacked on PR4) in GLM's own
+  worktrees, plus relevant targeted tests; coordinate exact file
+  ownership; preserve all reviewed changes. No force push until the
+  coordinator provides the exact expected lease after inspecting the
+  rebuilt candidate; never plain force, never overwriting unexpected
+  remote edits. After EVERY merge exactly ONE agent runs
+  `scripts/check.sh` exclusively and checks CI. PI pauses new S-4
+  production work during merge/rebase coordination. Product decisions /
+  default / migration-127 / 8.6 boundaries unchanged.
+
+- **GLM pre-flight (read-only, ready to execute on the merged SHA):**
+  PR3 touches ONLY server files (accountingService, cashBalanceGuard, new
+  cashTimeline) — ZERO file overlap with PR4 or PR8, so both rebases are
+  expected conflict-free vs PR3. PR4∩PR8 overlap:
+  `lib/data/repositories/purchase_repository.dart` (expected — PR8 is
+  stacked on PR4; rebase order PR4 first, then PR8 onto the rebased PR4).
+  Remote tips verified intact at the exact known SHAs (glm/ux-review-tests
+  = 0186b8d9, glm/warning-ui = 52447ccc, main = 7a96e6d8) — no unexpected
+  remote edits. Note: PR4 carries an `audit/FINDINGS-STATUS.md` change; if
+  PR5 (docs, base main) merges during the sequence, that file may conflict
+  on the PR4 rebase — will handle at rebase time with the reviewed content
+  preserved. Worktree plan: dedicated worktree for `glm/ux-review-tests`
+  (branch not checked out anywhere), `glm-warnui` for `glm/warning-ui`.
+  Targeted tests after each rebase (no full-suite reruns without cause;
+  the exclusive post-merge check.sh runner is a single agent per Gull).
