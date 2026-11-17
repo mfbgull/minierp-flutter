@@ -1850,3 +1850,16 @@ situation of every existing install at migration time.
   Gull); PR8 base branch is still `glm/ux-review-tests` (its tip
   `ea8f79cd` is merged into main via PR4) — base change to main NOT
   required for CI; only on Gull's instruction.
+
+- **PR8 BASE SWITCHED TO MAIN (2026-11-17, msg_6bdc6b2e86dc) + FRESH
+  PR-EVENT CI ALL GREEN.** Head verified unchanged before the change
+  (`ef117084`, remote-checked). REST PATCH
+  `/repos/mfbgull/minierp-flutter/pulls/8` with base=main succeeded
+  (PI's `gh pr edit` GraphQL Projects-field deprecation avoided). Base
+  edit alone triggered NO new runs, so a fresh PR event was triggered by
+  close + reopen (no commit changes, head stays `ef117084`). New run
+  44105990414 (pull_request, base=main): **fallow SUCCESS + server
+  SUCCESS + flutter SUCCESS** — the required fresh PR event/content pass
+  is satisfied; the earlier push-event fallow base-ref artifact
+  (unreachable old head) is superseded for merge-readiness. PR8 remains
+  OPEN, NOT merged; awaiting Gull. No workflow edits made.
