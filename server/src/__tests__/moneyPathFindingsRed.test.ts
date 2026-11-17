@@ -8,14 +8,14 @@
  *   written_off_amount > 0. The F-2 case below is a normal regression guard:
  *   it passes today and fails if that guard is removed or weakened.
  *
- * - F-3 (Medium) — parked, pending Gull's dating decision. SupplierRefundModel
- *   .void appends its supplier-ledger reversal dated "today"
- *   (new Date().toISOString(), UTC) while the GL lines are voided
- *   retroactively, so for any as-of date between the receipt and the void, GL
- *   AP and the supplier subledger disagree. The codebase's own rule
- *   (ledgerUtils.reverseLedgerEntry) is same-date reversal. The F-3 case below
- *   is wrapped in `it.failing` so the suite stays green while the defect is
- *   visible; remove the wrapper when the dating decision is implemented.
+ * - F-3 (Medium) — FIXED. SupplierRefundModel.void used to append its
+ *   supplier-ledger reversal dated "today" (new Date().toISOString(), UTC)
+ *   while the GL lines were voided retroactively, so for any as-of date between
+ *   the receipt and the void, GL AP and the supplier subledger disagreed. The
+ *   codebase's own rule (ledgerUtils.reverseLedgerEntry) is same-date reversal.
+ *   The fix dates the ledger reversal on the receipt's own date. The F-3 case
+ *   below is now a normal regression guard: it passes today and fails if the
+ *   reversal dating regresses.
  */
 import { beforeAll, beforeEach, afterEach, describe, expect, it } from '@jest/globals';
 import request from 'supertest';
@@ -117,7 +117,7 @@ function supplierLedgerAsOf(supplierId: number, date: string): number {
   `).get(supplierId, date) as { v: number }).v;
 }
 
-describe('GLM-REVIEW findings (F-2 fixed, F-3 parked)', () => {
+describe('GLM-REVIEW findings (F-2 fixed, F-3 fixed)', () => {
   // F-2 is fixed (7a96e6d8 refused cancel of a written-off claim) — this is
   // now a normal regression guard for that fix.
   it('F-2: voiding a return whose claim carries a write-off is refused with 409', async () => {
@@ -195,8 +195,8 @@ describe('GLM-REVIEW findings (F-2 fixed, F-3 parked)', () => {
     expect(claim.status).toBe('CANCELLED');
   });
 
-  // it.failing: parked pending Gull's F-3 dating decision. It flips to a real
-  // failure the moment F-3 is fixed; remove the wrapper then.
+  // F-3 is fixed: the void dates the supplier-ledger reversal on the receipt's
+  // own date. This is now a normal regression guard (was `it.failing`).
   //
   // Verified 2026-11-16 (isolated test-only worktree, glm-f3-probe): the void
   // request below needs NO Idempotency-Key. `POST /api/supplier-refunds/:id/void`
@@ -209,7 +209,7 @@ describe('GLM-REVIEW findings (F-2 fixed, F-3 parked)', () => {
   // (Expected 0, Received 3000) — not a masked HTTP 400. The earlier claim
   // that 653dfe43 proves this route key-mandatory was wrong (that commit is
   // Flutter-only and its message is inaccurate about the server).
-  it.failing('F-3: a voided receipt keeps GL AP and the supplier ledger in agreement at every as-of date', async () => {
+  it('F-3: a voided receipt keeps GL AP and the supplier ledger in agreement at every as-of date', async () => {
     await seedOpeningCash(10000);
     const info = await paidPurchase(100);
 
