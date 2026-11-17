@@ -1377,3 +1377,16 @@ situation of every existing install at migration time.
   branch owns the FIX + new regressions; once the fix is integrated, GLM
   unparks the F-3 case on the GLM line (removes the `it.failing` wrapper) as
   the one owner/branch — pending Gull's confirmation.
+
+- **PR7 remote CI GREEN at exact `e400f4cc` — quality gate CLOSED
+  (2026-11-17).** All 6 checks PASS on head `e400f4ccd755…` (verified via
+  `gh pr view`: headRefOid = e400f4cc…, draft=OPEN, untouched): fallow PASS
+  ×2 (3m59s job 133847689582 / 4m42s job 133847716288 — the remote
+  changed-base audit confirms no findings, matching the independent local
+  `fallow --base 7a96e6d8` proof), flutter PASS ×2 (8m26s/8m12s), server
+  PASS ×2 (4m08s/4m59s). The earlier OPEN status (4 StockMovement complexity
+  findings @ `7416280e`) is resolved by PI's refactor `e400f4cc` — GLM
+  read-only review: approve-with-limits; independent changed-base proof:
+  exit 0, no issues, 9 changed files. PR7 stays DRAFT; ready/merge remains
+  Gull's call. PR4/PR7/PR8 tested candidates stay frozen per
+  msg_ca9008067d4f.
