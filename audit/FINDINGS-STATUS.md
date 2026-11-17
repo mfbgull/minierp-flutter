@@ -1341,3 +1341,18 @@ situation of every existing install at migration time.
   with fresh coverage on the refactor is the authority and has not landed —
   no final green claimed. Two proposed pinning tests recorded (trigger
   recomputation invariant; clamp-difference pin).
+
+- **PR7 quality gate: changed-base proof OBTAINED at `e400f4cc` — remote CI
+  pending (2026-11-17, Gull msg_ee0f1afaca90).** PI's full server gate:
+  287 suites / 2307 tests, exit 0. The coordinator's independent clean-ext4
+  rerun: 3 suites / 62 tests, 23.719s, exit 0, AND the **EXACT fallow
+  3.34.1 `audit --base 7a96e6d8`: exit 0, "No issues", 9 changed files**,
+  status clean — this REPLACES the earlier zero-changed limitation with
+  actual independent changed-base proof, with NO baseline changes. Logs:
+  `/home/fawad/logs/coordinator-e400f4cc-focused.log` +
+  `coordinator-e400f4cc-fallow.log`. GLM's read-only review of the refactor
+  (approve-with-limits) stands, not repeated. PI pushed `e400f4cc` to PR7
+  (fast-forward, draft kept); remote CI runs 44026406745/44026414784
+  **PENDING — not counted as green until they resolve** (no guessed green).
+  PR7 leaves quality-gate OPEN status only when the remote changed-base
+  audit confirms.
