@@ -164,11 +164,68 @@ function pushUniqueWarning(warnings: string[], message: string): void {
 }
 
 /**
- * BUG-013: drain ONE batch's sellable bins by AVAILABLE (physical - reserved)
- * for the pre-receipt fallback, which predates the location allocator. Caps at
- * the bin's available so a reservation survives, skips non-sellable bins so a
- * blocked bin is never eaten, and returns the same R1/R2 warnings the main
- * path raises.
+ * BUG-013 R1: drain a batch's already-selected sellable bins by `take`
+ * (bin-by-bin, oldest first) and report whether the take actually reached a
+ * DAMAGED bin. `clampToZero` applies MAX(0, physical - take) for the paths
+ * that drain by AVAILABLE and clamp; the flag-on allocator subtracts plainly.
+ * The bins are the ones the caller selected; this only moves quantities.
+ */
+function drainBinsForTake(
+  db: Database.Database,
+  locRows: Array<{ id: number; quantity_available: number; status_override: string | null }>,
+  take: number,
+  clampToZero: boolean
+): { consumed: number; hitDamaged: boolean } {
+  let remaining = take;
+  let hitDamaged = false;
+  for (const loc of locRows) {
+    if (remaining <= 0) break;
+    const amount = roundQty(Math.min(remaining, roundQty(loc.quantity_available)));
+    if (amount > 0 && loc.status_override === 'DAMAGED') hitDamaged = true;
+    const setExpr = clampToZero
+      ? 'quantity_physical = MAX(0, quantity_physical - ?)'
+      : 'quantity_physical = quantity_physical - ?';
+    db.prepare(`UPDATE batch_stock_by_location SET ${setExpr} WHERE id = ?`).run(amount, loc.id);
+    remaining -= amount;
+  }
+  return { consumed: roundQty(take - Math.max(0, remaining)), hitDamaged };
+}
+
+/** BUG-013 R2: warn when the sellable bins under-cover the batch take. */
+function warnMirrorShortfall(
+  warnings: string[],
+  db: Database.Database,
+  itemId: number,
+  binAvailable: number,
+  consumed: number
+): void {
+  pushUniqueWarning(
+    warnings,
+    `Item ${itemName(db, itemId)}: only ${binAvailable} unit(s) are available in the location ledger ` +
+    `for this batch, but ${consumed} were sold — the remainder came from the batch total. ` +
+    `Run the batch-location backfill to reconcile.`
+  );
+}
+
+/**
+ * BUG-013: does this item have any location coverage in this warehouse? A
+ * batch that carries stock but no location row predates the location layer.
+ */
+function hasLocationCoverage(db: Database.Database, itemId: number, warehouseId: number): boolean {
+  return db.prepare(`
+    SELECT 1 FROM batch_stock_by_location bsl
+    JOIN locations l ON bsl.location_id = l.id
+    WHERE l.warehouse_id = ?
+      AND EXISTS (SELECT 1 FROM stock_batches sb WHERE sb.id = bsl.batch_id AND sb.item_id = ?)
+    LIMIT 1
+  `).get(warehouseId, itemId) !== undefined;
+}
+
+/**
+ * BUG-013: mirror the consume on the location rows (no-op when absent). The
+ * bin is drained by AVAILABLE and only when sellable, so the fallback cannot
+ * eat a blocked bin or a reservation. A DAMAGED bin the take actually reached
+ * raises the same warning the main path raises.
  */
 function consumeFallbackBins(
   db: Database.Database,
@@ -189,24 +246,11 @@ function consumeFallbackBins(
   `).all(batchId, warehouseId) as Array<{ id: number; quantity_available: number; status_override: string | null }>;
 
   const sellableAvailable = roundQty(bins.reduce((s, b) => s + roundQty(b.quantity_available), 0));
-  let remaining = take;
-  let hitDamaged = false;
-  for (const bin of bins) {
-    if (remaining <= 0) break;
-    const amount = roundQty(Math.min(remaining, roundQty(bin.quantity_available)));
-    if (amount > 0 && bin.status_override === 'DAMAGED') hitDamaged = true;
-    db.prepare('UPDATE batch_stock_by_location SET quantity_physical = MAX(0, quantity_physical - ?) WHERE id = ?')
-      .run(amount, bin.id);
-    remaining -= amount;
-  }
+  const { hitDamaged } = drainBinsForTake(db, bins, take, true);
 
   if (hitDamaged) warnings.push(damagedWarning(db, itemId));
   if (bins.length > 0 && qtyLessThan(sellableAvailable, take)) {
-    warnings.push(
-      `Item ${itemName(db, itemId)}: only ${sellableAvailable} unit(s) are available in the location ledger ` +
-      `for this batch, but ${take} were sold — the remainder came from the batch total. ` +
-      `Run the batch-location backfill to reconcile.`
-    );
+    warnMirrorShortfall(warnings, db, itemId, sellableAvailable, take);
   }
   return warnings;
 }
@@ -311,6 +355,78 @@ function selectLocationBatches(
   `).all(itemId, warehouseId, { asOf }) as LocationBatchRow[];
 }
 
+/** Shared "not enough sellable stock" throw for the batch-level allocators. */
+function throwShortfall(
+  db: Database.Database,
+  itemId: number,
+  requested: number,
+  available: number
+): never {
+  const item = db.prepare('SELECT item_name FROM items WHERE id = ?').get(itemId) as { item_name: string } | undefined;
+  throw new SellableStockUnavailableError(item?.item_name || `item ${itemId}`, requested, available);
+}
+
+/** Shared oversell guard: the sellable figure must cover the requested qty. */
+function assertAvailable(
+  db: Database.Database,
+  itemId: number,
+  roundedQty: number,
+  availableQty: number
+): void {
+  if (qtyLessThan(availableQty, roundedQty)) {
+    throwShortfall(db, itemId, roundedQty, availableQty);
+  }
+}
+
+/**
+ * BUG-013: a batch with no location coverage is not gone, it is simply not
+ * yet location-tracked (a flag flip, or a row written by a path that did
+ * not refresh the location table). The flag chooses which source is READ;
+ * it must never make stock disappear. Add such batches at their master
+ * quantity. Done in JS so the location query and its FEFO rules are
+ * untouched; consumeBatchesByLocation already decrements the master row
+ * and only touches location rows that exist.
+ */
+function mergeUncoveredBatches(
+  db: Database.Database,
+  itemId: number,
+  warehouseId: number,
+  asOf: string,
+  useFEFO: boolean,
+  batchRows: LocationBatchRow[]
+): void {
+  const missing = db.prepare(`
+    SELECT sb.id, sb.unit_cost, sb.received_date, sb.expiry_date,
+           sb.quantity_remaining AS qty_avail
+    FROM stock_batches sb
+    WHERE sb.item_id = ? AND sb.warehouse_id = ?
+      AND sb.quantity_remaining > 0
+      AND NOT EXISTS (
+        SELECT 1 FROM batch_stock_by_location bsl
+        WHERE bsl.batch_id = sb.id AND bsl.quantity_available > 0
+      )
+      ${useFEFO ? "AND COALESCE(sb.halted, 0) = 0 AND (sb.expiry_date IS NULL OR sb.expiry_date >= @asOf)" : ''}
+  `).all(itemId, warehouseId, { asOf }) as LocationBatchRow[];
+  if (missing.length === 0) return;
+
+  logger.warn(
+    `[BatchLocations] ${missing.length} batch(es) for item ${itemId} in warehouse ${warehouseId} ` +
+    `carry stock but no location row; selling them from the batch total (BUG-013 guard). ` +
+    `This means the location table is behind — run the backfill if it persists.`
+  );
+  batchRows.push(...missing);
+  batchRows.sort((a, b) => {
+    const aDated = a.expiry_date ? 0 : 1;
+    const bDated = b.expiry_date ? 0 : 1;
+    if (aDated !== bDated) return aDated - bDated;
+    if (a.expiry_date && b.expiry_date && a.expiry_date !== b.expiry_date) {
+      return a.expiry_date < b.expiry_date ? -1 : 1;
+    }
+    if (a.received_date !== b.received_date) return a.received_date < b.received_date ? -1 : 1;
+    return a.id - b.id;
+  });
+}
+
 /**
  * Stock exists in this warehouse but every batch/location is blocked or
  * expired. That is "no sellable stock", not legacy unbatched stock.
@@ -343,6 +459,23 @@ function assertNoBlockedStockOnly(
   );
 }
 
+/** Sellable bins of ONE batch in this warehouse, oldest location first. */
+function selectBatchBins(
+  db: Database.Database,
+  batchId: number,
+  warehouseId: number
+): Array<{ id: number; quantity_available: number; status_override: string | null; created_at: string }> {
+  return db.prepare(`
+    SELECT bsl.id, bsl.quantity_available, bsl.status_override, l.created_at
+    FROM batch_stock_by_location bsl
+    JOIN locations l ON bsl.location_id = l.id
+    WHERE bsl.batch_id = ? AND l.warehouse_id = ?
+      AND bsl.quantity_available > 0
+      AND ${sellableStatusClause('bsl.status_override')}
+    ORDER BY l.created_at ASC, bsl.id ASC
+  `).all(batchId, warehouseId) as Array<{ id: number; quantity_available: number; status_override: string | null; created_at: string }>;
+}
+
 /**
  * Consume from the oldest eligible batch first. The location rows of a batch
  * are drawn down first, then the master batch row is decremented by the
@@ -369,34 +502,12 @@ function consumeBatchesByLocation(
     // here only location sellability applies (ACTIVE status).
     // (The previous version referenced `sb.expiry_date` out of scope
     // — a latent "no such column" failure on every FEFO consumption.)
-    const locRows = db.prepare(`
-      SELECT bsl.id, bsl.quantity_available, bsl.status_override, l.created_at
-      FROM batch_stock_by_location bsl
-      JOIN locations l ON bsl.location_id = l.id
-      WHERE bsl.batch_id = ? AND l.warehouse_id = ?
-        AND bsl.quantity_available > 0
-        AND ${sellableStatusClause('bsl.status_override')}
-      ORDER BY l.created_at ASC, bsl.id ASC
-    `).all(batch.id, warehouseId) as Array<{ id: number; quantity_available: number; status_override: string | null; created_at: string }>;
+    const locRows = selectBatchBins(db, batch.id, warehouseId);
 
     // BUG-013 R1 (flag ON): selling from a DAMAGED bin is allowed, but never
     // silent. The warning is raised from the bins the take ACTUALLY hit — a
     // DAMAGED bin the allocator never reached must not cry wolf.
-    let hitDamaged = false;
-
-    let batchRemaining = consumeFromThis;
-    for (const loc of locRows) {
-      if (batchRemaining <= 0) break;
-      const locAvail = roundQty(loc.quantity_available);
-      const take = roundQty(Math.min(batchRemaining, locAvail));
-      if (take > 0 && loc.status_override === 'DAMAGED') hitDamaged = true;
-      db.prepare(`
-        UPDATE batch_stock_by_location
-        SET quantity_physical = quantity_physical - ?, quantity_reserved = quantity_reserved
-        WHERE id = ?
-      `).run(take, loc.id);
-      batchRemaining -= take;
-    }
+    const { hitDamaged } = drainBinsForTake(db, locRows, consumeFromThis, false);
 
     if (hitDamaged) pushUniqueWarning(warnings, damagedWarning(db, itemId));
 
@@ -412,12 +523,7 @@ function consumeBatchesByLocation(
   }
 
   if (qtyPositive(remaining)) {
-    const item = db.prepare('SELECT item_name FROM items WHERE id = ?').get(itemId) as { item_name: string } | undefined;
-    throw new SellableStockUnavailableError(
-      item?.item_name || `item ${itemId}`,
-      roundedQty,
-      roundQty(roundedQty - remaining)
-    );
+    throwShortfall(db, itemId, roundedQty, roundQty(roundedQty - remaining));
   }
 
   return consumption;
@@ -510,18 +616,18 @@ function consumeLegacyBatches(
       FROM batch_stock_by_location bsl
       JOIN locations l ON bsl.location_id = l.id
       WHERE bsl.batch_id = ? AND l.warehouse_id = ?
-    `).get(batch.id, warehouseId) as { c: number; avail: number; reserved: number; unsellable: number };
+    `).get(batch.id, warehouseId) as { c: number; reserved: number; unsellable: number };
     const binCount = Number(binAgg.c);
-    const binReserved = roundQty(Number(binAgg.reserved));
     // R1+R4: free = master - every reserved unit - the unreserved units parked
     // in a non-sellable bin (EXPIRED/BLOCKED/QUARANTINED). Disjoint terms: a
     // reserved unit is subtracted once, never twice. A batch with no bin rows
     // has neither reservation nor status evidence, so free is the master
     // quantity.
-    const binUnsellable = roundQty(Number(binAgg.unsellable));
-    const sellableHere = roundQty(
-      Math.max(0, roundQty(batch.quantity_remaining) - binReserved - binUnsellable)
-    );
+    const sellableHere = roundQty(Math.max(0,
+      roundQty(batch.quantity_remaining) -
+      roundQty(Number(binAgg.reserved)) -
+      roundQty(Number(binAgg.unsellable))
+    ));
     if (sellableHere <= 0) continue;
     //  - R1: a DAMAGED bin is still sellable, so read the shared sellable
     //    status clause instead of ignoring status entirely. EXPIRED/BLOCKED/
@@ -530,14 +636,7 @@ function consumeLegacyBatches(
     //    its physical. Filtering on quantity_physical > 0 while taking
     //    quantity_physical hands out reserved units. The reserved promise
     //    survives the fallback.
-    const locRows = db.prepare(`      SELECT bsl.id, bsl.quantity_available, bsl.status_override, l.created_at
-      FROM batch_stock_by_location bsl
-      JOIN locations l ON bsl.location_id = l.id
-      WHERE bsl.batch_id = ? AND l.warehouse_id = ?
-        AND bsl.quantity_available > 0
-        AND ${sellableStatusClause('bsl.status_override')}
-      ORDER BY l.created_at ASC, bsl.id ASC
-    `).all(batch.id, warehouseId) as Array<{ id: number; quantity_available: number; status_override: string | null; created_at: string }>;
+    const locRows = selectBatchBins(db, batch.id, warehouseId);
 
     // R2 compares the take against the SELLABLE bins' availability only. A
     // BLOCKED/EXPIRED bin is not stock the sale can have drawn on, so its
@@ -551,19 +650,7 @@ function consumeLegacyBatches(
       WHERE id = ?
     `).run(consumeFromThis, batch.id);
 
-    let locRemaining = consumeFromThis;
-    let hitDamaged = false;
-    for (const loc of locRows) {
-      if (locRemaining <= 0) break;
-      const take = roundQty(Math.min(locRemaining, roundQty(loc.quantity_available)));
-      if (take > 0 && loc.status_override === 'DAMAGED') hitDamaged = true;
-      db.prepare(`
-        UPDATE batch_stock_by_location
-        SET quantity_physical = MAX(0, quantity_physical - ?)
-        WHERE id = ?
-      `).run(take, loc.id);
-      locRemaining -= take;
-    }
+    const { hitDamaged } = drainBinsForTake(db, locRows, consumeFromThis, true);
 
     // R1: warn only when the take actually reached a DAMAGED bin, and once
     // per sale (deduped by the caller-visible text), not once per batch.
@@ -573,12 +660,7 @@ function consumeLegacyBatches(
     // quantity; the master batch still backs the unit, so this is mirror lag
     // (never a true shortage — that already threw above).
     if (binCount > 0 && qtyLessThan(binAvailable, consumeFromThis)) {
-      pushUniqueWarning(
-        warnings,
-        `Item ${itemName(db, itemId)}: only ${binAvailable} unit(s) are available in the location ledger ` +
-        `for this batch, but ${consumeFromThis} were sold — the remainder came from the batch total. ` +
-        `Run the batch-location backfill to reconcile.`
-      );
+      warnMirrorShortfall(warnings, db, itemId, binAvailable, consumeFromThis);
     }
 
     consumption.push({ batchId: batch.id, consumed: consumeFromThis, unitCost: batch.unit_cost });
@@ -586,12 +668,7 @@ function consumeLegacyBatches(
   }
 
   if (qtyPositive(remaining)) {
-    const item = db.prepare('SELECT item_name FROM items WHERE id = ?').get(itemId) as { item_name: string } | undefined;
-    throw new SellableStockUnavailableError(
-      item?.item_name || `item ${itemId}`,
-      roundedQty,
-      roundQty(roundedQty - remaining)
-    );
+    throwShortfall(db, itemId, roundedQty, roundQty(roundedQty - remaining));
   }
 
   return consumption;
@@ -654,6 +731,42 @@ function consumeLegacyStock(
   }
 
   return consumeLegacyBatches(db, itemId, warehouseId, batches, roundedQty, warnings);
+}
+
+/**
+ * ACCT-006 with location coverage (flag ON): sellability (ACTIVE status,
+ * expiry at the sale date) is judged on the location rows only. Returns null
+ * when there is no coverage at all (caller falls through to batch-level) or
+ * when any precondition fails (as-of position non-empty, later receipts do
+ * not cover the quantity) so the normal allocator keeps its refusals.
+ */
+function preReceiptFallbackWithLocations(
+  db: Database.Database,
+  itemId: number,
+  warehouseId: number,
+  roundedQty: number,
+  saleDate: string,
+  useFEFO: boolean,
+  warnings: string[]
+): { consumption: ConsumptionEntry[]; firstReceiptDate: string | null; warnings: string[] } | null {
+  if (!hasLocationCoverage(db, itemId, warehouseId)) return null;
+  const withLocations = selectLocationBatches(db, itemId, warehouseId, saleDate, useFEFO, {
+    ignoreReceiptDate: true,
+  });
+  if (withLocations.length === 0) return null;
+  const covered = roundQty(withLocations.reduce((s, b) => s + Number(b.qty_avail), 0));
+  if (qtyLessThan(covered, roundedQty)) return null;
+  const asOfRows = selectLocationBatches(db, itemId, warehouseId, saleDate, useFEFO);
+  if (asOfRows.length > 0) return null;
+  const firstReceiptDate = (db.prepare(`
+    SELECT MIN(received_date) AS d FROM stock_batches
+    WHERE item_id = ? AND warehouse_id = ? AND quantity_remaining > 0
+  `).get(itemId, warehouseId) as { d: string | null }).d;
+  return {
+    consumption: consumeBatchesByLocation(db, itemId, warehouseId, withLocations, roundedQty, warnings),
+    firstReceiptDate,
+    warnings,
+  };
 }
 
 class StockMovementModel {
@@ -1468,6 +1581,60 @@ class StockMovementModel {
     return db.prepare(sql).all(...params) as Array<{ item_id: number; warehouse_id: number; sellable_qty: number }>;
   }
 
+  /**
+   * BUG-013 flag-ON allocator. Batches are read from the location rows and
+   * topped up with any stock that has no location coverage, then consumed
+   * location-first. Falls back to the legacy batch-level rules when no
+   * location rows exist at all.
+   */
+  private static consumeFlagOn(
+    db: Database.Database,
+    itemId: number,
+    warehouseId: number,
+    quantity: number,
+    roundedQty: number,
+    asOf: string,
+    useFEFO: boolean,
+    availableQty: number,
+    itemRow: { has_expiry: number; standard_cost: number; item_name: string } | undefined,
+    warnings: string[]
+  ): ConsumptionEntry[] {
+    const batchRows = selectLocationBatches(db, itemId, warehouseId, asOf, useFEFO);
+    mergeUncoveredBatches(db, itemId, warehouseId, asOf, useFEFO, batchRows);
+
+    // Stock exists but every batch/location is blocked or expired.
+    if (batchRows.length === 0 && availableQty > 0) {
+      assertNoBlockedStockOnly(db, itemId, warehouseId, quantity);
+    }
+
+    if (batchRows.length > 0) {
+      return consumeBatchesByLocation(db, itemId, warehouseId, batchRows, roundedQty, warnings);
+    }
+
+    // Batches exist but carry no batch_stock_by_location rows (the rollout is
+    // transitional — API purchases create stock_batches without location rows).
+    // Consume them batch-level with the legacy rules so the sale stays
+    // batch-linked at actual cost: a standard-cost phantom sale here would
+    // consume no batch and drift GL inventory away from batch values.
+    const tracked = db.prepare(`
+      SELECT COUNT(*) AS c FROM stock_batches
+      WHERE item_id = ? AND warehouse_id = ? AND quantity_remaining > 0
+    `).get(itemId, warehouseId) as { c: number };
+    if (Number(tracked.c) > 0) {
+      return consumeLegacyStock(
+        db, itemId, warehouseId, quantity, roundedQty, asOf, useFEFO, availableQty, itemRow, warnings
+      );
+    }
+
+    // Legacy case: positive warehouse stock and no batch rows at all.
+    const fallbackCost = itemRow?.standard_cost ?? 0;
+    logger.warn(
+      `[BatchCosting] No batch_stock_by_location rows for ${itemRow?.item_name || 'item'} in warehouse. ` +
+      `Using standard_cost (${fallbackCost}) for the entire ${quantity} units (legacy stock).`
+    );
+    return [{ batchId: null, consumed: quantity, unitCost: fallbackCost }];
+  }
+
   static consumeFromOldestBatches(
     itemId: number,
     warehouseId: number,
@@ -1486,96 +1653,16 @@ class StockMovementModel {
     const featureOn = isFeatureEnabled(db, 'feature_batch_locations');
 
     const availableQty = resolveAvailableQuantity(db, itemId, warehouseId, roundedQty, featureOn);
-
-    if (qtyLessThan(availableQty, roundedQty)) {
-      const item = db.prepare('SELECT item_name FROM items WHERE id = ?').get(itemId) as { item_name: string } | undefined;
-      throw new SellableStockUnavailableError(
-        item?.item_name || `item ${itemId}`,
-        roundedQty,
-        availableQty
-      );
-    }
+    assertAvailable(db, itemId, roundedQty, availableQty);
 
     // Check if item has expiry tracking — determines FEFO vs FIFO
     const itemRow = db.prepare('SELECT has_expiry, standard_cost, item_name FROM items WHERE id = ?').get(itemId) as { has_expiry: number; standard_cost: number; item_name: string } | undefined;
     const useFEFO = itemRow?.has_expiry === 1;
 
     if (featureOn) {
-      const batchRows = selectLocationBatches(db, itemId, warehouseId, asOf, useFEFO);
-
-      // BUG-013: a batch with no location coverage is not gone, it is simply not
-      // yet location-tracked (a flag flip, or a row written by a path that did
-      // not refresh the location table). The flag chooses which source is READ;
-      // it must never make stock disappear. Add such batches at their master
-      // quantity. Done in JS so the location query and its FEFO rules are
-      // untouched; consumeBatchesByLocation already decrements the master row
-      // and only touches location rows that exist.
-      const missing = db.prepare(`
-        SELECT sb.id, sb.unit_cost, sb.received_date, sb.expiry_date,
-               sb.quantity_remaining AS qty_avail
-        FROM stock_batches sb
-        WHERE sb.item_id = ? AND sb.warehouse_id = ?
-          AND sb.quantity_remaining > 0
-          AND NOT EXISTS (
-            SELECT 1 FROM batch_stock_by_location bsl
-            WHERE bsl.batch_id = sb.id AND bsl.quantity_available > 0
-          )
-          ${useFEFO ? "AND COALESCE(sb.halted, 0) = 0 AND (sb.expiry_date IS NULL OR sb.expiry_date >= @asOf)" : ''}
-      `).all(itemId, warehouseId, { asOf }) as LocationBatchRow[];
-      if (missing.length > 0) {
-        logger.warn(
-          `[BatchLocations] ${missing.length} batch(es) for item ${itemId} in warehouse ${warehouseId} ` +
-          `carry stock but no location row; selling them from the batch total (BUG-013 guard). ` +
-          `This means the location table is behind — run the backfill if it persists.`
-        );
-        batchRows.push(...missing);
-        // Keep the documented order: dated expiry first (soonest first), then
-        // undated, then FIFO by receipt date and id.
-        batchRows.sort((a, b) => {
-          const aDated = a.expiry_date ? 0 : 1;
-          const bDated = b.expiry_date ? 0 : 1;
-          if (aDated !== bDated) return aDated - bDated;
-          if (a.expiry_date && b.expiry_date && a.expiry_date !== b.expiry_date) {
-            return a.expiry_date < b.expiry_date ? -1 : 1;
-          }
-          if (a.received_date !== b.received_date) return a.received_date < b.received_date ? -1 : 1;
-          return a.id - b.id;
-        });
-      }
-
-      // Check if stock exists but all batches/locations are blocked/expired.
-      if (batchRows.length === 0 && availableQty > 0) {
-        assertNoBlockedStockOnly(db, itemId, warehouseId, quantity);
-      }
-
-      if (batchRows.length === 0) {
-        // Batches exist but carry no batch_stock_by_location rows (the
-        // batch-locations rollout is transitional — API purchases create
-        // stock_batches without location rows). Consume them batch-level
-        // with the legacy rules so the sale stays batch-linked at actual
-        // cost: a standard-cost phantom sale here would consume no batch
-        // and drift GL inventory away from batch values.
-        const tracked = db.prepare(`
-          SELECT COUNT(*) AS c FROM stock_batches
-          WHERE item_id = ? AND warehouse_id = ? AND quantity_remaining > 0
-        `).get(itemId, warehouseId) as { c: number };
-        if (Number(tracked.c) > 0) {
-          return consumeLegacyStock(
-            db, itemId, warehouseId, quantity, roundedQty, asOf, useFEFO, availableQty, itemRow,
-            warnings ?? []
-          );
-        }
-
-        // Legacy case: positive warehouse stock and no batch rows at all.
-        const fallbackCost = itemRow?.standard_cost ?? 0;
-        logger.warn(
-          `[BatchCosting] No batch_stock_by_location rows for ${itemRow?.item_name || 'item'} in warehouse. ` +
-          `Using standard_cost (${fallbackCost}) for the entire ${quantity} units (legacy stock).`
-        );
-        return [{ batchId: null, consumed: quantity, unitCost: fallbackCost }];
-      }
-
-      return consumeBatchesByLocation(db, itemId, warehouseId, batchRows, roundedQty, warnings ?? []);
+      return this.consumeFlagOn(
+        db, itemId, warehouseId, quantity, roundedQty, asOf, useFEFO, availableQty, itemRow, warnings ?? []
+      );
     }
 
     // Legacy path (feature flag off): original behavior unchanged.
@@ -1641,34 +1728,11 @@ class StockMovementModel {
       | undefined)?.has_expiry === 1;
 
     if (isFeatureEnabled(db, 'feature_batch_locations')) {
-      const withLocations = selectLocationBatches(db, itemId, warehouseId, saleDate, useFEFO, {
-        ignoreReceiptDate: true,
-      });
-      const hasLocationRows = db.prepare(`
-        SELECT 1 FROM batch_stock_by_location bsl
-        JOIN locations l ON bsl.location_id = l.id
-        WHERE l.warehouse_id = ?
-          AND EXISTS (SELECT 1 FROM stock_batches sb WHERE sb.id = bsl.batch_id AND sb.item_id = ?)
-        LIMIT 1
-      `).get(warehouseId, itemId);
-      if (hasLocationRows) {
-        // Location rows exist: sellability (ACTIVE status, expiry at the
-        // sale date) is judged on them only. The fallback needs the as-of
-        // position empty and the later receipts covering the quantity.
-        if (withLocations.length === 0) return null;
-        const covered = roundQty(withLocations.reduce((s, b) => s + Number(b.qty_avail), 0));
-        if (qtyLessThan(covered, roundedQty)) return null;
-        const asOfRows = selectLocationBatches(db, itemId, warehouseId, saleDate, useFEFO);
-        if (asOfRows.length > 0) return null;
-        const firstReceiptDate = (db.prepare(`
-          SELECT MIN(received_date) AS d FROM stock_batches
-          WHERE item_id = ? AND warehouse_id = ? AND quantity_remaining > 0
-        `).get(itemId, warehouseId) as { d: string | null }).d;
-        return {
-          consumption: consumeBatchesByLocation(db, itemId, warehouseId, withLocations, roundedQty, warnings),
-          firstReceiptDate,
-          warnings,
-        };
+      const viaLocations = preReceiptFallbackWithLocations(
+        db, itemId, warehouseId, roundedQty, saleDate, useFEFO, warnings
+      );
+      if (viaLocations !== null || hasLocationCoverage(db, itemId, warehouseId)) {
+        return viaLocations;
       }
       // No location rows: fall through to the batch-level path (API-purchased
       // batches predate the location layer).
