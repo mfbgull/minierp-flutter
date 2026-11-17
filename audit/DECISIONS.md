@@ -1780,3 +1780,21 @@ remains a separate mechanism.
   (red-first tests + review land).
 - Scope guards: no new current-date reversal feature/UI; existing tested
   candidates PR4/PR7/PR8 stay frozen.
+
+## F3 test-file ownership: CONFIRMED by Gull (2026-11-17, msg_065193806caa)
+
+- **PI owns:** the SupplierRefund.ts fix + NEW dedicated F3 regression
+  tests (fresh branch).
+- **GLM alone owns:** the existing
+  `server/src/__tests__/moneyPathFindingsRed.test.ts` on the GLM line.
+  PI must not edit the existing GLM test.
+- **Unpark rule:** the F-3 `it.failing` case is NOT unparked on any branch
+  that lacks the fix. Unpark only after that branch actually contains the
+  reviewed fixed commit through approved integration AND the regression is
+  observed passing normally. When the marker is edited, the pending-decision
+  comment in the file header must be updated accurately. No concurrent
+  edits.
+- **Frozen candidates:** PR4/PR8 stay frozen until integration is
+  explicitly sequenced. No silent cherry-picks, no force pushes.
+- Routine file-ownership questions no longer need Gull; ready/merge remain
+  human-only; no full test reruns unless an actual change/risk warrants.

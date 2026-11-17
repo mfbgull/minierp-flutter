@@ -1390,3 +1390,12 @@ situation of every existing install at migration time.
   exit 0, no issues, 9 changed files. PR7 stays DRAFT; ready/merge remains
   Gull's call. PR4/PR7/PR8 tested candidates stay frozen per
   msg_ca9008067d4f.
+
+- **F3 ownership CONFIRMED (Gull msg_065193806caa):** single-owner plan
+  confirmed — PI owns SupplierRefund.ts + NEW F3 regressions; GLM alone owns
+  moneyPathFindingsRed.test.ts on the GLM line. Unpark only on a branch
+  containing the reviewed fixed commit through approved integration, with
+  the regression observed passing; header comment updated accurately at the
+  same edit; no concurrency. Ownership agreement sent to PI via the run.
+  F3 stays DECIDED/implementation-pending; GLM will independently review
+  PI's exact money diff when available.
