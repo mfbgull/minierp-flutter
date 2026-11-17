@@ -26,8 +26,9 @@ afterEach(() => { db.exec('ROLLBACK TO f3_void_case; RELEASE f3_void_case'); });
 
 const RECEIPT_DATE = '2026-03-15';
 const RETURN_DATE = '2026-03-10';
-/** Between the purchase and the receipt — a date a caller may ask about. */
-const INTERMEDIATE_DATE = '2026-03-12';
+/** After the receipt (2026-03-15) but before the real action date — a date a
+ *  caller may ask about once the receipt exists and the void has not run. */
+const INTERMEDIATE_DATE = '2026-03-20';
 
 /** Scoped GL AP (account 2000) balance attributable to ONE supplier's
  *  documents, read as-of a date. Liability increases on credit, so the AP
