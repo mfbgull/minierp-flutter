@@ -1562,3 +1562,36 @@ situation of every existing install at migration time.
   invariant widening, no schema/backfill/default/127 changes (verified in
   diff); focused-coverage CRAP warnings inconclusive until full
   same-worktree coverage; no baseline changes.
+
+- **CORRECTION to the S-3 review (Gull msg_c7abb19bc488): the
+  recordMovement caller gate is the SAME invariant, not a protective
+  exemption.** Gull independently verified StockMovement.ts:877-880 still
+  flag-gates the shared mirror refresh. Since the function is now
+  ungated, the caller-level gate is REDUNDANT and enforces nothing but an
+  inconsistency with the shared maintained-write rule ("the flag selects
+  what is READ, never what is MAINTAINED"). It must NOT be described as
+  protective for the no-bin case. Routed to PI (bounded, before the final
+  gate): narrow OFF real-route regression first, THEN remove the
+  redundant caller gate, alongside the meaningful
+  existing-NONZERO-reservation THEN ADD case with red/revert proof. S-3
+  stays validation-pending — no final approve until the bounded follow-up
+  is tested.
+
+- **Evidence-class relabeling (same message).** The tracker must
+  distinguish SOURCE-confirmed missing calls from runtime-confirmed
+  reproductions, and current-source observations must not carry
+  "pre-existing" labels unless a clean known-good baseline proves them:
+  - RUNTIME-CONFIRMED reproduction: S-3 itself — bins present, extension
+    NULL via real purchase/receipt/production routes (PI, e400f4cc).
+  - SOURCE-CONFIRMED missing calls (current source, runtime repro NOT
+    required for the code fact): StockReservation reserve/release updates
+    bins with zero stock_balances references; PurchaseOrder.ts:758
+    PO-cancel zeroing does not sync; recordMovement:877-880 caller gate.
+    All three remain UNRESOLVED gaps — none is fixed by 360e1aa8, and
+    none is permission for wider production cleanup beyond the routed
+    bounded follow-up.
+  - No-bin extension sum=0: already reviewed safe (read-inert; legacy
+    `quantity` stays authoritative with flag OFF).
+
+- **Discipline standing:** no GLM tests during PI's future full gate; no
+  stock edits; batched routine record updates.
