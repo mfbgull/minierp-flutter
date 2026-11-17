@@ -1595,3 +1595,38 @@ situation of every existing install at migration time.
 
 - **Discipline standing:** no GLM tests during PI's future full gate; no
   stock edits; batched routine record updates.
+
+- **S-3 batched update (2026-11-17, Gull msg_0bba910f3970): final follow-up
+  `2692ab1e` reviewed — APPROVE; S-3 validation-pending on the running
+  gate.** Full review:
+  `/home/fawad/logs/glm-s3-final-followup-review-2692ab1e.md`. [SOURCE]:
+  production change is EXACTLY the routed caller-gate removal
+  (recordMovement ~877-880: `syncStockBalancesExtension` now unconditional,
+  accurate comment) — consistent with the shared maintained-write
+  invariant; no other production changes in the branch (4 model files + 1
+  spec only; no services/migrations). New cases verified meaningful:
+  (a) both-flag recordMovement parity (real-HTTP ADJUSTMENT, both states —
+  the OFF regression justifying the gate removal); (b) the coordinator's
+  existing-NONZERO-reservation THEN ADD case via the REAL reservation
+  route (10 → reserve 4 → ADD 5 ⇒ bins/mirror {15,4,11}, reservation
+  preserved); (c) legacy/no-bin control (quantity 42, no bins: nothing
+  fabricated, legacy column intact, mirror reads its true 0 coverage).
+  [TEST, PI-reported]: 13/13 focused, 27 suites / 205 dependents + A–J;
+  revert-all → 11 fail / 2 pass (survivors consistent: the PROBE asserting
+  current stale behavior + the tolerant legacy control). Full gate
+  RUNNING at `/home/fawad/verify-2692ab1e`
+  (`/home/fawad/logs/gate-2692ab1e.log`); exact changed-base audit with
+  fresh coverage follows; NO final green until both resolve.
+
+- **RESERVATION-ONLY STALE MIRROR: evidence class corrected to
+  RUNTIME-CONFIRMED (Gull msg_0bba910f3970).** PI's executed probe (green
+  in the focused run) asserts the concrete divergent state after a REAL
+  reservation with no ADD afterward: bins {physical:10, reserved:4,
+  available:6} vs stock_balances extension mirror {10, 0, 10}. This is a
+  runtime-confirmed CHARACTERIZATION of the defect — not UNCONFIRMED, and
+  NOT intended correct semantics. It remains a SEPARATE finding from the
+  S-1 consume/release issue, UNFIXED in S-3 (no StockReservation production
+  edits in the branch), and not permission for wider cleanup. The test
+  comment's "UNCONFIRMED PROBE" header is mislabeled; this tracker entry
+  is the authoritative record; the in-code label corrects naturally when
+  the separate finding is fixed and the assertions flip to equality.
