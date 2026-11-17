@@ -1830,3 +1830,23 @@ situation of every existing install at migration time.
   optional re-parent onto `d60df612` would be a no-conflict formality.
   Awaiting coordinator's exact lease (`52447ccc…` old head) after their
   inspection; fresh-head CI follows the push.
+
+- **PR8 PUSHED with exact lease (2026-11-17, msg_0a8a534e8264):
+  `glm/warning-ui` = `ef117084` (was `52447ccc`).** Fresh remote check
+  matched the lease old-head exactly; `--force-with-lease` accepted;
+  post-push remote verified. New-head CI at `ef117084`: runs
+  44097109245 (push event) + 44097118947 (pull_request event).
+  Results: server SUCCESS + flutter SUCCESS in BOTH runs;
+  **pull_request fallow SUCCESS (the content verdict: PASS)**; push-event
+  fallow FAILURE — a NEW VARIANT of the known fallow push-event infra
+  class: not the zero-SHA `0000…` case but "could not determine changed
+  files for base ref `52447ccc…`: Invalid symmetric difference
+  expression … Verify the ref exists" (exit 2) — the force-push removed
+  the old head from the remote's reachable refs, so the push-event
+  fallow cannot compute the changed-file set. Not a content verdict.
+  The standing fallow workflow-fix proposal
+  (`/home/fawad/logs/fallow-ci-base-ref-fix-proposal.md`) covers this
+  class and still awaits Gull's decision. PR8 NOT merged (awaiting
+  Gull); PR8 base branch is still `glm/ux-review-tests` (its tip
+  `ea8f79cd` is merged into main via PR4) — base change to main NOT
+  required for CI; only on Gull's instruction.
