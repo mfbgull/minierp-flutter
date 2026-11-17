@@ -1802,3 +1802,31 @@ situation of every existing install at migration time.
   just run at the shared base), server suites (PR8 touches no server
   files). **NOT PUSHED**: awaiting coordinator inspection of `ef117084`
   and the exact old-head lease (`52447ccc…`).
+
+- **PR6 MERGED (merge commit `d60df612`, 2026-11-17) — GLM EXCLUSIVE
+  FULL GATE at exact `d60df612` — PASS, exit 0 (2026-11-17).** Clean ext4
+  detached worktree `/home/fawad/verify-pr6-merge-d60df612` (HEAD =
+  `d60df612` exact), real `npm ci` + `flutter pub get`, ran via
+  `bash scripts/check.sh` (100644 non-executable; no chmod, no source
+  change). Results: **server 285/285 suites, 2277/2277 tests passed, 0
+  FAIL** (285th suite = PR6's `batchLocationLegacyConsumeScope.test.ts`);
+  **Flutter 1212 passed + 1 skipped** (the 1 skip recorded honestly; same
+  single-skip pattern as the `d1075cd2` gate and PI's PR3 gate), "All
+  other tests passed!"; l10n-drift clean (0/0); finding-tag audit: server
+  it.failing=1 (parked F-3), flutter RED-BY-DESIGN files=0. Post-run
+  dirty: exactly the 11 known `audit/accounting-audit/remediation/`
+  golden artifacts regenerated — restored via `git checkout --`; tracked
+  dirty 0 / untracked 0 afterward. Log:
+  `/home/fawad/logs/gate-d60df612/check-full.log` (final line
+  `GATE_EXIT=0`). Main CI at `d60df612`: run 44089674320 — server
+  SUCCESS, fallow SUCCESS, flutter SUCCESS (3/3).
+- **PR8 status after PR6 merge:** candidate remains `ef117084` (based on
+  `d1075cd2`), NOT pushed (remote `glm/warning-ui` still old head
+  `52447ccc`; the old head's fallow CI failure is the known zero-SHA
+  push-event artifact class, not a content verdict). Overlap check:
+  PR6 (`d1075cd2..d60df612`) touched ONLY server files
+  (`StockMovement.ts` + its test); PR8 touches ONLY Flutter files — zero
+  overlap, so `ef117084` content is unaffected by the PR6 merge; an
+  optional re-parent onto `d60df612` would be a no-conflict formality.
+  Awaiting coordinator's exact lease (`52447ccc…` old head) after their
+  inspection; fresh-head CI follows the push.
