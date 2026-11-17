@@ -546,8 +546,10 @@ class PurchaseRepository {
   /// Void a refund receipt (`POST /supplier-refunds/:id/void`). A void that
   /// would overdraw cash is refused with 409 and a `cashBlockers` list.
   ///
-  /// [idempotencyKey] is mandatory: the server refuses this route (400)
-  /// without the header, so an un-keyed call can never post.
+  /// [idempotencyKey] is NOT mandated by the server on this route (the void
+  /// controller performs no idempotency handling — unlike the write-off
+  /// route, which returns 400 without the header). The client sends one
+  /// voluntarily (653dfe43) as a retry-safety measure.
   Future<ApiResult<void>> voidRefund(
     int id, {
     required String reason,
