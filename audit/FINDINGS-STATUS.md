@@ -1531,3 +1531,34 @@ situation of every existing install at migration time.
   (284/2273 exit 0 + independent 37-test rerun + changed-base clean),
   F3 stands at: implementation locally verified, remote content verdict
   clean, NOT merged — ready/merge remains human-only.
+
+- **S-3 batched update (2026-11-17, Gull msg_f23d3ecacd98): GLM review of
+  `360e1aa8` — APPROVE-WITH-LIMITS; reservation-only mirror gap CONFIRMED
+  as a separate linked finding.** Full review:
+  `/home/fawad/logs/glm-s3-review-360e1aa8.md`. [SOURCE] verified: all
+  three ADD-path sync calls inside the same transaction AFTER balance+bin
+  rows exist (Purchase writePurchaseRow:312 / PO:1123 / Production:547);
+  warehouse scope correct (bins batch-scoped, l.warehouse_id filter, same
+  warehouse as the writes); legacy/no-bin safe — the sync touches ONLY the
+  extension columns, never legacy `quantity`; no-bin → 0/0/0 is
+  semantically correct and read-inert (the only extension reader,
+  StockMovement.ts:280, reads quantity_available only with flag ON; no
+  COALESCE-fallback readers). Callers: recordMovement:879 call site STILL
+  self-gated (net behavior unchanged; inconsistency with the in-function
+  comment noted — protective for no-bin adjustments); PhysicalCount
+  399/669 now ungated (flag-OFF behavior change, consistent+inert).
+  LINKED FINDING (coordinator's, confirmed at source): StockReservation.ts
+  (reserve :104 / release via negative delta) updates bin rows but has
+  ZERO stock_balances references — mirror stale after every
+  reservation/release; SEPARATE from S-1 consume-release, NOT fixed by
+  360e1aa8; later ADD-path syncs repair staleness incidentally. Same
+  family, pre-existing, out of scope: PurchaseOrder.ts:758 PO-cancel
+  zeroing also does not sync. TEST FOLLOW-UP before the final gate
+  (coordinator): replace the downgraded reserved=0 control with a
+  meaningful existing-NONZERO-reservation THEN ADD case (reservation
+  preserved), red/revert proof; code frozen at 360e1aa8. S-3 =
+  implemented / validation-pending — final verdict waits on the corrected
+  case + PI's exclusive full gate + changed-base audit. No global
+  invariant widening, no schema/backfill/default/127 changes (verified in
+  diff); focused-coverage CRAP warnings inconclusive until full
+  same-worktree coverage; no baseline changes.
