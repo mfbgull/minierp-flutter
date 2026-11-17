@@ -1863,3 +1863,23 @@ situation of every existing install at migration time.
   is satisfied; the earlier push-event fallow base-ref artifact
   (unreachable old head) is superseded for merge-readiness. PR8 remains
   OPEN, NOT merged; awaiting Gull. No workflow edits made.
+
+- **PR8 MERGED (merge commit `87a425ea`, 2026-11-17T14:51:52Z; reviewed
+  head `ef117084`; fresh PR run 44105990414 3/3 SUCCESS) — GLM EXCLUSIVE
+  FULL GATE at exact `87a425ea` — PASS, exit 0 (2026-11-17).** Clean ext4
+  detached worktree `/home/fawad/verify-pr8-merge-87a425ea` (HEAD =
+  `87a425ea` exact), real `npm ci` + `flutter pub get`, via
+  `bash scripts/check.sh` (100644 non-executable; no chmod, no source
+  change). Results: **server 285/285 suites, 2277/2277 tests passed, 0
+  FAIL**; **Flutter 1219 passed + 1 skipped** (up from 1212 — PR8's 7
+  warning-path tests now on main; the 1 skip recorded honestly, same
+  single-skip pattern across the d1075cd2 / d60df612 / 87a425ea gates and
+  PI's PR3 gate), "All other tests passed!"; l10n-drift clean (0/0);
+  finding-tag audit: server it.failing=1 (parked F-3), flutter
+  RED-BY-DESIGN files=0. Post-run dirty: exactly the 11 known
+  `audit/accounting-audit/remediation/` golden artifacts — restored via
+  `git checkout --`; tracked dirty 0 / untracked 0 afterward. Log:
+  `/home/fawad/logs/gate-87a425ea/check-full.log` (final line
+  `GATE_EXIT=0`). Main CI at `87a425ea`: run 44107790691 — server
+  SUCCESS, fallow SUCCESS, flutter SUCCESS (3/3). Full gate slot
+  RELEASED after this report; PR7 merge unblocked from GLM's side.
