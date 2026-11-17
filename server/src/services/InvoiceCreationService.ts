@@ -299,8 +299,11 @@ export class InvoiceCreationService {
         discount_value: item.discount_value,
         amount: item.amount,
       });
-      const { consumption, backdatedBeforeReceipt: backdatedLine, firstReceiptDate } =
+      const { consumption, backdatedBeforeReceipt: backdatedLine, firstReceiptDate, warnings: stockWarnings } =
         StockMovementModel.consumeForSale(item.item_id, warehouseId, item.quantity, this.db, input.invoiceDate);
+      // BUG-013 R1/R2: damaged-bin and bin-under-coverage notes from the
+      // consume path ride the SAME warnings[] channel as ACCT-006 below.
+      warnings.push(...stockWarnings);
       if (backdatedLine) {
         backdatedBeforeReceipt = true;
         const itemName = (this.db.prepare('SELECT item_name FROM items WHERE id = ?').get(item.item_id) as

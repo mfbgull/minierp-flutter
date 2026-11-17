@@ -124,6 +124,30 @@ type LocationBatchRow = {
 type LegacyBatchRow = { id: number; quantity_remaining: number; unit_cost: number };
 
 /**
+ * BUG-013 R1: the location statuses that may still be SOLD. DAMAGED stock is
+ * sellable at scrap / reduced price, so it must be offered (with a warning the
+ * caller raises) rather than hidden. Every other override — EXPIRED, BLOCKED,
+ * QUARANTINED — stays unsellable. One shared rule so the flag-on allocator and
+ * the flag-off legacy path cannot drift apart again.
+ */
+const SELLABLE_STATUS_OVERRIDES = ['ACTIVE', 'DAMAGED'] as const;
+
+/** SQL fragment: the bin's status_override is missing (never overridden) or a
+ *  sellable one. Built from a fixed code constant — never from request input —
+ *  so it is safe to inline in queries that already use named parameters. */
+function sellableStatusClause(column: string): string {
+  const list = SELLABLE_STATUS_OVERRIDES.map((s) => `'${s}'`).join(', ');
+  return `(${column} IS NULL OR ${column} IN (${list}))`;
+}
+
+/** Item name for a warning message, with a stable fallback. */
+function itemName(db: Database.Database, itemId: number): string {
+  return (db.prepare('SELECT item_name FROM items WHERE id = ?').get(itemId) as
+    | { item_name: string }
+    | undefined)?.item_name ?? `item ${itemId}`;
+}
+
+/**
  * Sellable quantity for the item in the warehouse.
  *
  * `stock_balances` is the source of truth. `quantity_available` exists only
@@ -196,9 +220,9 @@ function selectLocationBatches(
   opts?: { ignoreReceiptDate?: boolean }
 ): LocationBatchRow[] {
   const locationFilter = useFEFO
-    ? `AND COALESCE(sb.halted, 0) = 0 AND COALESCE(bsl.status_override, 'ACTIVE') = 'ACTIVE'
+    ? `AND COALESCE(sb.halted, 0) = 0 AND ${sellableStatusClause('bsl.status_override')}
        AND (sb.expiry_date IS NULL OR sb.expiry_date >= @asOf)`
-    : `AND COALESCE(sb.halted, 0) = 0 AND COALESCE(bsl.status_override, 'ACTIVE') = 'ACTIVE'`;
+    : `AND COALESCE(sb.halted, 0) = 0 AND ${sellableStatusClause('bsl.status_override')}`;
   // ACCT-006 backdated fallback: drop the received_date cutoff so batches
   // received after the sale date are visible. Expiry sellability is still
   // judged at the sale date.
@@ -265,7 +289,8 @@ function consumeBatchesByLocation(
   itemId: number,
   warehouseId: number,
   batchRows: LocationBatchRow[],
-  roundedQty: number
+  roundedQty: number,
+  warnings: string[]
 ): ConsumptionEntry[] {
   let remaining = roundedQty;
   const consumption: ConsumptionEntry[] = [];
@@ -281,14 +306,23 @@ function consumeBatchesByLocation(
     // (The previous version referenced `sb.expiry_date` out of scope
     // — a latent "no such column" failure on every FEFO consumption.)
     const locRows = db.prepare(`
-      SELECT bsl.id, bsl.quantity_available, l.created_at
+      SELECT bsl.id, bsl.quantity_available, bsl.status_override, l.created_at
       FROM batch_stock_by_location bsl
       JOIN locations l ON bsl.location_id = l.id
       WHERE bsl.batch_id = ? AND l.warehouse_id = ?
         AND bsl.quantity_available > 0
-        AND (bsl.status_override IS NULL OR bsl.status_override = 'ACTIVE')
+        AND ${sellableStatusClause('bsl.status_override')}
       ORDER BY l.created_at ASC, bsl.id ASC
-    `).all(batch.id, warehouseId) as Array<{ id: number; quantity_available: number; created_at: string }>;
+    `).all(batch.id, warehouseId) as Array<{ id: number; quantity_available: number; status_override: string | null; created_at: string }>;
+
+    // BUG-013 R1 (flag ON): selling from a DAMAGED bin is allowed, but never
+    // silent — the caller shows the same warning the legacy path raises.
+    if (locRows.some((l) => l.status_override === 'DAMAGED')) {
+      warnings.push(
+        `Item ${itemName(db, itemId)}: sold stock held in a DAMAGED location — ` +
+        `confirm the goods are fit for the agreed scrap or reduced price.`
+      );
+    }
 
     let batchRemaining = consumeFromThis;
     for (const loc of locRows) {
@@ -386,15 +420,65 @@ function consumeLegacyBatches(
   itemId: number,
   warehouseId: number,
   batches: LegacyBatchRow[],
-  roundedQty: number
+  roundedQty: number,
+  warnings: string[]
 ): ConsumptionEntry[] {
   let remaining = roundedQty;
   const consumption: ConsumptionEntry[] = [];
 
   for (const batch of batches) {
     if (remaining <= 0) break;
-    const batchRemaining = roundQty(batch.quantity_remaining);
-    const consumeFromThis = roundQty(Math.min(remaining, batchRemaining));
+
+    // BUG-013 R4: the bins are the reservation ledger. Free units are
+    //   master quantity - TOTAL reserved in this batch's bins
+    // (not per-bin available, whose MAX(0, ...) hides an over-reservation).
+    // A batch with no bin rows has no reservation evidence, so reserved is 0
+    // and the legacy master-quantity rule stands.
+    const binAgg = db.prepare(`
+      SELECT COUNT(*) AS c,
+             COALESCE(SUM(bsl.quantity_available), 0) AS avail,
+             COALESCE(SUM(bsl.quantity_reserved), 0) AS reserved,
+             -- Only the UNRESERVED part of a non-sellable bin is lost stock.
+             -- A reserved unit is already subtracted below, so subtracting
+             -- the full physical again would count it twice and hide free
+             -- stock that lives elsewhere in the batch.
+             COALESCE(SUM(CASE WHEN ${sellableStatusClause('bsl.status_override')}
+                               THEN 0
+                               ELSE MAX(0, bsl.quantity_physical - bsl.quantity_reserved) END), 0) AS unsellable
+      FROM batch_stock_by_location bsl
+      JOIN locations l ON bsl.location_id = l.id
+      WHERE bsl.batch_id = ? AND l.warehouse_id = ?
+    `).get(batch.id, warehouseId) as { c: number; avail: number; reserved: number; unsellable: number };
+    const binCount = Number(binAgg.c);
+    const binReserved = roundQty(Number(binAgg.reserved));
+    // R1+R4: free = master - every reserved unit - the unreserved units parked
+    // in a non-sellable bin (EXPIRED/BLOCKED/QUARANTINED). Disjoint terms: a
+    // reserved unit is subtracted once, never twice. A batch with no bin rows
+    // has neither reservation nor status evidence, so free is the master
+    // quantity.
+    const binUnsellable = roundQty(Number(binAgg.unsellable));
+    const sellableHere = roundQty(
+      Math.max(0, roundQty(batch.quantity_remaining) - binReserved - binUnsellable)
+    );
+    if (sellableHere <= 0) continue;
+    //  - R1: a DAMAGED bin is still sellable, so read the shared sellable
+    //    status clause instead of ignoring status entirely. EXPIRED/BLOCKED/
+    //    QUARANTINED bins were silently sold before this.
+    //  - R4: cap each take to the bin's AVAILABLE (physical - reserved), not
+    //    its physical. Filtering on quantity_physical > 0 while taking
+    //    quantity_physical hands out reserved units. The reserved promise
+    //    survives the fallback.
+    const locRows = db.prepare(`      SELECT bsl.id, bsl.quantity_available, bsl.status_override, l.created_at
+      FROM batch_stock_by_location bsl
+      JOIN locations l ON bsl.location_id = l.id
+      WHERE bsl.batch_id = ? AND l.warehouse_id = ?
+        AND bsl.quantity_available > 0
+        AND ${sellableStatusClause('bsl.status_override')}
+      ORDER BY l.created_at ASC, bsl.id ASC
+    `).all(batch.id, warehouseId) as Array<{ id: number; quantity_available: number; status_override: string | null; created_at: string }>;
+
+    const binAvailable = roundQty(Number(binAgg.avail));
+    const consumeFromThis = roundQty(Math.min(remaining, sellableHere));
 
     db.prepare(`
       UPDATE stock_batches
@@ -402,31 +486,28 @@ function consumeLegacyBatches(
       WHERE id = ?
     `).run(consumeFromThis, batch.id);
 
-    // BUG-013: keep the location rows in step on the legacy path too. The
-    // flag-on read path trusts batch_stock_by_location, so a flag flip after a
-    // period of flag-off trading would leave every consumed batch
-    // over-reported and offer phantom stock. Unconditional: a no-op when the
-    // batch has no location rows (the flag-OFF-only legacy shape).
-    //
-    // S-2: the WHERE must name the warehouse AND drain bin by bin. A
-    // `WHERE batch_id = ?` takes the full `consumeFromThis` out of EVERY bin
-    // row — split 5 + 5, sell 3, and both bins read 2 (physical 4) while the
-    // master batch says 7 — and reaches bins in another warehouse. The order
-    // matches consumeBatchesByLocation above so the two paths agree on which
-    // bin moves.
-    const locRows = db.prepare(`
-      SELECT bsl.id, bsl.quantity_physical
-      FROM batch_stock_by_location bsl
-      JOIN locations l ON bsl.location_id = l.id
-      WHERE bsl.batch_id = ? AND l.warehouse_id = ?
-        AND bsl.quantity_physical > 0
-      ORDER BY l.created_at ASC, bsl.id ASC
-    `).all(batch.id, warehouseId) as Array<{ id: number; quantity_physical: number }>;
+    if (locRows.some((l) => l.status_override === 'DAMAGED')) {
+      warnings.push(
+        `Item ${itemName(db, itemId)}: sold stock held in a DAMAGED location — ` +
+        `confirm the goods are fit for the agreed scrap or reduced price.`
+      );
+    }
+
+    // R2: the bin layer under-covered this batch. Warn with the available
+    // quantity; the master batch still backs the unit, so this is mirror lag
+    // (never a true shortage — that already threw above).
+    if (binCount > 0 && qtyLessThan(binAvailable, consumeFromThis)) {
+      warnings.push(
+        `Item ${itemName(db, itemId)}: only ${binAvailable} unit(s) are available in the location ledger ` +
+        `for this batch, but ${consumeFromThis} were sold — the remainder came from the batch total. ` +
+        `Run the batch-location backfill to reconcile.`
+      );
+    }
 
     let locRemaining = consumeFromThis;
     for (const loc of locRows) {
       if (locRemaining <= 0) break;
-      const take = roundQty(Math.min(locRemaining, roundQty(loc.quantity_physical)));
+      const take = roundQty(Math.min(locRemaining, roundQty(loc.quantity_available)));
       db.prepare(`
         UPDATE batch_stock_by_location
         SET quantity_physical = MAX(0, quantity_physical - ?)
@@ -464,7 +545,8 @@ function consumeLegacyStock(
   asOf: string,
   useFEFO: boolean,
   availableQty: number,
-  itemRow: { has_expiry: number; standard_cost: number; item_name: string } | undefined
+  itemRow: { has_expiry: number; standard_cost: number; item_name: string } | undefined,
+  warnings: string[]
 ): ConsumptionEntry[] {
   const { batches, totalBatchTrackedQty } = selectLegacyBatches(
     db, itemId, warehouseId, asOf, useFEFO, availableQty
@@ -506,7 +588,7 @@ function consumeLegacyStock(
     return [{ batchId: null, consumed: quantity, unitCost: fallbackCost }];
   }
 
-  return consumeLegacyBatches(db, itemId, warehouseId, batches, roundedQty);
+  return consumeLegacyBatches(db, itemId, warehouseId, batches, roundedQty, warnings);
 }
 
 class StockMovementModel {
@@ -1193,7 +1275,7 @@ class StockMovementModel {
            JOIN locations l ON bsl.location_id = l.id
            WHERE bsl.quantity_available > 0
              AND (sb.halted = 0 OR sb.halted IS NULL)
-             AND COALESCE(bsl.status_override, 'ACTIVE') = 'ACTIVE'
+             AND ${sellableStatusClause('bsl.status_override')}
              AND (sb.expiry_date IS NULL OR sb.expiry_date >= date('now'))
            GROUP BY sb.item_id, l.warehouse_id
            UNION ALL
@@ -1326,7 +1408,8 @@ class StockMovementModel {
     warehouseId: number,
     quantity: number,
     db: Database.Database,
-    asOfDate?: string
+    asOfDate?: string,
+    warnings?: string[]
   ): Array<{ batchId: number | null; consumed: number; unitCost: number }> {
     // Eligibility is judged as of the document date; absent one, today.
     const asOf = asOfDate ?? new Date().toISOString().slice(0, 10);
@@ -1413,7 +1496,8 @@ class StockMovementModel {
         `).get(itemId, warehouseId) as { c: number };
         if (Number(tracked.c) > 0) {
           return consumeLegacyStock(
-            db, itemId, warehouseId, quantity, roundedQty, asOf, useFEFO, availableQty, itemRow
+            db, itemId, warehouseId, quantity, roundedQty, asOf, useFEFO, availableQty, itemRow,
+            warnings ?? []
           );
         }
 
@@ -1426,12 +1510,13 @@ class StockMovementModel {
         return [{ batchId: null, consumed: quantity, unitCost: fallbackCost }];
       }
 
-      return consumeBatchesByLocation(db, itemId, warehouseId, batchRows, roundedQty);
+      return consumeBatchesByLocation(db, itemId, warehouseId, batchRows, roundedQty, warnings ?? []);
     }
 
     // Legacy path (feature flag off): original behavior unchanged.
     return consumeLegacyStock(
-      db, itemId, warehouseId, quantity, roundedQty, asOf, useFEFO, availableQty, itemRow
+      db, itemId, warehouseId, quantity, roundedQty, asOf, useFEFO, availableQty, itemRow,
+      warnings ?? []
     );
   }
 
@@ -1458,13 +1543,15 @@ class StockMovementModel {
     quantity: number,
     db: Database.Database,
     saleDate: string
-  ): { consumption: ConsumptionEntry[]; backdatedBeforeReceipt: boolean; firstReceiptDate: string | null } {
+  ): { consumption: ConsumptionEntry[]; backdatedBeforeReceipt: boolean; firstReceiptDate: string | null; warnings: string[] } {
     const fallback = this.preReceiptFallback(db, itemId, warehouseId, quantity, saleDate);
-    if (fallback !== null) return { ...fallback, backdatedBeforeReceipt: true };
+    if (fallback !== null) return { ...fallback, backdatedBeforeReceipt: true, warnings: [] };
+    const warnings: string[] = [];
     return {
-      consumption: this.consumeFromOldestBatches(itemId, warehouseId, quantity, db, saleDate),
+      consumption: this.consumeFromOldestBatches(itemId, warehouseId, quantity, db, saleDate, warnings),
       backdatedBeforeReceipt: false,
       firstReceiptDate: null,
+      warnings,
     };
   }
 
@@ -1511,7 +1598,7 @@ class StockMovementModel {
           SELECT MIN(received_date) AS d FROM stock_batches
           WHERE item_id = ? AND warehouse_id = ? AND quantity_remaining > 0
         `).get(itemId, warehouseId) as { d: string | null }).d;
-        return { consumption: consumeBatchesByLocation(db, itemId, warehouseId, withLocations, roundedQty), firstReceiptDate };
+        return { consumption: consumeBatchesByLocation(db, itemId, warehouseId, withLocations, roundedQty, []), firstReceiptDate };
       }
       // No location rows: fall through to the batch-level path (API-purchased
       // batches predate the location layer).
