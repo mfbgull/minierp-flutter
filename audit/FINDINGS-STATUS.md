@@ -1883,3 +1883,25 @@ situation of every existing install at migration time.
   `GATE_EXIT=0`). Main CI at `87a425ea`: run 44107790691 — server
   SUCCESS, fallow SUCCESS, flutter SUCCESS (3/3). Full gate slot
   RELEASED after this report; PR7 merge unblocked from GLM's side.
+
+- **PR7 MERGED (merge commit `91df221c`, 2026-11-17T15:30:44Z; exact
+  reviewed head `4a98d95d`; push+PR runs all six checks PASS) — GLM
+  EXCLUSIVE FULL GATE at exact `91df221c` — PASS, exit 0 (2026-11-17).**
+  Clean ext4 detached worktree `/home/fawad/verify-pr7-merge-91df221c`
+  (HEAD = `91df221c` exact), real `npm ci` + `flutter pub get`, via
+  `bash scripts/check.sh` (100644 non-executable; no chmod, no source
+  change). Results: **server 288/288 suites, 2311/2311 tests passed, 0
+  FAIL** (up from 285/2277 at the previous gate — PR7's reviewed
+  refactor + test suites are now on main); **Flutter 1219 passed + 1
+  skipped** (unchanged — PR7 is server-side; the 1 skip recorded
+  honestly, same single-skip pattern across all recent gates), "All
+  other tests passed!"; l10n-drift clean (0/0); finding-tag audit:
+  server it.failing=1 (parked F-3), flutter RED-BY-DESIGN files=0.
+  Post-run dirty: exactly the 11 known
+  `audit/accounting-audit/remediation/` golden artifacts — restored via
+  `git checkout --`; tracked dirty 0 / untracked 0 afterward. Log:
+  `/home/fawad/logs/gate-91df221c/check-full.log` (final line
+  `GATE_EXIT=0`). Main CI at `91df221c`: run 44115170192 — server
+  SUCCESS, fallow SUCCESS, flutter SUCCESS (3/3). Full gate slot
+  RELEASED after this report; PI's PR9 (F-3) rebase onto `91df221c`
+  unblocked from GLM's side.
