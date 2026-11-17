@@ -1399,3 +1399,26 @@ situation of every existing install at migration time.
   same edit; no concurrency. Ownership agreement sent to PI via the run.
   F3 stays DECIDED/implementation-pending; GLM will independently review
   PI's exact money diff when available.
+
+- **F3 status: implemented / validation-pending — GLM independent review of
+  PI's `859831aa` (parent main `7a96e6d8`): fix correct at source, test gap
+  confirmed (2026-11-17, Gull msg_5b991349abb0).** Full review:
+  `/home/fawad/logs/glm-f3-money-fix-review-859831aa.md`. [SOURCE] findings:
+  the one-line fix (`transaction_date: refund.refund_date`) matches the
+  decided rule and the codebase precedent
+  (`ledgerUtils.reverseLedgerEntry` same-date reversal); receipt path
+  already posts at `refundDate`, so both stores now cancel as a net-zero
+  pair ON the receipt date; ledger stays append-only (INSERT +
+  `rebuildBalances`, REVERSAL-RULES 1.6); period guard
+  (`assertPeriodNotClosed` on receipt_date + CODE-001 internal guard)
+  blocks closed-period void before any write; cash timeline guard
+  unchanged and consistent; `voided_at` stays wall-clock (attribution
+  metadata, not a money date). Coordinator's test gap VERIFIED PRECISE:
+  the as-of test filters REFUND types only and compares GL only
+  before-vs-2099 — it never asserts GL at the receipt date nor
+  cross-store GL-vs-ledger agreement; proposed test-only matrix recorded
+  (GL flat across before/atReceipt/now; whole-ledger unfiltered net
+  identical across dates; GL-vs-ledger delta constant). F3 = implemented /
+  validation-pending: NOT fully fixed until PI's refined tests pass the
+  full server gate. Parked moneyPathFindingsRed.test.ts untouched (unpark
+  only after approved integration, observed passing).
