@@ -54,9 +54,17 @@ class PosRepository {
       headers: idempotencyKey == null
           ? null
           : <String, dynamic>{'Idempotency-Key': idempotencyKey},
-      parse: (json) => PosSale.fromJson(
-        json['data'] as Map<String, dynamic>,
-      ),
+      // `warnings` rides the envelope top level (like the ACCT-006 merge on
+      // POST /invoices) or inside `data` — accept both, no new field.
+      parse: (json) {
+        final data = json['data'] as Map<String, dynamic>;
+        final envelopeWarnings = json['warnings'];
+        return PosSale.fromJson(
+          data['warnings'] == null && envelopeWarnings is List<dynamic>
+              ? <String, dynamic>{...data, 'warnings': envelopeWarnings}
+              : data,
+        );
+      },
     );
   }
 
