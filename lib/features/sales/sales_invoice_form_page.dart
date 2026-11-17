@@ -31,6 +31,7 @@ import '../../core/utils/date_utils.dart' show isoDate;
 import '../../core/utils/print_service.dart' show PrintFormat, PrintService;
 import '../../core/utils/formatters.dart';
 import '../../core/utils/invoice_status.dart';
+import '../../core/theme/status_colors.dart';
 import '../../data/models/customer.dart' show Customer;
 import '../../data/models/sales_return.dart' show InvoicePosition;
 import '../../data/models/invoice.dart'
@@ -1253,6 +1254,59 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
       _showError(_paymentFailure!);
       return;
     }
+    await _finishSuccess(saved, l10n);
+  }
+
+  /// Success close-out shared by the save and save-and-print paths: show the
+  /// server's warning strings (ACCT-006 / BUG-013 R1/R2 — verbatim, amber,
+  /// no acknowledgement step) before the page closes, or the plain saved
+  /// toast when there are none. A normal success behaves exactly as before.
+  Future<void> _finishSuccess(Invoice saved, AppLocalizations l10n) async {
+    if (saved.warnings.isNotEmpty) {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(l10n.salesInvoicesaved),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final warning in saved.warnings)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        size: 18,
+                        color: StatusColors.of(dialogContext).warning,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          warning,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: StatusColors.of(dialogContext).warning,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(l10n.commonClose),
+            ),
+          ],
+        ),
+      );
+      if (!mounted) return;
+    }
     Navigator.of(context).pop();
     showAppToast(context, l10n.salesInvoicesaved);
   }
@@ -1271,8 +1325,7 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     await _showPrintFormatPicker(saved.id);
     if (!mounted) return;
     ref.invalidate(invoicesProvider);
-    Navigator.of(context).pop();
-    showAppToast(context, l10n.salesInvoicesaved);
+    await _finishSuccess(saved, l10n);
   }
 
   Future<void> _delete() async {
