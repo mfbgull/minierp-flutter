@@ -1445,3 +1445,23 @@ situation of every existing install at migration time.
   changed-base audit. F3 remains **implementation-pending-full-gate** —
   not fixed until that gate passes; no final green claimed. Parked GLM
   test untouched; frozen PR4/PR8 untouched.
+
+- **F3 batched update (2026-11-17, Gull msg_2442fda9bf0d): final test
+  refactor `dbfbe415` reviewed — APPROVE; date fix verified at `d1f5091b`;
+  gate pending at `dbfbe415`.** Full review:
+  `/home/fawad/logs/glm-f3-final-refactor-review-dbfbe415.md`. [SOURCE]:
+  (a) source byte-identical across 859831aa/d1f5091b/dbfbe415 (SupplierRefund.ts
+  blob 8b0ddf9d — approved fix untouched, no re-audit needed); (b) `d1f5091b`
+  lands exactly the proposed one-line date fix (INTERMEDIATE_DATE 03-12 →
+  03-20, corrected comment; sampled set now monotonic with a genuine
+  mid-window point); (c) `dbfbe415` helper split is verbatim-equivalent
+  (seed vs post decomposed, same sequence/constants/payloads/expects,
+  same wrapper return shape; describe split moves only the two state-guard
+  its, bodies untouched; file-level savepoint hooks unchanged; execution
+  order preserved). Evidence ledger: PI-reported [TEST] focused 4/4 +
+  changed-base audit no-issues (2 files, exit 0, fresh coverage) at
+  dbfbe415; full server gate RUNNING at dbfbe415 (single run); prior full
+  gate 284/2273 @ d1f5091b valid FOR THAT SHA only. F3 remains
+  **implementation-pending-full-gate** until the dbfbe415 run resolves —
+  no final green claimed, no baseline/threshold changes. Parked GLM test
+  untouched; frozen PR4/PR8 untouched.
