@@ -1741,3 +1741,18 @@ situation of every existing install at migration time.
   ignored on this line — unlike the S-3 verify worktree noted earlier).
   **NOT PUSHED**: awaiting the coordinator's inspection and the exact
   old-head lease `0186b8d9…`; PR8 rebase DEFERRED until PR4 merges.
+
+- **PR4 rebased candidate PUSHED with exact lease (2026-11-17,
+  msg_1a04e8d02e28): `glm/ux-review-tests` = `ea8f79cd` (was `0186b8d9`).**
+  Fresh remote check matched the lease old-head exactly; push
+  `--force-with-lease` accepted; post-push remote verified `ea8f79cd…`.
+  CI runs at the exact SHA: 44066510602, 44066522702 (6 checks; pending at
+  report time — monitored automatically; PR4 merge waits for PI's
+  post-merge full gate + this rebased CI). Coordinator rerun package:
+  `/home/fawad/logs/pr4-ea8f79cd-rerun-evidence.md` — exact commands +
+  log paths: server targeted 4 suites/29 tests exit 0
+  (`pr4-ea8f79cd-server-targeted.log`), Flutter 10 touched files 34 tests
+  exit 0 (`pr4-ea8f79cd-flutter-targeted.log`), l10n-drift clean
+  (`pr4-ea8f79cd-l10n-drift.log`). F-3 parked test/comment NOT changed per
+  Gull; GLM owns its unpark on fix-containing integration later. PR8
+  rebase deferred until PR4 merges.
