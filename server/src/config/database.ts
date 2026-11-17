@@ -2467,6 +2467,7 @@ export function applyPendingMigrations(): void {
   runLedgered('125_party_adjustments.sql');
   runLedgered('126_sales_order_item_tax_discount.sql');
   runLedgered('127_backfill_batch_stock_by_location.sql');
+  runLedgered('fn.runIdempotencyResponseWarningsMigration', runIdempotencyResponseWarningsMigration);
   // Boot-time guard (spec §4.1): the restocking-fee posting resolves 4150 at
   // return time — a legacy COA predating GL foundation must fail the boot
   // with a clear error, never mis-post.
@@ -2973,6 +2974,17 @@ function runBatchCostingMigration(): void {
   } catch (error: unknown) {
     throw new Error('Batch costing migration error:: ' + errorMessage(error), { cause: error });
   }
+}
+
+function runIdempotencyResponseWarningsMigration(): void {
+  // BUG-013 F5: an idempotency replay of a LOST response must return the same
+  // stock warnings the first caller was sent. They cannot be recomputed (no
+  // bin status_override history is retained), so they are stored next to the
+  // key. addColumnIfMissing makes the step safe to RETRY: if the process dies
+  // after the ALTER but before the ledger row, the next boot finds the column
+  // already present and only records the row instead of failing on a
+  // duplicate-column error.
+  addColumnIfMissing('idempotency_keys', 'response_warnings TEXT');
 }
 
 function runCreditBalanceMigration(): void {

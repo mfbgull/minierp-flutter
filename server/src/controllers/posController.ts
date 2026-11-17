@@ -338,7 +338,16 @@ function createPOSSale(req: AuthRequest, res: Response): void {
       return;
     }
     logCRUD(ActionType.INVOICE_CREATE, 'Invoice', result.invoiceId, `POS sale ${result.invoiceNo}`, req.user.id, { total_amount: total }, { correlationId: newCorrelationId() });
-    res.status(201).json({ success: true, message: 'POS sale completed successfully', data: replayed });
+    // BUG-013: the service builds stock warnings (damaged stock sold, bin
+    // under-coverage). This handler rebuilds its body from the database,
+    // which stores no warnings, so they must be re-attached here or the
+    // cashier never sees them. Top-level `warnings` matches the invoice route.
+    res.status(201).json({
+      success: true,
+      message: 'POS sale completed successfully',
+      data: replayed,
+      warnings: result.warnings,
+    });
   } catch (error: unknown) {
     return handleCreatePOSSaleError(res, error);
   }

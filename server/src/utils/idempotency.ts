@@ -104,6 +104,26 @@ export function findIdempotencyRecord(
 }
 
 /**
+ * BUG-013 R1/R2: the warnings the FIRST caller was sent, so an idempotency
+ * replay of a lost response returns the same notices instead of an empty
+ * list. NULL/absent means no warnings were recorded (replays as []).
+ */
+export function findIdempotencyWarnings(
+  db: Database.Database, scope: string, key: string,
+): string[] {
+  const row = db.prepare(
+    'SELECT response_warnings FROM idempotency_keys WHERE scope = ? AND key = ?'
+  ).get(scope, key) as { response_warnings: string | null } | undefined;
+  if (!row?.response_warnings) return [];
+  try {
+    const parsed: unknown = JSON.parse(row.response_warnings);
+    return Array.isArray(parsed) ? parsed.filter((w): w is string => typeof w === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Claim the key and link the created resource INSIDE the caller's create
  * transaction: the (key → resource) row persists if and only if the
  * document creation commits, so a rolled-back or crashed attempt leaves no
@@ -146,14 +166,17 @@ export function beginIdempotentWrite(
  */
 export function claimIdempotencyKey(
   db: Database.Database, scope: string, key: string, requestHash: string, resourceId: number,
+  responseWarnings: string[] = [],
 ): void {
   db.prepare(`
-    INSERT INTO idempotency_keys (key, scope, request_hash, resource_id, completed_at)
-    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+    INSERT INTO idempotency_keys (key, scope, request_hash, resource_id, completed_at, response_warnings)
+    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
     ON CONFLICT(scope, key) DO UPDATE SET
       resource_id = excluded.resource_id,
-      completed_at = excluded.completed_at
-  `).run(key, scope, requestHash, resourceId);
+      completed_at = excluded.completed_at,
+      response_warnings = excluded.response_warnings
+  `).run(key, scope, requestHash, resourceId,
+    responseWarnings.length > 0 ? JSON.stringify(responseWarnings) : null);
 }
 
 /**
