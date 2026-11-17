@@ -455,7 +455,8 @@ class PurchaseRepository {
       );
 
   /// One page of refund claims (`GET /supplier-refunds/claims`). [status]
-  /// filters to a single lifecycle state; omit it for all claims.
+  /// filters to one lifecycle state or a comma-separated set — the list
+  /// screen's "open only" sends `EXPECTED,PARTIAL`; omit it for all claims.
   Future<ApiResult<PagedResponse<RefundClaim>>> claimsPaged(
     PagedRequest request, {
     String? status,
@@ -523,7 +524,8 @@ class PurchaseRepository {
   /// mandatory; above Rs 1,000 the server requires the admin role.
   ///
   /// [idempotencyKey] is mandatory: the server refuses this route (400)
-  /// without the header, so an un-keyed call can never post.
+  /// without the header, so an un-keyed call can never post. A retry with
+  /// the same key replays instead of posting the expense twice.
   Future<ApiResult<void>> writeOffClaim(
     int id, {
     required String reason,
@@ -562,8 +564,9 @@ final purchaseRepositoryProvider = Provider<PurchaseRepository>(
   (ref) => PurchaseRepository(ref.watch(repositoryClientProvider)),
 );
 
-/// One page of refund claims. [status] null → every claim, which the list
-/// screen turns into "open only" by passing `EXPECTED`/`PARTIAL`.
+/// One page of refund claims. [status] null → every claim; the list
+/// screen's "open only" passes `EXPECTED,PARTIAL` (comma set) so the
+/// server does the filtering and the totals cover every page.
 final refundClaimsProvider = FutureProvider.autoDispose
     .family<
       PagedResponse<RefundClaim>,

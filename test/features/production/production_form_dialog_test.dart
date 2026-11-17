@@ -72,6 +72,12 @@ class _FakeProductionRepository extends ProductionRepository {
   /// Body captured from the last `POST /productions`.
   Map<String, dynamic>? lastBody;
 
+  /// Every Idempotency-Key handed to [createProduction], in order.
+  final List<String> keys = [];
+
+  /// When true, saves fail so the dialog stays open for retry testing.
+  bool failSaves = false;
+
   @override
   Future<ApiResult<BomDetail>> bom(int id) async => const ApiSuccess(_bomDetail);
 
@@ -81,6 +87,12 @@ class _FakeProductionRepository extends ProductionRepository {
     required String idempotencyKey,
   }) async {
     lastBody = body;
+    keys.add(idempotencyKey);
+    if (failSaves) {
+      return const ApiFailure(
+        ApiError(message: 'rejected by test'),
+      );
+    }
     return const ApiSuccess(
       Production(
         id: 1,
@@ -215,6 +227,38 @@ void main() {
     expect(body['output_quantity'], 10);
     expect(body.containsKey('outputs'), isFalse);
   });
+
+  // POST /productions is key-mandatory on the server (ACCT-008). The dialog
+  // derives the key from the body: an unchanged retry replays, an edited
+  // quantity is a new operation.
+  testWidgets(
+    'production submit carries an Idempotency-Key, keeps it on retry, rotates it when the quantity is edited',
+    (tester) async {
+      final repo = _FakeProductionRepository()..failSaves = true;
+      await _openDialog(tester, repo);
+
+      await _pickPrimaryOutput(tester);
+      await _pickWarehouseAndBom(tester);
+
+      await _save(tester); // qty 10, first submit
+      await _save(tester); // unchanged retry
+      await tester.enterText(find.byType(TextFormField).at(0), '12');
+      await _save(tester); // edited quantity
+
+      expect(repo.keys, hasLength(3));
+      expect(
+        repo.keys[0].length,
+        greaterThanOrEqualTo(8),
+        reason: 'the production endpoint mandates an Idempotency-Key',
+      );
+      expect(repo.keys[1], repo.keys[0], reason: 'an unchanged retry replays');
+      expect(
+        repo.keys[2],
+        isNot(repo.keys[0]),
+        reason: 'an edited quantity is a new operation',
+      );
+    },
+  );
 
   testWidgets('adding a co-product switches the payload to outputs[]', (
     tester,

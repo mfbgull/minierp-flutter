@@ -2,6 +2,13 @@
 // cash, the server's 409 carries the journal lines on the first deficit date
 // under `details`. This widget turns them into readable rows and truncates a
 // long list into "and N more", so a wall of blockers cannot fill the dialog.
+//
+// UX-6 (audit/GLM-UX-REVIEW.md) changed the row contract: the journal
+// reference_type and the ISO date are no longer rendered raw — the type goes
+// through cashBlockerTypeLabel (localized label, humanized fallback) and the
+// date through Formatters.date. These tests assert the NEW contract; the raw
+// tokens 'SALE'/'EXPENSE'/ISO must NOT appear (see
+// cash_blockers_localization_test.dart for the leak pin).
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -37,10 +44,12 @@ void main() {
         ),
       ),
     );
-    expect(find.textContaining('SALE'), findsOneWidget);
-    expect(find.textContaining('EXPENSE'), findsOneWidget);
-    expect(find.textContaining('2026-11-05'), findsOneWidget);
-    expect(find.textContaining('2026-11-06'), findsOneWidget);
+    // UX-6 contract: the type renders as a localized/humanized label, the
+    // date locale-formatted — never the raw enum or ISO string.
+    expect(find.textContaining('Sale'), findsOneWidget);
+    expect(find.textContaining('Expense'), findsOneWidget);
+    expect(find.textContaining('Nov 5, 2026'), findsOneWidget);
+    expect(find.textContaining('Nov 6, 2026'), findsOneWidget);
   });
 
   testWidgets('shows the guard title and the retry hint', (tester) async {
@@ -60,7 +69,7 @@ void main() {
       ),
     );
     // Three rows shown, five collapsed into the counter.
-    expect(find.textContaining('SALE'), findsNWidgets(3));
+    expect(find.textContaining('Sale'), findsNWidgets(3));
     final l10n = await AppLocalizations.delegate.load(const Locale('en'));
     expect(find.text(l10n.refundBlockedMore(5)), findsOneWidget);
   });
@@ -76,6 +85,6 @@ void main() {
     );
     final l10n = await AppLocalizations.delegate.load(const Locale('en'));
     expect(find.text(l10n.refundBlockedMore(0)), findsNothing);
-    expect(find.textContaining('SALE'), findsNWidgets(3));
+    expect(find.textContaining('Sale'), findsNWidgets(3));
   });
 }

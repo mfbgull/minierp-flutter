@@ -32,6 +32,7 @@ import '../../widgets/date_picker.dart' show pickDate;
 import '../../widgets/form_field.dart';
 import '../../widgets/form_helpers.dart' show numText;
 import '../../widgets/searchable_select.dart';
+import '../../widgets/screen_error_panel.dart';
 import '../inventory/inventory_providers.dart' show warehousesProvider;
 import 'sales_order_pdf.dart' show buildA4SalesOrderPdf;
 import 'sales_order_providers.dart';
@@ -446,6 +447,16 @@ class _SalesOrderFormDialogState extends ConsumerState<SalesOrderFormDialog> {
             if (line.discountType == DiscountType.percentage && amount >= 100) {
               return l10n.commonInvalid;
             }
+            // UX-13: a FLAT discount above the line total passed local
+            // validation and reached the server, which refused it (or
+            // computed a negative line). Bound it here with the same
+            // rounding the shared calculation uses (round2 of qty x price).
+            if (line.discountType == DiscountType.flat) {
+              final gross = (line.quantity * line.unitPrice * 100).round() / 100;
+              if (amount > gross + 0.005) {
+                return l10n.commonInvalid;
+              }
+            }
             return null;
           },
           onChanged: (_) => setState(() {}),
@@ -529,11 +540,29 @@ class _SalesOrderFormDialogState extends ConsumerState<SalesOrderFormDialog> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final customers =
-        ref.watch(salesOrderCustomerOptionsProvider).valueOrNull ??
-        const <Customer>[];
-    final warehouses =
-        ref.watch(warehousesProvider).valueOrNull ?? const <Warehouse>[];
+    final customersAsync = ref.watch(salesOrderCustomerOptionsProvider);
+    final warehousesAsync = ref.watch(warehousesProvider);
+    final itemsAsync = ref.watch(soItemsProvider);
+    final customers = customersAsync.valueOrNull ?? const <Customer>[];
+    final warehouses = warehousesAsync.valueOrNull ?? const <Warehouse>[];
+    // UX-11: the providers were read with `valueOrNull ?? []`, so a failed
+    // fetch rendered exactly like an empty list — a blank picker with no
+    // message and no retry. Surface the failure like every other screen
+    // (l10n.errorsFailed + ScreenErrorPanel) and let the user retry.
+    final Object? optionError = [
+      customersAsync,
+      warehousesAsync,
+      itemsAsync,
+    ].where((v) => v.hasError).map((v) => v.error).firstOrNull;
+    // UX-11 (loading): a pending provider must not render like an empty
+    // list either. Loading feedback shows only while a provider is pending
+    // with no data yet — a background refetch (e.g. after retry) keeps the
+    // previous data on screen instead of flickering the bar back in.
+    final optionsLoading = [
+      customersAsync,
+      warehousesAsync,
+      itemsAsync,
+    ].any((v) => v.isLoading && v.valueOrNull == null);
     final customerIds = [for (final c in customers) c.id];
     final warehouseIds = [for (final w in warehouses) w.id];
 
@@ -563,6 +592,22 @@ class _SalesOrderFormDialogState extends ConsumerState<SalesOrderFormDialog> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      if (optionsLoading)
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 8),
+                          child: LinearProgressIndicator(minHeight: 3),
+                        ),
+                      if (optionError != null) ...[
+                        ScreenErrorPanel(
+                          message: optionError.toString(),
+                          onRetry: () {
+                            ref.invalidate(salesOrderCustomerOptionsProvider);
+                            ref.invalidate(warehousesProvider);
+                            ref.invalidate(soItemsProvider);
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                      ],
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [

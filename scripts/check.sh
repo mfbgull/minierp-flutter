@@ -41,6 +41,21 @@ step() {
   fi
 }
 
+# Report (never fail) the finding-tagged tests: server `it.failing`/`it.skip`
+# and Flutter `skip: true` with a RED-BY-DESIGN marker. These are known,
+# unfixed findings kept green on purpose — the count keeps them visible so
+# nobody forgets they are parked. See audit/FINDINGS-STATUS.md.
+report_finding_tagged() {
+  local server_failing server_skipped flutter_skipped
+  server_failing=$(grep -rEo "it\.failing\(" "$ROOT/server/src/__tests__" 2>/dev/null | wc -l | tr -d ' ')
+  server_skipped=$(grep -rEo "it\.skip\(" "$ROOT/server/src/__tests__" 2>/dev/null | wc -l | tr -d ' ')
+  flutter_skipped=$(grep -rl "RED-BY-DESIGN" "$ROOT/test" 2>/dev/null | wc -l | tr -d ' ')
+  echo "   finding-tagged tests: server it.failing=$server_failing it.skip=$server_skipped, flutter RED-BY-DESIGN files=$flutter_skipped"
+  if [[ "$server_failing" -gt 0 || "$server_skipped" -gt 0 || "$flutter_skipped" -gt 0 ]]; then
+    echo "   (parked findings — see audit/FINDINGS-STATUS.md; remove the tag when fixed)"
+  fi
+}
+
 if [[ $RUN_SERVER -eq 1 ]]; then
   step "server: typecheck"  bash -c "cd '$ROOT/server' && npm run typecheck"
   step "server: lint"       bash -c "cd '$ROOT/server' && npm run lint"
@@ -66,6 +81,10 @@ if [[ $RUN_FLUTTER -eq 1 ]]; then
     step "flutter: test"    bash -c "cd '$ROOT' && flutter test --reporter compact"
   fi
 fi
+
+echo ""
+echo "── finding-tagged tests"
+report_finding_tagged
 
 echo ""
 if [[ ${#FAILED[@]} -gt 0 ]]; then

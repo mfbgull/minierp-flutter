@@ -3848,6 +3848,18 @@ abstract class AppLocalizations {
   /// **'Refund Amount'**
   String get purchasesRefundamount;
 
+  /// No description provided for @purchasesRefundamountinvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid refund amount'**
+  String get purchasesRefundamountinvalid;
+
+  /// No description provided for @purchasesRefundamountexceeds.
+  ///
+  /// In en, this message translates to:
+  /// **'Refund amount exceeds the refundable amount'**
+  String get purchasesRefundamountexceeds;
+
   /// No description provided for @purchasesRefundmethod.
   ///
   /// In en, this message translates to:
@@ -3992,6 +4004,12 @@ abstract class AppLocalizations {
   /// **'Write-offs above Rs 1,000 need an owner'**
   String get refundClaimWriteOffAdminOnly;
 
+  /// No description provided for @refundClaimWriteOffAmountInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid write-off amount'**
+  String get refundClaimWriteOffAmountInvalid;
+
   /// No description provided for @refundClaimCancel.
   ///
   /// In en, this message translates to:
@@ -4105,6 +4123,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'and {count} more'**
   String refundBlockedMore(int count);
+
+  /// No description provided for @cashBlockerTypeExpensepayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Expense payment'**
+  String get cashBlockerTypeExpensepayment;
+
+  /// No description provided for @cashBlockerTypeExpense.
+  ///
+  /// In en, this message translates to:
+  /// **'Expense'**
+  String get cashBlockerTypeExpense;
+
+  /// No description provided for @cashBlockerTypeSupplierrefund.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplier refund'**
+  String get cashBlockerTypeSupplierrefund;
+
+  /// No description provided for @cashBlockerTypeRefundreceipt.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplier refund receipt'**
+  String get cashBlockerTypeRefundreceipt;
+
+  /// No description provided for @cashBlockerTypeRefundclaimwriteoff.
+  ///
+  /// In en, this message translates to:
+  /// **'Refund claim write-off'**
+  String get cashBlockerTypeRefundclaimwriteoff;
+
+  /// No description provided for @cashBlockerTypeOwnerwithdrawal.
+  ///
+  /// In en, this message translates to:
+  /// **'Owner withdrawal'**
+  String get cashBlockerTypeOwnerwithdrawal;
+
+  /// No description provided for @cashBlockerTypeOwnercapital.
+  ///
+  /// In en, this message translates to:
+  /// **'Owner capital'**
+  String get cashBlockerTypeOwnercapital;
+
+  /// No description provided for @cashBlockerTypeSupplierpayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplier payment'**
+  String get cashBlockerTypeSupplierpayment;
+
+  /// No description provided for @cashBlockerTypeCustomerrefund.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer refund'**
+  String get cashBlockerTypeCustomerrefund;
+
+  /// No description provided for @cashBlockerTypeSalarypayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Salary payment'**
+  String get cashBlockerTypeSalarypayment;
+
+  /// No description provided for @cashBlockerTypeSupplierprepayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplier prepayment'**
+  String get cashBlockerTypeSupplierprepayment;
+
+  /// No description provided for @cashBlockerTypeLoandisbursement.
+  ///
+  /// In en, this message translates to:
+  /// **'Loan disbursement'**
+  String get cashBlockerTypeLoandisbursement;
+
+  /// No description provided for @cashBlockerTypeLoanrepayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Loan repayment'**
+  String get cashBlockerTypeLoanrepayment;
+
+  /// No description provided for @cashBlockerTypePurchase.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase'**
+  String get cashBlockerTypePurchase;
+
+  /// No description provided for @cashBlockerTypeOpeningbalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening balance'**
+  String get cashBlockerTypeOpeningbalance;
+
+  /// No description provided for @cashBlockerTypeManualjournal.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual journal'**
+  String get cashBlockerTypeManualjournal;
+
+  /// No description provided for @cashBlockerTypeCreditoffset.
+  ///
+  /// In en, this message translates to:
+  /// **'Credit offset'**
+  String get cashBlockerTypeCreditoffset;
+
+  /// No description provided for @cashBlockerTypeOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other entry'**
+  String get cashBlockerTypeOther;
 
   /// No description provided for @purchasesProcessreturn.
   ///

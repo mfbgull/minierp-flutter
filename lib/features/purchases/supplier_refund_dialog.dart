@@ -107,11 +107,11 @@ class _SupplierRefundDialogState extends ConsumerState<_SupplierRefundDialog> {
     final l10n = AppLocalizations.of(context)!;
     final amount = num.tryParse(_amountController.text.trim());
     if (amount == null || amount <= 0) {
-      setState(() => _error = l10n.purchasesReturnqtyinvalid);
+      setState(() => _error = l10n.purchasesRefundamountinvalid);
       return;
     }
     if (amount > widget.refundable + 0.005 && !_excessAsCredit) {
-      setState(() => _error = l10n.purchasesReturnqtyexceeds);
+      setState(() => _error = l10n.purchasesRefundamountexceeds);
       return;
     }
 

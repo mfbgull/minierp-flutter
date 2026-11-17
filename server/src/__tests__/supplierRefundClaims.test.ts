@@ -607,6 +607,67 @@ describe('PRET-002 supplier refund claims', () => {
       .some((row) => row.id === info.claimId)).toBe(true);
   });
 
+  // UX-1 (audit/GLM-UX-REVIEW.md): the claims screen's "open only" filter
+  // needs a server-side open set. No status → every claim (all lifecycle
+  // states); `status=EXPECTED,PARTIAL` → only open claims; an unknown
+  // status is refused rather than silently matching nothing.
+  it('lists claims with no status (all), an open set (EXPECTED,PARTIAL), and rejects an unknown status', async () => {
+    await seedOpeningCash(500);
+    const info = await paidPurchaseWithReturn({ total: 100 });
+
+    // No status: every claim, including the open one.
+    const all = await request(app).get('/api/supplier-refunds/claims')
+      .set('Cookie', cookie);
+    expect(all.status).toBe(200);
+    expect((all.body.data as Array<{ id: number }>)
+      .some((row) => row.id === info.claimId)).toBe(true);
+
+    // Open set: the auto-opened claim (EXPECTED) is in, a CANCELLED one out.
+    const open = await request(app)
+      .get('/api/supplier-refunds/claims?status=EXPECTED,PARTIAL')
+      .set('Cookie', cookie);
+    expect(open.status).toBe(200);
+    expect((open.body.data as Array<{ id: number }>)
+      .some((row) => row.id === info.claimId)).toBe(true);
+
+    const cancelled = await request(app)
+      .post(`/api/supplier-refunds/claims/${info.claimId}/cancel`)
+      .set('Cookie', cookie)
+      .send({ reason: 'test' });
+    expect(cancelled.status).toBe(200);
+
+    const openAfter = await request(app)
+      .get('/api/supplier-refunds/claims?status=EXPECTED,PARTIAL')
+      .set('Cookie', cookie);
+    expect((openAfter.body.data as Array<{ id: number }>)
+      .some((row) => row.id === info.claimId)).toBe(false);
+
+    const stillAll = await request(app).get('/api/supplier-refunds/claims')
+      .set('Cookie', cookie);
+    expect((stillAll.body.data as Array<{ id: number }>)
+      .some((row) => row.id === info.claimId)).toBe(true);
+
+    const bogus = await request(app)
+      .get('/api/supplier-refunds/claims?status=EXPECTED;DROP')
+      .set('Cookie', cookie);
+    expect(bogus.status).toBe(400);
+    expect(String(bogus.body.error)).toMatch(/Unknown claim status/i);
+
+    // A known status set returns a valid, filtered page — the count matches
+    // the rows returned, and every returned row carries a requested status.
+    // This distinguishes "no rows for this filter" from "bad request".
+    const none = await request(app)
+      .get('/api/supplier-refunds/claims?status=CANCELLED&limit=200')
+      .set('Cookie', cookie);
+    expect(none.status).toBe(200);
+    const noneRows = none.body.data as Array<{ id: number; status: string }>;
+    expect(Array.isArray(noneRows)).toBe(true);
+    expect(noneRows.every((row) => row.status === 'CANCELLED')).toBe(true);
+    expect(none.body.pagination.total).toBe(noneRows.length);
+    // The cancelled claim above is in this set; the open one is not.
+    expect(noneRows.some((row) => row.id === info.claimId)).toBe(true);
+  });
+
   it('cancelling a claim that holds receipts is refused', async () => {
     await seedOpeningCash(500);
     const info = await paidPurchaseWithReturn({ total: 100 });
