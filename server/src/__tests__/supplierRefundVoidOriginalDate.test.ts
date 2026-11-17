@@ -64,8 +64,8 @@ function ledgerNetAsOf(supplierId: number, asOf: string): number {
   return row?.total ?? 0;
 }
 
-async function makeRefundReceipt(supplierName: string, itemName: string): Promise<{
-  refundId: number; supplierId: number; refundNo: string; purchaseId: number;
+async function seedPaidPurchaseWithCreditNote(supplierName: string, itemName: string): Promise<{
+  purchaseId: number; creditNoteId: number; warehouseId: number;
 }> {
   // Seed opening cash so the cash-out supplier payment passes the timeline guard.
   const capital = await request(app).post('/api/owner-equity/capital').set('Cookie', cookie)
@@ -83,13 +83,13 @@ async function makeRefundReceipt(supplierName: string, itemName: string): Promis
   }, cookie);
   expect(purchase.status).toBe(201);
   const purchaseId = purchase.body.data?.id ?? purchase.body.id;
-  const supplierIdForPay = db.prepare<[number], { supplier_id: number }>(
+  const supplierId = db.prepare<[number], { supplier_id: number }>(
     'SELECT supplier_id FROM purchases WHERE id = ?'
   ).get(purchaseId)!.supplier_id;
   // Pay the purchase in full first: REVERSAL-RULES 1.12 caps a refund at the
   // refundable credit, and an unpaid purchase leaves nothing refundable.
   new SupplierPaymentService(db).recordSupplierPayment({
-    supplierId: supplierIdForPay, paymentDate: '2026-03-01', amount: 100, paymentMethod: 'Cash',
+    supplierId, paymentDate: '2026-03-01', amount: 100, paymentMethod: 'Cash',
     allocations: [{ kind: 'purchase', id: purchaseId, amount: 100 }],
   });
 
@@ -97,7 +97,7 @@ async function makeRefundReceipt(supplierName: string, itemName: string): Promis
     .set('Cookie', cookie)
     .set('Idempotency-Key', `f3-pr-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
     .send({
-      return_date: '2026-03-10', source_type: 'PURCHASE', source_id: purchaseId,
+      return_date: RETURN_DATE, source_type: 'PURCHASE', source_id: purchaseId,
       warehouse_id: warehouse.id, disposition: 'credit_on_account',
       items: [{ source_item_id: purchaseId, quantity: 10 }],
     });
@@ -108,19 +108,30 @@ async function makeRefundReceipt(supplierName: string, itemName: string): Promis
   ).get(returned.body.data?.id ?? returned.body.id);
   if (!note) throw new Error('Missing fixture credit note');
 
-  // Real HTTP receipt: this is the cash the supplier pays back.
+  return { purchaseId, creditNoteId: note.id, warehouseId: warehouse.id };
+}
+
+/** Real HTTP receipt: the cash the supplier pays back. */
+async function postRefundReceipt(creditNoteId: number): Promise<{ refundId: number; refundNo: string }> {
   const receipt = await request(app).post('/api/supplier-refunds')
     .set('Cookie', cookie)
     .set('Idempotency-Key', `f3-sr-${Date.now()}-${Math.floor(Math.random() * 1e6)}`)
-    .send({ credit_note_id: note.id, refund_date: RECEIPT_DATE, amount: 100, payment_method: 'cash' });
+    .send({ credit_note_id: creditNoteId, refund_date: RECEIPT_DATE, amount: 100, payment_method: 'cash' });
   expect(receipt.status).toBe(201);
-  const refundId = receipt.body.data?.id ?? receipt.body.id;
-  const refundNo: string = receipt.body.data?.refund_no ?? receipt.body.refund_no;
+  return {
+    refundId: receipt.body.data?.id ?? receipt.body.id,
+    refundNo: receipt.body.data?.refund_no ?? receipt.body.refund_no,
+  };
+}
 
+async function makeRefundReceipt(supplierName: string, itemName: string): Promise<{
+  refundId: number; supplierId: number; refundNo: string; purchaseId: number;
+}> {
+  const { purchaseId, creditNoteId } = await seedPaidPurchaseWithCreditNote(supplierName, itemName);
+  const { refundId, refundNo } = await postRefundReceipt(creditNoteId);
   const supplierId = db.prepare<[number], { supplier_id: number }>(
     'SELECT supplier_id FROM supplier_refunds WHERE id = ?'
   ).get(refundId)!.supplier_id;
-
   return { refundId, supplierId, refundNo, purchaseId };
 }
 
@@ -186,7 +197,9 @@ describe('F-3: supplier refund void dates both stores on the original receipt da
     expect(baselineAtReceipt).not.toBe(preReceiptBaseline);
     expectAllInvariantsHold('after F-3 void');
   });
+});
 
+describe('F-3: supplier refund void state guards', () => {
   it('refuses to void a receipt in a closed period and changes nothing', async () => {
     const { refundId, supplierId, refundNo } = await makeRefundReceipt('F3 supplier C', 'F3 item C');
 
