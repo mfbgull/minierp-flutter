@@ -1465,3 +1465,42 @@ situation of every existing install at migration time.
   **implementation-pending-full-gate** until the dbfbe415 run resolves —
   no final green claimed, no baseline/threshold changes. Parked GLM test
   untouched; frozen PR4/PR8 untouched.
+
+- **F3 batched update (2026-11-17, Gull msg_ef5a53431ebe): implementation
+  LOCALLY VERIFIED / remote CI pending / NOT merged.** Evidence at exact
+  `dbfbe415`: PI full server gate 284 suites / 2273 tests exit 0;
+  changed-base fallow audit no issues (2 files, exit 0, fresh coverage);
+  coordinator independent F3 + accountingInvariants rerun 2 suites /
+  37 tests, 58.857s, exit 0, clean before/after
+  (`/home/fawad/logs/coordinator-dbfbe415-focused.log`). GLM final review
+  APPROVE stands (no duplicate). Draft **PR9** head verified exact
+  `dbfbe415`; all 6 remote CI checks PENDING — monitored automatically.
+  F3 is NOT merged; no final green claimed until PR9 CI resolves.
+
+- **F3 unpark-before-merge sequencing rule + concrete integration plan
+  (per Gull msg_ef5a53431ebe).** Rule: the existing GLM
+  `moneyPathFindingsRed.test.ts` F-3 case (in `it.failing`) MUST be
+  unparked on a fix-containing integration branch BEFORE the combined fix
+  merges — jest fails a passing `it.failing`, so merging the fix while the
+  case is still wrapped would break CI with an unexpected pass. Concrete
+  plan (single owner per file, no silent candidate change):
+  1. PR9 CI green at `dbfbe415` (pending; monitored automatically) →
+     reported; ready/merge stays human-only.
+  2. On Gull's explicit integration approval: create an integration branch
+     containing BOTH the F3 fix (PR9 content) AND the GLM parked test
+     (from the GLM line).
+  3. GLM (sole owner of the file) removes the `it.failing` wrapper on that
+     branch in the SAME edit that updates the header comment accurately
+     (decision implemented at `859831aa`; case now a normal regression).
+  4. Targeted run: the previously-parked case observed PASSING on the
+     integration branch (no full-suite rerun without cause).
+  5. Only then the combined merge proceeds, as sequenced by Gull.
+  Frozen PR4/PR8 candidates stay untouched until explicitly sequenced; no
+  silent cherry-picks/force pushes.
+
+- **Slot + next assignment (Gull msg_ef5a53431ebe).** The exclusive full
+  server slot is FREE (F3 gate complete). PI assigned S3 only, on a fresh
+  branch from `e400f4cc`: reproduce then red-first
+  purchase/receipt/production `stock_balance` extension — stock/server
+  only. GLM cross-reviews the future S3 diff read-only when available.
+  GLM runs no tests in PI's slots.
