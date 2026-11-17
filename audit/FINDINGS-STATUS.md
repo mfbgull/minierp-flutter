@@ -1662,3 +1662,26 @@ situation of every existing install at migration time.
   - **Slots free**; no baseline changes, no ready/merge, no artifact
     changes. GLM follow-up role: independent check of the clean final
     snapshot when routed.
+
+- **S-3 batched update (2026-11-17, Gull msg_af4ac86d0e0d):
+  INDEPENDENTLY VERIFIED; draft publication routed.**
+  - Coordinator clean-final-snapshot verification at `9fd41a39` (real
+    deps, clean before/after): S-3 parity + accounting invariants —
+    2 suites / 46 tests, 52.339s, EXIT 0
+    (`/home/fawad/logs/coordinator-s3-9fd41a39-focused.log`).
+  - Combined bounded evidence: full server gate 288/2320 EXIT 0 +
+    exact changed-base fallow audit 14 files "No issues" EXIT 0 at
+    production-identical `2692ab1e`; setup correction (untracked
+    node_modules symlink in the retained verify worktree) retained
+    honestly. GLM source review APPROVE stands; no duplicate review.
+  - **S-3 status: independently verified / NOT merged.** PI authorized:
+    normal push + DRAFT S-3 PR stacked on PR7 — no force, no ready, no
+    merge. GLM monitors the new PR's CI at the exact SHA and reports
+    automatically.
+  - **PI next assignment: S-4 reproduction ONLY** — fresh branch from
+    `9fd41a39`, real reconciliation route + batch/bin/warehouse/GL
+    A–J evidence. NO confirmed status until an actual result exists.
+  - Reservation-only stale mirror and PO-cancel non-sync gaps remain
+    SEPARATELY UNRESOLVED.
+  - Full slots free; no extra broad tests; no baseline changes;
+    no ready/merge.
