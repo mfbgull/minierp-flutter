@@ -153,10 +153,33 @@ describe('S-3: stock_balances extension mirror parity on ADD paths', () => {
     const itemId = await createItem('S3 reserved item', cookie);
     await drivePurchase(itemId, whId, 10);
 
-    // S-3 governs the three ADD paths: after the receipt the mirror must equal
-    // the bins. (A later reservation moves the bin only — see the note below.)
+    // After the ADD-path receipt the mirror must equal the bins. This asserts
+    // the ADD path only; reservations are exercised in the scoped case below.
     const truth = binSums(itemId, whId);
     expect({ physical: truth.physical, reserved: truth.reserved, available: truth.available }).toEqual({ physical: 10, reserved: 0, available: 10 });
+    assertMirrorParity(itemId, whId);
+  });
+
+  it('S-3 scoped: a later ADD preserves an existing reservation in the mirror (flag ON)', async () => {
+    setFeatureEnabled(db, 'feature_batch_locations', true);
+    const itemId = await createItem('S3 reserved-then-add item', cookie);
+    await drivePurchase(itemId, whId, 10);
+
+    // Reserve a real portion THROUGH THE REAL RESERVATION ROUTE.
+    const locId = (db.prepare(`SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT'`).get(whId) as { id: number }).id;
+    const batchId = (db.prepare('SELECT id FROM stock_batches WHERE item_id = ? ORDER BY id DESC LIMIT 1').get(itemId) as { id: number }).id;
+    const reserved = await post('/api/inventory/reservations', {
+      item_id: itemId, warehouse_id: whId, location_id: locId, batch_id: batchId,
+      quantity_reserved: 4, reference_doctype: 'SALES_ORDER', reference_docno: 'S3-SO-1', reference_line_id: 1,
+    });
+    expect(reserved.status).toBe(201);
+
+    // ADD more stock for the SAME item+warehouse through a covered ADD route.
+    await drivePurchase(itemId, whId, 5);
+
+    // S-3 refresh must preserve the nonzero reserved and keep available coherent.
+    const truth = binSums(itemId, whId);
+    expect(truth).toEqual({ physical: 15, reserved: 4, available: 11 });
     assertMirrorParity(itemId, whId);
   });
 
@@ -186,5 +209,85 @@ describe('S-3: stock_balances extension mirror parity on ADD paths', () => {
     expect(adj.status).toBe(201);
 
     assertMirrorParity(itemId, whId);
+  });
+
+  it('S-3 scoped: recordMovement keeps the mirror equal in BOTH flag states', async () => {
+    for (const flag of [false, true]) {
+      db.exec('SAVEPOINT s3_rm_state');
+      setFeatureEnabled(db, 'feature_batch_locations', flag);
+      const itemId = await createItem(`S3 recordMovement ${flag}`, cookie);
+
+      const adj = await post('/api/inventory/stock-movements', {
+        item_id: itemId, warehouse_id: whId, movement_type: 'ADJUSTMENT', quantity: 3, remarks: `S3 rm ${flag}`,
+      });
+      expect(adj.status).toBe(201);
+
+      // recordMovement seeds the bin row ungated, so the mirror must follow in
+      // both states. The caller gate on the refresh is the defect here.
+      expect(binSums(itemId, whId).physical).toBe(3);
+      assertMirrorParity(itemId, whId);
+      db.exec('ROLLBACK TO s3_rm_state; RELEASE s3_rm_state');
+    }
+  });
+
+  it('legacy/no-bin control: a balance with no bin row keeps quantity and reads zero bins', async () => {
+    for (const flag of [false, true]) {
+      db.exec('SAVEPOINT s3_legacy');
+      setFeatureEnabled(db, 'feature_batch_locations', flag);
+      const itemId = await createItem(`S3 legacy ${flag}`, cookie);
+
+      // A legacy balance row with a real quantity and NO bin rows (no bins are
+      // fabricated / backfilled). The mirror must read its true bin coverage
+      // (zero) while the authoritative running balance is retained.
+      db.prepare('INSERT INTO stock_balances (item_id, warehouse_id, quantity) VALUES (?, ?, ?)').run(itemId, whId, 42);
+      const adj = await post('/api/inventory/stock-movements', {
+        item_id: itemId, warehouse_id: whId, movement_type: 'ADJUSTMENT', quantity: 0, remarks: `S3 legacy ${flag}`,
+      });
+      // A zero-quantity movement may be refused; the key assertion is the
+      // legacy row is not corrupted and no bins are invented either way.
+      if (adj.status === 201) {
+        expect(binSums(itemId, whId)).toEqual({ physical: 0, reserved: 0, available: 0 });
+      }
+      const row = db.prepare('SELECT quantity, quantity_physical FROM stock_balances WHERE item_id = ? AND warehouse_id = ?').get(itemId, whId) as { quantity: number; quantity_physical: number | null };
+      expect(Number(row.quantity)).toBeGreaterThanOrEqual(42);
+      expect(binSums(itemId, whId).physical).toBe(0);
+      db.exec('ROLLBACK TO s3_legacy; RELEASE s3_legacy');
+    }
+  });
+
+  /**
+   * UNCONFIRMED PROBE — separate reservation-only stale mirror (NOT S-3).
+   *
+   * Reproducible note for a later finding: `StockReservationModel
+   * .changeLocationReserved` updates `batch_stock_by_location.quantity_reserved`
+   * but never refreshes the `stock_balances` extension mirror. So after ONLY a
+   * reservation (no ADD path runs afterwards) the bin truth and the mirror
+   * disagree: bins read reserved=4 / available=6 while the mirror still reads
+   * reserved=0 / available=10.
+   *
+   * This is the reservation write path, NOT one of S-3's three ADD paths and
+   * NOT the S-1 consume/release path. It is left UNFIXED in this branch (no
+   * StockReservation production edits here). The probe below asserts the
+   * CURRENT, WRONG behaviour so the gap is captured as evidence rather than
+   * silently dropped; flip these assertions to EQUALITY when the separate
+   * finding is fixed.
+   */
+  it('PROBE (unconfirmed, separate finding): a reservation alone leaves the mirror stale', async () => {
+    setFeatureEnabled(db, 'feature_batch_locations', true);
+    const itemId = await createItem('S3 reservation-probe item', cookie);
+    await drivePurchase(itemId, whId, 10);
+
+    const locId = (db.prepare(`SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT'`).get(whId) as { id: number }).id;
+    const batchId = (db.prepare('SELECT id FROM stock_batches WHERE item_id = ? ORDER BY id DESC LIMIT 1').get(itemId) as { id: number }).id;
+    const reserved = await post('/api/inventory/reservations', {
+      item_id: itemId, warehouse_id: whId, location_id: locId, batch_id: batchId,
+      quantity_reserved: 4, reference_doctype: 'SALES_ORDER', reference_docno: 'S3-PROBE-1', reference_line_id: 1,
+    });
+    expect(reserved.status).toBe(201);
+
+    // Bins moved; the mirror did not.
+    expect(binSums(itemId, whId)).toEqual({ physical: 10, reserved: 4, available: 6 });
+    expect({ physical: mirror(itemId, whId).physical, reserved: mirror(itemId, whId).reserved, available: mirror(itemId, whId).available })
+      .toEqual({ physical: 10, reserved: 0, available: 10 }); // stale — the gap
   });
 });

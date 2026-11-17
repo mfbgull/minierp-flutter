@@ -874,10 +874,11 @@ class StockMovementModel {
         `).run(data.item_id, data.warehouse_id, qty);
       }
 
-      // New path: keep extension columns in sync with batch_stock_by_location
-      if (isFeatureEnabled(db, 'feature_batch_locations')) {
-        this.syncStockBalancesExtension(data.item_id, data.warehouse_id, db);
-      }
+      // S-3: the extension mirror is a maintained write, not a read — refresh
+      // it in BOTH flag states. The bin row was seeded ungated just above, so
+      // gating this refresh would leave quantity_available stale while the bin
+      // holds real units.
+      this.syncStockBalancesExtension(data.item_id, data.warehouse_id, db);
 
       this.refreshItemStockMirror(data.item_id, db);
 
