@@ -1316,3 +1316,28 @@ situation of every existing install at migration time.
   and must not be used to predict PR8's PR-event fallow outcome. PR8's
   content verdict is pending; it will be reported when it finishes, without
   plausibility guesses.
+
+- **Attribution correction: the 4 PR7 fallow findings are ALL
+  StockMovement.ts functions — GLM's "InvoiceCreationService ×1" retracted
+  (Gull msg_c6e3756d02d3).** Literal CI log (job 133827661652):
+  consumeFromOldestBatches (cyclomatic 22 / cognitive 22),
+  consumeLegacyBatches (cognitive 21), preReceiptFallback (cognitive 21),
+  consumeBatchesByLocation (cognitive 16). The earlier ×1 attribution was
+  inferred from the changed-files list, not the finding list. Kept separate
+  from the PR4/PR8 push-event base-ref failures (infra class).
+- **GLM read-only review of PI's refactor `e400f4cc` (parent `7416280e`,
+  StockMovement.ts only, 265+/201−): APPROVE-WITH-LIMITS** — full findings:
+  `/home/fawad/logs/glm-refactor-review-e400f4cc.md`. Verified equivalent at
+  the exact SHAs: clamp ON (legacy/fallback MAX(0)) vs OFF (flag-on plain
+  subtraction) preserved per path; the removed `quantity_reserved`
+  self-assign is value-identical (trigger `AFTER UPDATE OF
+  quantity_physical, quantity_reserved` still fires — `quantity_physical` is
+  listed — and recomputes available from NEW values); `selectBatchBins`,
+  `throwShortfall`/`assertAvailable`, `warnMirrorShortfall`,
+  `mergeUncoveredBatches`, `consumeFlagOn`,
+  `preReceiptFallbackWithLocations` all verbatim-equivalent; warning
+  text/precision, cost/order, and rollback unchanged. LIMITS: source-reading
+  only (no tests — PI's exclusive gate); the EXACT CI changed-base audit
+  with fresh coverage on the refactor is the authority and has not landed —
+  no final green claimed. Two proposed pinning tests recorded (trigger
+  recomputation invariant; clamp-difference pin).
