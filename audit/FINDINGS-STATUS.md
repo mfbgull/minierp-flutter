@@ -1504,3 +1504,30 @@ situation of every existing install at migration time.
   purchase/receipt/production `stock_balance` extension — stock/server
   only. GLM cross-reviews the future S3 diff read-only when available.
   GLM runs no tests in PI's slots.
+
+- **S-3 CONFIRMED SCOPE + flag-gated mirror-write correction (Gull
+  msg_c67507eb7509).** PI reproduced S-3 on `e400f4cc` through REAL
+  purchase/receipt/production routes: bin quantities present, the
+  `stock_balances` extension NULL; the control `recordMovement` path
+  passes. Gull independently read `syncStockBalancesExtension` and
+  confirmed it returns flag OFF — the mirror write is FLAG-GATED, the
+  confirmed defect class. PI routed: extend the red matrix to BOTH flag
+  states BEFORE code; then unconditional SHARED mirror refresh after
+  balance+bin creation at all three seams. Scope guards: no global
+  invariant widening; no schema/backfill/default/migration-127 changes.
+  Ownership: PI owns the model seams + StockMovement; GLM owns
+  Flutter/docs and cross-reviews the eventual stock diff READ-ONLY.
+  Status: **confirmed S-3 scope, fix NOT final until evidence** (red
+  matrix both states + gate + changed-base audit).
+
+- **PR9 remote CI final (2026-11-17): 5 PASS / 1 FAIL(artifact) at exact
+  `dbfbe415`.** Content verdict: PR-event fallow PASS (3m46s, job
+  133895665328) — changed-base audit clean. server PASS ×2, flutter PASS
+  ×2. Push-event fallow FAIL 4m46s (job 133895588740): literal log
+  "could not determine changed files for base ref '0000…': fatal:
+  Invalid symmetric difference expression", exit 2 — the SAME zero-SHA
+  base-ref INFRA artifact as PR4/PR8 push runs (new branch, `event.before`
+  = all-zero), NOT a content verdict. With the locally verified gate
+  (284/2273 exit 0 + independent 37-test rerun + changed-base clean),
+  F3 stands at: implementation locally verified, remote content verdict
+  clean, NOT merged — ready/merge remains human-only.
