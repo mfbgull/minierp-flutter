@@ -1452,3 +1452,310 @@ assert 409, the exact message, and that invoice item ids/quantities, return-to-l
 references, `stock_batches`, `batch_stock_by_location`, reservations, stock
 movements and journal lines are byte-for-byte unchanged. Red-first: both cases
 returned 500 before the guard. Revert-proof: removing the guard restored the 500.
+
+## D26 — Review-cycle state and the open product calls (2026-11-16)
+
+**Context.** The GLM/PI review cycle produced two reviews (money-path
+`audit/GLM-REVIEW.md`, UX `audit/GLM-UX-REVIEW.md`) and one stock review
+(`audit/GLM-STOCK-REVIEW.md`), plus three draft PRs. This entry records what is
+settled and what is a proposal awaiting a product call.
+
+**Settled.**
+
+- `main` = `origin/main` = `7a96e6d8`; CI green on that SHA.
+- Three draft PRs are open: `#3` (D21 extraction), `#4` (UX fixes + parked
+  tests), `#5` (review docs).
+- The stock findings were **not reproduced**. They are read-only reasoning.
+- PI is on a read-only review/environment task, including `#3`.
+- The full-suite lock is unassigned.
+- Next order: S-2, then the F-3 dating decision and reproduction, then S-3, S-4,
+  S-1, S-5, S-6, S-7.
+- D21 is **implemented** in draft PR `#3`; it is not merged and not resolved.
+- The earlier "no keyless Flutter caller" claim was corrected by `653dfe43`. Its
+  own claim that `POST /supplier-refunds/:id/void` is key-mandatory is **wrong**
+  (Flutter-only commit; the void route/handler call no idempotency helper and
+  there is no `SUPPLIER_REFUND_VOID` scope). Verified at runtime by GLM: a
+  keyless void returns HTTP 200. The write-off route *is* key-mandatory.
+
+**PI read-only findings (`readonly-cycle-report.md` v1 / `readonly-cycle-report-v2.md`).**
+
+- PR `#3` @ `971c4f5b`: **NO FINDINGS**, behaviour-preserving. PI re-ran 7
+  suites / 67 tests (exit 0); the same on `7a96e6d8` gives 69 (the F-2 two-test
+  delta, not a PR #3 regression). **The coordinator has since independently
+  re-run the same 7 suites / 67 tests, exit 0, on a clean ext4 worktree at the
+  exact SHA (log `/home/fawad/logs/minierp-orchestration-20261116/coordinator-pr3-targeted.log`;
+  clean status, `diff --check` passes) and CI is green on the exact SHA. PR #3
+  remains draft; review is not merge approval. The full suites / `scripts/check.sh`
+  were NOT run.**
+- PI v2 withdrawals: the NTFS→BUG-011 causal claim, and the F-3 "the ONLY
+  reversal that breaks the rule" universal claim (only the `reverseLedgerEntry`
+  caller inventory is known). F-3 is now runtime-reproduced by GLM; the missing
+  key was a red herring (see OPEN-DECISION 1).
+- Repo + dependencies are on NTFS; the ext4 move is **pending Gull's approval**
+  and not executed. Proposal doc `audit/NTFS-TO-EXT4-PROPOSAL.md` **exists**
+  (tracked; added in `f75c6777`) — the reference is valid.
+- Regenerated artifacts: generator
+  `test/features/accounting_report_regressions_test.dart`; two JSON files change
+  one date line each; nine PNGs change nine rendered date glyphs. No broader
+  claim of substantive non-date change is made.
+- Preferred artifact fix: a **deterministic test clock**, pending Gull. Do not
+  accept `.gitignore` alone for tracked artifacts, `assume-unchanged`, or
+  commit-once as recurring-churn fixes.
+
+**Deferred backlog preserved.** Stage-2 keys, D20, BUG-011, task 8.6, mobile
+keys, the remaining mutating-endpoint keys, and the first-deployment checklist.
+
+**OPEN-DECISION — proposals, not decisions taken.** Each needs Gull's call; none
+is settled here.
+
+1. **Money F-3 dating.** PI escalated the discrepancy; **no dating implementation
+   exists.** Any decision must keep both accounting stores consistent.
+   **Correction on record (2026-11-16):** an earlier claim that the F-3 test
+   "masks an HTTP 400 because the void request omits a mandatory
+   `Idempotency-Key`" was **WRONG**. `POST /api/supplier-refunds/:id/void`
+   requires **no** key: the route (`routes/supplierRefunds.ts:34`) and handler
+   (`controllers/supplierRefundController.ts:162`) call no idempotency helper;
+   there is no `SUPPLIER_REFUND_VOID` scope (only `SUPPLIER_REFUND_CREATE`,
+   `SUPPLIER_REFUND_CLAIM_CREATE`, `SUPPLIER_REFUND_CLAIM_WRITE_OFF`). The
+   claim came from the `653dfe43` commit message, which is Flutter-only and
+   inaccurate about the server, and from the coordinator's own reading of it;
+   the coordinator has since confirmed the correction. **Runtime verification
+   (GLM, isolated test-only worktree):** F-3 unwrapped with the keyless void
+   returned `HTTP 200`, and the **first failing assertion is the as-of
+   GL/subledger comparison** (`Expected 0, Received 3000`) — **not** a masked
+   400. Adding a key is optional and does not change the handler. The F-3 test
+   now carries a header comment recording this; F-3 remains parked. Options:
+   - **Option A — same-date reversal** — align with the house primitive
+     `ledgerUtils.reverseLedgerEntry`, whose correction is dated at the
+     original row's `transaction_date`. The complete non-test writer inventory
+     of `reverseLedgerEntry` on this tree is `invoiceReturnService.ts:1481`,
+     `Payment.ts:198/:222/:726/:732`, `SupplierBill.ts:145`, `Purchase.ts:736`,
+     and `Invoice.ts:1099`; `SupplierRefundModel.void` is **not** among them —
+     it builds its own supplier-ledger void dated today (UTC). Respect the
+     period lock exactly as `Payment.delete` does. Stores agree at every as-of
+     date. **No claim is made that every reversal path uses the primitive** —
+     the inventory covers `reverseLedgerEntry` callers only, not every ledger
+     write, so a universal claim is unsupported.
+   - **Option B — current-date GL and subledger reversal together**, preserving
+     historical postings. Wider scope.
+   A UTC-only adjustment does **not** resolve the as-of mismatch, so it is not a
+   standalone option. F-3 stays parked until this is decided.
+2. **F-1 (money review) — product choice, not an ambiguous finding ID.** F-1 is
+   a real, defined finding (`audit/GLM-REVIEW.md`, on `glm/audit-reviews`): a
+   claim can never be written off in two steps. `writeOff` calls
+   `assertNoActivePosting(db, 'REFUND_CLAIM_WRITE_OFF', id)`
+   (`SupplierRefundClaim.ts:250`, guard `:1113-1121`), which refuses any second
+   write-off because the first already posted active lines. The docstring at
+   `:218-219` says a smaller amount "leaves the claim PARTIAL", implying the
+   remainder can be written off later — it cannot. The choice is one of:
+   - **Keep the guard** (one active write-off per claim). Then the `:218-219`
+     docstring is wrong and must be corrected; a partial write-off strands the
+     remainder in PARTIAL with no permitted resolution. The existing pins at
+     `supplierRefundClaims.test.ts:329` and `:385` stay.
+   - **Relax the guard** to allow repeated *deliberate, different-amount*
+     write-offs (the API already supports a partial `data.amount`). Then F-1's
+     proposed two-step test is added and the `:329`/`:385` pins are updated.
+   This is Gull's product call. It is **not** a question about which finding ID
+   "F-1" refers to.
+3. **UX-5 / UX-7 wording.** The proposed user-facing strings need Gull's wording
+   approval before they land.
+4. **Audit-artifact policy.** The generator is a test side-effect; the JSON/PNG
+   delta is date-only (two JSON lines, nine glyphs). The preferred fix is a
+   deterministic test clock; `.gitignore` alone, `assume-unchanged`, and
+   commit-once are not accepted as recurring-churn fixes. Gull selects the policy.
+5. **ext4 move.** The NTFS→ext4 move for the repository volume
+   (`audit/NTFS-TO-EXT4-PROPOSAL.md`). Operational timing and risk are Gull's call;
+   PI's migration plan must not be executed before approval.
+
+## D27 — The PR #6 (stock S-2) review: correction trail (2026-11-16)
+
+**Date.** 2026-11-16. **Status.** DECIDED (review discipline; no product call).
+
+**Context.** GLM filed a read-only review of PR #6 (stock S-2 @ `819034da`) and
+labelled several claims "confirmed"/"pre-existing". The coordinator read the
+source graph and corrected them, invoking D22 (no "pre-existing" label without a
+clean known-good baseline). The review is at
+`/home/fawad/logs/pr6-stock-s2-readonly-review.md` (v2). **v1 must not be
+propagated.**
+
+**Corrections, each re-verified against the `819034da` tree.**
+
+1. **Both allocators do not run in one request.** Flag-ON **returns**
+   `consumeBatchesByLocation` (`StockMovement.ts:1355`); flag-OFF calls
+   `consumeLegacyStock` (`:1413-1418`). The commit's "2 pre-fix red (flag-OFF) +
+   2 green flag-ON controls" is therefore **coherent**; four red is not implied.
+   The review's "four red" claim is withdrawn.
+2. **No opposite inner-bin guard.** `consumeBatchesByLocation`'s final guard
+   checks `remaining` across **batches** (`:315-321`), not the inner
+   `batchRemaining` bin remainder. The review's "the flag-ON path has the
+   opposite inner guard" claim is withdrawn.
+3. **F2 arithmetic.** master 10, one bin physical 4, sell 6 → master 4, bin 0,
+   **diff 4**; the gap pre-existed the sale. The review's "bins drift six below
+   the master" is withdrawn. The remaining question (report the legacy drain's
+   under-coverage, reconcile, or clamp) is a product choice routed to PI for a
+   test, not a confirmed defect.
+4. **F1 fixture was invalid.** A trigger maintains
+   `quantity_available = MAX(0, quantity_physical − quantity_reserved)`
+   (`add-batch-location-model.sql:88-105`), so `physical=0, available=5` is
+   unreachable. The valid, reachable fixture is a `DAMAGED` bin with
+   `physical=5, reserved=0` (`DAMAGED` is a real status in
+   `utils/batchStatus.ts`). The finding — the legacy predicate omits the
+   `status_override` filter the flag-ON predicate applies — survives on that
+   fixture and is routed to PI.
+5. **"Pre-existing" label removed** (D22). Also, `quantity_available > 0` **does**
+   account for reservations, so the review's reservation claim was overstated;
+   it is now a flag-parity hypothesis, not a confirmed defect. The S-1 release
+   issue stays separate.
+
+**Rule reinforced.** A read-only review states hypotheses with file:line and a
+reachable fixture; it does not use "confirmed" or "pre-existing" without a run
+(a clean baseline for the latter). Hypotheses go to PI for test-only
+reproduction.
+
+**No stock code changed. No test was run** (PI holds the full-suite slot).
+
+## D28 — Gull's R1 / R2 / R4 calls on the BUG-013 legacy consume (2026-11-16/17)
+
+**Provenance.** Recorded from PI's transcription
+`/home/fawad/logs/gull-decisions-r1r2r4.md` ("Source: Gull, direct answer in
+session", dated 2026-11-16), per coordinator msg_884fbdd0378c. Evidence base:
+`819034da`; triage snapshot `d687e6bd` (branch `triage/r1r2r4-819034da`,
+`/home/fawad/logs/triage-final.log`, `/home/fawad/logs/triage-r1r2r4-report.md`).
+**Status.** DECIDED by Gull (product owner). Implementation NOT started; the
+coordinator routes it.
+
+**Gull's decisions, verbatim (owner voice).**
+
+- **R1 (non-ACTIVE/DAMAGED stock on the legacy path).** "Damaged items **can
+  be sold**, as scrap or at a reduced price. The sale is **allowed**, but the
+  user must get a **warning / notification**." The legacy path "must NOT
+  silently refuse, and must NOT silently sell with no signal. It sells and
+  reports."
+- **R2 (bins under-cover the master; no `locRemaining` guard).** "**Warn the
+  user about the available quantity.**" The legacy path "keeps its clamp
+  behaviour, and adds a warning that says the available quantity was less
+  than requested" — choice (c) **clamp and warn**, "not refuse, not
+  reconcile".
+- **R4 (fully reserved bin on the legacy path).** "The old way (OFF) **must
+  respect the promise** (the reservation)." The legacy predicate "must stop
+  draining a bin whose free quantity is 0" — a **correctness fix**, "not a
+  warning".
+
+**Scope caveats (coordinator msg_884fbdd0378c; GLM recording, not
+interpreting).**
+
+1. The R1 permission covers **DAMAGED only**. It does **not** generalize to
+   HALTED, EXPIRED, BLOCKED, QUARANTINED or REJECTED; their legacy-path
+   behaviour is **undecided** until Gull says otherwise.
+2. The R2 warning reports the **shortfall** (available vs requested). It is
+   **not** a licence to oversell; the sale still clamps at what the bins
+   hold.
+3. All three calls address the **legacy (flag-OFF) consume path only**. The
+   flag-ON behaviour (which refuses non-ACTIVE with 400) is **unchanged**
+   unless Gull decides otherwise. flag-OFF-vs-both scope is explicit here.
+4. The **wire shape** of the warning payload is an **architecture** call and
+   stays with the agent, following the ACCT-006 precedent ("flags + warns
+   instead of refusing", `StockMovement.ts:1448-1457`, returns
+   `backdatedBeforeReceipt` / `firstReceiptDate` for the caller's warning
+   text) — that precedent is PI's citation in the source file.
+5. The R4 triage tests at `d687e6bd` are **characterization** tests pinning
+   today's behaviour; they are **not** corrected-semantics regression tests
+   and will need updating when the fix lands.
+
+**Owner vs agent attribution.** Decisions: Gull (quoted above). Triage facts
+("today's behaviour"): PI's probe at `d687e6bd`. Precedent/shape suggestion:
+PI. This record and its scope caveats: GLM per the coordinator's instruction.
+
+**Not done.** No production code changed, no parity fix shipped, no full
+suite run; implementation and its red-first tests are not started.
+
+## D28a — Amendment: R1/R2/R4 scope answered — option B, BOTH flag states (2026-11-17)
+
+**Provenance.** Gull answered the open scope question (which flag states the
+R1/R2/R4 decisions apply to). Recorded from PI's implementation brief
+`/home/fawad/logs/r1r2r4-implementation-brief.md` — "Scope — ANSWERED by Gull:
+option B, BOTH STATES" — relayed by the coordinator (msg_2834f953b232: "PI
+reports Gull chose B BOTH states for damaged-sale warning"). Gull's verbatim
+decision quotes are in D28 and re-quoted verbatim in the brief §1
+("damage items can be sell as scrape or in reduced price. they can be sold
+but with warning or notification." / "Sould warn the user about the available
+quantity." / "the old way should respect the promise.").
+
+**What option B means (recorded from PI's brief, attribution PI — stock/server
+design owner).** R1/R2/R4 apply in **both flag states**, not only the legacy
+flag-OFF path: the flag-ON sellable predicates must also accept `DAMAGED`, and
+the ON path must emit the warning. Per the brief's triage: R4 is already
+correct on flag ON; R1 is not (flag ON refuses damaged today), so R1 genuinely
+needs an ON change.
+
+**Caveats carried over unchanged from D28.** DAMAGED only — EXPIRED is
+refused (the brief's R1-c case: "Gull did not authorise expired"); the R2
+warning reports under-coverage and is not an oversell licence nor an
+accounting/closed-period bypass (brief I4/I5); the wire shape stays an
+architecture call (`warnings: string[]` per the coordinator's resolution,
+msg_884fbdd0378c).
+
+**Status.** DECIDED by Gull (scope). Implementation is PI's stock/server work
+on `fix/r1r2r4-warn-reserve` (off `819034da`), with the brief §5 red-first
+regression specifications; the brief itself ran **no tests and changed no
+production code**. GLM records this decision only; the gate candidate
+`0186b8d9` is untouched.
+
+## D28b — R4 clarification: reservations honoured through the fallback too (2026-11-17)
+
+**Provenance.** Recorded from PI's implementation brief
+`/home/fawad/logs/r1r2r4-implementation-brief.md`, §1a "Architecture
+resolutions (coordinator, 2026-11-16)", item 6, relayed by the coordinator
+(msg_60183552f03f: "R4 e fallback clarification"). This is a settled
+**architecture** resolution (coordinator), sitting under Gull's product
+decision D28 ("the old way should respect the promise") — it is not a new
+product call.
+
+**What it settles.** R4's reservation cap applies **through the legacy
+fallback path too**, not only on the first bin pass. A fallback bin pick that
+ignores reservations would drain promised units even though the first pass
+honoured them. Combined with brief I5: each take is capped to the bin's
+available (physical − reserved), not merely a `>0` filter.
+
+**Status.** SETTLED (architecture). Implementation is PI's stock/server work
+on `fix/r1r2r4-warn-reserve`. GLM records the decision only; the gate
+candidate `0186b8d9` is untouched. UI note: the Flutter client currently has
+**no** `warnings` parsing anywhere in `lib/` (grep: 0 hits), so the R1/R2
+warning strings will not surface in the UI until a client integration is
+planned — routing question raised, no code written.
+
+## D28c — correction: the two-commit split proposal was NOT proven independent (2026-11-17)
+
+**What was claimed.** GLM's migration-128 architecture review
+(`/home/fawad/logs/glm-cross-review-migration128.md`, finding F-C) proposed a
+two-commit split — migration/replay commit (SQL + `database.ts` +
+`idempotency.ts` + `InvoiceCreationService.ts`) separate from the stock-
+precision commit (`StockMovement.ts` + `batchLocationWarningPrecision.test.ts`)
+— and stated both orders compile and neither commit hides the other's
+behavior.
+
+**What is now known.** PI's targeted verification (17 targeted tests + full
+suite 32/32 suites, 333/333 tests, green) proved the split source is **not
+independent**: GLM's earlier claim of a proven independent split is
+**RETRACTED**. Gull chose **ONE atomic commit** carrying source + direct
+tests together.
+
+**Corrections that follow.**
+- The F-C "verified feasible, both orders compile" language in the
+  migration-128 review file described a source-reading hypothesis, not a
+  proven property; it did not survive PI's actual test run.
+- Publication decisions are unaffected: no split was ever published; both
+  publication candidates (`0186b8d9`, `52447ccc`) remain frozen and untouched.
+
+**Status.** DECIDED by Gull (msg_22e79f3bbb63): one atomic commit (source +
+direct tests). Recorded as a correction to GLM's own review claim; lesson:
+compile-order reasoning is not evidence of behavioral independence — only the
+targeted tests establish that.
+
+**D28c provenance addendum (2026-11-17).** PI retracted the dependency-
+independent-split claim in msg_d46e4e3f73ea, independent of and consistent
+with Gull's decision recorded above: PI's own targeted verification showed
+the split source was not independent. The final atomic commit is
+`7416280e` (`fix/r1r2r4-warn-reserve`), currently under PI's exclusive full
+server gate. GLM's read-only final review of that commit:
+`/home/fawad/logs/glm-cross-review-migration128-final.md`.
