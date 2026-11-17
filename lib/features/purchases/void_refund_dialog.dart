@@ -50,8 +50,10 @@ class _VoidRefundDialog extends ConsumerStatefulWidget {
 class _VoidRefundDialogState extends ConsumerState<_VoidRefundDialog> {
   final _reasonController = TextEditingController();
 
-  /// The void route mandates an Idempotency-Key. A retry of the same reason
-  /// replays the original key; editing the reason mints a new one.
+  /// The void route does NOT mandate an Idempotency-Key server-side (the
+  /// route middleware and controller don't read it) — the client sends one
+  /// voluntarily as a retry-safety measure (653dfe43): a retry of the same
+  /// reason replays the original key; editing the reason mints a new one.
   final _idempotency = IdempotencyKeyCache(prefix: 'refund-void');
 
   bool _busy = false;

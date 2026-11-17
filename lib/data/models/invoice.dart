@@ -336,6 +336,7 @@ class Invoice {
     this.expiryNotes,
     this.overrideSale = false,
     this.creditOffset = 0,
+    this.warnings = const [],
   });
 
   factory Invoice.fromJson(Map<String, dynamic> json) => Invoice(
@@ -390,6 +391,13 @@ class Invoice {
         : null,
     returns: _parseList(json['returns'], ReturnDocument.fromJson) ?? const [],
     timeline: _parseList(json['timeline'], TimelineEvent.fromJson) ?? const [],
+    // Server-authored warning strings on the create response (ACCT-006 —
+    // the controller merges `warnings` into the returned invoice object).
+    // Displayed verbatim; empty for a normal success.
+    warnings: (json['warnings'] as List<dynamic>?)
+        ?.map((e) => e as String)
+        .toList() ??
+        const [],
   );
 
   final int id;
@@ -435,6 +443,11 @@ class Invoice {
   final InvoicePosition? position;
   final List<ReturnDocument> returns;
   final List<TimelineEvent> timeline;
+
+  /// Server-authored warning strings returned with the invoice (ACCT-006
+  /// precedent; BUG-013 R1/R2 ride the same existing `warnings: string[]`
+  /// field). Empty for a normal success. Displayed verbatim.
+  final List<String> warnings;
 
   Map<String, dynamic> toJson() => {
     'id': id,

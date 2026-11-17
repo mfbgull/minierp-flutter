@@ -66,6 +66,11 @@ class _FakeInvoiceRepository extends InvoiceRepository {
   /// whose retry must replay, not duplicate — P11).
   String? failCreateWith;
 
+  /// Server warning strings returned with the created invoice (the
+  /// ACCT-006 `warnings: string[]` on POST /invoices). Empty = normal
+  /// success.
+  List<String> createWarnings = const <String>[];
+
   /// Task 42: when true, the first [create] returns an *outcome-unknown*
   /// failure (request delivered, no response — the server may have already
   /// committed) and every subsequent call succeeds, modelling a delayed
@@ -110,7 +115,9 @@ class _FakeInvoiceRepository extends InvoiceRepository {
     if (failCreateWith != null) {
       return ApiFailure(ApiError(message: failCreateWith!, isNetwork: true));
     }
-    return ApiSuccess(Invoice.fromJson(const <String, dynamic>{}));
+    return ApiSuccess(
+      Invoice.fromJson(<String, dynamic>{'warnings': createWarnings}),
+    );
   }
 
   @override
@@ -2504,6 +2511,67 @@ void main() {
         find.text('Payment amount must be greater than zero'),
         findsOneWidget,
       );
+    });
+  });
+
+  group('BUG-013 warning display: created-invoice server warnings', () {
+    // Verbatim ACCT-006 warning wording from InvoiceCreationService (the
+    // backdated-before-receipt case) — the server authors the string, the
+    // client must display it as-is.
+    const String acmeBackdatedWarning =
+        'Item Widget: invoice date 2026-11-17 is before the item\'s first '
+        'purchase receipt in this warehouse (2026-12-01). Stock was consumed '
+        'from later receipts at their recorded cost — verify the documents.';
+
+    Future<void> fillLine(WidgetTester tester) async {
+      await tester.tap(find.text('Acme Corp').last);
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).first, 'Wid');
+      await tester.pump();
+      await tester.tap(find.text('Widget').last);
+      await tester.pumpAndSettle();
+      await tester.enterText(gridEditor(), '7');
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> save(WidgetTester tester) async {
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyS);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets(
+      'a created invoice with server warnings shows them verbatim before '
+      'the page closes',
+      (tester) async {
+        final repo = _FakeInvoiceRepository()
+          ..createWarnings = const [acmeBackdatedWarning];
+        await _pumpPage(tester, repo: repo);
+        await fillLine(tester);
+
+        await save(tester);
+
+        // The server's warning reaches the user, word for word — it must
+        // not be dropped the way the parse dropped it before this fix.
+        expect(find.textContaining(acmeBackdatedWarning), findsOneWidget);
+      },
+    );
+
+    testWidgets('a created invoice without warnings closes as before', (
+      tester,
+    ) async {
+      final repo = _FakeInvoiceRepository();
+      await _pumpPage(tester, repo: repo);
+      await fillLine(tester);
+
+      await save(tester);
+
+      // Normal success stays normal: no warning UI, and the form closes.
+      expect(find.byIcon(Icons.warning_amber_rounded), findsNothing);
+      expect(find.textContaining('verify the documents'), findsNothing);
+      expect(find.byType(SalesInvoiceFormPage), findsNothing);
     });
   });
 }

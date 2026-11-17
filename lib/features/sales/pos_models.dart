@@ -148,6 +148,7 @@ class PosSale {
     required this.change,
     required this.itemsCount,
     required this.saleIds,
+    this.warnings = const [],
   });
 
   factory PosSale.fromJson(Map<String, dynamic> json) => PosSale(
@@ -169,6 +170,13 @@ class PosSale {
                 ?.map((e) => (e as num).toInt())
                 .toList() ??
             const [],
+        // Server-authored warning strings (ACCT-006 precedent; the BUG-013
+        // R1/R2 decisions ride the same existing field). Displayed verbatim
+        // — the client authors no wording of its own.
+        warnings: (json['warnings'] as List<dynamic>?)
+                ?.map((e) => e as String)
+                .toList() ??
+            const [],
       );
 
   final String transactionNo;
@@ -183,6 +191,11 @@ class PosSale {
   final double change;
   final int itemsCount;
   final List<int> saleIds;
+
+  /// Server-authored warning strings on the completed sale (ACCT-006
+  /// precedent; BUG-013 R1/R2 ride the same existing `warnings: string[]`
+  /// field). Empty for a normal success. Displayed verbatim.
+  final List<String> warnings;
 }
 
 /// One row of `GET /api/pos/transactions` (recent POS sales history).

@@ -19,6 +19,8 @@ import 'package:flutter/services.dart'
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import 'package:minierp_app/core/theme/status_colors.dart';
+
 import '../../core/utils/formatters.dart';
 import '../../core/utils/print_service.dart' show PrintService;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
@@ -314,9 +316,45 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('Sale Completed'),
-        content: Text('Transaction: ${sale.transactionNo}\n'
-            'Total: ${Formatters.currency(sale.total)}\n'
-            'Change: ${Formatters.currency(sale.change)}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Transaction: ${sale.transactionNo}\n'
+                'Total: ${Formatters.currency(sale.total)}\n'
+                'Change: ${Formatters.currency(sale.change)}'),
+            // Server-authored warnings (ACCT-006 precedent; BUG-013 R1/R2).
+            // Verbatim strings, amber warning tokens, no acknowledgement
+            // step — a normal success renders exactly as before.
+            if (sale.warnings.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              for (final warning in sale.warnings)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        size: 18,
+                        color: StatusColors.of(ctx).warning,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          warning,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: StatusColors.of(ctx).warning,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
