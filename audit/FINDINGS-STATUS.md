@@ -1308,3 +1308,11 @@ situation of every existing install at migration time.
   check CI's changed-base audit performs and which PR7 currently FAILS.
   PR7 therefore remains quality-gate OPEN until PI's refactor lands and CI
   passes.
+
+- **Correction to GLM's msg_6f9d11aff091 (Gull msg_edf9609a4c3f).** The
+  clause "PR4/PR7 PR-runs passed their fallow" was FALSE for PR7: **both** of
+  PR7's fallow jobs failed on CONTENT (the 4 complexity findings). Only
+  PR4's PR-event fallow passed; PR7's passed none. The clause is retracted
+  and must not be used to predict PR8's PR-event fallow outcome. PR8's
+  content verdict is pending; it will be reported when it finishes, without
+  plausibility guesses.
