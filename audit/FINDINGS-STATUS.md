@@ -1630,3 +1630,35 @@ situation of every existing install at migration time.
   comment's "UNCONFIRMED PROBE" header is mislabeled; this tracker entry
   is the authoritative record; the in-code label corrects naturally when
   the separate finding is fixed and the assertions flip to equality.
+
+- **S-3 batched update (2026-11-17, Gull msg_cba41ac59db9): final gate
+  evidence + setup-claim correction.**
+  - **Gate VERIFIED at exact `2692ab1e`: 288 suites / 2320 tests, EXIT 0;
+    exact changed-base fallow audit: 14 changed files, "No issues",
+    EXIT 0.** Together with GLM's APPROVE of the follow-up diff, S-3 is
+    now **locally verified at source+gate level; not merged**; final
+    publication awaits Gull (proposed: S-3 draft stacked on the PR7
+    branch AFTER an independent check of the final snapshot, normal push
+    only — no force, no ready/merge).
+  - **Candidate `9fd41a39`** (parent line after `2692ab1e`): diff is
+    comments/test-name ONLY; production unchanged; inspected by the
+    coordinator; NO full rerun required for that delta.
+  - **SETUP-CLAIM CORRECTION (accurate evidence per SHA):** the retained
+    `verify-2692ab1e` worktree was reported clean-untracked-0 but ACTUALLY
+    carries an untracked symlink `server/node_modules ->
+    /home/fawad/s3-ext/server/node_modules` (verified by GLM: `??` in
+    status, symlink target confirmed). Source is unchanged and the test
+    results remain observed valid; the correction is recorded so per-SHA
+    evidence stays accurate. PI asked to prepare a CLEAN final `9fd41a39`
+    snapshot with a REAL npm ci for the coordinator's focused
+    verification — not a repeat of the full gate.
+  - **Fallow default note:** a default-base fallow run showed "1 changed
+    file" — likely the dependency link (the untracked node_modules
+    symlink); the AUTHORITATIVE result is the exact changed-base audit
+    (14 files, clean) recorded above.
+  - **Reservation-only stale mirror: remains RUNTIME-CONFIRMED** (executed
+    probe, bins {10,4,6} vs mirror {10,0,10}) — separate from S-1, unfixed
+    in S-3, not permission for wider cleanup.
+  - **Slots free**; no baseline changes, no ready/merge, no artifact
+    changes. GLM follow-up role: independent check of the clean final
+    snapshot when routed.
