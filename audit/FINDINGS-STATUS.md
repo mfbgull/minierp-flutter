@@ -1756,3 +1756,49 @@ situation of every existing install at migration time.
   (`pr4-ea8f79cd-l10n-drift.log`). F-3 parked test/comment NOT changed per
   Gull; GLM owns its unpark on fix-containing integration later. PR8
   rebase deferred until PR4 merges.
+
+- **PR4 MERGED (merge commit `d1075cd2`, 2026-11-17T11:17:48Z) — batched
+  status update (2026-11-17).** Coordinator independently verified PR4
+  candidate `ea8f79cd` in clean ext4 (`/home/fawad/verify-pr4-ea8f79cd`):
+  29/29 server, 34/34 Flutter, l10n clean, all 6 checks SUCCESS at exact
+  head; marked ready and merged; logs `coordinator-pr4-ea8f79cd-*.log`.
+  PI's PR3 post-merge gate (recorded here per msg_fdcc0951589a-style
+  batching): 283/2269 server, 1199 pass + 1 skip Flutter, exit 0, main CI
+  green, only the known 11 artifact outputs modified.
+- **PR6 (PI) verification batched:** rebuilt `94d12c6a` patch-identical to
+  `819034da` on main `d1075cd2`, clean ext4; PI 11 suites / 96 tests PASS;
+  coordinator reran S2 real-invoice flag OFF/ON + accountingInvariants —
+  2 suites / 37 tests PASS exit 0 (28.410s), clean afterward, log
+  `coordinator-pr6-94d12c6a-focused.log`. Lease push authorized, not yet
+  pushed; PR6 merge waits for GLM's post-PR4 full gate + new-head CI.
+- **GLM EXCLUSIVE FULL GATE at exact `d1075cd2` — PASS, exit 0
+  (2026-11-17).** Clean ext4 detached worktree
+  `/home/fawad/verify-pr4-merge-d1075cd2` (HEAD = `d1075cd2` exact), real
+  `npm ci` + `flutter pub get`, ran via `bash scripts/check.sh` (the
+  script is 100644 non-executable in git on this line; no chmod, no source
+  change). Results: **server 284/284 suites, 2273/2273 tests passed, 0
+  FAIL**; **Flutter 1212 passed + 1 skipped (the 1 skip recorded honestly;
+  consistent with PI's PR3-gate 1-skip pattern), "All other tests
+  passed!"**; l10n-drift clean (fallback gap 0, orphaned 0); finding-tag
+  audit: server it.failing=1 (the parked F-3), flutter RED-BY-DESIGN
+  files=0. Post-run worktree: exactly the 11 known
+  `audit/accounting-audit/remediation/` golden artifacts regenerated
+  (same known pattern as PI's PR3 gate; not source changes) — restored
+  with `git checkout --`, tracked dirty 0 / untracked 0 afterward.
+  Log: `/home/fawad/logs/gate-d1075cd2/check-full.log` (final line
+  `GATE_EXIT=0`). Main CI at `d1075cd2`: run 44072725619 — server
+  SUCCESS, fallow SUCCESS, flutter SUCCESS (3/3).
+- **PR8 REBASED onto merged `d1075cd2` → new tip `ef117084` (NOT
+  pushed).** Rebase `git rebase --onto d1075cd2 0186b8d9 glm/warning-ui`
+  (old-base `0186b8d9` = old PR4 head, so only the 4 PR8-only commits
+  replay). Range-diff old `0186b8d9..52447ccc` vs new
+  `d1075cd2..ef117084`: **all 4 commits "=" (patch-identical)**; diff of
+  patch bodies EMPTY; zero conflicts (expected `purchase_repository.dart`
+  overlap with PR4 resolved cleanly by the replay). Targeted regressions
+  (run AFTER the full gate, exclusive slot respected): Flutter
+  `pos_sale_warning_test.dart`, `invoice_create_warning_wire_test.dart`,
+  `sales_invoice_form_page_test.dart` — **68/68 PASS** (exit 0);
+  l10n-drift clean. NOT RUN (intentionally): full suites (this gate was
+  just run at the shared base), server suites (PR8 touches no server
+  files). **NOT PUSHED**: awaiting coordinator inspection of `ef117084`
+  and the exact old-head lease (`52447ccc…`).
