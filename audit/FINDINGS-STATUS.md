@@ -284,9 +284,18 @@ ordinary passing regressions. Evidence on current main (`91df221c`): the
 all four test files pass in the post-merge gates (1219 passed + 1 pre-existing
 non-finding skip).
 
+F-3 status, stated precisely to avoid a false "fixed" reading: **the F-3 code
+fix is implemented on PI's PR9 branch (`fix/f3-refund-void-original-date`) but
+is NOT merged into main.** On main today the F-3 regression still runs as
+`it.failing` (expected-failure) in
+`server/src/__tests__/moneyPathFindingsRed.test.ts`. The test unpark companion
+`b209303a` (test-only: drops the `it.failing` wrapper, updates the stale parked
+comment and describe title, assertions unchanged) rides the same PR9 line, so
+the wrapper is removed only when PR9 merges through the approved sequence.
+
 | Finding | Test | Tag | Fails today because |
 |---|---|---|---|
-| F-3 (GLM-REVIEW) | `server/src/__tests__/moneyPathFindingsRed.test.ts` | `it.failing` with `F-3:` in the name | GL AP vs supplier subledger differ by 3,000 at as-of 2026-11-05 (`Expected: 0, Received: 3000`). Fix assigned to PI on PR9 (F-3 dating decision, Option A); the parked test is unparked only on a fix-containing integration branch after approved integration. |
+| F-3 (GLM-REVIEW) | `server/src/__tests__/moneyPathFindingsRed.test.ts` | PARKED on main — `it.failing` with `F-3:` in the name | GL AP vs supplier subledger differ by 3,000 at as-of 2026-11-05 (`Expected: 0, Received: 3000`). The F-3 code fix is implemented on PI's PR9 branch but NOT merged; the test unpark companion `b209303a` (test-only, assertions unchanged) is on the same PR9 line, so the wrapper drops on main only via PR9's approved integration. |
 | UX-3 (GLM-UX-REVIEW) | `test/features/supplier_refund_message_test.dart` | FIXED — un-parked by PR4 (`d1075cd2`) | None: refund amounts get their own refund-specific error strings, not return-quantity messages. Runs as an ordinary passing test. |
 | UX-6 (GLM-UX-REVIEW) | `test/widgets/cash_blockers_localization_test.dart` | FIXED — un-parked by PR4 (`d1075cd2`) | None: cash-blocker rows render localized type labels and formatted dates, not raw enums or ISO dates. Runs as an ordinary passing test. |
 | UX-11 (GLM-UX-REVIEW) | `test/features/sales_order_form_loading_test.dart` | FIXED — un-parked by PR4 (`d1075cd2`) | None: option-provider errors surface with loading feedback. Runs as an ordinary passing test. |
