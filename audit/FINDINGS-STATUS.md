@@ -1487,7 +1487,8 @@ situation of every existing install at migration time.
   untouched; frozen PR4/PR8 untouched.
 
 - **F3 batched update (2026-11-17, Gull msg_ef5a53431ebe): implementation
-  LOCALLY VERIFIED / remote CI pending / NOT merged.** Evidence at exact
+  LOCALLY VERIFIED / remote CI pending / NOT merged.** [RESOLVED
+  2026-11-18: merged as `29457260` — see PR9 COMPLETION above.] Evidence at exact
   `dbfbe415`: PI full server gate 284 suites / 2273 tests exit 0;
   changed-base fallow audit no issues (2 files, exit 0, fresh coverage);
   coordinator independent F3 + accountingInvariants rerun 2 suites /
