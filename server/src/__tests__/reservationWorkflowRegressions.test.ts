@@ -555,3 +555,138 @@ describe('Finding 6: duplicate reference-line guards', () => {
     expect(binRow(b2, loc)).toEqual({ physical: 5, reserved: 0, available: 5 });
   });
 });
+
+// ── 7. Voiding ONE of several invoices must restore only THAT invoice's bins ──
+
+/**
+ * GLM re-review of 4842faf5: the void restored the reservation's whole original
+ * allocation (`quantity_allocated`) rather than the bins this invoice drained.
+ * With two sales against one reservation, voiding the second over-reserved.
+ * The durable fix is a per-invoice-item bin-consumption ledger, so the void can
+ * restore exactly what that line took instead of guessing from quantities.
+ */
+describe('Finding 7: a void restores only the voided invoice line\'s bins', () => {
+  function consumptionRows(invoiceId: number): Array<{ batch_id: number; location_id: number; quantity: number }> {
+    return db.prepare(
+      `SELECT batch_id, location_id, quantity FROM invoice_item_bin_consumption
+       WHERE invoice_item_id IN (SELECT id FROM invoice_items WHERE invoice_id = ?) ORDER BY id`,
+    ).all(invoiceId) as Array<{ batch_id: number; location_id: number; quantity: number }>;
+  }
+
+  it('restores only b2 when the second of two invoices is voided', async () => {
+    setFeatureEnabled(db, FLAG, true);
+    const item = await createItem(`S1R void-two-invoices ${Date.now()}`, cookie);
+    await purchaseStock(item, warehouseA, 5, 40, cookie, '2026-10-01');
+    await purchaseStock(item, warehouseA, 5, 42, cookie, '2026-10-05');
+    const [b1, b2] = batchIdsOf(item, warehouseA);
+    const loc = defaultLocation(warehouseA);
+
+    const reservation = StockReservationModel.create({
+      item_id: item, warehouse_id: warehouseA, quantity_reserved: 6,
+      reference_doctype: 'SALES_ORDER', reference_docno: seedSalesOrder('Confirmed'), reference_line_id: 1,
+      bins: [
+        { batch_id: b1, location_id: loc, quantity: 4 },
+        { batch_id: b2, location_id: loc, quantity: 2 },
+      ],
+    }, db);
+
+    // Invoice 1 takes all 4 from b1; invoice 2 takes the 2 from b2.
+    expect(await sell(item, 4, 'vi-1', reservation.id)).toBe(201);
+    const invoice1 = lastInvoiceId();
+    expect(await sell(item, 2, 'vi-2', reservation.id)).toBe(201);
+    const invoice2 = lastInvoiceId();
+    expect(reservationRow(reservation.id)).toEqual({ status: 'CONSUMED', quantity_reserved: 0 });
+
+    // The ledger must record exactly what each line drained.
+    expect(consumptionRows(invoice1)).toEqual([{ batch_id: b1, location_id: loc, quantity: 4 }]);
+    expect(consumptionRows(invoice2)).toEqual([{ batch_id: b2, location_id: loc, quantity: 2 }]);
+
+    // Void ONLY invoice 2: b2 comes back, b1 stays sold.
+    expect(await cancelInvoice(invoice2)).toBe(200);
+
+    expect(reservationRow(reservation.id)).toEqual({ status: 'ACTIVE', quantity_reserved: 2 });
+    expect(liveBinRows(reservation.id)).toEqual([{ batch_id: b2, location_id: loc, quantity_reserved: 2 }]);
+    expectHeaderMatchesChildren(reservation.id);
+    expect(binRow(b1, loc)).toEqual({ physical: 1, reserved: 0, available: 1 });
+    expect(binRow(b2, loc)).toEqual({ physical: 5, reserved: 2, available: 3 });
+  });
+
+  it('does not 409 on void when the voided line\'s bin still has physical stock', async () => {
+    setFeatureEnabled(db, FLAG, true);
+    const item = await createItem(`S1R void-physical ${Date.now()}`, cookie);
+    await purchaseStock(item, warehouseA, 5, 40, cookie, '2026-10-01');
+    await purchaseStock(item, warehouseA, 5, 42, cookie, '2026-10-05');
+    const [b1, b2] = batchIdsOf(item, warehouseA);
+    const loc = defaultLocation(warehouseA);
+
+    const reservation = StockReservationModel.create({
+      item_id: item, warehouse_id: warehouseA, quantity_reserved: 6,
+      reference_doctype: 'SALES_ORDER', reference_docno: seedSalesOrder('Confirmed'), reference_line_id: 1,
+      bins: [
+        { batch_id: b1, location_id: loc, quantity: 4 },
+        { batch_id: b2, location_id: loc, quantity: 2 },
+      ],
+    }, db);
+
+    expect(await sell(item, 4, 'vp-1', reservation.id)).toBe(201);
+    expect(await sell(item, 2, 'vp-2', reservation.id)).toBe(201);
+    const invoice2 = lastInvoiceId();
+
+    // b1 now holds physical 1 (5 - 4). Restoring the whole original b1
+    // allocation of 4 would try to reserve 4 on a bin with physical 1.
+    expect(await cancelInvoice(invoice2)).toBe(200);
+
+    expect(reservationRow(reservation.id)).toEqual({ status: 'ACTIVE', quantity_reserved: 2 });
+    expectHeaderMatchesChildren(reservation.id);
+    expect(binRow(b1, loc)).toEqual({ physical: 1, reserved: 0, available: 1 });
+    expect(binRow(b2, loc)).toEqual({ physical: 5, reserved: 2, available: 3 });
+  });
+});
+
+// ── 8. Re-creating a RELEASED multi-bin reservation with the same bins[] ──
+
+describe('Finding 8: released multi-bin reservation reactivation contract', () => {
+  it('reactivates idempotently when the same bins[] is resent', async () => {
+    setFeatureEnabled(db, FLAG, true);
+    const item = await createItem(`S1R released-samebins ${Date.now()}`, cookie);
+    await purchaseStock(item, warehouseA, 5, 40, cookie, '2026-10-01');
+    await purchaseStock(item, warehouseA, 5, 42, cookie, '2026-10-05');
+    const [b1, b2] = batchIdsOf(item, warehouseA);
+    const loc = defaultLocation(warehouseA);
+    const soNo = seedSalesOrder('Confirmed');
+    const bins = [
+      { batch_id: b1, location_id: loc, quantity: 2 },
+      { batch_id: b2, location_id: loc, quantity: 1 },
+    ];
+
+    const created = StockReservationModel.create({
+      item_id: item, warehouse_id: warehouseA, quantity_reserved: 3,
+      reference_doctype: 'SALES_ORDER', reference_docno: soNo, reference_line_id: 1,
+      bins,
+    }, db);
+    StockReservationModel.release(
+      { reference_doctype: 'SALES_ORDER', reference_docno: soNo, reference_line_id: 1 }, db);
+    expect(reservationBinRows(created.id)).toEqual([]);
+
+    // The same request again: same reference, same bins[], same quantity.
+    const again = StockReservationModel.create({
+      item_id: item, warehouse_id: warehouseA, quantity_reserved: 3,
+      reference_doctype: 'SALES_ORDER', reference_docno: soNo, reference_line_id: 1,
+      bins,
+    }, db);
+
+    expect(again.id).toBe(created.id);
+    expect(again.status).toBe('ACTIVE');
+    expect(reservationRow(created.id)).toEqual({ status: 'ACTIVE', quantity_reserved: 3 });
+    expect(liveBinRows(created.id)).toEqual([
+      { batch_id: b1, location_id: loc, quantity_reserved: 2 },
+      { batch_id: b2, location_id: loc, quantity_reserved: 1 },
+    ]);
+    expectHeaderMatchesChildren(created.id);
+    expect(binRow(b1, loc)).toEqual({ physical: 5, reserved: 2, available: 3 });
+    expect(binRow(b2, loc)).toEqual({ physical: 5, reserved: 1, available: 4 });
+    // Exactly one row for the reference line.
+    expect((db.prepare('SELECT COUNT(*) AS c FROM stock_reservations WHERE reference_docno = ?')
+      .get(soNo) as { c: number }).c).toBe(1);
+  });
+});

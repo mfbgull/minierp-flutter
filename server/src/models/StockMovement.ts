@@ -112,7 +112,7 @@ interface RecordMovementDTO {
   skipAdjustmentFinancialPosting?: boolean;
 }
 
-type ConsumptionEntry = { batchId: number | null; consumed: number; unitCost: number };
+type ConsumptionEntry = { batchId: number | null; consumed: number; unitCost: number; /** Set by the reservation path, which must record an exact per-bin draw. */ locationId?: number };
 
 type LocationBatchRow = {
   id: number;
@@ -1802,7 +1802,7 @@ class StockMovementModel {
     db.prepare('UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?')
       .run(roundedQty, batch.id);
 
-    return { batchId: batch.id, consumed: roundedQty, unitCost: Number(batch.unit_cost) };
+    return { batchId: batch.id, consumed: roundedQty, unitCost: Number(batch.unit_cost), locationId };
   }
 
   /**

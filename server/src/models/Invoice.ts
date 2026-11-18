@@ -905,21 +905,20 @@ class InvoiceModel {
   /**
    * Create a new invoice item
    */
-  static createInvoiceItem(db: Database.Database, invoiceId: number, item: CreateInvoiceItemDTO): void {
+  static createInvoiceItem(db: Database.Database, invoiceId: number, item: CreateInvoiceItemDTO): number {
     // ACC-18 interim: the stored amount is always the server-computed
     // line total — round(base − discount) with tax applied at the line
     // boundary. The base is qty × price, or the entered `amount` for
     // loose amount-driven lines (the same base the validation summed).
     const { amount, netAmount, taxAmount } = decomposeLineAmount(item);
-    db.prepare(`
+    const result = db.prepare(`
       INSERT INTO invoice_items (
         invoice_id, item_id, quantity, unit_price, amount,
         tax_rate, discount_type, discount_value,
         net_amount, tax_amount, reservation_id
       )
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     `).run(
-      invoiceId,
+     `).run(      invoiceId,
       item.item_id,
       item.quantity,
       item.unit_price,
@@ -931,6 +930,7 @@ class InvoiceModel {
       taxAmount,
       item.reservation_id ?? null
     );
+    return Number(result.lastInsertRowid);
   }
 
   /**
@@ -1075,8 +1075,8 @@ class InvoiceModel {
   /**
    * Get invoice items for stock reversal
    */
-  static getInvoiceItemsForStockReverse(db: Database.Database, invoiceId: number): Array<{ item_id: number; quantity: number; unit_price: number; reservation_id?: number | null }> {
-    return db.prepare(`SELECT item_id, quantity, unit_price, reservation_id FROM invoice_items WHERE invoice_id = ?`).all(invoiceId) as Array<{ item_id: number; quantity: number; unit_price: number; reservation_id?: number | null }>;
+  static getInvoiceItemsForStockReverse(db: Database.Database, invoiceId: number): Array<{ id: number; item_id: number; quantity: number; unit_price: number; reservation_id?: number | null }> {
+    return db.prepare(`SELECT id, item_id, quantity, unit_price, reservation_id FROM invoice_items WHERE invoice_id = ?`).all(invoiceId) as Array<{ id: number; item_id: number; quantity: number; unit_price: number; reservation_id?: number | null }>;
   }
 
   /**
@@ -1208,7 +1208,21 @@ class InvoiceModel {
     // inside the caller's transaction so both commit together.
     for (const line of items) {
       if (line.reservation_id) {
-        StockReservationModel.reopenForInvoiceLine(db, line.reservation_id, roundQty(Math.abs(line.quantity)));
+        // S-1: restore exactly the bins THIS line drained, from the durable
+        // per-line ledger. A quantity-only reopen cannot tell which bins the
+        // line took, so it over-reserves when one reservation backed several
+        // invoices. Falls back to the quantity reopen for historical lines
+        // written before the ledger existed.
+        const draw = db.prepare(
+          'SELECT batch_id, location_id, quantity FROM invoice_item_bin_consumption WHERE invoice_item_id = ? ORDER BY id')
+          .all(line.id) as Array<{ batch_id: number; location_id: number; quantity: number }>;
+        if (draw.length > 0) {
+          StockReservationModel.restoreConsumedBins(
+            db, line.reservation_id, draw.map((d) => ({ batch_id: d.batch_id, location_id: d.location_id, quantity_reserved: roundQty(Number(d.quantity)) })));
+          db.prepare('DELETE FROM invoice_item_bin_consumption WHERE invoice_item_id = ?').run(line.id);
+        } else {
+          StockReservationModel.reopenForInvoiceLine(db, line.reservation_id, roundQty(Math.abs(line.quantity)));
+        }
       }
     }
 

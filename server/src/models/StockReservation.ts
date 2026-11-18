@@ -42,7 +42,12 @@ function assertMatchingReservation(existing: StockReservation, data: Reservation
   // the requested allocation to the stored child rows instead.
   const requestedBins = (data.bins ?? [])
     .map((b) => `${b.batch_id}:${b.location_id}:${roundQty(b.quantity)}`).sort().join('|');
-  const sameBins = requestedBins.length === 0 || requestedBins === data.storedBinSignature;
+  // A RELEASED row has no child rows left (release drops them), so there is no
+  // stored signature to compare. Its allocations were returned in full, so
+  // nothing is being reused: re-creating with an explicit bins[] is a genuine
+  // reactivation, and the guard below only has to protect LIVE reservations.
+  const released = existing.status === 'RELEASED';
+  const sameBins = requestedBins.length === 0 || released || requestedBins === data.storedBinSignature;
   const sameQuantity = existing.status !== 'ACTIVE' || Number(existing.quantity_reserved) === qty;
   if (!sameStock || !sameBins || !sameQuantity) throw new BusinessRuleError(409, 'Reservation reference already has different stock or quantity');
 }
@@ -459,6 +464,43 @@ export class StockReservationModel {
     }
     db.prepare(`UPDATE stock_reservations SET status = 'ACTIVE', consumed_at = NULL, quantity_reserved = ? WHERE id = ?`)
       .run(roundQty(bins.reduce((s, b) => s + Number(b.quantity_allocated ?? b.quantity_reserved), 0)), existing.id);
+  }
+
+  /**
+   * S-1: restore the exact bins an invoice line drained, using the durable
+   * per-line ledger. Unlike `reopenPartial`, this names each bin explicitly,
+   * so voiding one of several invoices against a reservation restores only
+   * that line's draw and never over-reserves a bin it did not take from.
+   * The reservation goes back to ACTIVE and the parent is derived from the
+   * child rows actually restored.
+   */
+  static restoreConsumedBins(db: Database.Database, reservationId: number, draw: StockReservationBin[]): void {
+    const existing = this.getById(reservationId, db);
+    if (!existing) return;
+    if (!this.sourceOrderIsActive(db, existing)) return;
+
+    const upd = db.prepare('UPDATE stock_reservation_bins SET quantity_reserved = ? WHERE reservation_id = ? AND batch_id = ? AND location_id = ?');
+    const ins = db.prepare('INSERT INTO stock_reservation_bins (reservation_id, batch_id, location_id, quantity_reserved, quantity_allocated) VALUES (?, ?, ?, ?, ?)');
+    for (const bin of draw) {
+      const add = roundQty(Number(bin.quantity_reserved));
+      if (add <= 0) continue;
+      this.reserveBins(db, existing, [{ batch_id: bin.batch_id, location_id: bin.location_id, quantity_reserved: add }], 1, false);
+      // Restore into the existing row when there is one (a partial sale keeps
+      // a zeroed row), else recreate it, so the allocation total stays exact.
+      const current = db.prepare('SELECT id, quantity_reserved FROM stock_reservation_bins WHERE reservation_id = ? AND batch_id = ? AND location_id = ?')
+        .get(reservationId, bin.batch_id, bin.location_id) as { id: number; quantity_reserved: number } | undefined;
+      if (current) {
+        const restored = roundQty(Number(current.quantity_reserved) + add);
+        db.prepare('UPDATE stock_reservation_bins SET quantity_reserved = ? WHERE id = ?').run(restored, current.id);
+        db.prepare('UPDATE stock_reservation_bins SET quantity_allocated = MAX(COALESCE(quantity_allocated, 0), ?) WHERE id = ?').run(restored, current.id);
+      } else {
+        ins.run(reservationId, bin.batch_id, bin.location_id, add, add);
+      }
+    }
+
+    const rows = this.getBins(reservationId, db);
+    db.prepare(`UPDATE stock_reservations SET status = 'ACTIVE', consumed_at = NULL, quantity_reserved = ? WHERE id = ?`)
+      .run(roundQty(rows.reduce((s, b) => s + Number(b.quantity_reserved), 0)), reservationId);
   }
 
   /**
