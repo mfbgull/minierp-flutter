@@ -874,10 +874,11 @@ class StockMovementModel {
         `).run(data.item_id, data.warehouse_id, qty);
       }
 
-      // New path: keep extension columns in sync with batch_stock_by_location
-      if (isFeatureEnabled(db, 'feature_batch_locations')) {
-        this.syncStockBalancesExtension(data.item_id, data.warehouse_id, db);
-      }
+      // S-3: the extension mirror is a maintained write, not a read — refresh
+      // it in BOTH flag states. The bin row was seeded ungated just above, so
+      // gating this refresh would leave quantity_available stale while the bin
+      // holds real units.
+      this.syncStockBalancesExtension(data.item_id, data.warehouse_id, db);
 
       this.refreshItemStockMirror(data.item_id, db);
 
@@ -1409,7 +1410,10 @@ class StockMovementModel {
   }
 
   static syncStockBalancesExtension(itemId: number, warehouseId: number, db: Database.Database): void {
-    if (!isFeatureEnabled(db, 'feature_batch_locations')) return;
+    // S-3: the mirror is a maintained write, not a read — it must refresh in
+    // BOTH flag states (the flag selects which source is READ, never which is
+    // maintained). The bin rows it sums are seeded ungated by every ADD path,
+    // so the mirror is correct whether the flag is on or off.
     const sums = db.prepare(`
       SELECT COALESCE(SUM(bsl.quantity_physical), 0) as physical,
              COALESCE(SUM(bsl.quantity_reserved), 0) as reserved,

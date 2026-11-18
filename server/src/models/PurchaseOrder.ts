@@ -1117,6 +1117,11 @@ class PurchaseOrderModel {
           `).run(poItem.item_id, warehouse_id, receiptItem.received_quantity);
         }
 
+        // S-3: refresh the extension mirror after the stock_balances row and
+        // the bin row (seeded by syncBatchStockByLocationForNewBatch above)
+        // both exist. Ungated; the flag selects reads only.
+        StockMovementModel.syncStockBalancesExtension(poItem.item_id, warehouse_id, db);
+
         totalQuantity += receiptItem.received_quantity;
         totalAmount += roundQty(receiptItem.received_quantity * poItem.unit_price);
       };

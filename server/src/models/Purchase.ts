@@ -307,6 +307,10 @@ class PurchaseModel {
       `).run(item_id, warehouse_id, quantity);
     }
 
+    // S-3: refresh the extension mirror now that both the stock_balances row
+    // and the bin row (seeded above) exist. Ungated — see syncStockBalancesExtension.
+    StockMovementModel.syncStockBalancesExtension(item_id, warehouse_id, db);
+
     StockMovementModel.refreshItemStockMirror(item_id, db);
 
     // Supplier AP entry: a linked purchase increases the supplier's
