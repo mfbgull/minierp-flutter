@@ -398,7 +398,11 @@ class SupplierRefundModel {
 
       SupplierLedgerModel.createEntry({
         supplier_id: refund.supplier_id,
-        transaction_date: new Date().toISOString().split('T')[0],
+        // F-3: a void reverses a receipt entered in error, so the counter-entry
+        // carries the receipt's own date. Dating it "today" split the ledger
+        // from the GL (which keeps the original entry date) and made the
+        // supplier balance disagree between two as-of dates for no reason.
+        transaction_date: refund.refund_date,
         transaction_type: ledgerVoidType,
         reference_no: refund.refund_no,
         debit: 0,
