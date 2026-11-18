@@ -69,11 +69,7 @@ export class StockReservationModel {
 
     // Decision B: normalize to a bin allocation list. No bins[] means the
     // classic single-bin shape from location_id/batch_id.
-    const bins: StockReservationBin[] = data.bins && data.bins.length > 0
-      ? data.bins.map((b) => ({ batch_id: b.batch_id, location_id: b.location_id, quantity_reserved: roundQty(b.quantity) }))
-      : (data.location_id && data.batch_id)
-        ? [{ batch_id: data.batch_id, location_id: data.location_id, quantity_reserved: qty }]
-        : [];
+    const bins = this.normalizeCreateBins(data, qty);
     if (bins.length > 0) {
       const sum = roundQty(bins.reduce((s, b) => s + b.quantity_reserved, 0));
       if (sum !== qty) {
@@ -88,24 +84,7 @@ export class StockReservationModel {
       WHERE reference_doctype = ? AND reference_docno = ? AND reference_line_id IS ?
     `).get(data.reference_doctype, data.reference_docno, data.reference_line_id ?? null) as StockReservation | undefined;
 
-    if (existing) {
-      assertMatchingReservation(existing, { ...data, storedBinSignature: this.getBinSignature(existing.id, db) }, qty);
-      if (existing.status === 'ACTIVE') {
-        logger.warn(`[Reservation] Duplicate reservation for ${data.reference_doctype}:${data.reference_docno}:${data.reference_line_id}`);
-        return existing;
-      }
-      if (existing.status === 'RELEASED') {
-        this.reserveBins(db, existing, bins, 1);
-        // Re-activate a released reservation
-        db.prepare(`
-          UPDATE stock_reservations
-          SET status = 'ACTIVE', released_at = NULL, quantity_reserved = ?
-          WHERE id = ?
-        `).run(qty, existing.id);
-        return { ...existing, quantity_reserved: qty, status: 'ACTIVE', released_at: undefined } as StockReservation;
-      }
-      throw new BusinessRuleError(409, 'Consumed reservation cannot be reactivated');
-    }
+    if (existing) return this.createAgainstExisting(db, existing, data, bins, qty);
 
     const result = db.prepare(`
       INSERT INTO stock_reservations (
@@ -131,6 +110,41 @@ export class StockReservationModel {
     this.reserveBins(db, created, bins, 1);
     return this.getById(id, db)!;
     })();
+  }
+
+  /** Bins named by the caller, else the classic single parent bin, else none. */
+  private static normalizeCreateBins(data: { location_id?: number; batch_id?: number; bins?: Array<{ batch_id: number; location_id: number; quantity: number }> }, qty: number): StockReservationBin[] {
+    if (data.bins && data.bins.length > 0) {
+      return data.bins.map((b) => ({ batch_id: b.batch_id, location_id: b.location_id, quantity_reserved: roundQty(b.quantity) }));
+    }
+    if (data.location_id && data.batch_id) {
+      return [{ batch_id: data.batch_id, location_id: data.location_id, quantity_reserved: qty }];
+    }
+    return [];
+  }
+
+  /** Reuse an existing row for this reference line: same data, reactivate or refuse. */
+  private static createAgainstExisting(
+    db: Database.Database,
+    existing: StockReservation,
+    data: ReservationInput,
+    bins: StockReservationBin[],
+    qty: number,
+  ): StockReservation {
+    assertMatchingReservation(existing, { ...data, storedBinSignature: this.getBinSignature(existing.id, db) }, qty);
+    if (existing.status === 'ACTIVE') {
+      logger.warn(`[Reservation] Duplicate reservation for ${data.reference_doctype}:${data.reference_docno}:${data.reference_line_id}`);
+      return existing;
+    }
+    if (existing.status !== 'RELEASED') throw new BusinessRuleError(409, 'Consumed reservation cannot be reactivated');
+
+    this.reserveBins(db, existing, bins, 1);
+    db.prepare(`
+      UPDATE stock_reservations
+      SET status = 'ACTIVE', released_at = NULL, quantity_reserved = ?
+      WHERE id = ?
+    `).run(qty, existing.id);
+    return { ...existing, quantity_reserved: qty, status: 'ACTIVE', released_at: undefined } as StockReservation;
   }
 
   /** Child-bin rows for a reservation, oldest first. */
@@ -399,37 +413,37 @@ export class StockReservationModel {
     if (!existing) return;
     if (!this.sourceOrderIsActive(db, existing)) return;
 
-    if (existing.status === 'CONSUMED') {
-      // The full consume kept the child rows intact; the sale is void, so
-      // re-reserve each bin's allocation exactly and restore the parent row.
-      const bins = this.resolveBins(db, existing, []);
-      for (const bin of bins) {
-        this.reserveBins(db, existing, [{ batch_id: bin.batch_id, location_id: bin.location_id, quantity_reserved: bin.quantity_reserved }], 1, false);
-      }
-      db.prepare(`UPDATE stock_reservations SET status = 'ACTIVE', consumed_at = NULL, quantity_reserved = ? WHERE id = ?`)
-        .run(roundQty(bins.reduce((s, b) => s + Number(b.quantity_reserved), 0)), existing.id);
-      return;
-    }
+    if (existing.status === 'CONSUMED') return this.reopenConsumed(db, existing);
+    if (existing.status === 'ACTIVE') this.reopenPartial(db, existing, quantity);
+  }
 
-    if (existing.status === 'ACTIVE') {
-      // Partial consumption: add the sold quantity back onto the same bins.
-      let left = roundQty(quantity);
-      const bins = this.getBins(existing.id, db);
-      for (const bin of bins) {
-        if (left <= 0) break;
-        const add = roundQty(Math.min(left, Number(bin.quantity_reserved)));
-        if (add <= 0) continue;
-        this.reserveBins(db, existing, [{ ...bin, quantity_reserved: add }], 1, false);
-        db.prepare('UPDATE stock_reservation_bins SET quantity_reserved = ? WHERE reservation_id = ? AND batch_id = ? AND location_id = ?')
-          .run(roundQty(bin.quantity_reserved + add), existing.id, bin.batch_id, bin.location_id);
-        left = roundQty(left - add);
-      }
-      if (left > 0 && existing.batch_id && existing.location_id) {
-        this.reserveBins(db, existing, [{ batch_id: existing.batch_id, location_id: existing.location_id, quantity_reserved: left }], 1, false);
-      }
-      db.prepare(`UPDATE stock_reservations SET quantity_reserved = ? WHERE id = ?`)
-        .run(roundQty(Number(existing.quantity_reserved) + quantity), existing.id);
+  /** Undo a full consume: put every stored bin back to its exact allocation. */
+  private static reopenConsumed(db: Database.Database, existing: StockReservation): void {
+    const bins = this.resolveBins(db, existing, []);
+    for (const bin of bins) {
+      this.reserveBins(db, existing, [{ batch_id: bin.batch_id, location_id: bin.location_id, quantity_reserved: bin.quantity_reserved }], 1, false);
     }
+    db.prepare(`UPDATE stock_reservations SET status = 'ACTIVE', consumed_at = NULL, quantity_reserved = ? WHERE id = ?`)
+      .run(roundQty(bins.reduce((s, b) => s + Number(b.quantity_reserved), 0)), existing.id);
+  }
+
+  /** Undo a partial consume: add the sold quantity back onto the same bins. */
+  private static reopenPartial(db: Database.Database, existing: StockReservation, quantity: number): void {
+    let left = roundQty(quantity);
+    for (const bin of this.getBins(existing.id, db)) {
+      if (left <= 0) break;
+      const add = roundQty(Math.min(left, Number(bin.quantity_reserved)));
+      if (add <= 0) continue;
+      this.reserveBins(db, existing, [{ ...bin, quantity_reserved: add }], 1, false);
+      db.prepare('UPDATE stock_reservation_bins SET quantity_reserved = ? WHERE reservation_id = ? AND batch_id = ? AND location_id = ?')
+        .run(roundQty(bin.quantity_reserved + add), existing.id, bin.batch_id, bin.location_id);
+      left = roundQty(left - add);
+    }
+    if (left > 0 && existing.batch_id && existing.location_id) {
+      this.reserveBins(db, existing, [{ batch_id: existing.batch_id, location_id: existing.location_id, quantity_reserved: left }], 1, false);
+    }
+    db.prepare(`UPDATE stock_reservations SET quantity_reserved = ? WHERE id = ?`)
+      .run(roundQty(Number(existing.quantity_reserved) + quantity), existing.id);
   }
 
   /** Decision A: active = a sales order in Draft, Confirmed or Delivered. */
