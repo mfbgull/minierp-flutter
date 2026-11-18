@@ -1457,7 +1457,9 @@ returned 500 before the guard. Revert-proof: removing the guard restored the 500
 
 **Context.** The GLM/PI review cycle produced two reviews (money-path
 `audit/GLM-REVIEW.md`, UX `audit/GLM-UX-REVIEW.md`) and one stock review
-(`audit/GLM-STOCK-REVIEW.md`), plus three draft PRs. This entry records what is
+(`audit/GLM-STOCK-REVIEW.md` — note, 2026-11-18 correction: that file was never
+merged to main; it exists only on the local branches `glm/stock-review` /
+`glm/stock-review-ids` at `66e09945`), plus three draft PRs. This entry records what is
 settled and what is a proposal awaiting a product call.
 
 **Settled.**

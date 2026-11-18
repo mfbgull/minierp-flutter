@@ -14,7 +14,11 @@ below. That section is the only later addition; the findings above are unchanged
 - Reviewed by reading code and l10n files only. No runtime rendering, no RTL
   device test, no `flutter analyze`, no `flutter test`, no full test suites
   (shared machine; per task instructions).
-- Line numbers refer to the working tree at commit `a5fd4afa`.
+- Line numbers refer to the working tree at commit `a5fd4afa`. *(2026-11-18
+  correction: `a5fd4afa` was a local review-time commit on the unmerged
+  `glm/extract-cash-timeline` line — it is not an ancestor of `origin/main` and
+  was not part of merged PR #3 (`bf96ee1f`), so those line numbers cannot be
+  checked out from main.)*
 - Each finding lists: location, issue, severity, suggested fix. Nothing here is
   a fix in code.
 
@@ -262,8 +266,15 @@ merge without fixing them or deleting them deliberately.
 | UX-6 (cash-blocker rows render the raw `reference_type` enum and raw ISO date in both languages) | Medium | `test/widgets/cash_blockers_localization_test.dart` | **CONFIRMED, parked, tagged** (`skip: true`, `RED-BY-DESIGN … UX-6`). Fails unmarked: `Found 1 widget with text containing receipt_overpayment`. |
 | UX-11 (failed option fetch renders as an empty picker, no message) | Medium | `test/features/sales_order_form_loading_test.dart` | **CONFIRMED, parked, tagged** (`skip: true`, `RED-BY-DESIGN … UX-11`). Fails unmarked: `Expected: at least one matching candidate / Actual: Found 0 widgets with text containing Failed`. |
 | UX-13 (flat discount above the line total passes local validation) | Medium | `test/features/sales_order_discount_validation_test.dart` | **CONFIRMED, parked, tagged** (`skip: true`, `RED-BY-DESIGN … UX-13`). Fails unmarked: `Expected: not null / Actual: <null>` on the discount field's `errorText`. |
-| UX-5 (product gap — wording of the write-off explanation) | Medium | — | **UNCONFIRMED** — product wording decision, not a defect. |
+| UX-5 (product gap — standalone claim creation UI missing, `createClaim` has zero callers) | Medium | — | **UNCONFIRMED** — product decision (build the screen or remove the strings), not a defect. **(2026-11-18 correction: row label aligned with the UX-5 heading above; the earlier "wording of the write-off explanation" label described a different item — the write-off wording finding is UX-7.)** |
 | UX-7 (Urdu wording) | Medium | — | **UNCONFIRMED** — language decision. |
+
+*(2026-11-18 correction to the four "parked, tagged" rows above: UX-3, UX-6, UX-11
+and UX-13 were fixed and un-parked by the merged UX-review line — PR4, head
+`ea8f79cd`, merged as `d1075cd2` on 2026-11-17. Verified on current main
+`1f6a2905`: no `skip: true` or `RED-BY-DESIGN` marker remains anywhere under
+`test/`, and all four tests run as ordinary passing regressions. The
+"CONFIRMED, parked, tagged" cells above are the historical review-time state.)*
 
 ## What was not run
 

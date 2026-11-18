@@ -2,6 +2,12 @@
 
 ## Review cycle state — 2026-11-16 (coordinator record)
 
+*(2026-11-18 correction: this 2026-11-16 record is superseded. Main is now
+`1f6a2905` (post PR #40). D21 merged via PR #3; the UX parks were cleared by
+merged PR #4 (`d1075cd2`) and F-3 by merged PR #9 (`29457260`) — no findings
+remain parked (see "Finding-tagged tests" below). Only PR #5 remains open.
+The text below is kept as a dated historical record.)*
+
 This section records the state of the GLM/PI review cycle. It is a status note,
 not a re-audit; nothing below was re-derived.
 
@@ -23,6 +29,10 @@ in a draft PR" is not "merged"; D21 stays open until that PR merges.
 reasoning pass. No stock finding was reproduced against a live database or a test.
 They stay unconfirmed. PI is doing a **read-only** review/environment task this
 cycle, including `#3`; PI produced no code changes on these files.
+*(2026-11-18 correction: that file was never merged to main — it exists only on
+the local branches `glm/stock-review` / `glm/stock-review-ids` (added `28a46e95`,
+S-renamed `66e09945`) and on no remote branch. The S-2/S-3/S-4 fixes have since
+merged via PRs #6, #10 (`d3a35510`) and #40 (`1f6a2905`).)*
 
 **Full-suite lock.** Unassigned. No agent holds the exclusive full-suite slot.
 
@@ -1936,6 +1946,8 @@ situation of every existing install at migration time.
   integration branch, after approved integration, observed passing, with
   the header comment updated in the same edit; PI must not edit it.
   PR5 remains LAST in merge order; PR10/S-4 deferred.
+  *(2026-11-18 correction: superseded — PR #10 (S-3) merged as `d3a35510` and
+  S-4 merged via PR #40 as `1f6a2905`; only PR #5 remains open.)*
 
 - **PR9 COMPLETION (2026-11-18):** the PR9 assignment above is CLOSED. The
   F-3 fix line (`fix/f3-refund-void-original-date` @ `b209303a` — fix + the
@@ -1945,3 +1957,7 @@ situation of every existing install at migration time.
   finding-tag table above is updated to match. Remaining open stock defect
   (S-3 reservation-only mirror staleness) stays with PR10; PR5 remains last
   in merge order.
+  *(2026-11-18 correction: superseded — PR #10 merged as `d3a35510`; its
+  `stockBalancesExtensionParity.test.ts` on main pins the mirror against
+  `quantity_reserved` (a reservation control included in the parity checks),
+  and S-4 merged via PR #40 as `1f6a2905`.)*
