@@ -58,10 +58,22 @@ function reservationRow(id: number): { status: string; quantity_reserved: number
     .get(id) as { status: string; quantity_reserved: number };
 }
 
+/** Header↔child invariant: the parent total must equal the sum of its child rows. */
+function expectHeaderMatchesChildren(reservationId: number): void {
+  const sum = reservationBinRows(reservationId)
+    .reduce((s, r) => s + Number(r.quantity_reserved), 0);
+  expect(Math.round(sum * 1000) / 1000).toBe(Number(reservationRow(reservationId).quantity_reserved));
+}
+
 function reservationBinRows(reservationId: number): Array<{ batch_id: number; location_id: number; quantity_reserved: number }> {
   return db.prepare(
     'SELECT batch_id, location_id, quantity_reserved FROM stock_reservation_bins WHERE reservation_id = ? ORDER BY id',
   ).all(reservationId) as Array<{ batch_id: number; location_id: number; quantity_reserved: number }>;
+}
+
+/** Live allocations only: a row drained to 0 is void history, not an allocation. */
+function liveBinRows(reservationId: number): Array<{ batch_id: number; location_id: number; quantity_reserved: number }> {
+  return reservationBinRows(reservationId).filter((r) => Number(r.quantity_reserved) > 0);
 }
 
 function binCount(reservationId: number): number {
@@ -235,7 +247,7 @@ describe('Finding 2: child allocations after repeated partial sales', () => {
 
     // Sell 5: drains b1 fully (4) and takes 1 from b2.
     expect(await sell(item, 5, 'span', reservation.id)).toBe(201);
-    expect(reservationBinRows(reservation.id)).toEqual([
+    expect(liveBinRows(reservation.id)).toEqual([
       { batch_id: b2, location_id: loc, quantity_reserved: 1 },
     ]);
     expect(binRow(b1, loc)).toEqual({ physical: 1, reserved: 0, available: 1 });
@@ -307,6 +319,46 @@ describe('Finding 3: multi-bin void reopens exact allocations', () => {
     expect(binRow(b2, loc)).toEqual({ physical: 5, reserved: 0, available: 5 });
     expect(reservationRow(reservation.id)).toEqual({ status: 'CONSUMED', quantity_reserved: 0 });
   });
+
+  // GLM HIGH: a PARTIAL sale deleted the fully-drained b1 row (keepRows was
+  // false whenever a remainder was left), so the void restored only b2 and
+  // then added the whole sold qty to the parent — parent 6 vs child sum 2.
+  it('Finding 3b: a PARTIAL multi-bin sale then void restores every original bin', async () => {
+    setFeatureEnabled(db, FLAG, true);
+    const item = await createItem(`S1R void-partial-multibin ${Date.now()}`, cookie);
+    await purchaseStock(item, warehouseA, 5, 40, cookie, '2026-10-01');
+    await purchaseStock(item, warehouseA, 5, 42, cookie, '2026-10-05');
+    const [b1, b2] = batchIdsOf(item, warehouseA);
+    const loc = defaultLocation(warehouseA);
+
+    const reservation = StockReservationModel.create({
+      item_id: item, warehouse_id: warehouseA, quantity_reserved: 6,
+      reference_doctype: 'SALES_ORDER', reference_docno: seedSalesOrder('Confirmed'), reference_line_id: 1,
+      bins: [
+        { batch_id: b1, location_id: loc, quantity: 4 },
+        { batch_id: b2, location_id: loc, quantity: 2 },
+      ],
+    }, db);
+    expectHeaderMatchesChildren(reservation.id);
+
+    // Sell 5 of 6: drains b1 fully (4) and takes 1 from b2, leaving 1 ACTIVE.
+    expect(await sell(item, 5, 'void-partial-multibin', reservation.id)).toBe(201);
+    expect(reservationRow(reservation.id)).toEqual({ status: 'ACTIVE', quantity_reserved: 1 });
+    expectHeaderMatchesChildren(reservation.id);
+    const invoiceId = lastInvoiceId();
+
+    expect(await cancelInvoice(invoiceId)).toBe(200);
+
+    // The void must restore the ORIGINAL allocation, not just the last row.
+    expect(reservationRow(reservation.id)).toEqual({ status: 'ACTIVE', quantity_reserved: 6 });
+    expect(reservationBinRows(reservation.id)).toEqual([
+      { batch_id: b1, location_id: loc, quantity_reserved: 4 },
+      { batch_id: b2, location_id: loc, quantity_reserved: 2 },
+    ]);
+    expectHeaderMatchesChildren(reservation.id);
+    expect(binRow(b1, loc)).toEqual({ physical: 5, reserved: 4, available: 1 });
+    expect(binRow(b2, loc)).toEqual({ physical: 5, reserved: 2, available: 3 });
+  });
 });
 
 // ── 4. Batch-only reservation through the invoice path ──
@@ -356,5 +408,150 @@ describe('Finding 4: batch-only reservation through the invoice path', () => {
     expect(Math.round(b.physical * 1000) / 1000).toBe(4.7);
     expect(Math.round(b.reserved * 1000) / 1000).toBe(0);
     expect(Math.round(b.available * 1000) / 1000).toBe(4.7);
+  });
+});
+
+// ── 5. GLM LOW findings: duplicate bins[] and RELEASED re-create without bins ──
+
+describe('Finding 5: LOW cross-review findings', () => {
+  // LOW-1: duplicate bins naming the same batch+location in one request.
+  it('rejects duplicate bins instead of writing two ambiguous rows', async () => {
+    setFeatureEnabled(db, FLAG, true);
+    const item = await createItem(`S1R dup-bins ${Date.now()}`, cookie);
+    await purchaseStock(item, warehouseA, 10, 40, cookie, AS_OF);
+    const [b1] = batchIdsOf(item, warehouseA);
+    const loc = defaultLocation(warehouseA);
+
+    // The same bin twice: without de-duplication the two child rows are
+    // indistinguishable, so apply/restore cannot tell which one to touch.
+    expect(() => StockReservationModel.create({
+      item_id: item, warehouse_id: warehouseA, quantity_reserved: 5,
+      reference_doctype: 'SALES_ORDER', reference_docno: seedSalesOrder('Confirmed'), reference_line_id: 1,
+      bins: [
+        { batch_id: b1, location_id: loc, quantity: 2 },
+        { batch_id: b1, location_id: loc, quantity: 3 },
+      ],
+    }, db)).toThrow(/duplicate/i);
+
+    // Nothing was written for that reference.
+    expect(db.prepare('SELECT COUNT(*) AS c FROM stock_reservations WHERE item_id = ?')
+      .get(item) as { c: number }).toEqual({ c: 0 });
+    expect(binRow(b1, loc)).toEqual({ physical: 10, reserved: 0, available: 10 });
+  });
+
+  // LOW-2: a RELEASED row re-created with the legacy single-bin shape (no bins[])
+  // had no child rows and no parent bin, so nothing was re-reserved yet the
+  // row flipped ACTIVE carrying the requested quantity.
+  it('does not reactivate a RELEASED multi-bin reservation when no allocation is given', async () => {
+    setFeatureEnabled(db, FLAG, true);
+    const item = await createItem(`S1R released-recreate ${Date.now()}`, cookie);
+    await purchaseStock(item, warehouseA, 5, 40, cookie, '2026-10-01');
+    await purchaseStock(item, warehouseA, 5, 42, cookie, '2026-10-05');
+    const [b1, b2] = batchIdsOf(item, warehouseA);
+    const loc = defaultLocation(warehouseA);
+    const soNo = seedSalesOrder('Confirmed');
+
+    const reservation = StockReservationModel.create({
+      item_id: item, warehouse_id: warehouseA, quantity_reserved: 3,
+      reference_doctype: 'SALES_ORDER', reference_docno: soNo, reference_line_id: 1,
+      bins: [
+        { batch_id: b1, location_id: loc, quantity: 2 },
+        { batch_id: b2, location_id: loc, quantity: 1 },
+      ],
+    }, db);
+
+    const released = StockReservationModel.release(
+      { reference_doctype: 'SALES_ORDER', reference_docno: soNo, reference_line_id: 1 }, db);
+    expect(released?.status).toBe('RELEASED');
+    expect(reservationBinRows(reservation.id)).toEqual([]);
+    expect(binRow(b1, loc)).toEqual({ physical: 5, reserved: 0, available: 5 });
+
+    // Re-create the same reference line WITHOUT bins[]: there is nothing to
+    // re-reserve, so the row must not become an empty ACTIVE reservation.
+    expect(() => StockReservationModel.create({
+      item_id: item, warehouse_id: warehouseA, quantity_reserved: 3,
+      reference_doctype: 'SALES_ORDER', reference_docno: soNo, reference_line_id: 1,
+    }, db)).toThrow(/allocation|bins/i);
+
+    expect(reservationRow(reservation.id)).toEqual({ status: 'RELEASED', quantity_reserved: 3 });
+    expect(binRow(b1, loc)).toEqual({ physical: 5, reserved: 0, available: 5 });
+  });
+});
+
+// ── 6. Duplicate-reference guard: a different allocation or quantity reuses nothing ──
+
+describe('Finding 6: duplicate reference-line guards', () => {
+  it('refuses a re-create with a different bin allocation or quantity', async () => {
+    setFeatureEnabled(db, FLAG, true);
+    const item = await createItem(`S1R dup-ref ${Date.now()}`, cookie);
+    await purchaseStock(item, warehouseA, 5, 40, cookie, '2026-10-01');
+    await purchaseStock(item, warehouseA, 5, 42, cookie, '2026-10-05');
+    const [b1, b2] = batchIdsOf(item, warehouseA);
+    const loc = defaultLocation(warehouseA);
+    const soNo = seedSalesOrder('Confirmed');
+
+    StockReservationModel.create({
+      item_id: item, warehouse_id: warehouseA, quantity_reserved: 4,
+      reference_doctype: 'SALES_ORDER', reference_docno: soNo, reference_line_id: 1,
+      bins: [
+        { batch_id: b1, location_id: loc, quantity: 3 },
+        { batch_id: b2, location_id: loc, quantity: 1 },
+      ],
+    }, db);
+
+    // Same reference line, different bin split.
+    expect(() => StockReservationModel.create({
+      item_id: item, warehouse_id: warehouseA, quantity_reserved: 4,
+      reference_doctype: 'SALES_ORDER', reference_docno: soNo, reference_line_id: 1,
+      bins: [
+        { batch_id: b1, location_id: loc, quantity: 1 },
+        { batch_id: b2, location_id: loc, quantity: 3 },
+      ],
+    }, db)).toThrow(/different stock or quantity/i);
+
+    // Same reference line, different quantity.
+    expect(() => StockReservationModel.create({
+      item_id: item, warehouse_id: warehouseA, quantity_reserved: 5,
+      reference_doctype: 'SALES_ORDER', reference_docno: soNo, reference_line_id: 1,
+      bins: [
+        { batch_id: b1, location_id: loc, quantity: 3 },
+        { batch_id: b2, location_id: loc, quantity: 2 },
+      ],
+    }, db)).toThrow(/different stock or quantity/i);
+
+    // Same reference line, different warehouse.
+    expect(() => StockReservationModel.create({
+      item_id: item, warehouse_id: warehouseA + 999, quantity_reserved: 4,
+      reference_doctype: 'SALES_ORDER', reference_docno: soNo, reference_line_id: 1,
+      bins: [
+        { batch_id: b1, location_id: loc, quantity: 3 },
+        { batch_id: b2, location_id: loc, quantity: 1 },
+      ],
+    }, db)).toThrow(/different stock or quantity/i);
+
+    // The original allocation is untouched.
+    expect(binRow(b1, loc)).toEqual({ physical: 5, reserved: 3, available: 2 });
+    expect(binRow(b2, loc)).toEqual({ physical: 5, reserved: 1, available: 4 });
+  });
+
+  it('rejects a bins[] total that does not match quantity_reserved', async () => {
+    setFeatureEnabled(db, FLAG, true);
+    const item = await createItem(`S1R bad-total ${Date.now()}`, cookie);
+    await purchaseStock(item, warehouseA, 5, 40, cookie, '2026-10-01');
+    await purchaseStock(item, warehouseA, 5, 42, cookie, '2026-10-05');
+    const [b1, b2] = batchIdsOf(item, warehouseA);
+    const loc = defaultLocation(warehouseA);
+
+    expect(() => StockReservationModel.create({
+      item_id: item, warehouse_id: warehouseA, quantity_reserved: 6,
+      reference_doctype: 'SALES_ORDER', reference_docno: seedSalesOrder('Confirmed'), reference_line_id: 1,
+      bins: [
+        { batch_id: b1, location_id: loc, quantity: 1 },
+        { batch_id: b2, location_id: loc, quantity: 2 },
+      ],
+    }, db)).toThrow(/does not match quantity_reserved/i);
+
+    expect(binRow(b1, loc)).toEqual({ physical: 5, reserved: 0, available: 5 });
+    expect(binRow(b2, loc)).toEqual({ physical: 5, reserved: 0, available: 5 });
   });
 });

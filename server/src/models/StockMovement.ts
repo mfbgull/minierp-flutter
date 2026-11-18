@@ -1733,7 +1733,7 @@ class StockMovementModel {
     // Decision B: a reservation may span several bins. Drain each stored bin
     // oldest-first; fall back to the parent columns for legacy single-bin rows.
     const bins = reservation.id
-      ? (db.prepare(`SELECT batch_id, location_id, quantity_reserved FROM stock_reservation_bins WHERE reservation_id = ? ORDER BY id ASC`)
+      ? (db.prepare(`SELECT batch_id, location_id, quantity_reserved FROM stock_reservation_bins WHERE reservation_id = ? AND quantity_reserved > 0 ORDER BY id ASC`)
           .all(reservation.id) as Array<{ batch_id: number; location_id: number; quantity_reserved: number }>)
       : [];
     let allocation: Array<{ batch_id: number; location_id: number; quantity_reserved: number }>;
