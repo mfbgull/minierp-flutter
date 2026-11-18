@@ -11,6 +11,8 @@ export type InvoiceCreationItem = {
   readonly discount_value?: number;
   readonly warehouse_id?: number;
   readonly amount?: number;
+  /** S-1: the ACTIVE reservation this line fulfils; consumed on sale. */
+  readonly reservation_id?: number;
 };
 
 export type InvoiceCreationPayment = {

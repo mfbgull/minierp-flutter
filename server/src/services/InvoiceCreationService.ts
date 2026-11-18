@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import AccountingService from './accountingService';
 import InvoiceModel from '../models/Invoice';
 import StockMovementModel from '../models/StockMovement';
+import { StockReservationModel } from '../models/StockReservation';
 import ledgerUtils from '../utils/ledgerUtils';
 import { PaymentRecordingService } from './PaymentRecordingService';
 import { addCurrency, computeInvoiceGrandTotal, parseCurrency, subtractCurrency } from '../utils/currency';
@@ -305,6 +306,14 @@ export class InvoiceCreationService {
       });
       const { consumption, backdatedBeforeReceipt: backdatedLine, firstReceiptDate, warnings: stockWarnings } =
         StockMovementModel.consumeForSale(item.item_id, warehouseId, item.quantity, this.db, input.invoiceDate);
+      // S-1: the line names the reservation it fulfils; consume EXACTLY that
+      // one so the bin's reserved is released with the physical drain.
+      if (item.reservation_id !== undefined) {
+        const consumed = StockReservationModel.consumeById(item.reservation_id, this.db);
+        if (!consumed) {
+          throw new BusinessRuleError(409, `Reservation ${item.reservation_id} is not active or does not exist`);
+        }
+      }
       // BUG-013 R1/R2: damaged-bin and bin-under-coverage notes from the
       // consume path ride the SAME warnings[] channel as ACCT-006 below.
       warnings.push(...stockWarnings);

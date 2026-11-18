@@ -46,6 +46,8 @@ export const invoiceLine = z.object({
   tax_rate: z.number().min(0).max(100).optional(),
   discount_type: z.enum(['none', 'percentage', 'flat']).optional(),
   discount_value: z.number().min(0).optional(),
+  // S-1: the ACTIVE reservation this line fulfils; consumed on sale.
+  reservation_id: z.coerce.number().int().positive().optional(),
 }).passthrough().superRefine((line, ctx) => {
   if (line.discount_type === 'percentage' && Number(line.discount_value ?? 0) > 100) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'percentage discount cannot exceed 100' });

@@ -145,12 +145,35 @@ export class StockReservationModel {
     if (!isFeatureEnabled(db, 'feature_batch_locations')) return undefined;
 
     const existing = db.prepare(`
-      SELECT id FROM stock_reservations
+      SELECT * FROM stock_reservations
       WHERE reference_doctype = ? AND reference_docno = ? AND reference_line_id IS ?
         AND status = 'ACTIVE'
-    `).get(data.reference_doctype, data.reference_docno, data.reference_line_id ?? null) as { id: number } | undefined;
+    `).get(data.reference_doctype, data.reference_docno, data.reference_line_id ?? null) as StockReservation | undefined;
 
     if (!existing) return undefined;
+    return this.markConsumed(db, existing);
+  }
+
+  /**
+   * S-1: consume the reservation named by id — the one the sale actually
+   * fulfils. Unlike a reference lookup, this can never release a different
+   * reservation that happens to share the bin.
+   */
+  static consumeById(id: number, db: Database.Database): StockReservation | undefined {
+    if (!isFeatureEnabled(db, 'feature_batch_locations')) return undefined;
+
+    const existing = db.prepare(`
+      SELECT * FROM stock_reservations WHERE id = ? AND status = 'ACTIVE'
+    `).get(id) as StockReservation | undefined;
+
+    if (!existing) return undefined;
+    return this.markConsumed(db, existing);
+  }
+
+  /** Flip ACTIVE -> CONSUMED and release the bin's reserved quantity, so the
+   *  consumed units are no longer double-counted as unavailable. */
+  private static markConsumed(db: Database.Database, existing: StockReservation): StockReservation {
+    this.changeLocationReserved(db, existing, -Number(existing.quantity_reserved));
 
     db.prepare(`
       UPDATE stock_reservations
@@ -158,7 +181,7 @@ export class StockReservationModel {
       WHERE id = ?
     `).run(existing.id);
 
-    return this.getById(existing.id, db);
+    return this.getById(existing.id, db)!;
   }
 
   static autoReleaseExpired(db: Database.Database, ttlHours: number = 24): number {

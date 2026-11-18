@@ -36,6 +36,9 @@ export interface InvoiceItemDTO {
   /** Loose amount-driven lines: the entered bill amount is the line's
    * gross base (sales form flip model §5.2); otherwise qty × unit_price. */
   amount?: number;
+  /** S-1: the ACTIVE reservation this line fulfils. When set, the sale
+   * consumes EXACTLY that reservation and releases its bin reserved. */
+  reservation_id?: number;
 }
 
 export interface PaymentDTO {
