@@ -295,6 +295,25 @@ export class InvoiceCreationService {
     for (let li = 0; li < input.items.length; li++) {
       const item = input.items[li];
       const warehouseId = lineWarehouses[li].warehouseId;
+
+      // S-1: the line names the reservation it fulfils. Validate BEFORE any
+      // write: an id for another item/warehouse/bin must not drain or consume
+      // anything. Reads are flag-independent, so this works flag-on and off.
+      const reservation = item.reservation_id !== undefined
+        ? StockReservationModel.getActiveById(item.reservation_id, this.db)
+        : undefined;
+      if (item.reservation_id !== undefined) {
+        if (!reservation) {
+          throw new BusinessRuleError(409, `Reservation ${item.reservation_id} is not active or does not exist`);
+        }
+        if (reservation.item_id !== item.item_id || reservation.warehouse_id !== warehouseId) {
+          throw new BusinessRuleError(409, `Reservation ${item.reservation_id} does not belong to this item and warehouse`);
+        }
+        if (reservation.quantity_reserved < item.quantity) {
+          throw new BusinessRuleError(409, `Reservation ${item.reservation_id} reserves only ${reservation.quantity_reserved}, but ${item.quantity} were sold`);
+        }
+      }
+
       InvoiceModel.createInvoiceItem(this.db, invoiceId, {
         item_id: item.item_id,
         quantity: item.quantity,
@@ -303,16 +322,24 @@ export class InvoiceCreationService {
         discount_type: item.discount_type,
         discount_value: item.discount_value,
         amount: item.amount,
+        reservation_id: item.reservation_id,
       });
+
+      // S-1: a named reservation drains ITS OWN batch/bin; otherwise FIFO.
       const { consumption, backdatedBeforeReceipt: backdatedLine, firstReceiptDate, warnings: stockWarnings } =
-        StockMovementModel.consumeForSale(item.item_id, warehouseId, item.quantity, this.db, input.invoiceDate);
-      // S-1: the line names the reservation it fulfils; consume EXACTLY that
-      // one so the bin's reserved is released with the physical drain.
-      if (item.reservation_id !== undefined) {
-        const consumed = StockReservationModel.consumeById(item.reservation_id, this.db);
-        if (!consumed) {
-          throw new BusinessRuleError(409, `Reservation ${item.reservation_id} is not active or does not exist`);
-        }
+        reservation
+          ? {
+              consumption: StockMovementModel.consumeAgainstReservation(reservation, item.quantity, this.db),
+              backdatedBeforeReceipt: false,
+              firstReceiptDate: null as string | null,
+              warnings: [] as string[],
+            }
+          : StockMovementModel.consumeForSale(item.item_id, warehouseId, item.quantity, this.db, input.invoiceDate);
+
+      // S-1: fulfil the named reservation by exactly the sold quantity — a
+      // partial sale leaves the remainder ACTIVE and reserved.
+      if (reservation) {
+        StockReservationModel.markConsumedPartial(this.db, reservation, item.quantity);
       }
       // BUG-013 R1/R2: damaged-bin and bin-under-coverage notes from the
       // consume path ride the SAME warnings[] channel as ACCT-006 below.

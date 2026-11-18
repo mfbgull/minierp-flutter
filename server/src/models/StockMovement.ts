@@ -5,6 +5,7 @@ import AccountingService from '../services/accountingService';
 import { sanitizeSortParams, STOCK_BALANCE_SORT_COLUMNS, STOCK_MOVEMENT_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import { isFeatureEnabled } from '../utils/featureFlags';
 import { SellableStockUnavailableError } from '../types';
+import { BusinessRuleError } from '../utils/businessRuleError';
 import { roundQty, qtyEpsilon, qtyLessThan, qtyPositive } from '../utils/quantity';
 import { roundCurrency } from '../utils/currency';
 import { SqlParam } from '../utils/sqlTypes';
@@ -1709,6 +1710,54 @@ class StockMovementModel {
       firstReceiptDate: null,
       warnings,
     };
+  }
+
+  /**
+   * S-1: consume a sale AGAINST the reservation it fulfils. The take comes
+   * from the reservation's own batch and location — never FIFO's oldest bin
+   * and never a different bin of the same item — so a reservation for the
+   * newer batch is honoured exactly.
+   *
+   * The caller has already validated that the reservation is ACTIVE and
+   * matches the line's item/warehouse. This drains `quantity` from the
+   * reservation's bin and decrements the master batch row; it does NOT
+   * touch the reservation row (the caller consumes that separately so the
+   * link is recorded and validated in one place).
+   */
+  static consumeAgainstReservation(
+    reservation: { batch_id?: number | null; location_id?: number | null; item_id: number; warehouse_id: number },
+    quantity: number,
+    db: Database.Database
+  ): ConsumptionEntry[] {
+    const roundedQty = roundQty(quantity);
+    if (reservation.batch_id == null || reservation.location_id == null) {
+      throw new BusinessRuleError(409, 'Reservation is not tied to a batch and location and cannot be consumed by a sale');
+    }
+    const bin = db.prepare(`
+      SELECT bsl.id, bsl.quantity_physical, bsl.quantity_reserved, bsl.quantity_available
+      FROM batch_stock_by_location bsl
+      JOIN locations l ON l.id = bsl.location_id
+      WHERE bsl.batch_id = ? AND bsl.location_id = ? AND l.warehouse_id = ?
+    `).get(reservation.batch_id, reservation.location_id, reservation.warehouse_id) as
+      { id: number; quantity_physical: number; quantity_reserved: number; quantity_available: number } | undefined;
+    if (!bin) throw new BusinessRuleError(409, 'Reservation bin no longer exists');
+
+    const batch = db.prepare(`
+      SELECT id, quantity_remaining, unit_cost FROM stock_batches WHERE id = ? AND item_id = ?
+    `).get(reservation.batch_id, reservation.item_id) as
+      { id: number; quantity_remaining: number; unit_cost: number } | undefined;
+    if (!batch) throw new BusinessRuleError(409, 'Reservation batch no longer exists for this item');
+
+    if (qtyLessThan(roundQty(Number(bin.quantity_physical)), roundedQty)) {
+      throw new SellableStockUnavailableError(`item ${reservation.item_id}`, roundedQty, 0);
+    }
+
+    db.prepare('UPDATE batch_stock_by_location SET quantity_physical = quantity_physical - ? WHERE id = ?')
+      .run(roundedQty, bin.id);
+    db.prepare('UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?')
+      .run(roundedQty, batch.id);
+
+    return [{ batchId: batch.id, consumed: roundedQty, unitCost: Number(batch.unit_cost) }];
   }
 
   /**

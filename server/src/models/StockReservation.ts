@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import logger from '../utils/logger';
 import { isFeatureEnabled } from '../utils/featureFlags';
 import { BusinessRuleError } from '../utils/businessRuleError';
+import { roundQty } from '../utils/quantity';
 
 export interface StockReservation {
   id: number;
@@ -137,13 +138,51 @@ export class StockReservationModel {
     })();
   }
 
+  /**
+   * S-1: the ACTIVE reservation named by id, or undefined. Reads are not
+   * gated by feature_batch_locations — only READS may depend on the flag, and
+   * consuming an existing reservation is a WRITE that must work flag-off.
+   */
+  static getActiveById(id: number, db: Database.Database): StockReservation | undefined {
+    return db.prepare(`
+      SELECT * FROM stock_reservations WHERE id = ? AND status = 'ACTIVE'
+    `).get(id) as StockReservation | undefined;
+  }
+
+  /**
+   * S-1: fulfil `quantity` of the reservation named by id. Decrements the
+   * reservation by the sold quantity; a partial sale leaves the remainder
+   * ACTIVE (reserve 4, sell 1 -> 3 reserved), only a full sale flips it to
+   * CONSUMED. Releases the bin's reserved for exactly the sold quantity, so
+   * available = physical - reserved stays correct.
+   */
+  static markConsumedPartial(db: Database.Database, existing: StockReservation, quantity: number): StockReservation {
+    const sold = Math.min(quantity, Number(existing.quantity_reserved));
+    if (sold <= 0) return existing;
+    this.changeLocationReserved(db, existing, -sold);
+
+    const remaining = roundQty(Number(existing.quantity_reserved) - sold);
+    if (remaining <= 0) {
+      db.prepare(`
+        UPDATE stock_reservations
+        SET status = 'CONSUMED', quantity_reserved = 0, consumed_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(existing.id);
+    } else {
+      db.prepare(`UPDATE stock_reservations SET quantity_reserved = ? WHERE id = ?`)
+        .run(remaining, existing.id);
+    }
+    return this.getById(existing.id, db)!;
+  }
+
   static consume(data: {
     reference_doctype: string;
     reference_docno: string;
     reference_line_id?: number;
   }, db: Database.Database): StockReservation | undefined {
-    if (!isFeatureEnabled(db, 'feature_batch_locations')) return undefined;
-
+    // Only READS depend on feature_batch_locations; consuming an existing
+    // reservation is a WRITE that also maintains batch_stock_by_location, so
+    // it runs regardless of the flag.
     const existing = db.prepare(`
       SELECT * FROM stock_reservations
       WHERE reference_doctype = ? AND reference_docno = ? AND reference_line_id IS ?
@@ -160,8 +199,7 @@ export class StockReservationModel {
    * reservation that happens to share the bin.
    */
   static consumeById(id: number, db: Database.Database): StockReservation | undefined {
-    if (!isFeatureEnabled(db, 'feature_batch_locations')) return undefined;
-
+    // Flag-independent: see consume().
     const existing = db.prepare(`
       SELECT * FROM stock_reservations WHERE id = ? AND status = 'ACTIVE'
     `).get(id) as StockReservation | undefined;

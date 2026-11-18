@@ -141,6 +141,8 @@ export interface CreateInvoiceItemDTO {
   discount_value?: number;
   /** Loose amount-driven lines: entered bill amount as the gross base. */
   amount?: number;
+  /** S-1: the ACTIVE reservation this line fulfils (persisted for audit). */
+  reservation_id?: number;
 }
 
 export interface InvoiceFilters {
@@ -912,9 +914,9 @@ class InvoiceModel {
       INSERT INTO invoice_items (
         invoice_id, item_id, quantity, unit_price, amount,
         tax_rate, discount_type, discount_value,
-        net_amount, tax_amount
+        net_amount, tax_amount, reservation_id
       )
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      `).run(
       invoiceId,
       item.item_id,
@@ -925,7 +927,8 @@ class InvoiceModel {
       item.discount_type || 'percentage',
       item.discount_value || 0,
       netAmount,
-      taxAmount
+      taxAmount,
+      item.reservation_id ?? null
     );
   }
 
