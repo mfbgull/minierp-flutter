@@ -1736,11 +1736,23 @@ class StockMovementModel {
       ? (db.prepare(`SELECT batch_id, location_id, quantity_reserved FROM stock_reservation_bins WHERE reservation_id = ? ORDER BY id ASC`)
           .all(reservation.id) as Array<{ batch_id: number; location_id: number; quantity_reserved: number }>)
       : [];
-    const allocation = bins.length > 0
-      ? bins
-      : (reservation.batch_id != null && reservation.location_id != null)
-        ? [{ batch_id: reservation.batch_id, location_id: reservation.location_id, quantity_reserved: roundedQty }]
-        : [];
+    let allocation: Array<{ batch_id: number; location_id: number; quantity_reserved: number }>;
+    if (bins.length > 0) {
+      allocation = bins;
+    } else if (reservation.batch_id != null && reservation.location_id != null) {
+      // Legacy single-bin row without child allocations.
+      allocation = [{ batch_id: reservation.batch_id, location_id: reservation.location_id, quantity_reserved: roundedQty }];
+    } else if (reservation.batch_id != null) {
+      // Batch-only reservation: no location of its own, so drain the batch's
+      // physical stock from its bins in this warehouse, oldest bin first.
+      allocation = (db.prepare(`SELECT bsl.batch_id, bsl.location_id FROM batch_stock_by_location bsl
+          JOIN locations l ON l.id = bsl.location_id
+          WHERE bsl.batch_id = ? AND l.warehouse_id = ? ORDER BY bsl.id ASC`)
+        .all(reservation.batch_id, reservation.warehouse_id) as Array<{ batch_id: number; location_id: number }>)
+        .map((b) => ({ batch_id: b.batch_id, location_id: b.location_id, quantity_reserved: Number.POSITIVE_INFINITY }));
+    } else {
+      allocation = [];
+    }
     if (allocation.length === 0) {
       throw new BusinessRuleError(409, 'Reservation is not tied to a batch and location and cannot be consumed by a sale');
     }

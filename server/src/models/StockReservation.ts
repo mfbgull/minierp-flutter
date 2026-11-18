@@ -153,8 +153,8 @@ export class StockReservationModel {
    * item/warehouse or would go out of range; the caller's txn rolls back.
    * Batch-only reservations have no bins and keep their metadata workflow.
    */
-  private static reserveBins(db: Database.Database, row: Pick<StockReservation, 'id' | 'item_id' | 'warehouse_id'>, bins: StockReservationBin[], sign: 1 | -1): void {
-    const stored = bins.length > 0 ? bins : this.getBins(row.id, db);
+  private static reserveBins(db: Database.Database, row: Pick<StockReservation, 'id' | 'item_id' | 'warehouse_id' | 'batch_id' | 'location_id' | 'quantity_reserved'>, bins: StockReservationBin[], sign: 1 | -1, persist = true): void {
+    const stored = this.resolveBins(db, row, bins);
     if (stored.length === 0) return;
     for (const bin of stored) {
       const delta = sign * bin.quantity_reserved;
@@ -174,30 +174,50 @@ export class StockReservationModel {
         SET quantity_reserved = ROUND(quantity_reserved, 3)
         WHERE batch_id = ? AND location_id = ?`).run(bin.batch_id, bin.location_id);
     }
-    if (bins.length > 0) {
-      // Fresh allocation: persist the child rows that later release/consume read.
+    // Only a fresh RESERVE persists child rows, and only when asked (a reopen
+    // restores existing rows and must not duplicate them). A release never does.
+    if (persist && sign === 1 && bins.length > 0) {
       const insert = db.prepare(`INSERT INTO stock_reservation_bins (reservation_id, batch_id, location_id, quantity_reserved) VALUES (?, ?, ?, ?)`);
       for (const bin of bins) insert.run(row.id, bin.batch_id, bin.location_id, bin.quantity_reserved);
     }
   }
 
   /**
-   * Decision B: drain child-bin rows oldest-first by `quantity` (the amount
-   * actually sold). Reduces each row's reserve in place and deletes rows that
-   * reach zero, so a partial sale keeps the remainder linked to the same bins.
+   * Bins this write must act on. An explicit list wins; otherwise use the
+   * stored child rows; a legacy (pre-migration-129) row with no child rows
+   * falls back to its parent batch/location columns.
    */
-  private static consumeBins(db: Database.Database, reservationId: number, quantity: number): void {
-    let left = roundQty(quantity);
-    const rows = db.prepare(`SELECT id, quantity_reserved FROM stock_reservation_bins WHERE reservation_id = ? ORDER BY id ASC`)
-      .all(reservationId) as Array<{ id: number; quantity_reserved: number }>;
+  private static resolveBins(
+    db: Database.Database,
+    row: Pick<StockReservation, 'id' | 'batch_id' | 'location_id' | 'quantity_reserved'>,
+    bins: StockReservationBin[],
+  ): StockReservationBin[] {
+    if (bins.length > 0) return bins;
+    const stored = this.getBins(row.id, db);
+    if (stored.length > 0) return stored;
+    if (row.batch_id != null && row.location_id != null) {
+      return [{ batch_id: row.batch_id, location_id: row.location_id, quantity_reserved: roundQty(Number(row.quantity_reserved)) }];
+    }
+    return [];
+  }
+
+  /**
+   * Decision B: reduce the named child-bin rows by the amounts drained. Each
+   * entry's `quantity_reserved` is the amount TAKEN from that bin; a row that
+   * reaches zero is deleted, so a partial sale keeps the remainder linked to
+   * the same bins. Only named rows are touched — never an arbitrary row for the
+   * same bin.
+   */
+  private static consumeBins(db: Database.Database, reservationId: number, taken: StockReservationBin[], keepRows = true): void {
+    if (keepRows) return; // Allocation pattern retained for a later void-reopen.
     const del = db.prepare('DELETE FROM stock_reservation_bins WHERE id = ?');
     const upd = db.prepare('UPDATE stock_reservation_bins SET quantity_reserved = ? WHERE id = ?');
-    for (const r of rows) {
-      if (left <= 0) break;
-      const take = Math.min(left, roundQty(r.quantity_reserved));
-      const rest = roundQty(r.quantity_reserved - take);
-      if (rest <= 0) del.run(r.id); else upd.run(rest, r.id);
-      left = roundQty(left - take);
+    for (const t of taken) {
+      const row = db.prepare('SELECT id, quantity_reserved FROM stock_reservation_bins WHERE reservation_id = ? AND batch_id = ? AND location_id = ?')
+        .get(reservationId, t.batch_id, t.location_id) as { id: number; quantity_reserved: number } | undefined;
+      if (!row) continue;
+      const rest = roundQty(Number(row.quantity_reserved) - t.quantity_reserved);
+      if (rest <= 0) del.run(row.id); else upd.run(rest, row.id);
     }
   }
 
@@ -216,8 +236,9 @@ export class StockReservationModel {
     `).get(data.reference_doctype, data.reference_docno, data.reference_line_id ?? null) as StockReservation | undefined;
 
     if (!existing) return undefined;
-    this.reserveBins(db, existing, [], -1);
-    this.consumeBins(db, existing.id, Number(existing.quantity_reserved));
+    this.drainAllocation(db, existing, Number(existing.quantity_reserved));
+    // Release is terminal: drop the allocations entirely.
+    db.prepare('DELETE FROM stock_reservation_bins WHERE reservation_id = ?').run(existing.id);
 
     db.prepare(`
       UPDATE stock_reservations
@@ -241,40 +262,44 @@ export class StockReservationModel {
   }
 
   /**
-   * S-1: fulfil `quantity` of the reservation named by id. Decrements the
-   * reservation by the sold quantity; a partial sale leaves the remainder
-   * ACTIVE (reserve 4, sell 1 -> 3 reserved), only a full sale flips it to
-   * CONSUMED. Releases the bin's reserved for exactly the sold quantity, so
-   * available = physical - reserved stays correct.
+   * Reduce the reservation's reserve by `quantity`, draining its bins
+   * oldest-first (explicit allocation, else stored rows, else the legacy parent
+   * bin). Each drained bin is released by exactly the amount taken, so
+   * `available = physical - reserved` stays correct.
+   *
+   * `keepRows` controls what happens to a child row that reaches zero: a
+   * CONSUME keeps it (at 0) so a void can restore the exact allocations, while
+   * a RELEASE deletes it. Falls back to the parent columns for legacy rows with
+   * no child allocation.
    */
-  /**
-   * Release `quantity` of reserve, draining child-bin rows oldest-first and
-   * releasing each drained bin by exactly the amount taken (so `available`
-   * stays `physical - reserved`). Used by partial consumption and void-reopen
-   * bookkeeping.
-   */
-  private static releaseBinsPartial(db: Database.Database, row: StockReservation, quantity: number): void {
+  private static drainAllocation(
+    db: Database.Database,
+    row: StockReservation,
+    quantity: number,
+    keepRows = true,
+  ): StockReservationBin[] {
     let left = roundQty(quantity);
-    for (const bin of this.getBins(row.id, db)) {
+    const taken: StockReservationBin[] = [];
+    for (const bin of this.resolveBins(db, row, [])) {
       if (left <= 0) break;
       const take = roundQty(Math.min(left, Number(bin.quantity_reserved)));
       if (take <= 0) continue;
-      this.reserveBins(db, row, [{ ...bin, quantity_reserved: take }], -1);
-      this.consumeBins(db, row.id, take);
+      this.reserveBins(db, row, [{ batch_id: bin.batch_id, location_id: bin.location_id, quantity_reserved: take }], -1);
+      this.consumeBins(db, row.id, [{ batch_id: bin.batch_id, location_id: bin.location_id, quantity_reserved: take }], keepRows);
+      taken.push({ batch_id: bin.batch_id, location_id: bin.location_id, quantity_reserved: take });
       left = roundQty(left - take);
     }
-    if (left > 0 && row.batch_id && row.location_id) {
-      // Legacy single-bin rows with no child rows.
-      this.reserveBins(db, row, [{ batch_id: row.batch_id, location_id: row.location_id, quantity_reserved: left }], -1);
-    }
+    return taken;
   }
 
   static markConsumedPartial(db: Database.Database, existing: StockReservation, quantity: number): StockReservation {
     const sold = Math.min(quantity, Number(existing.quantity_reserved));
     if (sold <= 0) return existing;
-    this.releaseBinsPartial(db, existing, sold);
-
     const remaining = roundQty(Number(existing.quantity_reserved) - sold);
+    // A full consume keeps the allocation pattern so a later void can restore
+    // every bin; a partial consume must trim the rows to the true remainder.
+    this.drainAllocation(db, existing, sold, remaining <= 0);
+
     if (remaining <= 0) {
       db.prepare(`
         UPDATE stock_reservations
@@ -324,8 +349,9 @@ export class StockReservationModel {
   /** Flip ACTIVE -> CONSUMED and release the bin's reserved quantity, so the
    *  consumed units are no longer double-counted as unavailable. */
   private static markConsumed(db: Database.Database, existing: StockReservation): StockReservation {
+    // Full consume: release each bin's reserve but KEEP the child rows intact,
+    // so a later void can restore the exact per-bin allocations.
     this.reserveBins(db, existing, [], -1);
-    this.consumeBins(db, existing.id, Number(existing.quantity_reserved));
 
     db.prepare(`
       UPDATE stock_reservations
@@ -374,13 +400,14 @@ export class StockReservationModel {
     if (!this.sourceOrderIsActive(db, existing)) return;
 
     if (existing.status === 'CONSUMED') {
-      // Consume deleted the child rows; the sale is void, so reserve the sold
-      // quantity once more and restore the parent row to ACTIVE.
-      if (existing.batch_id && existing.location_id) {
-        this.reserveBins(db, existing, [{ batch_id: existing.batch_id, location_id: existing.location_id, quantity_reserved: quantity }], 1);
+      // The full consume kept the child rows intact; the sale is void, so
+      // re-reserve each bin's allocation exactly and restore the parent row.
+      const bins = this.resolveBins(db, existing, []);
+      for (const bin of bins) {
+        this.reserveBins(db, existing, [{ batch_id: bin.batch_id, location_id: bin.location_id, quantity_reserved: bin.quantity_reserved }], 1, false);
       }
       db.prepare(`UPDATE stock_reservations SET status = 'ACTIVE', consumed_at = NULL, quantity_reserved = ? WHERE id = ?`)
-        .run(quantity, existing.id);
+        .run(roundQty(bins.reduce((s, b) => s + Number(b.quantity_reserved), 0)), existing.id);
       return;
     }
 
@@ -392,13 +419,13 @@ export class StockReservationModel {
         if (left <= 0) break;
         const add = roundQty(Math.min(left, Number(bin.quantity_reserved)));
         if (add <= 0) continue;
-        this.reserveBins(db, existing, [{ ...bin, quantity_reserved: add }], 1);
+        this.reserveBins(db, existing, [{ ...bin, quantity_reserved: add }], 1, false);
         db.prepare('UPDATE stock_reservation_bins SET quantity_reserved = ? WHERE reservation_id = ? AND batch_id = ? AND location_id = ?')
           .run(roundQty(bin.quantity_reserved + add), existing.id, bin.batch_id, bin.location_id);
         left = roundQty(left - add);
       }
       if (left > 0 && existing.batch_id && existing.location_id) {
-        this.reserveBins(db, existing, [{ batch_id: existing.batch_id, location_id: existing.location_id, quantity_reserved: left }], 1);
+        this.reserveBins(db, existing, [{ batch_id: existing.batch_id, location_id: existing.location_id, quantity_reserved: left }], 1, false);
       }
       db.prepare(`UPDATE stock_reservations SET quantity_reserved = ? WHERE id = ?`)
         .run(roundQty(Number(existing.quantity_reserved) + quantity), existing.id);
