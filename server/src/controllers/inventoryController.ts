@@ -1471,12 +1471,12 @@ export function updateBatchStatus(req: AuthRequest, res: Response): Response | v
 
 export function createReservation(req: AuthRequest, res: Response): Response | void {
   try {
-        const { item_id, warehouse_id, location_id, batch_id, quantity_reserved, reference_doctype, reference_docno, reference_line_id } =
+        const { item_id, warehouse_id, location_id, batch_id, quantity_reserved, reference_doctype, reference_docno, reference_line_id, bins } =
       req.body as Parameters<typeof StockReservationModel.create>[0];
     const userId = req.user!.id;
 
     const reservation = StockReservationModel.create(
-      { item_id, warehouse_id, location_id, batch_id, quantity_reserved, reference_doctype, reference_docno, reference_line_id },
+      { item_id, warehouse_id, location_id, batch_id, quantity_reserved, reference_doctype, reference_docno, reference_line_id, bins },
       db
     );
 

@@ -2468,6 +2468,7 @@ export function applyPendingMigrations(): void {
   runLedgered('126_sales_order_item_tax_discount.sql');
   runLedgered('127_backfill_batch_stock_by_location.sql');
   runLedgered('128_invoice_item_reservation.sql');
+  runLedgered('129_stock_reservation_bins.sql');
   runLedgered('fn.runIdempotencyResponseWarningsMigration', runIdempotencyResponseWarningsMigration);
   // Boot-time guard (spec §4.1): the restocking-fee posting resolves 4150 at
   // return time — a legacy COA predating GL foundation must fail the boot

@@ -1725,27 +1725,60 @@ class StockMovementModel {
    * link is recorded and validated in one place).
    */
   static consumeAgainstReservation(
-    reservation: { batch_id?: number | null; location_id?: number | null; item_id: number; warehouse_id: number },
+    reservation: { id?: number; batch_id?: number | null; location_id?: number | null; item_id: number; warehouse_id: number },
     quantity: number,
     db: Database.Database
   ): ConsumptionEntry[] {
     const roundedQty = roundQty(quantity);
-    if (reservation.batch_id == null || reservation.location_id == null) {
+    // Decision B: a reservation may span several bins. Drain each stored bin
+    // oldest-first; fall back to the parent columns for legacy single-bin rows.
+    const bins = reservation.id
+      ? (db.prepare(`SELECT batch_id, location_id, quantity_reserved FROM stock_reservation_bins WHERE reservation_id = ? ORDER BY id ASC`)
+          .all(reservation.id) as Array<{ batch_id: number; location_id: number; quantity_reserved: number }>)
+      : [];
+    const allocation = bins.length > 0
+      ? bins
+      : (reservation.batch_id != null && reservation.location_id != null)
+        ? [{ batch_id: reservation.batch_id, location_id: reservation.location_id, quantity_reserved: roundedQty }]
+        : [];
+    if (allocation.length === 0) {
       throw new BusinessRuleError(409, 'Reservation is not tied to a batch and location and cannot be consumed by a sale');
     }
+
+    let left = roundedQty;
+    const entries: ConsumptionEntry[] = [];
+    for (const bin of allocation) {
+      if (left <= 0) break;
+      const take = roundQty(Math.min(left, Number(bin.quantity_reserved)));
+      if (take <= 0) continue;
+      entries.push(this.drainReservationBin(db, reservation, bin.batch_id, bin.location_id, take));
+      left = roundQty(left - take);
+    }
+
+    if (left > 0) throw new SellableStockUnavailableError(`item ${reservation.item_id}`, roundedQty, 0);
+    return entries;
+  }
+
+  /** Consume `quantity` from one bin of a reservation: move stock out of the
+   *  batch and the bin, so both stock stores agree. */
+  private static drainReservationBin(
+    db: Database.Database,
+    reservation: { item_id: number; warehouse_id: number },
+    batchId: number,
+    locationId: number,
+    quantity: number
+  ): ConsumptionEntry {
+    const roundedQty = roundQty(quantity);
     const bin = db.prepare(`
-      SELECT bsl.id, bsl.quantity_physical, bsl.quantity_reserved, bsl.quantity_available
-      FROM batch_stock_by_location bsl
+      SELECT bsl.id, bsl.quantity_physical FROM batch_stock_by_location bsl
       JOIN locations l ON l.id = bsl.location_id
       WHERE bsl.batch_id = ? AND bsl.location_id = ? AND l.warehouse_id = ?
-    `).get(reservation.batch_id, reservation.location_id, reservation.warehouse_id) as
-      { id: number; quantity_physical: number; quantity_reserved: number; quantity_available: number } | undefined;
+    `).get(batchId, locationId, reservation.warehouse_id) as { id: number; quantity_physical: number } | undefined;
     if (!bin) throw new BusinessRuleError(409, 'Reservation bin no longer exists');
 
     const batch = db.prepare(`
       SELECT id, quantity_remaining, unit_cost FROM stock_batches WHERE id = ? AND item_id = ?
-    `).get(reservation.batch_id, reservation.item_id) as
-      { id: number; quantity_remaining: number; unit_cost: number } | undefined;
+    `).get(batchId, reservation.item_id) as { id: number; quantity_remaining: number; unit_cost: number } | undefined;
     if (!batch) throw new BusinessRuleError(409, 'Reservation batch no longer exists for this item');
 
     if (qtyLessThan(roundQty(Number(bin.quantity_physical)), roundedQty)) {
@@ -1757,7 +1790,7 @@ class StockMovementModel {
     db.prepare('UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?')
       .run(roundedQty, batch.id);
 
-    return [{ batchId: batch.id, consumed: roundedQty, unitCost: Number(batch.unit_cost) }];
+    return { batchId: batch.id, consumed: roundedQty, unitCost: Number(batch.unit_cost) };
   }
 
   /**

@@ -6,6 +6,7 @@ import { sanitizeSortParams, INVOICE_SORT_COLUMNS, INVOICE_RETURN_SORT_COLUMNS }
 import Database from 'better-sqlite3';
 import logger from '../utils/logger';
 import StockMovementModel from './StockMovement';
+import { StockReservationModel } from './StockReservation';
 import AccountingService from '../services/accountingService';
 import InvoiceReturnModel from './InvoiceReturn';
 import { isFeatureEnabled } from '../utils/featureFlags';
@@ -1074,8 +1075,8 @@ class InvoiceModel {
   /**
    * Get invoice items for stock reversal
    */
-  static getInvoiceItemsForStockReverse(db: Database.Database, invoiceId: number): Array<{ item_id: number; quantity: number; unit_price: number }> {
-    return db.prepare(`SELECT item_id, quantity, unit_price FROM invoice_items WHERE invoice_id = ?`).all(invoiceId) as Array<{ item_id: number; quantity: number; unit_price: number }>;
+  static getInvoiceItemsForStockReverse(db: Database.Database, invoiceId: number): Array<{ item_id: number; quantity: number; unit_price: number; reservation_id?: number | null }> {
+    return db.prepare(`SELECT item_id, quantity, unit_price, reservation_id FROM invoice_items WHERE invoice_id = ?`).all(invoiceId) as Array<{ item_id: number; quantity: number; unit_price: number; reservation_id?: number | null }>;
   }
 
   /**
@@ -1199,6 +1200,16 @@ class InvoiceModel {
     const items = InvoiceModel.getInvoiceItemsForStockReverse(db, invoice.id);
     if (items.length > 0) {
       InvoiceModel.reverseStockForItems(db, items, invoice.invoice_no, userId, 'INVOICE_CANCEL');
+    }
+
+    // Decision A: a void reopens each line's consumed reservation, but only
+    // when the reservation's source order is still active. The stock reversal
+    // above restored the physical quantity; this restores the reserve. Runs
+    // inside the caller's transaction so both commit together.
+    for (const line of items) {
+      if (line.reservation_id) {
+        StockReservationModel.reopenForInvoiceLine(db, line.reservation_id, roundQty(Math.abs(line.quantity)));
+      }
     }
 
     // ---- 2. GL void (canonical journal_lines) ----
