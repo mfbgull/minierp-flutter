@@ -1330,9 +1330,16 @@ export function correctBatchReconciliation(req: AuthRequest, res: Response): Res
       return res.status(404).json({ error: 'Location not found' });
     }
 
-    const batch = db.prepare(`SELECT quantity_remaining FROM stock_batches WHERE id = ?`).get(batch_id) as { quantity_remaining: number } | undefined;
+    const batch = db.prepare(`SELECT item_id, warehouse_id FROM stock_batches WHERE id = ?`).get(batch_id) as { item_id: number; warehouse_id: number } | undefined;
     if (!batch) {
       return res.status(404).json({ error: 'Batch not found' });
+    }
+
+    // S-4 review: the location must belong to the batch's own warehouse.
+    // Otherwise the correction would write a movement and a stock_balances
+    // row in the wrong warehouse.
+    if (locRow.warehouse_id !== batch.warehouse_id) {
+      return res.status(400).json({ error: 'Location does not belong to the batch warehouse' });
     }
 
     const newQty = parseFloat(String(new_quantity_physical));
@@ -1344,7 +1351,14 @@ export function correctBatchReconciliation(req: AuthRequest, res: Response): Res
     const oldRow = db.prepare(`
       SELECT quantity_physical FROM batch_stock_by_location WHERE batch_id = ? AND location_id = ?
     `).get(batch_id, location_id) as { quantity_physical: number } | undefined;
-    const oldQty = oldRow?.quantity_physical ?? 0;
+    // S-4 review: a correction adjusts an existing bin row. If none exists the
+    // UPDATE would match zero rows and the batch would not move, while the old
+    // code still pushed `newQty - 0` into stock_balances (phantom stock).
+    // Reject instead of inventing a row.
+    if (!oldRow) {
+      return res.status(404).json({ error: 'No stock at this batch and location' });
+    }
+    const oldQty = oldRow.quantity_physical;
     const diff = newQty - oldQty;
 
     db.transaction(() => {
@@ -1362,6 +1376,43 @@ export function correctBatchReconciliation(req: AuthRequest, res: Response): Res
 
       db.prepare(`UPDATE stock_batches SET quantity_remaining = ? WHERE id = ?`).run(totalPhysical.total, batch_id);
 
+      // S-4 (issue #15): the bin and the batch master alone are not the
+      // on-hand record. stock_balances.quantity is the item/warehouse mirror
+      // that every other stock write maintains, so a correction must move it
+      // by the same delta or Invariant E fails. Do it in the same transaction
+      // as the bin write.
+      const itemId = batch.item_id;
+      const balanceRow = db.prepare(`
+        SELECT quantity FROM stock_balances WHERE item_id = ? AND warehouse_id = ?
+      `).get(itemId, locRow.warehouse_id) as { quantity: number } | undefined;
+      if (balanceRow) {
+        // Existing mirror: move it by the same delta the correction applied,
+        // so any non-batch-tracked quantity on the same item/warehouse stays.
+        db.prepare(`
+          UPDATE stock_balances SET quantity = quantity + ?, last_updated = CURRENT_TIMESTAMP
+          WHERE item_id = ? AND warehouse_id = ?
+        `).run(diff, itemId, locRow.warehouse_id);
+      } else {
+        // No mirror yet: stock_balances.quantity is per item+WAREHOUSE, so seed
+        // it from the on-hand of EVERY batch of this item in this warehouse,
+        // not just the corrected one. Sum bin physical across the warehouse
+        // (the same shape syncStockBalancesExtension mirrors), floored at 0
+        // because CHECK(quantity >= 0) forbids a negative seed.
+        const warehouseOnHand = db.prepare(`
+          SELECT COALESCE(SUM(bsl.quantity_physical), 0) AS total
+          FROM batch_stock_by_location bsl
+          JOIN locations l ON bsl.location_id = l.id
+          JOIN stock_batches sb ON sb.id = bsl.batch_id
+          WHERE l.warehouse_id = ? AND sb.item_id = ?
+        `).get(locRow.warehouse_id, itemId) as { total: number };
+        db.prepare(`
+          INSERT INTO stock_balances (item_id, warehouse_id, quantity, last_updated)
+          VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+        `).run(itemId, locRow.warehouse_id, Math.max(warehouseOnHand.total, 0));
+      }
+      StockMovementModel.syncStockBalancesExtension(itemId, locRow.warehouse_id, db);
+      StockMovementModel.refreshItemStockMirror(itemId, db);
+
       const movementNo = StockMovementModel.generateMovementNo(db);
       db.prepare(`
         INSERT INTO stock_movements (
@@ -1371,7 +1422,7 @@ export function correctBatchReconciliation(req: AuthRequest, res: Response): Res
         ) VALUES (?, ?, ?, 'ADJUSTMENT', ?, 0, 'BATCH_RECONCILIATION', ?, ?, ?, ?, ?)
       `).run(
         movementNo,
-        (db.prepare(`SELECT item_id FROM stock_batches WHERE id = ?`).get(batch_id) as { item_id: number }).item_id,
+        itemId,
         locRow.warehouse_id,
         diff,
         `RECON-${batch_id}`,
