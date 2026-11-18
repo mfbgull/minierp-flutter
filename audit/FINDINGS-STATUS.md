@@ -265,8 +265,9 @@ ledger. Older phase records below are dated evidence, not a new release assessme
 
 ## Finding-tagged tests (skipped / expected-failure)
 
-Only F-3 remains parked. Each parked test is tagged with its finding ID so it
-stays visible and flips to a real failure when the finding is fixed.
+No findings remain parked on main (updated 2026-11-18: F-3 merged via PR9,
+see below). Parked tests are tagged with their finding ID so they stay visible
+and flip to a real failure when the finding is fixed.
 `scripts/check.sh` prints the count (see "Finding-tagged test count").
 
 F-2 was un-parked on 2026-11-16: `7a96e6d8` fixed it (a claim with a standing
@@ -284,18 +285,21 @@ ordinary passing regressions. Evidence on current main (`91df221c`): the
 all four test files pass in the post-merge gates (1219 passed + 1 pre-existing
 non-finding skip).
 
-F-3 status, stated precisely to avoid a false "fixed" reading: **the F-3 code
-fix is implemented on PI's PR9 branch (`fix/f3-refund-void-original-date`) but
-is NOT merged into main.** On main today the F-3 regression still runs as
-`it.failing` (expected-failure) in
-`server/src/__tests__/moneyPathFindingsRed.test.ts`. The test unpark companion
-`b209303a` (test-only: drops the `it.failing` wrapper, updates the stale parked
-comment and describe title, assertions unchanged) rides the same PR9 line, so
-the wrapper is removed only when PR9 merges through the approved sequence.
+F-3 status (updated 2026-11-18): **the F-3 code fix and the test unpark
+companion are MERGED.** PR9 (`fix/f3-refund-void-original-date`, head
+`b209303a` — the fix dates the supplier-refund void's ledger reversal on the
+receipt's own date, plus the test-only companion `b209303a` that dropped the
+`it.failing` wrapper and updated the stale parked comment, assertions
+unchanged) merged as `29457260`. On main the F-3 regression
+(`server/src/__tests__/moneyPathFindingsRed.test.ts`) is now an ordinary
+passing regression guard — verified: no `it.failing` remains in the file and
+the describe reads "(F-2 fixed, F-3 fixed)" at `29457260`. Verified by PI's
+full post-merge gate + main CI run 44219220758 (fallow, server, flutter all
+SUCCESS at `29457260`). **No findings remain parked on main.**
 
 | Finding | Test | Tag | Fails today because |
 |---|---|---|---|
-| F-3 (GLM-REVIEW) | `server/src/__tests__/moneyPathFindingsRed.test.ts` | PARKED on main — `it.failing` with `F-3:` in the name | GL AP vs supplier subledger differ by 3,000 at as-of 2026-11-05 (`Expected: 0, Received: 3000`). The F-3 code fix is implemented on PI's PR9 branch but NOT merged; the test unpark companion `b209303a` (test-only, assertions unchanged) is on the same PR9 line, so the wrapper drops on main only via PR9's approved integration. |
+| F-3 (GLM-REVIEW) | `server/src/__tests__/moneyPathFindingsRed.test.ts` | FIXED & UNPARKED — merged via PR9 (`29457260`, 2026-11-18) | None: the supplier-refund void now dates its ledger reversal on the receipt's own date; the former `it.failing` wrapper is gone (unpark companion `b209303a`, test-only, assertions unchanged) and the case runs as an ordinary passing regression. Verified by the post-merge gate + main CI run 44219220758 (3/3 SUCCESS at `29457260`). |
 | UX-3 (GLM-UX-REVIEW) | `test/features/supplier_refund_message_test.dart` | FIXED — un-parked by PR4 (`d1075cd2`) | None: refund amounts get their own refund-specific error strings, not return-quantity messages. Runs as an ordinary passing test. |
 | UX-6 (GLM-UX-REVIEW) | `test/widgets/cash_blockers_localization_test.dart` | FIXED — un-parked by PR4 (`d1075cd2`) | None: cash-blocker rows render localized type labels and formatted dates, not raw enums or ISO dates. Runs as an ordinary passing test. |
 | UX-11 (GLM-UX-REVIEW) | `test/features/sales_order_form_loading_test.dart` | FIXED — un-parked by PR4 (`d1075cd2`) | None: option-provider errors surface with loading feedback. Runs as an ordinary passing test. |
@@ -1931,3 +1935,12 @@ situation of every existing install at migration time.
   integration branch, after approved integration, observed passing, with
   the header comment updated in the same edit; PI must not edit it.
   PR5 remains LAST in merge order; PR10/S-4 deferred.
+
+- **PR9 COMPLETION (2026-11-18):** the PR9 assignment above is CLOSED. The
+  F-3 fix line (`fix/f3-refund-void-original-date` @ `b209303a` — fix + the
+  test unpark companion) MERGED as `29457260`; PI's full post-merge gate and
+  main CI run 44219220758 passed (fallow, server, flutter 3/3 SUCCESS at
+  `29457260`). F-3 is now an ordinary passing regression on main; the
+  finding-tag table above is updated to match. Remaining open stock defect
+  (S-3 reservation-only mirror staleness) stays with PR10; PR5 remains last
+  in merge order.
