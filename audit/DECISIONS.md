@@ -1798,3 +1798,19 @@ remains a separate mechanism.
   explicitly sequenced. No silent cherry-picks, no force pushes.
 - Routine file-ownership questions no longer need Gull; ready/merge remain
   human-only; no full test reruns unless an actual change/risk warrants.
+
+- **CORRECTION (2026-11-18, PR10 post-merge gate count comparison):** the
+  2026-11-18 post-merge gate report for PR10 (`d3a35510`) compared its server
+  result (290 suites / 2328 tests passed) against a WRONG pre-PR10 baseline of
+  "282 suites / 2311 tests (+8 suites, +17 tests)". Verified authoritative
+  pre-PR10 baseline is **289 suites / 2315 tests**, from PI's own post-PR9
+  main CI server job (run 44219220758, job 134516633244, at `29457260`):
+  "Test Suites: 289 passed, 289 total / Tests: 2315 passed, 2315 total".
+  Correct delta: **+1 suite, +13 tests** (PR10's
+  `stockBalancesExtensionParity.test.ts`). The 288/2311 figure was the GLM
+  PR7-era gate at `91df221c` (retained log
+  `/home/fawad/logs/gate-91df221c/check-full.log`); PR9 then added the
+  supplier-refund-void suite (+1 suite, +4 tests) before PR10. The gate
+  results themselves (GATE_EXIT=0, all pass) are unaffected — only the
+  comparison in the report was wrong. Evidence: PR10 gate log
+  `/home/fawad/logs/pr10-merge-d3a35510-gate.log` (290/2328).
