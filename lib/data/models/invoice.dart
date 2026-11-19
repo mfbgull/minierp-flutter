@@ -62,6 +62,32 @@ class Discount {
   Map<String, dynamic> toJson() => {'type': type.value, 'value': value};
 }
 
+/// One bin an invoice line drew from, oldest draw first (`bin_consumption`
+/// on the server's invoice-line payload).
+class InvoiceBinDraw {
+  const InvoiceBinDraw({
+    required this.batchId,
+    required this.locationId,
+    required this.quantity,
+  });
+
+  factory InvoiceBinDraw.fromJson(Map<String, dynamic> json) => InvoiceBinDraw(
+    batchId: asInt(json['batch_id']) ?? 0,
+    locationId: asInt(json['location_id']) ?? 0,
+    quantity: asNum(json['quantity']) ?? 0,
+  );
+
+  final int batchId;
+  final int locationId;
+  final num quantity;
+
+  Map<String, dynamic> toJson() => {
+    'batch_id': batchId,
+    'location_id': locationId,
+    'quantity': quantity,
+  };
+}
+
 /// Invoice line as returned by the server (`InvoiceItem` in
 /// server/src/models/Invoice.ts) — NOT the client form-shape type.
 ///
@@ -85,6 +111,8 @@ class InvoiceItem {
     this.reservationId,
     this.expiryDate,
     this.isExpiredAtSale = false,
+    this.binConsumption = const [],
+    this.requiresReturnBin = false,
   });
 
   factory InvoiceItem.fromJson(Map<String, dynamic> json) => InvoiceItem(
@@ -103,6 +131,11 @@ class InvoiceItem {
     reservationId: asInt(json['reservation_id']),
     expiryDate: asString(json['expiry_date']),
     isExpiredAtSale: asBool(json['is_expired_at_sale']),
+    binConsumption: [
+      for (final draw in (json['bin_consumption'] as List<dynamic>? ?? const []))
+        InvoiceBinDraw.fromJson(Map<String, dynamic>.from(draw as Map)),
+    ],
+    requiresReturnBin: asBool(json['requires_return_bin']),
   );
 
   final int id;
@@ -125,6 +158,16 @@ class InvoiceItem {
   final String? expiryDate;
   final bool isExpiredAtSale;
 
+  /// The bins this line's units came out of, oldest draw first. Empty when
+  /// the sale predates the draw ledger (see [requiresReturnBin]) or drew
+  /// from no batch at all.
+  final List<InvoiceBinDraw> binConsumption;
+
+  /// True when the server says a return of this line must name the bin to
+  /// restock into: the line was sold from a batch, but no per-bin draw was
+  /// recorded, so the user must choose instead of the server guessing.
+  final bool requiresReturnBin;
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'invoice_id': invoiceId,
@@ -141,6 +184,8 @@ class InvoiceItem {
     if (reservationId != null) 'reservation_id': reservationId,
     if (expiryDate != null) 'expiry_date': expiryDate,
     'is_expired_at_sale': isExpiredAtSale ? 1 : 0,
+    'bin_consumption': [for (final draw in binConsumption) draw.toJson()],
+    'requires_return_bin': requiresReturnBin,
   };
 }
 

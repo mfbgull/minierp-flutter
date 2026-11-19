@@ -327,6 +327,7 @@ transfers can be traced using their existing movement link.
 | GET | /inventory/warehouses/:id | Get single warehouse |
 | POST | /inventory/warehouses | Create warehouse |
 | PUT | /inventory/warehouses/:id | Update warehouse |
+| GET | /inventory/locations?warehouse_id= | List the bins (locations) of one warehouse |
 
 ### Stock
 
@@ -425,6 +426,12 @@ old reservation is released, not reopened. The server ignores the `reservation_i
 that the client resends for that line, so the line becomes an ordinary unreserved
 sale. The edit does not fail.
 
+Each item also carries `bin_consumption`: the exact per-bin draw of the sale, one
+entry `{ batch_id, location_id, quantity }` per bin the line took stock from.
+`requires_return_bin` is `true` when the line was sold from a tracked batch but
+has no recorded draw, so a return must ask which bin restocks it. Both fields are
+read-only. See `POST /invoices/:id/return`.
+
 ### POST /invoices
 Create invoice. Optionally records payment in the same transaction.
 
@@ -458,6 +465,13 @@ listed by `GET /invoices/backdated`.
 ### PUT /invoices/:id
 Update invoice. Reverses old stock movements and creates new ones.
 
+A same-item edit keeps each line's stock reservation. When the source sales
+order is still active the hold reopens; when it is not (a terminal order, or a
+reference that is not an active order) the hold is released instead, and the line
+becomes an ordinary unreserved sale. The edit does not fail. An edit that still
+claims a reservation the server cannot reopen and cannot release returns 409 and
+changes nothing.
+
 ### DELETE /invoices/:id
 **Admin only.** Delete invoice, reverse stock, clean up payments and ledger.
 
@@ -475,10 +489,21 @@ from), posts the GL/ledger reversal and applies the disposition.
   "disposition": "credit",        // "refund" | "credit" | "adjust"
   "warehouse_id": 1,              // optional restock target
   "items": [
-    { "invoice_item_id": 10, "return_quantity": 2 }
+    { "invoice_item_id": 10, "return_quantity": 2, "location_id": 3 }
   ]
 }
 ```
+
+`location_id` is the bin to restock that line into. Send it for a line whose
+sale recorded no per-bin draw. The invoice detail marks those lines with
+`requires_return_bin`, and lists the recorded draws in `bin_consumption`.
+A line with a recorded draw replays its own bins and ignores `location_id`.
+Successive partial returns of the same line resume that replay where the last
+one stopped, so a later return fills the bins the earlier returns did not.
+A line with a batch but no draw returns 400
+(`Line N has no recorded bin draw; choose the bin to restock it into`) when
+`location_id` is absent. The bin must exist and belong to the restock warehouse.
+A legacy line sold from no tracked batch needs no bin.
 
 ### GET /invoices/returns
 List invoice-return history (paginated).

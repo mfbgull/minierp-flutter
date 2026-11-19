@@ -7,7 +7,7 @@ import { AuthRequest, CreateInvoiceDTO, Invoice, InvoiceItemDTO, PaymentDTO, Inv
 import StockMovementModel from '../models/StockMovement';
 import { StockReservationModel, type StockReservation } from '../models/StockReservation';
 import InvoiceModel from '../models/Invoice';
-import { InvoiceCancellationGuardError } from '../models/Invoice';
+import { InvoiceCancellationGuardError, type InvoiceLineRow } from '../models/Invoice';
 import PaymentModel from '../models/Payment';
 import AccountingService from '../services/accountingService';
 import { InvoiceReturnService, ReturnError } from '../services/invoiceReturnService';
@@ -107,23 +107,7 @@ interface InvoiceRow {
   customer_email?: string;
   customer_phone?: string;
   customer_address?: string;
-  items?: InvoiceItemRow[];
-}
-
-interface InvoiceItemRow {
-  item_id: number;
-  quantity: number;
-  unit_price: number;
-  amount: number;
-  tax_rate: number;
-  discount_type: string;
-  discount_value: number;
-  /** S-1: the reservation this line fulfilled. Nullable on purpose - every
-   * pre-128 line predates the link, and an unreserved sale has none. The edit
-   * form resends it so a same-item line keeps its own reservation (NEW-4). */
-  reservation_id: number | null;
-  item_name?: string;
-  item_code?: string;
+  items?: InvoiceLineRow[];
 }
 
 // ============ Controllers ============
@@ -170,7 +154,7 @@ function getInvoice(req: AuthRequest, res: Response): Response | void {
     const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
     const invoice = InvoiceModel.getWithCustomer(id, db) as InvoiceRow | undefined;
     if (!invoice) { return res.status(404).json({ error: 'Invoice not found' }); }
-    invoice.items = InvoiceModel.getItems(id, db) as InvoiceItemRow[];
+    invoice.items = InvoiceModel.getItems(id, db);
 
     // The invoice detail screen and the printouts need the full return
     // picture: the returns themselves, the authoritative money position
@@ -440,8 +424,11 @@ function consumeInvoiceItemsAndPostCogs(
         const consumption = reservation
             ? StockMovementModel.consumeAgainstReservation(reservation, item.quantity, db)
             : InvoiceModel.consumeFromOldestBatches(item.item_id, warehouseId, item.quantity, db);
+        // Every re-created line records where it drew, for the same reasons as
+        // the create path: an edit's reversal and a later return both replay
+        // these rows instead of guessing a bin.
+        InvoiceModel.recordLineBinDraw(db, invoiceItemId, consumption);
         if (reservation) {
-            InvoiceModel.recordLineBinDraw(db, invoiceItemId, consumption);
             StockReservationModel.markConsumedPartial(db, reservation, item.quantity);
         }
 
@@ -835,7 +822,23 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
         // S-1: an edit reverses the sale, so it follows the same reservation
         // rule as a cancel - reopen only when the source order is still
         // active. Runs after the stock reversal, in the same transaction.
-        InvoiceModel.reopenReservationsForLines(db, linesToReopen, oldDraws);
+        //
+        // Decision C: when the reopen is IMPOSSIBLE (a terminal sales order, or
+        // a reference that is not a sales order), the edit has taken the hold
+        // off a sale that is gone, so it must end the hold instead of leaving
+        // it CONSUMED for good. It is released by id - terminal, holding
+        // nothing - exactly like an item change (NEW-2 Option 1). Void and
+        // cancel keep the CONSUMED rule above: only this edit path releases.
+        const reopenable: typeof linesToReopen = [];
+        for (const old of linesToReopen) {
+          if (old.reservation_id != null && !StockReservationModel.canReopenById(old.reservation_id, db)) {
+            StockReservationModel.releaseById(db, old.reservation_id);
+            releasedIds.add(old.reservation_id);
+            continue;
+          }
+          reopenable.push(old);
+        }
+        InvoiceModel.reopenReservationsForLines(db, reopenable, oldDraws);
 
         // NEW-2 wire contract (PR #42): the edit form resends BOTH the line `id`
         // and its `reservation_id`, and it KEEPS the old link on a line whose
@@ -1383,15 +1386,26 @@ function returnInvoiceItems(req: AuthRequest, res: Response): Response | void {
     const body = req.body as Record<string, unknown>;
 
     const rawItems = body.items;
-    const items: Array<{ invoice_item_id: number; return_quantity: number }> = Array.isArray(rawItems)
-      ? rawItems
-      : [];
+    // `location_id` is the user's chosen restock bin, needed for a line whose
+    // sale recorded no draw; the service validates it and refuses the line
+    // without it. Keep the mapping explicit so no stray body field is honored.
+    const items: Array<{ invoice_item_id: number; return_quantity: number; location_id?: number }> =
+      Array.isArray(rawItems)
+        ? (rawItems as Array<Record<string, unknown>>).map((raw) => ({
+            // Kept raw, as before: the service coerces and validates both.
+            invoice_item_id: raw.invoice_item_id as number,
+            return_quantity: (raw.return_quantity ?? 0) as number,
+            ...(raw.location_id == null ? {} : { location_id: Number(raw.location_id) }),
+          }))
+        : [];
     if (items.length === 0) {
       return res.status(400).json({ error: 'Invalid request: items must be a non-empty array' });
     }
 
-    // Legacy clients send the reason inside the first item.
-    const legacyReason = items.length > 0 ? String((items[0] as Record<string, unknown>)?.reason ?? '') : '';
+    // Legacy clients send the reason inside the first item. Read it from the
+    // RAW body: the mapping above keeps only the fields the service consumes.
+    const firstRaw = Array.isArray(rawItems) ? (rawItems[0] as Record<string, unknown> | undefined) : undefined;
+    const legacyReason = firstRaw ? String(firstRaw.reason ?? '') : '';
     const reason = body.reason ? String(body.reason) : legacyReason || null;
 
     // audit-3 task 08: a sales return puts stock back and may refund or

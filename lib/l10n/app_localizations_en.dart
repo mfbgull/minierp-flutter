@@ -5913,6 +5913,16 @@ class AppLocalizationsEn extends AppLocalizations {
       'Select a warehouse to restock into';
 
   @override
+  String get salesreturnsReturnbin => 'Restock Bin';
+
+  @override
+  String get salesreturnsReturnbinhint => 'Select the bin to restock into';
+
+  @override
+  String get salesreturnsReturnbinrequired =>
+      'Choose the restock bin for every returned line that has no recorded bin';
+
+  @override
   String get salesreturnsReturnreasonplaceholder =>
       'Enter reason for return...';
 

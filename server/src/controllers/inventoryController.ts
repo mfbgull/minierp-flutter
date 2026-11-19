@@ -399,6 +399,36 @@ function getWarehouse(req: Request, res: Response): void {
   }
 }
 
+/**
+ * GET /api/inventory/locations?warehouse_id=N
+ *
+ * List the bins of one warehouse. The return flow needs this list to ask the
+ * user which bin receives a line that has no recorded draw. A bin stays
+ * selectable at zero stock, because the customer can bring goods back to a bin
+ * the sale emptied.
+ */
+function getLocations(req: Request, res: Response): void {
+  try {
+    const warehouseId = getQueryInteger(req.query.warehouse_id);
+    if (!Number.isInteger(warehouseId) || warehouseId <= 0) {
+      res.status(400).json({ error: 'warehouse_id must be a positive integer' });
+      return;
+    }
+
+    const locations = db.prepare(`
+      SELECT id as location_id, warehouse_id, location_code, location_name, is_active
+      FROM locations
+      WHERE warehouse_id = ?
+      ORDER BY id
+    `).all(warehouseId);
+
+    res.json({ success: true, data: locations });
+  } catch (error) {
+    logger.error('Get locations error:', error);
+    res.status(500).json({ error: 'Failed to fetch locations' });
+  }
+}
+
 // Expired-stock plan Phase 4.1: system warehouse codes are reserved —
 // the boot task and write-off flow resolve them by code, so a user-created
 // warehouse squatting on one would break expiry detection. The UNIQUE
@@ -1239,6 +1269,7 @@ export default {
   getUnitsOfMeasure,
   getWarehouses,
   getWarehouse,
+  getLocations,
   createWarehouse,
   updateWarehouse,
   deleteWarehouse,

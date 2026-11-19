@@ -1687,18 +1687,21 @@ describe('Finding 22: an edit changes the NUMBER of lines', () => {
   });
 });
 
-// ── 23. partial return of a line sold from two bins (analysis only) ──
+// ── 23. partial return of a line sold from two bins ──
 
 /**
- * GLM round 3 finding, unreproduced until now: a line sold from TWO bins returns
- * a PARTIAL quantity, and the return is proportional, so it cannot say which bin
- * the customer physically brought back. This test DRIVES that case and records
- * the current split. The allocation rule is a product decision and is NOT
- * changed here - the assertions document today's behaviour, and the options are
- * written up for Gull.
+ * GLM round 3 finding: a line sold from TWO bins returned a PARTIAL quantity,
+ * and the reversal was proportional, so it could not say which bin the customer
+ * physically brought back — the units landed on the warehouse DEFAULT instead.
+ *
+ * The ledger now records the exact per-bin draw of EVERY batched sale, so the
+ * return replays those bins in the order the units left them, and successive
+ * partial returns continue where the previous one stopped. This block pins that
+ * replay: two partial returns restore each bin to exactly what it held before
+ * the sale.
  */
 describe('Finding 23: partial return of one line sold from two bins', () => {
-  it('cannot be exact today: an unreserved sale records no per-bin draw', async () => {
+  it('restocks the bins the sale recorded, across successive partial returns', async () => {
     setFeatureEnabled(db, FLAG, true);
     const item = await createItem(`S1R two-bin ${Date.now()}`, cookie);
     await purchaseStock(item, warehouseA, 10, 40, cookie, AS_OF);
@@ -1715,29 +1718,38 @@ describe('Finding 23: partial return of one line sold from two bins', () => {
       ] });
     expect(create.status).toBe(201);
     const invoice = lastInvoiceId();
-    // The sale really did span both bins.
+    // The sale really did span both bins, and it emptied DEFAULT first: that
+    // bin was created before the rack, and the walk is oldest bin first.
     const rackLeft = binRow(b1, rack).physical;
     const dlLeft = binRow(b1, dl).physical;
     expect({ rackLeft, dlLeft }).toEqual({ rackLeft: 2, dlLeft: 0 });
 
-    // ROOT CAUSE, measured: the per-bin ledger is written ONLY for a
-    // reservation-backed line, so a plain FIFO sale has no record of which bin
-    // each unit came from. A partial return can therefore only be split by
-    // re-walking the batch's bins, never by replaying what actually happened.
+    // FIX MEASURED: a plain FIFO sale now records which bin each unit came
+    // from — 6 from DEFAULT, then 2 from the rack.
     const lineId = (db.prepare('SELECT id FROM invoice_items WHERE invoice_id = ?').get(invoice) as { id: number }).id;
-    const draws = db.prepare('SELECT * FROM invoice_item_bin_consumption WHERE invoice_item_id = ?').all(lineId);
-    expect(draws).toEqual([]);
+    const draws = db.prepare(
+      'SELECT batch_id, location_id, quantity FROM invoice_item_bin_consumption WHERE invoice_item_id = ? ORDER BY id'
+    ).all(lineId);
+    expect(draws).toEqual([
+      { batch_id: b1, location_id: dl, quantity: 6 },
+      { batch_id: b1, location_id: rack, quantity: 2 },
+    ]);
 
-    // A partial return of 2 goes to ONE bin - whichever the walk reaches first -
-    // and DEFAULT gained the 2 even though the sale drew mostly from it. This is
-    // the behaviour under discussion; it is recorded, NOT endorsed and NOT
-    // changed, pending Gull's decision on allocation.
+    // A partial return of 2 replays the recorded draws from their start, so it
+    // lands on the bin those units came from, not on a guessed one.
     const ret = await request(app).post(`/api/invoices/${invoice}/return`).set('Cookie', cookie)
       .set('Idempotency-Key', nextIdemKey('s1r-twobin-ret'))
       .send({ items: [{ invoice_item_id: lineId, return_quantity: 2 }], reason: 'two-bin partial' });
     expect(ret.status).toBe(200);
-    const returned = { dl: binRow(b1, dl).physical, rack: binRow(b1, rack).physical };
-    expect(returned).toEqual({ dl: 2, rack: 2 });
+    expect({ dl: binRow(b1, dl).physical, rack: binRow(b1, rack).physical }).toEqual({ dl: 2, rack: 2 });
+
+    // The remaining 6 continues the same draw: DEFAULT finishes its 6 and the
+    // rack takes back its own 2, so both bins end exactly as they started.
+    const ret2 = await request(app).post(`/api/invoices/${invoice}/return`).set('Cookie', cookie)
+      .set('Idempotency-Key', nextIdemKey('s1r-twobin-ret2'))
+      .send({ items: [{ invoice_item_id: lineId, return_quantity: 6 }], reason: 'two-bin rest' });
+    expect(ret2.status).toBe(200);
+    expect({ dl: binRow(b1, dl).physical, rack: binRow(b1, rack).physical }).toEqual({ dl: 6, rack: 4 });
   });
 });
 

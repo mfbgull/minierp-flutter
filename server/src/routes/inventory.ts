@@ -34,6 +34,9 @@ router.get('/items-low-stock', requirePermission('inventory', 'read'), inventory
 router.get('/items-uom', requirePermission('inventory', 'read'), inventoryController.getUnitsOfMeasure);
 
 router.get('/warehouses', requirePermission('inventory', 'read'), inventoryController.getWarehouses);
+// Bins of one warehouse. The return flow asks for these when a returned line
+// has no recorded draw, so the user picks the restock bin instead of guessing.
+router.get('/locations', requirePermission('inventory', 'read'), inventoryController.getLocations);
 router.get('/warehouses/:id', requirePermission('inventory', 'read'), inventoryController.getWarehouse);
 router.post('/warehouses', requirePermission('inventory', 'create'), sensitiveOperationLimiter, validateZodBody(zodBodySchemas.object), inventoryController.createWarehouse);
 router.put('/warehouses/:id', requirePermission('inventory', 'update'), sensitiveOperationLimiter, validateZodBody(zodBodySchemas.object), inventoryController.updateWarehouse);

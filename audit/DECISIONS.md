@@ -1285,6 +1285,37 @@ sales with no draw: persist exact bin consumption for every sale, replay it for
 returns, and require a user-selected bin when historical data has no location
 record. Do not infer missing historical allocations.
 
+**Implementation status correction (2026-11-19).** This entry records an
+**existing implementation gap**, not an unresolved product decision. The rule was
+already agreed; the code did not follow it. Four root causes were found and
+fixed on branch `mfbgull/reservation-bin-decisions`:
+
+1. `recordLineBinDraw` ran only inside `if (reservation)`, in
+   `InvoiceCreationService.createInvoice` and
+   `invoiceController.consumeInvoiceItemsAndPostCogs`. It now runs for every
+   line, so a plain FIFO sale records its draws.
+2. FIFO consumption entries carried no `locationId`. `drainBinsForTake` now
+   returns the drained bins as `bins: [{ location_id, quantity }]`, and
+   `consumeBatchesByLocation` / `consumeLegacyBatches` pass them through, so one
+   batch draining two bins writes two ledger rows.
+3. A return line with no ledger row fell back to the warehouse `DEFAULT` bin.
+   `resolveReturnBins` now rejects it with 400
+   (`Line N has no recorded bin draw; choose the bin to restock it into`), and
+   validates the chosen bin exists and belongs to the restock warehouse.
+4. A second partial return of the same line restarted its bin walk at the first
+   bin and over-filled it. The walk resumes from `invoice_return_batches`, which
+   now records the returning `invoice_item_id`, and the seed names a slot by
+   batch AND bin so it addresses the same slot the walk does.
+
+`GET /invoices/:id` marks such lines with `requires_return_bin` and returns the
+recorded draws as `bin_consumption`. The Flutter return dialog asks for a bin on
+exactly those lines and sends it as `location_id`. The client learns the bins
+from `GET /api/inventory/locations?warehouse_id=`, the first location API in the
+product. Tests: `server/src/__tests__/invoiceReturnBinChoice.test.ts` (11),
+`server/src/__tests__/locationsRoute.test.ts` (5), Finding 23 in
+`server/src/__tests__/reservationWorkflowRegressions.test.ts` rewritten to pin
+the fix, `test/features/sales/invoice_return_bin_choice_test.dart` (3).
+
 ---
 
 ## DECIDED — an edit that changes the number of lines
@@ -1344,6 +1375,44 @@ VOID, not as a claim on the hold it just released: the link is not budgeted, and
 the edit does not fail. Without this, an ordinary item change from the real client
 returned 409 "reservation N holds 0 but the line requests X". Covered by Finding 29
 in `server/src/__tests__/reservationWorkflowRegressions.test.ts`.
+
+---
+
+## DECIDED — Decision C: an edit that drops a reservation link whose source order is terminal
+
+**Status:** DECIDED by Gull (2026-11-19). This decides what an invoice edit does
+with a same-item reservation link it cannot reopen. Branch
+`mfbgull/reservation-bin-decisions`.
+
+**The case.** A line names `reservation_id` R. The edit keeps the item, so the
+normal rule is to reopen R. R's source sales order is not active any more (it is
+completed, cancelled or otherwise terminal), so `reopenForInvoiceLine` cannot
+reopen it. The old code returned 409 and refused the whole edit, so the user
+could not correct an invoice after the order that funded it was closed, and the
+hold stayed `CONSUMED` against a line that no longer names it.
+
+**Decision.** Keep the existing behaviour when the source IS an active sales
+order: reopen the reservation. When the reference is not an active sales order,
+including a terminal one, release that reservation by id: terminal `RELEASED`,
+`quantity_reserved = 0`, bin rows removed. Never leave it `CONSUMED`, and do not
+answer 409 for this case.
+
+**Scope.** The release lives in the edit route (`updateInvoice`), not in
+`reopenForInvoiceLine`. Putting it in the shared reopen helper would change the
+void and cancel semantics, which Decision A's tests pin. `canReopenById` is the
+only new public API on `StockReservationModel`; the release reuses the existing
+`releaseById`.
+
+The 409 answer is kept for the shape it was written for: an edit that still
+claims a reservation the server can neither reopen nor release. That edit fails
+closed and rolls back, release included, because both run in the same
+transaction.
+
+**Tests.** `server/src/__tests__/reservationWorkflowDecisions.test.ts`,
+`describe('Decision C: an edit that drops a reservation link releases a hold it
+cannot reopen')` — three red-first cases (terminal order, non-order reference,
+cancel) and two negative controls (active order still reopens; an edit that
+still claims the hold still fails closed with 409).
 
 ---
 
