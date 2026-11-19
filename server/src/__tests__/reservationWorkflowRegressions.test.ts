@@ -90,6 +90,21 @@ function seedSalesOrder(status: string): string {
   return soNo;
 }
 
+function rackLocation(wh: number, code: string): number {
+  db.prepare('INSERT INTO locations (warehouse_id, location_code, location_name) VALUES (?, ?, ?)')
+    .run(wh, code, code);
+  return (db.prepare('SELECT id FROM locations WHERE warehouse_id = ? AND location_code = ?')
+    .get(wh, code) as { id: number }).id;
+}
+
+function moveToRack(batchId: number, wh: number, locId: number, qty: number): void {
+  const def = defaultLocation(wh);
+  db.prepare('UPDATE batch_stock_by_location SET quantity_physical = quantity_physical - ?, quantity_available = quantity_available - ? WHERE batch_id = ? AND location_id = ?')
+    .run(qty, qty, batchId, def);
+  db.prepare(`INSERT INTO batch_stock_by_location (batch_id, location_id, quantity_physical, quantity_reserved, quantity_available)
+              VALUES (?, ?, ?, 0, ?)`).run(batchId, locId, qty, qty);
+}
+
 async function sell(itemId: number, qty: number, tag: string, reservationId?: number): Promise<number> {
   const res = await request(app)
     .post('/api/invoices')
@@ -1038,21 +1053,6 @@ describe('Finding 12: edit and delete/restore follow the reservation rule', () =
  * what it gave.
  */
 describe('Finding 13: a batch split across two bins reverses per bin', () => {
-  function rackLocation(wh: number, code: string): number {
-    db.prepare('INSERT INTO locations (warehouse_id, location_code, location_name) VALUES (?, ?, ?)')
-      .run(wh, code, code);
-    return (db.prepare('SELECT id FROM locations WHERE warehouse_id = ? AND location_code = ?')
-      .get(wh, code) as { id: number }).id;
-  }
-
-  function moveToRack(batchId: number, wh: number, locId: number, qty: number): void {
-    const def = defaultLocation(wh);
-    db.prepare('UPDATE batch_stock_by_location SET quantity_physical = quantity_physical - ?, quantity_available = quantity_available - ? WHERE batch_id = ? AND location_id = ?')
-      .run(qty, qty, batchId, def);
-    db.prepare(`INSERT INTO batch_stock_by_location (batch_id, location_id, quantity_physical, quantity_reserved, quantity_available)
-                VALUES (?, ?, ?, 0, ?)`).run(batchId, locId, qty, qty);
-  }
-
   it('voids back to each bin the batch came from', async () => {
     setFeatureEnabled(db, FLAG, true);
     const item = await createItem(`S1R split-bin ${Date.now()}`, cookie);
@@ -1248,5 +1248,185 @@ describe('Finding 16: duplicate create after a partial sale', () => {
     }, db);
     expect(again.id).toBe(reservation.id);
     expect(reservationRow(reservation.id)).toEqual({ status: 'ACTIVE', quantity_reserved: 2 });
+  });
+});
+
+// ── 17. NEW-1: two lines of one item, distinct reservations ──
+
+/**
+ * GLM round 2 (NEW-1): the edit relink map was keyed by item_id, so two invoice
+ * lines for the SAME item backed by DIFFERENT reservations collapsed onto the
+ * last one written. Both re-created lines then drained that single reservation,
+ * which asked it for more than it held and returned 400 - and on a shape where
+ * the quantities happened to fit, it would silently consume the wrong
+ * reservation twice and leave the other ACTIVE. The mapping must be per line.
+ */
+describe('Finding 17: an edit keeps each line on its own reservation', () => {
+  it('relinks two same-item lines to their own reservations', async () => {
+    setFeatureEnabled(db, FLAG, true);
+    const item = await createItem(`S1R two-lines ${Date.now()}`, cookie);
+    await purchaseStock(item, warehouseA, 10, 40, cookie, '2026-10-01');
+    const [b1] = batchIdsOf(item, warehouseA);
+    const loc = defaultLocation(warehouseA);
+
+    const r1 = StockReservationModel.create({
+      item_id: item, warehouse_id: warehouseA, quantity_reserved: 3,
+      reference_doctype: 'SALES_ORDER', reference_docno: seedSalesOrder('Confirmed'), reference_line_id: 1,
+      bins: [{ batch_id: b1, location_id: loc, quantity: 3 }],
+    }, db);
+    const r2 = StockReservationModel.create({
+      item_id: item, warehouse_id: warehouseA, quantity_reserved: 3,
+      reference_doctype: 'SALES_ORDER', reference_docno: seedSalesOrder('Confirmed'), reference_line_id: 1,
+      bins: [{ batch_id: b1, location_id: loc, quantity: 3 }],
+    }, db);
+
+    // One invoice, two lines of the same item, one reservation each.
+    const create = await request(app)
+      .post('/api/invoices')
+      .set('Cookie', cookie)
+      .set('Idempotency-Key', nextIdemKey('s1r-two-lines'))
+      .send({
+        customer_id: customerId,
+        invoice_date: AS_OF,
+        warehouse_id: warehouseA,
+        items: [
+          { item_id: item, quantity: 3, unit_price: 50, tax_rate: 0, reservation_id: r1.id },
+          { item_id: item, quantity: 3, unit_price: 50, tax_rate: 0, reservation_id: r2.id },
+        ],
+      });
+    expect(create.status).toBe(201);
+    const invoice = lastInvoiceId();
+    expect(reservationRow(r1.id)).toEqual({ status: 'CONSUMED', quantity_reserved: 0 });
+    expect(reservationRow(r2.id)).toEqual({ status: 'CONSUMED', quantity_reserved: 0 });
+
+    // Edit the same two lines. Both reopens fire, so both are ACTIVE again and
+    // each must be taken by its OWN line, once.
+    const res = await request(app)
+      .put(`/api/invoices/${invoice}`)
+      .set('Cookie', cookie)
+      .send({
+        customer_id: customerId,
+        invoice_date: AS_OF,
+        warehouse_id: warehouseA,
+        items: [
+          { item_id: item, quantity: 3, unit_price: 50, tax_rate: 0 },
+          { item_id: item, quantity: 3, unit_price: 50, tax_rate: 0 },
+        ],
+      });
+    expect(res.status).toBe(200);
+
+    const linked = db.prepare('SELECT reservation_id FROM invoice_items WHERE invoice_id = ? ORDER BY id')
+      .all(invoice) as Array<{ reservation_id: number | null }>;
+    expect(linked.length).toBe(2);
+    expect(linked.map((l) => l.reservation_id).sort()).toEqual([r1.id, r2.id].sort());
+
+    // Each reservation consumed exactly once, neither left ACTIVE on top.
+    expect(reservationRow(r1.id)).toEqual({ status: 'CONSUMED', quantity_reserved: 0 });
+    expect(reservationRow(r2.id)).toEqual({ status: 'CONSUMED', quantity_reserved: 0 });
+    expect(binRow(b1, loc)).toEqual({ physical: 4, reserved: 0, available: 4 });
+    expectHeaderMatchesChildren(r1.id);
+    expectHeaderMatchesChildren(r2.id);
+  });
+});
+
+// ── 18. NEW-3: a return restocks the bin the stock was sold from ──
+
+/**
+ * GLM round 2 (NEW-3): the return path built its reversal items without line
+ * ids or ledger draws, so reverseStockForItems fell back to the warehouse
+ * DEFAULT. Stock sold from a rack came back to DEFAULT: the rack stayed empty
+ * and a bin that never held the goods gained them.
+ */
+describe('Finding 18: a return restocks the sold bin', () => {
+  it('returns rack stock to the rack, leaving DEFAULT untouched', async () => {
+    setFeatureEnabled(db, FLAG, true);
+    const item = await createItem(`S1R return-rack ${Date.now()}`, cookie);
+    await purchaseStock(item, warehouseA, 10, 40, cookie, '2026-10-01');
+    const [b1] = batchIdsOf(item, warehouseA);
+    const rack = rackLocation(warehouseA, `R-RET-${Date.now()}`);
+    moveToRack(b1, warehouseA, rack, 10);
+    const def = defaultLocation(warehouseA);
+
+    const reservation = StockReservationModel.create({
+      item_id: item, warehouse_id: warehouseA, quantity_reserved: 4,
+      reference_doctype: 'SALES_ORDER', reference_docno: seedSalesOrder('Confirmed'), reference_line_id: 1,
+      bins: [{ batch_id: b1, location_id: rack, quantity: 4 }],
+    }, db);
+
+    expect(await sell(item, 4, 'rt-1', reservation.id)).toBe(201);
+    const invoice = lastInvoiceId();
+    expect(binRow(b1, rack)).toEqual({ physical: 6, reserved: 0, available: 6 });
+
+    const lineId = (db.prepare('SELECT id FROM invoice_items WHERE invoice_id = ? ORDER BY id')
+      .get(invoice) as { id: number }).id;
+    const res = await request(app)
+      .post(`/api/invoices/${invoice}/return`)
+      .set('Cookie', cookie)
+      .set('Idempotency-Key', nextIdemKey('s1r-return'))
+      .send({ items: [{ invoice_item_id: lineId, return_quantity: 2 }], reason: 'S1R return to rack' });
+    expect(res.status).toBe(200);
+
+    // The 2 returned units go back to the rack they were sold from.
+    expect(binRow(b1, rack)).toEqual({ physical: 8, reserved: 0, available: 8 });
+    expect(binRow(b1, def)).toEqual({ physical: 0, reserved: 0, available: 0 });
+  });
+});
+
+// ── 19. NEW-2 (characterization only, behaviour NOT changed) ──
+
+/**
+ * GLM round 2 (NEW-2): changing a reserved invoice line to a DIFFERENT item
+ * leaves the old reservation ACTIVE and unlinked. This test documents the
+ * CURRENT behaviour so the decision Gull makes is recorded against a fact, not
+ * against an assumption. It asserts today's outcome deliberately - when Gull
+ * picks an option in audit/DECISIONS.md, flip these assertions.
+ */
+describe('Finding 19: item change on a reserved line (current behaviour)', () => {
+  it('leaves the old reservation ACTIVE when the line changes item', async () => {
+    setFeatureEnabled(db, FLAG, true);
+    const itemA = await createItem(`S1R switch-a ${Date.now()}`, cookie);
+    const itemB = await createItem(`S1R switch-b ${Date.now()}`, cookie);
+    await purchaseStock(itemA, warehouseA, 5, 40, cookie, '2026-10-01');
+    await purchaseStock(itemB, warehouseA, 5, 45, cookie, '2026-10-01');
+    const [bA] = batchIdsOf(itemA, warehouseA);
+    const loc = defaultLocation(warehouseA);
+
+    const reservation = StockReservationModel.create({
+      item_id: itemA, warehouse_id: warehouseA, quantity_reserved: 3,
+      reference_doctype: 'SALES_ORDER', reference_docno: seedSalesOrder('Confirmed'), reference_line_id: 1,
+      bins: [{ batch_id: bA, location_id: loc, quantity: 3 }],
+    }, db);
+
+    expect(await sell(itemA, 3, 'sw-1', reservation.id)).toBe(201);
+    const invoice = lastInvoiceId();
+    expect(reservationRow(reservation.id)).toEqual({ status: 'CONSUMED', quantity_reserved: 0 });
+
+    // Edit the line to a DIFFERENT item.
+    const res = await request(app)
+      .put(`/api/invoices/${invoice}`)
+      .set('Cookie', cookie)
+      .send({
+        customer_id: customerId,
+        invoice_date: AS_OF,
+        warehouse_id: warehouseA,
+        items: [{ item_id: itemB, quantity: 3, unit_price: 50, tax_rate: 0 }],
+      });
+    expect(res.status).toBe(200);
+
+    // CURRENT behaviour, measured: the reopen returned item A's 3 units to its
+    // bin (physical back to 5) AND made the reservation ACTIVE again holding
+    // those same 3 units, while 3 units of item B were sold separately. So the
+    // hold is only a leak - available 2 while nothing is owed on it - and the
+    // batch itself is whole (quantity_remaining 5). Header and child rows agree
+    // (3/3), so this is NOT header-vs-child corruption; it is a stranded hold.
+    expect(reservationRow(reservation.id)).toEqual({ status: 'ACTIVE', quantity_reserved: 3 });
+    expect(binRow(bA, loc)).toEqual({ physical: 5, reserved: 3, available: 2 });
+    const linked = db.prepare('SELECT reservation_id FROM invoice_items WHERE invoice_id = ? ORDER BY id')
+      .all(invoice) as Array<{ reservation_id: number | null }>;
+    expect(linked.map((l) => l.reservation_id)).toEqual([null]);
+
+    // Item B's own sale is unaffected - the two items never mix.
+    const [bB] = batchIdsOf(itemB, warehouseA);
+    expect(binRow(bB, loc)).toEqual({ physical: 2, reserved: 0, available: 2 });
   });
 });

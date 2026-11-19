@@ -393,17 +393,29 @@ export class InvoiceReturnService {
       // Reverse stock — restocked into the chosen warehouse. The movement
       // ids are attributed to the returned lines so a later void can post
       // the exact equal-and-opposite movement.
+      //
+      // NEW-3: carry the invoice line id and its recorded bin draws, so stock
+      // sold from a rack comes back to that rack. Without them the reversal
+      // fell back to the warehouse DEFAULT: the rack stayed empty and a bin
+      // that never held the goods gained them.
+      const returnLines = lines.map((l) => ({
+        id: l.invoice_item_id,
+        item_id: l.item_id,
+        quantity: l.returnedQuantity,
+        unit_price: roundCurrency(l.returnedGross / l.returnedQuantity),
+      }));
+      const returnDraws = InvoiceModel.readLineBinDraws(
+        db,
+        lines.map((l) => ({ id: l.invoice_item_id })),
+      );
       const movements = InvoiceModel.reverseStockForItems(
         db,
-        lines.map((l) => ({
-          item_id: l.item_id,
-          quantity: l.returnedQuantity,
-          unit_price: roundCurrency(l.returnedGross / l.returnedQuantity),
-        })),
+        returnLines,
         fresh.invoice_no,
         input.userId,
         'RETURN',
         warehouseId ?? undefined,
+        returnDraws,
       );
       movements.forEach((m) => {
         const idx = lines.findIndex((l) => l.item_id === m.item_id);

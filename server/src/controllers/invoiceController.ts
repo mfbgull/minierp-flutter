@@ -702,14 +702,21 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
         // === FIX #4: Reverse old stock before inserting new items ===
         const oldItems = InvoiceModel.getInvoiceItemsForStockReverse(db, invoiceId);
         const oldDraws = InvoiceModel.readLineBinDraws(db, oldItems);
-        // MEDIUM-1: remember which reservation backed each old line BEFORE the
-        // rows are deleted, so the re-created lines can relink to it. Keyed by
-        // item, because an edited line carries no line id.
-        const reservationByItem = new Map<number, StockReservation>();
+        // MEDIUM-1 / NEW-1: remember which reservation backed each old line
+        // BEFORE the rows are deleted, so the re-created lines can relink to
+        // it. A map keyed by item_id is NOT enough: one invoice may carry two
+        // lines of the same item on DIFFERENT reservations, and the second
+        // write would overwrite the first, leaving one reservation orphaned
+        // and the other drained twice. Queue per item and hand them out in
+        // line order instead, so each re-created line takes its own.
+        const reservationsByItem = new Map<number, StockReservation[]>();
         for (const old of oldItems) {
             if (!old.reservation_id) continue;
             const reservation = StockReservationModel.getById(old.reservation_id, db);
-            if (reservation) reservationByItem.set(old.item_id, reservation);
+            if (!reservation) continue;
+            const queue = reservationsByItem.get(old.item_id) ?? [];
+            queue.push(reservation);
+            reservationsByItem.set(old.item_id, queue);
         }
 
         InvoiceModel.reverseStockForItems(db, oldItems, originalInvoice.invoice_no, userId, 'INVOICE_UPDATE', undefined, oldDraws);
@@ -725,7 +732,8 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
         const updatedCogsTotal = consumeInvoiceItemsAndPostCogs(
             db, invoiceId, items, invoice_date, resolvedInvoiceNo, userId,
             (item) => {
-                const captured = reservationByItem.get(item.item_id);
+                const queue = reservationsByItem.get(item.item_id);
+                const captured = queue?.shift();
                 if (!captured) return undefined;
                 // Re-read: the reopen above changed the status, and only a
                 // reservation it made ACTIVE can be taken again - a closed

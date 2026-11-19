@@ -908,7 +908,7 @@ class InvoiceModel {
       const warehouseId = saleMovements[0].warehouse_id;
       // Replay the bins this line actually sold from, in ledger order, so a
       // rack sale comes back to its own rack.
-      const lineDraws = this.readLineBinDraws(db, [{ id: item.id, reservation_id: item.reservation_id }]);
+      const lineDraws = this.readLineBinDraws(db, [{ id: item.id }]);
       const itemDraws = lineDraws.get(item.id) ?? [];
       let drawCursor = 0;
       for (const sale of saleMovements) {
@@ -1188,13 +1188,16 @@ class InvoiceModel {
    */
   static readLineBinDraws(
     db: Database.Database,
-    lines: Array<{ id: number; reservation_id?: number | null }>,
+    lines: Array<{ id: number }>,
   ): Map<number, Array<{ batch_id: number; location_id: number; quantity: number }>> {
     const draws = new Map<number, Array<{ batch_id: number; location_id: number; quantity: number }>>();
     const stmt = db.prepare(
       'SELECT batch_id, location_id, quantity FROM invoice_item_bin_consumption WHERE invoice_item_id = ? ORDER BY id');
     for (const line of lines) {
-      if (!line.reservation_id) continue;
+      // No reservation_id filter: this is a pure read of where the line's
+      // units came from, and every reversal needs it (the return path has no
+      // reservation). Callers that act on a reservation check that field
+      // themselves - see reopenReservationsForLines.
       const draw = stmt.all(line.id) as Array<{ batch_id: number; location_id: number; quantity: number }>;
       if (draw.length > 0) draws.set(line.id, draw);
     }
@@ -1239,7 +1242,7 @@ class InvoiceModel {
   }
 
   static getInvoiceItemsForStockReverse(db: Database.Database, invoiceId: number): Array<{ id: number; item_id: number; quantity: number; unit_price: number; reservation_id?: number | null }> {
-    return db.prepare(`SELECT id, item_id, quantity, unit_price, reservation_id FROM invoice_items WHERE invoice_id = ?`).all(invoiceId) as Array<{ id: number; item_id: number; quantity: number; unit_price: number; reservation_id?: number | null }>;
+    return db.prepare(`SELECT id, item_id, quantity, unit_price, reservation_id FROM invoice_items WHERE invoice_id = ? ORDER BY id`).all(invoiceId) as Array<{ id: number; item_id: number; quantity: number; unit_price: number; reservation_id?: number | null }>;
   }
 
   /**
