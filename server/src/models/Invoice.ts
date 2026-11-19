@@ -103,6 +103,11 @@ export interface InvoiceItem {
   returned_qty: number;
   expiry_date?: string | null;
   is_expired_at_sale?: boolean;
+  /** S-1: the active reservation this line fulfils, or null/absent when the
+   * sale held none. The list route returns it so a grid-loaded edit can resend
+   * each line's own reservation identity — the same field the detail route
+   * (`getItems`) already exposes (NEW-4). */
+  reservation_id?: number | null;
 }
 
 interface CreateInvoiceDTO {
@@ -142,8 +147,11 @@ export interface CreateInvoiceItemDTO {
   discount_value?: number;
   /** Loose amount-driven lines: entered bill amount as the gross base. */
   amount?: number;
-  /** S-1: the ACTIVE reservation this line fulfils (persisted for audit). */
-  reservation_id?: number;
+  /** S-1: the ACTIVE reservation this line fulfils (persisted for audit).
+   * `null` is accepted as "no reservation" so a read invoice (whose items
+   * expose `reservation_id: number | null`) can round-trip straight into an
+   * edit payload. */
+  reservation_id?: number | null;
 }
 
 export interface InvoiceFilters {
@@ -460,6 +468,7 @@ class InvoiceModel {
           ii.id, ii.invoice_id, ii.item_id, ii.quantity, ii.returned_qty, ii.unit_price, ii.amount,
           ii.tax_rate, ii.discount_type, ii.discount_value,
           ii.expiry_date, ii.is_expired_at_sale,
+          ii.reservation_id,
           i.item_code, i.item_name
         FROM invoice_items ii
         LEFT JOIN items i ON ii.item_id = i.id

@@ -2230,3 +2230,94 @@ describe('Finding 27: release/reopen pairs by reservation id, not position', () 
     }).toEqual(before);
   });
 });
+
+// ── 28. S-1 list edit contract: the LIST route exposes each line reservation ──
+
+/**
+ * Client-contract fix (Gull, after PR #41 / PR #42 review). The DETAIL route
+ * (Finding 24) returns `reservation_id` on each line, but the LIST route
+ * (`GET /api/invoices` -> InvoiceModel.getAll) did not. The sales grid loads its
+ * rows from the LIST, so an edit started from the grid had no per-line
+ * reservation identity and could not resend it. This test drives the real
+ * route with two SAME-item reserved lines plus one unreserved line and asserts
+ * each returned item carries its OWN reservation_id - proving identity, not
+ * position.
+ */
+describe('Finding 28: GET /api/invoices list exposes each line reservation', () => {
+  it('returns the right reservation_id per line and matches the detail route', async () => {
+    setFeatureEnabled(db, FLAG, true);
+    const item = await createItem(`S1R list ${Date.now()}`, cookie);
+    await purchaseStock(item, warehouseA, 10, 40, cookie, AS_OF);
+    const [b1] = batchIdsOf(item, warehouseA);
+    const loc = defaultLocation(warehouseA);
+
+    // Same item, different reservation, different quantity: a positional or
+    // item-based guess could not tell these two lines apart.
+    const r1 = StockReservationModel.create({
+      item_id: item, warehouse_id: warehouseA, quantity_reserved: 2,
+      reference_doctype: 'SALES_ORDER', reference_docno: seedSalesOrder('Confirmed'), reference_line_id: 1,
+      bins: [{ batch_id: b1, location_id: loc, quantity: 2 }],
+    }, db);
+    const r2 = StockReservationModel.create({
+      item_id: item, warehouse_id: warehouseA, quantity_reserved: 3,
+      reference_doctype: 'SALES_ORDER', reference_docno: seedSalesOrder('Confirmed'), reference_line_id: 1,
+      bins: [{ batch_id: b1, location_id: loc, quantity: 3 }],
+    }, db);
+
+    const create = await request(app)
+      .post('/api/invoices')
+      .set('Cookie', cookie)
+      .set('Idempotency-Key', nextIdemKey('s1r-list'))
+      .send({
+        customer_id: customerId,
+        invoice_date: AS_OF,
+        warehouse_id: warehouseA,
+        items: [
+          { item_id: item, quantity: 2, unit_price: 50, tax_rate: 0, reservation_id: r1.id },
+          { item_id: item, quantity: 3, unit_price: 50, tax_rate: 0, reservation_id: r2.id },
+          { item_id: item, quantity: 1, unit_price: 50, tax_rate: 0 },
+        ],
+      });
+    expect(create.status).toBe(201);
+    const invoice = lastInvoiceId();
+
+    // Drive the REAL list route. The grid needs a page this invoice is on.
+    const list = await request(app)
+      .get('/api/invoices')
+      .query({ customer_id: customerId, limit: 100 })
+      .set('Cookie', cookie);
+    expect(list.status).toBe(200);
+
+    const row = (list.body.data as Array<{ id: number; items: Array<{ quantity: number; reservation_id: number | null }> }>)
+      .find((r) => r.id === invoice);
+    expect(row).toBeDefined();
+    const items = row!.items;
+    expect(items).toHaveLength(3);
+
+    // Each list line carries its own link, matched by quantity so the
+    // assertion proves identity rather than position. The third line was never
+    // reserved and must stay null - a legacy/unreserved line is not an error.
+    const byQty = items
+      .map((i) => ({ quantity: i.quantity, reservation_id: i.reservation_id }))
+      .sort((a, b) => a.quantity - b.quantity);
+    expect(byQty).toEqual([
+      { quantity: 1, reservation_id: null },
+      { quantity: 2, reservation_id: r1.id },
+      { quantity: 3, reservation_id: r2.id },
+    ]);
+    // The field must be PRESENT, not merely undefined: an absent key and a null
+    // value are the same to some serializers but not to a client that checks
+    // `hasOwnProperty` before resending the identity on an edit.
+    for (const line of items) {
+      expect(Object.prototype.hasOwnProperty.call(line, 'reservation_id')).toBe(true);
+    }
+
+    // The list and detail responses are one contract for the same lines.
+    const detail = await request(app).get(`/api/invoices/${invoice}`).set('Cookie', cookie);
+    expect(detail.status).toBe(200);
+    const pair = (rows: Array<{ quantity: number; reservation_id: number | null }>) =>
+      rows.map((i) => ({ quantity: i.quantity, reservation_id: i.reservation_id }))
+        .sort((a, b) => a.quantity - b.quantity);
+    expect(pair(items)).toEqual(pair(detail.body.items as Array<{ quantity: number; reservation_id: number | null }>));
+  });
+});
