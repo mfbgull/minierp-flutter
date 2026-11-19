@@ -1337,6 +1337,14 @@ GLM flagged as HIGH. The collapse rule is enforced twice: once on line counts pe
 item, and once on the per-reservation budget. Any reservation quantity that no
 resulting line takes is released, so a resize cannot strand a hold.
 
+**Combined-branch follow-up (PR #41 + PR #42).** PR #42's form keeps the
+`reservation_id` on a line whose item changed, because the form has no other way
+to say the line still exists. The server therefore treats that resent link as
+VOID, not as a claim on the hold it just released: the link is not budgeted, and
+the edit does not fail. Without this, an ordinary item change from the real client
+returned 409 "reservation N holds 0 but the line requests X". Covered by Finding 29
+in `server/src/__tests__/reservationWorkflowRegressions.test.ts`.
+
 ---
 
 ## Verification correction — GLM server suite count at f3b4c5f6

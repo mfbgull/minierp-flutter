@@ -2321,3 +2321,112 @@ describe('Finding 28: GET /api/invoices list exposes each line reservation', () 
     expect(pair(items)).toEqual(pair(detail.body.items as Array<{ quantity: number; reservation_id: number | null }>));
   });
 });
+
+// ── 29. the PR #42 wire contract: a line keeps the link it must lose ──
+
+/**
+ * PR #42 (Flutter) makes the edit form resend BOTH the line `id` and its
+ * `reservation_id`, and its wire test pins that a line whose ITEM CHANGED still
+ * carries both. PR #41 (server) decides an item change RELEASES the old hold and
+ * the new line links to nothing (NEW-2 Option 1, audit/DECISIONS.md). Both rules
+ * are right. Together they must not fail.
+ *
+ * Finding 25 covers the rule but drives it with the LEGACY shape (no `id`, no
+ * `reservation_id`) - a shape PR #42's client no longer sends. With the link
+ * still attached the line names a hold this edit just released, so the budget
+ * reads 0 and the edit 409s with "reservation N holds 0 but the line requests
+ * X". A link on a line whose item changed is not a claim on that hold: it must
+ * not be budgeted, and it must not trip the unknown-reservation guard.
+ */
+describe('Finding 29: an item change survives the PR #42 wire shape', () => {
+  async function setup(tag: string) {
+    setFeatureEnabled(db, FLAG, true);
+    const itemA = await createItem(`S1R wire-a ${tag} ${Date.now()}`, cookie);
+    const itemB = await createItem(`S1R wire-b ${tag} ${Date.now()}`, cookie);
+    await purchaseStock(itemA, warehouseA, 5, 40, cookie, AS_OF);
+    await purchaseStock(itemB, warehouseA, 5, 45, cookie, AS_OF);
+    const [bA] = batchIdsOf(itemA, warehouseA);
+    const [bB] = batchIdsOf(itemB, warehouseA);
+    const loc = defaultLocation(warehouseA);
+    const reservation = StockReservationModel.create({
+      item_id: itemA, warehouse_id: warehouseA, quantity_reserved: 3,
+      reference_doctype: 'SALES_ORDER', reference_docno: seedSalesOrder('Confirmed'), reference_line_id: 1,
+      bins: [{ batch_id: bA, location_id: loc, quantity: 3 }],
+    }, db);
+    expect(await sell(itemA, 3, `wire-${tag}`, reservation.id)).toBe(201);
+    expect(reservationRow(reservation.id)).toEqual({ status: 'CONSUMED', quantity_reserved: 0 });
+    return { itemA, itemB, bA, bB, loc, reservation };
+  }
+
+  function editLine(invoice: number, line: Record<string, unknown>) {
+    return request(app).put(`/api/invoices/${invoice}`).set('Cookie', cookie)
+      .send({ customer_id: customerId, invoice_date: AS_OF, warehouse_id: warehouseA, items: [line] });
+  }
+
+  function linkedReservation(invoice: number): Array<number | null> {
+    return (db.prepare('SELECT reservation_id FROM invoice_items WHERE invoice_id = ? ORDER BY id')
+      .all(invoice) as Array<{ reservation_id: number | null }>).map((r) => r.reservation_id);
+  }
+
+  it('a) releases the old hold when the changed line resends its old reservation_id', async () => {
+    const { itemB, bA, bB, loc, reservation } = await setup('a');
+    const invoice = lastInvoiceId();
+
+    const res = await editLine(invoice, {
+      id: lineIdsOf(invoice)[0], item_id: itemB, quantity: 3, unit_price: 50, tax_rate: 0,
+      reservation_id: reservation.id,
+    });
+    expect(res.status).toBe(200);
+
+    // The hold is released and its bin is whole again.
+    expect(reservationRow(reservation.id)).toEqual({ status: 'RELEASED', quantity_reserved: 0 });
+    expect(binRow(bA, loc)).toEqual({ physical: 5, reserved: 0, available: 5 });
+    // The new line links to nothing - the released hold is not handed back.
+    expect(linkedReservation(invoice)).toEqual([null]);
+    // Gadget's own sale is accounted: 3 sold, 2 left, nothing held.
+    expect(binRow(bB, loc)).toEqual({ physical: 2, reserved: 0, available: 2 });
+  });
+
+  it('b) changing the line BACK ignores the released link instead of 409', async () => {
+    const { itemA, itemB, bA, bB, loc, reservation } = await setup('b');
+    const invoice = lastInvoiceId();
+
+    const first = await editLine(invoice, {
+      id: lineIdsOf(invoice)[0], item_id: itemB, quantity: 3, unit_price: 50, tax_rate: 0,
+      reservation_id: reservation.id,
+    });
+    expect(first.status).toBe(200);
+    expect(linkedReservation(invoice)).toEqual([null]);
+
+    // The line id is new after the edit; its item goes back to A and the client
+    // resends the reservation it loaded. That hold is RELEASED and no old line
+    // names it any more, so it must be ignored - not rejected as "does not
+    // belong to this invoice". Release is terminal, so nothing is relinked.
+    const second = await editLine(invoice, {
+      id: lineIdsOf(invoice)[0], item_id: itemA, quantity: 3, unit_price: 50, tax_rate: 0,
+      reservation_id: reservation.id,
+    });
+    expect(second.status).toBe(200);
+    expect(reservationRow(reservation.id)).toEqual({ status: 'RELEASED', quantity_reserved: 0 });
+    expect(linkedReservation(invoice)).toEqual([null]);
+    // Both goods are back to an ordinary unreserved sale: A 5 - 3, B untouched.
+    expect(binRow(bA, loc)).toEqual({ physical: 2, reserved: 0, available: 2 });
+    expect(binRow(bB, loc)).toEqual({ physical: 5, reserved: 0, available: 5 });
+  });
+
+  it('c) control: the SAME item keeps the link it resends', async () => {
+    const { itemA, bA, loc, reservation } = await setup('c');
+    const invoice = lastInvoiceId();
+
+    const res = await editLine(invoice, {
+      id: lineIdsOf(invoice)[0], item_id: itemA, quantity: 3, unit_price: 55, tax_rate: 0,
+      reservation_id: reservation.id,
+    });
+    expect(res.status).toBe(200);
+
+    // Item unchanged: this IS a claim, so the hold must survive the edit.
+    expect(reservationRow(reservation.id)).toEqual({ status: 'CONSUMED', quantity_reserved: 0 });
+    expect(linkedReservation(invoice)).toEqual([reservation.id]);
+    expect(binRow(bA, loc)).toEqual({ physical: 2, reserved: 0, available: 2 });
+  });
+});

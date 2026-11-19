@@ -837,6 +837,21 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
         // active. Runs after the stock reversal, in the same transaction.
         InvoiceModel.reopenReservationsForLines(db, linesToReopen, oldDraws);
 
+        // NEW-2 wire contract (PR #42): the edit form resends BOTH the line `id`
+        // and its `reservation_id`, and it KEEPS the old link on a line whose
+        // item changed - the client has no other way to say "this line still
+        // exists". The loop above already RELEASED that hold, so the resent link
+        // is void, not a claim on it. Only a line that still sells the
+        // reservation's item may budget that hold or be rejected for naming an
+        // unknown one. Without this, an ordinary item change sent by the real
+        // client 409s with "reservation N holds 0 but the line requests X".
+        const claimsReservation = (item: (typeof items)[number]): boolean => {
+          if (item.reservation_id == null) return false;
+          if (item.id == null) return true;
+          const old = oldById.get(item.id);
+          return old == null || old.item_id === item.item_id;
+        };
+
         // Line-count rule (audit/DECISIONS.md): one reservation may SPLIT across
         // several resulting lines, but one line must never consume two distinct
         // reservations. Count by durable reservation id, never by position - a
@@ -844,11 +859,12 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
         // appears on several lines.
         const wantedIds = new Map<number, number>();
         for (const item of items) {
-          if (item.reservation_id == null) continue;
-          wantedIds.set(item.reservation_id, (wantedIds.get(item.reservation_id) ?? 0) + 1);
+          if (!claimsReservation(item)) continue;
+          const reservationId = item.reservation_id as number;
+          wantedIds.set(reservationId, (wantedIds.get(reservationId) ?? 0) + 1);
         }
-        const unknown = items.find((item) => item.reservation_id != null
-          && !reservationById.has(item.reservation_id));
+        const unknown = items.find((item) => claimsReservation(item)
+          && !reservationById.has(item.reservation_id as number));
         if (unknown) {
           // The line names a reservation this invoice never held - it would have
           // to consume someone else's hold. Reject before any row changes.
@@ -916,16 +932,17 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
           if (row) budget.set(id, roundQty(Number(row.quantity_reserved)));
         }
         for (const item of items) {
-          if (item.reservation_id == null) continue;
-          const left = budget.get(item.reservation_id) ?? 0;
+          if (!claimsReservation(item)) continue;
+          const reservationId = item.reservation_id as number;
+          const left = budget.get(reservationId) ?? 0;
           const want = roundQty(Number(item.quantity));
           if (want > left) {
             // Two reservations collapsed into one line lands here: the line
             // names one reservation and asks for more than it holds.
             throw new BusinessRuleError(409,
-              `Cannot collapse reservations into one line: reservation ${item.reservation_id} holds ${left} but the line requests ${want}`);
+              `Cannot collapse reservations into one line: reservation ${reservationId} holds ${left} but the line requests ${want}`);
           }
-          budget.set(item.reservation_id, roundQty(left - want));
+          budget.set(reservationId, roundQty(left - want));
         }
 
         // Any reservation quantity no resulting line takes is stranded, so it is
