@@ -339,16 +339,9 @@ export class InvoiceCreationService {
       // S-1: fulfil the named reservation by exactly the sold quantity — a
       // partial sale leaves the remainder ACTIVE and reserved.
       if (reservation) {
-        // Record the exact per-bin draw of THIS line. A void restores these
-        // amounts and nothing else: with several invoices against one
-        // reservation, a quantity-only reopen cannot tell which bins this
-        // line took and would over-reserve (or 409 on a drained bin).
-        const ledger = this.db.prepare(
-          'INSERT INTO invoice_item_bin_consumption (invoice_item_id, batch_id, location_id, quantity) VALUES (?, ?, ?, ?)');
-        for (const entry of consumption) {
-          if (entry.batchId == null || entry.locationId == null) continue;
-          ledger.run(invoiceItemId, entry.batchId, entry.locationId, entry.consumed);
-        }
+        // S-1: record the exact per-bin draw of THIS line so a void restores
+        // only what this line took (see Invoice.recordLineBinDraw).
+        InvoiceModel.recordLineBinDraw(this.db, invoiceItemId, consumption);
         StockReservationModel.markConsumedPartial(this.db, reservation, item.quantity);
       }
       // BUG-013 R1/R2: damaged-bin and bin-under-coverage notes from the

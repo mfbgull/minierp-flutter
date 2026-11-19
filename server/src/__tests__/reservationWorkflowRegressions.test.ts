@@ -690,3 +690,56 @@ describe('Finding 8: released multi-bin reservation reactivation contract', () =
       .get(soNo) as { c: number }).c).toBe(1);
   });
 });
+
+// ── 9. Legacy fallback: a line with no ledger row still restores exactly ──
+
+describe('Finding 9: reopenForInvoiceLine restores stored allocations (legacy path)', () => {
+  it('restores each bin to its recorded allocation, not to an increment', async () => {
+    setFeatureEnabled(db, FLAG, true);
+    const item = await createItem(`S1R legacy-reopen ${Date.now()}`, cookie);
+    await purchaseStock(item, warehouseA, 5, 40, cookie, '2026-10-01');
+    await purchaseStock(item, warehouseA, 5, 42, cookie, '2026-10-05');
+    const [b1, b2] = batchIdsOf(item, warehouseA);
+    const loc = defaultLocation(warehouseA);
+
+    const reservation = StockReservationModel.create({
+      item_id: item, warehouse_id: warehouseA, quantity_reserved: 6,
+      reference_doctype: 'SALES_ORDER', reference_docno: seedSalesOrder('Confirmed'), reference_line_id: 1,
+      bins: [
+        { batch_id: b1, location_id: loc, quantity: 4 },
+        { batch_id: b2, location_id: loc, quantity: 2 },
+      ],
+    }, db);
+
+    // Drain the whole reservation, then call the legacy entry point directly -
+    // this is the branch a pre-131 invoice line takes on void.
+    expect(await sell(item, 6, 'lg-1', reservation.id)).toBe(201);
+    expect(reservationRow(reservation.id)).toEqual({ status: 'CONSUMED', quantity_reserved: 0 });
+
+    // The real void reverses the stock FIRST, then reopens the reserve.
+    db.prepare('UPDATE batch_stock_by_location SET quantity_physical = quantity_physical + ? WHERE batch_id = ? AND location_id = ?').run(4, b1, loc);
+    db.prepare('UPDATE batch_stock_by_location SET quantity_physical = quantity_physical + ? WHERE batch_id = ? AND location_id = ?').run(2, b2, loc);
+    StockReservationModel.reopenForInvoiceLine(db, reservation.id, 6);
+
+    expect(reservationRow(reservation.id)).toEqual({ status: 'ACTIVE', quantity_reserved: 6 });
+    expect(liveBinRows(reservation.id)).toEqual([
+      { batch_id: b1, location_id: loc, quantity_reserved: 4 },
+      { batch_id: b2, location_id: loc, quantity_reserved: 2 },
+    ]);
+    expectHeaderMatchesChildren(reservation.id);
+    expect(binRow(b1, loc)).toEqual({ physical: 5, reserved: 4, available: 1 });
+    expect(binRow(b2, loc)).toEqual({ physical: 5, reserved: 2, available: 3 });
+  });
+
+  it('does nothing for a non-positive quantity or an unknown reservation', () => {
+    StockReservationModel.reopenForInvoiceLine(db, 999999, 5);
+    const item = (db.prepare('SELECT id FROM items ORDER BY id DESC LIMIT 1').get() as { id: number }).id;
+    const r = StockReservationModel.create({
+      item_id: item, warehouse_id: warehouseA, quantity_reserved: 1,
+      reference_doctype: 'SALES_ORDER', reference_docno: seedSalesOrder('Confirmed'), reference_line_id: 1,
+      batch_id: batchIdsOf(item, warehouseA)[0], location_id: defaultLocation(warehouseA),
+    }, db);
+    StockReservationModel.reopenForInvoiceLine(db, r.id, 0);
+    expect(reservationRow(r.id)).toEqual({ status: 'ACTIVE', quantity_reserved: 1 });
+  });
+});

@@ -1075,6 +1075,24 @@ class InvoiceModel {
   /**
    * Get invoice items for stock reversal
    */
+  /**
+   * S-1: record which bins an invoice line drained, so a void can restore
+   * exactly those bins. Entries without a resolved bin are skipped - only the
+   * reservation path sets locationId, and it always has one.
+   */
+  static recordLineBinDraw(
+    db: Database.Database,
+    invoiceItemId: number,
+    draw: Array<{ batchId: number | null; locationId?: number; consumed: number }>,
+  ): void {
+    const ins = db.prepare(
+      'INSERT INTO invoice_item_bin_consumption (invoice_item_id, batch_id, location_id, quantity) VALUES (?, ?, ?, ?)');
+    for (const entry of draw) {
+      if (entry.batchId == null || entry.locationId == null) continue;
+      ins.run(invoiceItemId, entry.batchId, entry.locationId, entry.consumed);
+    }
+  }
+
   static getInvoiceItemsForStockReverse(db: Database.Database, invoiceId: number): Array<{ id: number; item_id: number; quantity: number; unit_price: number; reservation_id?: number | null }> {
     return db.prepare(`SELECT id, item_id, quantity, unit_price, reservation_id FROM invoice_items WHERE invoice_id = ?`).all(invoiceId) as Array<{ id: number; item_id: number; quantity: number; unit_price: number; reservation_id?: number | null }>;
   }

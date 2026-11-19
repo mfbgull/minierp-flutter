@@ -449,26 +449,22 @@ export class StockReservationModel {
     if (!existing) return;
     if (!this.sourceOrderIsActive(db, existing)) return;
 
-    if (existing.status === 'CONSUMED') return this.reopenConsumed(db, existing);
-    if (existing.status === 'ACTIVE') this.reopenPartial(db, existing, quantity);
-  }
-
-  /** Undo a full consume: put every stored bin back to its exact allocation. */
-  private static reopenConsumed(db: Database.Database, existing: StockReservation): void {
-    const bins = this.getAllBinRows(existing.id, db);
-    for (const bin of bins) {
-      const allocated = roundQty(Number(bin.quantity_allocated ?? bin.quantity_reserved));
-      if (allocated <= 0) continue;
-      this.reserveBins(db, existing, [{ batch_id: bin.batch_id, location_id: bin.location_id, quantity_reserved: allocated }], 1, false);
-      db.prepare('UPDATE stock_reservation_bins SET quantity_reserved = ? WHERE id = ?').run(allocated, bin.id!);
-    }
-    db.prepare(`UPDATE stock_reservations SET status = 'ACTIVE', consumed_at = NULL, quantity_reserved = ? WHERE id = ?`)
-      .run(roundQty(bins.reduce((s, b) => s + Number(b.quantity_allocated ?? b.quantity_reserved), 0)), existing.id);
+    // No ledger row (a line written before migration 131): the reservation's
+    // own stored allocations are the only record of which bins it held, so
+    // restore those rather than an increment of `quantity`.
+    const draw = this.getAllBinRows(existing.id, db)
+      .filter((b) => roundQty(Number(b.quantity_allocated ?? b.quantity_reserved)) > 0);
+    if (quantity <= 0) return;
+    this.restoreConsumedBins(db, reservationId, draw.map((b) => ({
+      batch_id: b.batch_id,
+      location_id: b.location_id,
+      quantity_reserved: roundQty(Number(b.quantity_allocated ?? b.quantity_reserved)),
+    })));
   }
 
   /**
    * S-1: restore the exact bins an invoice line drained, using the durable
-   * per-line ledger. Unlike `reopenPartial`, this names each bin explicitly,
+   * per-line ledger. It names each bin explicitly,
    * so voiding one of several invoices against a reservation restores only
    * that line's draw and never over-reserves a bin it did not take from.
    * The reservation goes back to ACTIVE and the parent is derived from the
@@ -501,39 +497,6 @@ export class StockReservationModel {
     const rows = this.getBins(reservationId, db);
     db.prepare(`UPDATE stock_reservations SET status = 'ACTIVE', consumed_at = NULL, quantity_reserved = ? WHERE id = ?`)
       .run(roundQty(rows.reduce((s, b) => s + Number(b.quantity_reserved), 0)), reservationId);
-  }
-
-  /**
-   * Undo a partial consume: restore every original allocation and derive the
-   * parent total from the rows actually restored (never `existing + quantity`,
-   * which desyncs the header whenever a row was missing or already drained).
-   */
-  private static reopenPartial(db: Database.Database, existing: StockReservation, quantity: number): void {
-    let left = roundQty(quantity);
-    for (const bin of this.getAllBinRows(existing.id, db)) {
-      if (left <= 0) break;
-      // Top the bin back up to its durable original allocation, not to an
-      // increment of whatever remainder survived the sale.
-      const allocated = roundQty(Number(bin.quantity_allocated ?? bin.quantity_reserved));
-      const add = roundQty(Math.min(left, allocated - Number(bin.quantity_reserved)));
-      if (add <= 0) continue;
-      this.reserveBins(db, existing, [{ ...bin, quantity_reserved: add }], 1, false);
-      db.prepare('UPDATE stock_reservation_bins SET quantity_reserved = ? WHERE id = ?')
-        .run(roundQty(Number(bin.quantity_reserved) + add), bin.id!);
-      left = roundQty(left - add);
-    }
-    // Legacy single-bin rows keep their allocation in the parent columns.
-    if (left > 0 && existing.batch_id && existing.location_id) {
-      this.reserveBins(db, existing, [{ batch_id: existing.batch_id, location_id: existing.location_id, quantity_reserved: left }], 1, false);
-    }
-    // Parent = what the child rows now hold, so the header↔child invariant
-    // holds even when a bin could not be restored.
-    const rows = this.getBins(existing.id, db);
-    const total = rows.length > 0
-      ? roundQty(rows.reduce((s, b) => s + Number(b.quantity_reserved), 0))
-      : roundQty(Number(existing.quantity_reserved) + (roundQty(quantity) - left));
-    db.prepare(`UPDATE stock_reservations SET quantity_reserved = ? WHERE id = ?`)
-      .run(total, existing.id);
   }
 
   /** Decision A: active = a sales order in Draft, Confirmed or Delivered. */
