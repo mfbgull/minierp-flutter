@@ -719,12 +719,31 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
         const reservationsByItem = new Map<number, StockReservation[]>();
         for (const old of oldItems) {
             if (!old.reservation_id) continue;
+            // A released reservation is never handed back to a new line.
             const reservation = StockReservationModel.getById(old.reservation_id, db);
-            if (!reservation) continue;
+            if (!reservation || reservation.status === 'RELEASED') continue;
             reservationById.set(reservation.id, reservation);
             const queue = reservationsByItem.get(old.item_id) ?? [];
             queue.push(reservation);
             reservationsByItem.set(old.item_id, queue);
+        }
+
+        // NEW-2 Option 1: a line whose item CHANGED no longer belongs to the
+        // reservation that backed it, so that reservation is RELEASED rather
+        // than reopened - reopening would hold the units on a sale that no
+        // longer contains the item (the stranded hold Finding 19 pins). Release
+        // is terminal: a later change back must reserve again.
+        // Decided per old line by matching the invoice's NEW item list in order,
+        // so a same-item edit still follows the normal reopen rule (Finding 25d).
+        const linesToReopen: typeof oldItems = [];
+        for (const [index, old] of oldItems.entries()) {
+          const next = items[index];
+          const changedItem = !!next && next.item_id !== old.item_id;
+          if (changedItem && old.reservation_id) {
+            StockReservationModel.releaseById(db, old.reservation_id);
+            continue;
+          }
+          linesToReopen.push(old);
         }
 
         InvoiceModel.reverseStockForItems(db, oldItems, originalInvoice.invoice_no, userId, 'INVOICE_UPDATE', undefined, oldDraws);
@@ -732,7 +751,7 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
         // S-1: an edit reverses the sale, so it follows the same reservation
         // rule as a cancel - reopen only when the source order is still
         // active. Runs after the stock reversal, in the same transaction.
-        InvoiceModel.reopenReservationsForLines(db, oldItems, oldDraws);
+        InvoiceModel.reopenReservationsForLines(db, linesToReopen, oldDraws);
 
         InvoiceModel.deleteInvoiceItems(db, invoiceId);
 

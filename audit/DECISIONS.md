@@ -1158,10 +1158,11 @@ check is a claim, and D23/D24 are the cost of writing one.
 
 ---
 
-## OPEN-DECISION — a reserved invoice line changed to a different item
+## DECIDED — a reserved invoice line changed to a different item
 
-**Status:** OPEN-DECISION. Waiting on Gull. Nothing is implemented and no path is
-changed. PR #41 stays draft at `2dd97a4b`.
+**Status:** DECIDED by Gull. Release the old reservation when an invoice edit
+changes the line to a different item. If the user changes the line back later,
+they must create or take a new reservation. PR #41 stays draft until reviewed.
 
 **The situation.** An invoice line sold item A against reservation A. The user
 edits the invoice and changes that line to item B. An edit reverses the line and
@@ -1213,16 +1214,31 @@ reuses `release`, which already has the accounting and bin logic and is covered
 by tests. It is also the smallest diff. Options 2 and 3 change user-visible
 behaviour or reintroduce positional guessing.
 
-**What I need from Gull.** Pick 1, 2 or 3, or say what should happen when a user
-changes a line back to the original item. On a decision I will write the
-red-first regression, implement it, and add the reason here.
+**Decision.** Gull approved Option 1: release the old reservation when the item
+changes. A later change back requires a new reservation; do not silently reuse
+the released reservation.
+
+**Implemented on PR #41.** `StockReservationModel.releaseById` is the release
+path: id-based, because the existing `release` looks up by reference
+doctype/docno and an edit knows the id; ungated, because the flag selects what is
+READ while a release is a write. It drains the allocation, deletes the child
+rows and sets `RELEASED` with `quantity_reserved = 0`, so release is terminal and
+a later reopen or restore has nothing to hand back. The edit releases the old
+reservation for a line whose `item_id` changed instead of reopening it, and the
+relink resolver now skips a `RELEASED` reservation, so the new line links to
+nothing and behaves as an ordinary unreserved sale. A same-item edit still
+follows the normal reopen rule. `Finding 25` covers the four cases (release,
+change-back, cancelled source order, same-item control); `Finding 19` was
+rewritten to read the same scenario the other way rather than deleted, so the
+stranded hold cannot return unnoticed.
 
 ---
 
-## OPEN-DECISION — partial return of a line sold from two bins
+## DECIDED — partial return of a line sold from two bins
 
-**Status:** OPEN-DECISION. Waiting on Gull. Behaviour is unchanged; `Finding 23`
-pins it. PR #41 stays draft.
+**Status:** DECIDED by Gull. Record exact per-bin draws for every new sale and
+return goods to those recorded bins. For historical sales with no bin record,
+ask the user to choose the return bin. PR #41 stays draft until reviewed.
 
 **Root cause (found, not guessed).** The per-bin ledger is written only for a
 reservation-backed line — `recordLineBinDraw` in `InvoiceCreationService.ts` sits
@@ -1264,16 +1280,18 @@ units into DEFAULT:
 2 is a heuristic dressed as a rule; option 4 is a known-wrong answer that only
 looks tidy.
 
-**What I need from Gull.** Pick an option for (a) a sale whose bins ARE now
-recorded and (b) a historical sale with no record. Do not expect option 1 alone
-to fix old invoices.
+**Decision.** Gull approved Option 1 for new sales and Option 3 for historical
+sales with no draw: persist exact bin consumption for every sale, replay it for
+returns, and require a user-selected bin when historical data has no location
+record. Do not infer missing historical allocations.
 
 ---
 
-## OPEN-DECISION — an edit that changes the number of lines
+## DECIDED — an edit that changes the number of lines
 
-**Status:** OPEN-DECISION. Waiting on Gull. Behaviour is unchanged; `Finding 22`
-pins all three cases.
+**Status:** DECIDED by Gull. Split one reservation across multiple edited lines.
+Reject an edit that collapses multiple reservations into one line with a clear
+409. PR #41 stays draft until reviewed.
 
 **(a) Two reserved lines collapsed into one.** Returns 400: `sellable stock 0,
 requested 4`. Both reservations reopen, but an edit can keep only one per line,
@@ -1299,5 +1317,20 @@ leaving a stranded hold behind is silent damage. Option 2 for (a), because one
 line cannot honestly consume two reservations and a 409 is clearer than a 400
 about "sellable stock". Both are cheap; neither blocks this PR.
 
-**What I need from Gull.** Confirm 1 + 2, or say that a resize should always be
-refused.
+**Decision.** Gull approved Option 1 for splits and Option 2 for collapses:
+divide one reservation across the resulting lines; return a clear 409 when a
+single resulting line would need to consume multiple reservations.
+
+---
+
+## Verification correction — GLM server suite count at f3b4c5f6
+
+GLM's first review report overstated neither the pass result nor a failing test,
+but its reported count of 294 suites / 2,380 tests was from a filtered Jest run.
+The command `npx jest src/__tests__` treated that path as a filter and omitted
+`src/services/__tests__/accountingCashLookup.test.ts` (1 suite, 18 tests).
+
+GLM reran the exact server CI command, `npm test`, at commit
+`f3b4c5f6a16880da363422c70f3aeda6b175014a`. It passed 295 suites / 2,398 tests,
+matching both CI runs on that commit. GLM corrected its report and confirmed the
+worktree remained clean with no code changes.

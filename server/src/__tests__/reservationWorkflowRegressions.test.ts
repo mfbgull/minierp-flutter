@@ -1381,8 +1381,8 @@ describe('Finding 18: a return restocks the sold bin', () => {
  * against an assumption. It asserts today's outcome deliberately - when Gull
  * picks an option in audit/DECISIONS.md, flip these assertions.
  */
-describe('Finding 19: item change on a reserved line (current behaviour)', () => {
-  it('leaves the old reservation ACTIVE when the line changes item', async () => {
+describe('Finding 19: item change on a reserved line (superseded by Finding 25)', () => {
+  it('now RELEASES the old reservation instead of leaving it ACTIVE', async () => {
     setFeatureEnabled(db, FLAG, true);
     const itemA = await createItem(`S1R switch-a ${Date.now()}`, cookie);
     const itemB = await createItem(`S1R switch-b ${Date.now()}`, cookie);
@@ -1401,7 +1401,6 @@ describe('Finding 19: item change on a reserved line (current behaviour)', () =>
     const invoice = lastInvoiceId();
     expect(reservationRow(reservation.id)).toEqual({ status: 'CONSUMED', quantity_reserved: 0 });
 
-    // Edit the line to a DIFFERENT item.
     const res = await request(app)
       .put(`/api/invoices/${invoice}`)
       .set('Cookie', cookie)
@@ -1413,14 +1412,12 @@ describe('Finding 19: item change on a reserved line (current behaviour)', () =>
       });
     expect(res.status).toBe(200);
 
-    // CURRENT behaviour, measured: the reopen returned item A's 3 units to its
-    // bin (physical back to 5) AND made the reservation ACTIVE again holding
-    // those same 3 units, while 3 units of item B were sold separately. So the
-    // hold is only a leak - available 2 while nothing is owed on it - and the
-    // batch itself is whole (quantity_remaining 5). Header and child rows agree
-    // (3/3), so this is NOT header-vs-child corruption; it is a stranded hold.
-    expect(reservationRow(reservation.id)).toEqual({ status: 'ACTIVE', quantity_reserved: 3 });
-    expect(binRow(bA, loc)).toEqual({ physical: 5, reserved: 3, available: 2 });
+    // This test pinned the OLD stranded hold (ACTIVE holding 3, bin 5/3/2,
+    // available 2 with nothing owed). Gull approved Option 1 in
+    // audit/DECISIONS.md, so the hold is now RELEASED and the bin is whole.
+    // Kept rather than deleted: it is the same scenario, read the other way.
+    expect(reservationRow(reservation.id)).toEqual({ status: 'RELEASED', quantity_reserved: 0 });
+    expect(binRow(bA, loc)).toEqual({ physical: 5, reserved: 0, available: 5 });
     const linked = db.prepare('SELECT reservation_id FROM invoice_items WHERE invoice_id = ? ORDER BY id')
       .all(invoice) as Array<{ reservation_id: number | null }>;
     expect(linked.map((l) => l.reservation_id)).toEqual([null]);
@@ -1812,5 +1809,107 @@ describe('Finding 24: GET /api/invoices/:id exposes each line reservation', () =
     const again = await request(app).get(`/api/invoices/${invoice}`).set('Cookie', cookie);
     expect((again.body.items as Array<{ id: number }>).map((i) => i.id))
       .toEqual((items as unknown as Array<{ id: number }>).map((i) => i.id));
+  });
+});
+
+// ── 25. NEW-2, Option 1: an item change RELEASES the old reservation ──
+
+/**
+ * Approved product rule (NEW-2, Option 1 in audit/DECISIONS.md): when an edit
+ * changes a reserved line to a DIFFERENT item, the old reservation is RELEASED,
+ * not reopened. Reopening it (the behaviour Finding 19 pins) left the units held
+ * on an invoice that no longer contains the item - a stranded hold. Changing the
+ * line back does NOT reuse the released reservation; the user must reserve again,
+ * because release is terminal.
+ */
+describe('Finding 25: changing a reserved line to another item releases it', () => {
+  async function setup(tag: string, orderStatus = 'Confirmed') {
+    setFeatureEnabled(db, FLAG, true);
+    const itemA = await createItem(`S1R rl-a ${tag} ${Date.now()}`, cookie);
+    const itemB = await createItem(`S1R rl-b ${tag} ${Date.now()}`, cookie);
+    await purchaseStock(itemA, warehouseA, 5, 40, cookie, AS_OF);
+    await purchaseStock(itemB, warehouseA, 5, 45, cookie, AS_OF);
+    const [bA] = batchIdsOf(itemA, warehouseA);
+    const [bB] = batchIdsOf(itemB, warehouseA);
+    const loc = defaultLocation(warehouseA);
+    const reservation = StockReservationModel.create({
+      item_id: itemA, warehouse_id: warehouseA, quantity_reserved: 3,
+      reference_doctype: 'SALES_ORDER', reference_docno: seedSalesOrder(orderStatus), reference_line_id: 1,
+      bins: [{ batch_id: bA, location_id: loc, quantity: 3 }],
+    }, db);
+    expect(await sell(itemA, 3, `rl-${tag}`, reservation.id)).toBe(201);
+    expect(reservationRow(reservation.id)).toEqual({ status: 'CONSUMED', quantity_reserved: 0 });
+    return { itemA, itemB, bA, bB, loc, reservation };
+  }
+
+  function editTo(invoice: number, itemId: number) {
+    return request(app).put(`/api/invoices/${invoice}`).set('Cookie', cookie)
+      .send({ customer_id: customerId, invoice_date: AS_OF, warehouse_id: warehouseA, items: [
+        { item_id: itemId, quantity: 3, unit_price: 50, tax_rate: 0 },
+      ] });
+  }
+
+  it('a) releases the old reservation and frees its bin', async () => {
+    const { itemB, bA, bB, loc, reservation } = await setup('a');
+    const invoice = lastInvoiceId();
+
+    expect((await editTo(invoice, itemB)).status).toBe(200);
+
+    // The old reservation is RELEASED and holds nothing.
+    expect(reservationRow(reservation.id)).toEqual({ status: 'RELEASED', quantity_reserved: 0 });
+    // Its bin is free again: the 3 units are back and not held.
+    expect(binRow(bA, loc)).toEqual({ physical: 5, reserved: 0, available: 5 });
+    expect(db.prepare('SELECT * FROM stock_reservation_bins WHERE reservation_id = ?').all(reservation.id)).toEqual([]);
+    // No invoice line points at it.
+    const linked = db.prepare('SELECT reservation_id FROM invoice_items WHERE invoice_id = ?').all(invoice) as Array<{ reservation_id: number | null }>;
+    expect(linked).toEqual([{ reservation_id: null }]);
+    // The NEW item is correctly accounted: 3 sold, 2 left, nothing held.
+    expect(binRow(bB, loc)).toEqual({ physical: 2, reserved: 0, available: 2 });
+  });
+
+  it('b) changing the line BACK does not reuse the released reservation', async () => {
+    const { itemA, itemB, loc, reservation } = await setup('b');
+    const invoice = lastInvoiceId();
+
+    expect((await editTo(invoice, itemB)).status).toBe(200);
+    expect(reservationRow(reservation.id)).toEqual({ status: 'RELEASED', quantity_reserved: 0 });
+
+    // Change back to item A. Release is terminal, so this must NOT resurrect it -
+    // the sale is unreserved and draws from free stock instead.
+    expect((await editTo(invoice, itemA)).status).toBe(200);
+    expect(reservationRow(reservation.id)).toEqual({ status: 'RELEASED', quantity_reserved: 0 });
+    const [bA] = batchIdsOf(itemA, warehouseA);
+    expect(binRow(bA, loc)).toEqual({ physical: 2, reserved: 0, available: 2 });
+    const linked = db.prepare('SELECT reservation_id FROM invoice_items WHERE invoice_id = ?').all(invoice) as Array<{ reservation_id: number | null }>;
+    expect(linked).toEqual([{ reservation_id: null }]);
+  });
+
+  it('c) a cancelled source order releases the hold instead of reopening it', async () => {
+    const { itemB, bA, loc, reservation } = await setup('c', 'Cancelled');
+    const invoice = lastInvoiceId();
+
+    expect((await editTo(invoice, itemB)).status).toBe(200);
+
+    // The cancelled-order rule already said "do not reopen". Releasing is the
+    // stronger form of the same answer: the hold must not survive at all.
+    expect(reservationRow(reservation.id)).toEqual({ status: 'RELEASED', quantity_reserved: 0 });
+    expect(binRow(bA, loc)).toEqual({ physical: 5, reserved: 0, available: 5 });
+  });
+
+  it('d) an unreleased line keeps its reservation (no accidental release)', async () => {
+    const { itemA, bA, loc, reservation } = await setup('d');
+    const invoice = lastInvoiceId();
+
+    // SAME item, same quantity: the reservation is unchanged, so it must stay
+    // CONSUMED and linked - a release here would silently unlink a good sale.
+    const res = await request(app).put(`/api/invoices/${invoice}`).set('Cookie', cookie)
+      .send({ customer_id: customerId, invoice_date: AS_OF, warehouse_id: warehouseA, items: [
+        { item_id: itemA, quantity: 3, unit_price: 55, tax_rate: 0, reservation_id: reservation.id },
+      ] });
+    expect(res.status).toBe(200);
+    expect(reservationRow(reservation.id)).toEqual({ status: 'CONSUMED', quantity_reserved: 0 });
+    expect(binRow(bA, loc)).toEqual({ physical: 2, reserved: 0, available: 2 });
+    const linked = db.prepare('SELECT reservation_id FROM invoice_items WHERE invoice_id = ?').all(invoice) as Array<{ reservation_id: number | null }>;
+    expect(linked).toEqual([{ reservation_id: reservation.id }]);
   });
 });

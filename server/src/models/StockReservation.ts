@@ -312,6 +312,38 @@ export class StockReservationModel {
    * gated by feature_batch_locations — only READS may depend on the flag, and
    * consuming an existing reservation is a WRITE that must work flag-off.
    */
+  /**
+   * NEW-2 Option 1: release a reservation BY ID, terminally.
+   *
+   * Used when an invoice edit changes a reserved line to a different item. The
+   * reservation belonged to the item that is no longer on the invoice, so
+   * reopening it (the cancel/delete rule) would leave the units held on a sale
+   * that does not contain them - a stranded hold. Release is the honest answer:
+   * the hold ends, and a later change back must reserve again.
+   *
+   * NOT gated by feature_batch_locations. The flag selects what is READ; a
+   * release is a write and must work in both flag states, like every other
+   * reservation write here.
+   */
+  static releaseById(db: Database.Database, reservationId: number): void {
+    const existing = this.getById(reservationId, db);
+    if (!existing) return;
+    // Already released is not an error - a second edit must stay idempotent.
+    if (existing.status === 'RELEASED') return;
+
+    this.drainAllocation(db, existing, Number(existing.quantity_reserved));
+    // Release is terminal: drop the allocations entirely, so a later reopen or
+    // restore has nothing to hand back and the bin cannot be double-freed.
+    db.prepare('DELETE FROM stock_reservation_bins WHERE reservation_id = ?').run(existing.id);
+    StockMovementModel.syncStockBalancesExtension(existing.item_id, existing.warehouse_id, db);
+
+    db.prepare(`
+      UPDATE stock_reservations
+      SET status = 'RELEASED', quantity_reserved = 0, released_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(existing.id);
+  }
+
   static getActiveById(id: number, db: Database.Database): StockReservation | undefined {
     return db.prepare(`
       SELECT * FROM stock_reservations WHERE id = ? AND status = 'ACTIVE'
