@@ -584,11 +584,13 @@ class InvoiceModel {
    */
   static reverseStockForItems(
     db: Database.Database,
-    items: Array<{ item_id: number; quantity: number; unit_price: number }>,
+    items: Array<{ id?: number; item_id: number; quantity: number; unit_price: number }>,
     invoiceNo: string,
     userId: number,
     referenceDoctype: string,
-    explicitWarehouseId?: number
+    explicitWarehouseId?: number,
+    /** S-1 HIGH-1: per-line bin draws, keyed by invoice_items.id. */
+    lineDraws?: Map<number, Array<{ batch_id: number; location_id: number; quantity: number }>>
   ): Array<{ item_id: number; movement_id: number; quantity: number; warehouse_id: number; unit_cost: number }> {
     const posted: Array<{ item_id: number; movement_id: number; quantity: number; warehouse_id: number; unit_cost: number }> = [];
     const reverseInvoiceItemStock = (item: typeof items[number]): void => {
@@ -657,9 +659,16 @@ class InvoiceModel {
             // behind whenever the flag was off, and a later flip showed the
             // sold units as still gone.
             const targetWarehouseId = explicitWarehouseId ?? movement.warehouse_id;
-            const locRow = db.prepare(`
-              SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
-            `).get(targetWarehouseId) as { id: number } | undefined;
+            // S-1 HIGH-1: a reservation-backed sale drained a NAMED bin. Put
+            // the physical units back on that exact bin, not the warehouse
+            // DEFAULT, or the stock reappears where it never was while the
+            // reservation restore re-reserves the original (now-empty) bin.
+            const ledgerBin = item.id != null ? lineDraws?.get(item.id)?.find((d) => d.batch_id === movement.batch_id) : undefined;
+            const locRow = ledgerBin
+              ? { id: ledgerBin.location_id }
+              : (db.prepare(`
+                  SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
+                `).get(targetWarehouseId) as { id: number } | undefined);
             if (locRow) {
               db.prepare(`
                 INSERT INTO batch_stock_by_location (batch_id, location_id, quantity_physical, quantity_reserved, quantity_available)
@@ -1216,8 +1225,19 @@ class InvoiceModel {
 
     // ---- 1. Stock reversal ----
     const items = InvoiceModel.getInvoiceItemsForStockReverse(db, invoice.id);
+    // HIGH-1: the physical reversal must land on the bin the sale drained,
+    // not on the warehouse's DEFAULT bin. The per-line ledger is the only
+    // record of that bin, so read it before the reservation restore deletes it.
+    const lineDraws = new Map<number, Array<{ batch_id: number; location_id: number; quantity: number }>>();
+    const drawStmt = db.prepare(
+      'SELECT batch_id, location_id, quantity FROM invoice_item_bin_consumption WHERE invoice_item_id = ? ORDER BY id');
+    for (const line of items) {
+      if (!line.reservation_id) continue;
+      const draw = drawStmt.all(line.id) as Array<{ batch_id: number; location_id: number; quantity: number }>;
+      if (draw.length > 0) lineDraws.set(line.id, draw);
+    }
     if (items.length > 0) {
-      InvoiceModel.reverseStockForItems(db, items, invoice.invoice_no, userId, 'INVOICE_CANCEL');
+      InvoiceModel.reverseStockForItems(db, items, invoice.invoice_no, userId, 'INVOICE_CANCEL', undefined, lineDraws);
     }
 
     // Decision A: a void reopens each line's consumed reservation, but only
@@ -1231,10 +1251,8 @@ class InvoiceModel {
         // line took, so it over-reserves when one reservation backed several
         // invoices. Falls back to the quantity reopen for historical lines
         // written before the ledger existed.
-        const draw = db.prepare(
-          'SELECT batch_id, location_id, quantity FROM invoice_item_bin_consumption WHERE invoice_item_id = ? ORDER BY id')
-          .all(line.id) as Array<{ batch_id: number; location_id: number; quantity: number }>;
-        if (draw.length > 0) {
+        const draw = lineDraws.get(line.id);
+        if (draw) {
           StockReservationModel.restoreConsumedBins(
             db, line.reservation_id, draw.map((d) => ({ batch_id: d.batch_id, location_id: d.location_id, quantity_reserved: roundQty(Number(d.quantity)) })));
           db.prepare('DELETE FROM invoice_item_bin_consumption WHERE invoice_item_id = ?').run(line.id);

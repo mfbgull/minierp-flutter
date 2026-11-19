@@ -743,3 +743,156 @@ describe('Finding 9: reopenForInvoiceLine restores stored allocations (legacy pa
     expect(reservationRow(r.id)).toEqual({ status: 'ACTIVE', quantity_reserved: 1 });
   });
 });
+
+// ── 10. A void from a NON-DEFAULT bin must restore that same bin ──
+
+/**
+ * GLM review of 90d57a3a (HIGH-1): reverseStockForItems restored the physical
+ * quantity into the warehouse's DEFAULT bin, while the reservation restore put
+ * the reserve back on the ORIGINAL bin. The stock either vanished from the bin
+ * that held it or the void 409'd because the original bin had no physical left
+ * to reserve. Both directions are covered here.
+ */
+describe('Finding 10: non-DEFAULT bin void keeps physical and reserved together', () => {
+  /** A second, non-DEFAULT location in the warehouse. */
+  function rackLocation(wh: number, code: string): number {
+    db.prepare('INSERT INTO locations (warehouse_id, location_code, location_name) VALUES (?, ?, ?)')
+      .run(wh, code, code);
+    return (db.prepare('SELECT id FROM locations WHERE warehouse_id = ? AND location_code = ?')
+      .get(wh, code) as { id: number }).id;
+  }
+
+  /** Move `qty` of a batch's physical stock out of DEFAULT into another bin. */
+  function moveToRack(batchId: number, wh: number, locId: number, qty: number): void {
+    const def = defaultLocation(wh);
+    db.prepare('UPDATE batch_stock_by_location SET quantity_physical = quantity_physical - ?, quantity_available = quantity_available - ? WHERE batch_id = ? AND location_id = ?')
+      .run(qty, qty, batchId, def);
+    db.prepare(`INSERT INTO batch_stock_by_location (batch_id, location_id, quantity_physical, quantity_reserved, quantity_available)
+                VALUES (?, ?, ?, 0, ?)`).run(batchId, locId, qty, qty);
+  }
+
+  it('restores physical stock to the original non-DEFAULT bin, not DEFAULT', async () => {
+    setFeatureEnabled(db, FLAG, true);
+    const item = await createItem(`S1R rack-void ${Date.now()}`, cookie);
+    await purchaseStock(item, warehouseA, 5, 40, cookie, '2026-10-01');
+    const [b1] = batchIdsOf(item, warehouseA);
+    const rack = rackLocation(warehouseA, `R-A-${Date.now()}`);
+    moveToRack(b1, warehouseA, rack, 5);
+
+    const reservation = StockReservationModel.create({
+      item_id: item, warehouse_id: warehouseA, quantity_reserved: 4,
+      reference_doctype: 'SALES_ORDER', reference_docno: seedSalesOrder('Confirmed'), reference_line_id: 1,
+      bins: [{ batch_id: b1, location_id: rack, quantity: 4 }],
+    }, db);
+
+    // Exact physical: the rack holds exactly the reserved 4.
+    expect(await sell(item, 4, 'rv-1', reservation.id)).toBe(201);
+    const invoice = lastInvoiceId();
+    expect(binRow(b1, rack)).toEqual({ physical: 1, reserved: 0, available: 1 });
+
+    expect(await cancelInvoice(invoice)).toBe(200);
+
+    // Physical returns to the rack, never to DEFAULT.
+    expect(binRow(b1, rack)).toEqual({ physical: 5, reserved: 4, available: 1 });
+    expect(binRow(b1, defaultLocation(warehouseA)).physical).toBe(0);
+    expect(reservationRow(reservation.id)).toEqual({ status: 'ACTIVE', quantity_reserved: 4 });
+    expectHeaderMatchesChildren(reservation.id);
+  });
+
+  it('restores to the original non-DEFAULT bin when it holds surplus', async () => {
+    setFeatureEnabled(db, FLAG, true);
+    const item = await createItem(`S1R rack-surplus ${Date.now()}`, cookie);
+    await purchaseStock(item, warehouseA, 10, 40, cookie, '2026-10-01');
+    const [b1] = batchIdsOf(item, warehouseA);
+    const rack = rackLocation(warehouseA, `R-B-${Date.now()}`);
+    moveToRack(b1, warehouseA, rack, 10);
+
+    const reservation = StockReservationModel.create({
+      item_id: item, warehouse_id: warehouseA, quantity_reserved: 4,
+      reference_doctype: 'SALES_ORDER', reference_docno: seedSalesOrder('Confirmed'), reference_line_id: 1,
+      bins: [{ batch_id: b1, location_id: rack, quantity: 4 }],
+    }, db);
+
+    expect(await sell(item, 4, 'rs-1', reservation.id)).toBe(201);
+    const invoice = lastInvoiceId();
+    expect(binRow(b1, rack)).toEqual({ physical: 6, reserved: 0, available: 6 });
+
+    expect(await cancelInvoice(invoice)).toBe(200);
+
+    expect(binRow(b1, rack)).toEqual({ physical: 10, reserved: 4, available: 6 });
+    expect(binRow(b1, defaultLocation(warehouseA)).physical).toBe(0);
+    expectHeaderMatchesChildren(reservation.id);
+  });
+});
+
+// ── 11. stock_balances mirror must track reservation writes ──
+
+/**
+ * GLM review of 90d57a3a (MEDIUM-1): stock_balances.quantity_reserved and
+ * quantity_available were never written by the reservation path, so a reader
+ * of that mirror saw 0 reserved no matter what the bins held. The mirror is
+ * now synchronized inside the same transaction as the bin writes.
+ */
+describe('Finding 11: stock_balances mirror tracks reservations', () => {
+  function balanceRow(itemId: number, wh: number): { reserved: number; available: number } {
+    const r = db.prepare(
+      'SELECT quantity_reserved AS reserved, quantity_available AS available FROM stock_balances WHERE item_id = ? AND warehouse_id = ?',
+    ).get(itemId, wh) as { reserved: number | null; available: number | null } | undefined;
+    return { reserved: Number(r?.reserved ?? 0), available: Number(r?.available ?? 0) };
+  }
+
+  it('tracks create, partial consume, release and void restore', async () => {
+    setFeatureEnabled(db, FLAG, true);
+    const item = await createItem(`S1R mirror ${Date.now()}`, cookie);
+    await purchaseStock(item, warehouseA, 5, 40, cookie, '2026-10-01');
+    await purchaseStock(item, warehouseA, 5, 42, cookie, '2026-10-05');
+    const [b1, b2] = batchIdsOf(item, warehouseA);
+    const loc = defaultLocation(warehouseA);
+    const soNo = seedSalesOrder('Confirmed');
+
+    const reservation = StockReservationModel.create({
+      item_id: item, warehouse_id: warehouseA, quantity_reserved: 6,
+      reference_doctype: 'SALES_ORDER', reference_docno: soNo, reference_line_id: 1,
+      bins: [
+        { batch_id: b1, location_id: loc, quantity: 4 },
+        { batch_id: b2, location_id: loc, quantity: 2 },
+      ],
+    }, db);
+    expect(balanceRow(item, warehouseA)).toEqual({ reserved: 6, available: 4 });
+
+    // Partial sale of 2 leaves 4 reserved.
+    // 10 bought, 2 sold -> physical 8; 4 still reserved -> available 4.
+    expect(await sell(item, 2, 'mb-1', reservation.id)).toBe(201);
+    expect(balanceRow(item, warehouseA)).toEqual({ reserved: 4, available: 4 });
+
+    // Void restores the 2.
+    expect(await cancelInvoice(lastInvoiceId())).toBe(200);
+    expect(balanceRow(item, warehouseA)).toEqual({ reserved: 6, available: 4 });
+
+    // Release clears the reserve.
+    StockReservationModel.release(
+      { reference_doctype: 'SALES_ORDER', reference_docno: soNo, reference_line_id: 1 }, db);
+    expect(balanceRow(item, warehouseA)).toEqual({ reserved: 0, available: 10 });
+  });
+
+  it('stays correct across a full consume and its void', async () => {
+    setFeatureEnabled(db, FLAG, true);
+    const item = await createItem(`S1R mirror2 ${Date.now()}`, cookie);
+    await purchaseStock(item, warehouseA, 6, 40, cookie, '2026-10-01');
+    const [b1] = batchIdsOf(item, warehouseA);
+    const loc = defaultLocation(warehouseA);
+
+    const reservation = StockReservationModel.create({
+      item_id: item, warehouse_id: warehouseA, quantity_reserved: 6,
+      reference_doctype: 'SALES_ORDER', reference_docno: seedSalesOrder('Confirmed'), reference_line_id: 1,
+      bins: [{ batch_id: b1, location_id: loc, quantity: 6 }],
+    }, db);
+    expect(balanceRow(item, warehouseA)).toEqual({ reserved: 6, available: 0 });
+
+    expect(await sell(item, 6, 'mf-1', reservation.id)).toBe(201);
+    expect(balanceRow(item, warehouseA)).toEqual({ reserved: 0, available: 0 });
+
+    expect(await cancelInvoice(lastInvoiceId())).toBe(200);
+    expect(balanceRow(item, warehouseA)).toEqual({ reserved: 6, available: 0 });
+  });
+});

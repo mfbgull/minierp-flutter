@@ -3,6 +3,7 @@ import logger from '../utils/logger';
 import { isFeatureEnabled } from '../utils/featureFlags';
 import { BusinessRuleError } from '../utils/businessRuleError';
 import { roundQty, qtyEpsilon } from '../utils/quantity';
+import StockMovementModel from './StockMovement';
 
 export interface StockReservation {
   id: number;
@@ -229,6 +230,12 @@ export class StockReservationModel {
       const insert = db.prepare(`INSERT INTO stock_reservation_bins (reservation_id, batch_id, location_id, quantity_reserved, quantity_allocated) VALUES (?, ?, ?, ?, ?)`);
       for (const bin of bins) insert.run(row.id, bin.batch_id, bin.location_id, bin.quantity_reserved, bin.quantity_reserved);
     }
+    // MEDIUM-1: every reservation bin write goes through here, so refresh the
+    // stock_balances mirror in the SAME transaction. Without this a reader of
+    // that mirror saw 0 reserved after create, or a stale value after a
+    // consume, release or void restore. The flag selects what is READ, never
+    // what is maintained, so this is ungated.
+    StockMovementModel.syncStockBalancesExtension(row.item_id, row.warehouse_id, db);
   }
 
   /**
