@@ -186,6 +186,17 @@ class LineRowData implements CalculableLine, FillableLine {
 
   bool get isLoose => saleType == SaleType.loose;
 
+  /// The ACTIVE reservation this line fulfils (`null` when none). Preserved
+  /// from the loaded invoice line and re-emitted on edit; see `_buildBody`.
+  int? get reservationId {
+    final v = _cell('reservation_id');
+    if (v == null || v == '') return null;
+    if (v is num) return v.toInt();
+    return int.tryParse('$v');
+  }
+
+  set reservationId(int? value) => _setCell('reservation_id', value);
+
   num _num(String field) {
     final v = _cell(field);
     if (v is num) return v;
