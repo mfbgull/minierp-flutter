@@ -1430,3 +1430,309 @@ describe('Finding 19: item change on a reserved line (current behaviour)', () =>
     expect(binRow(bB, loc)).toEqual({ physical: 2, reserved: 0, available: 2 });
   });
 });
+
+// ── 20. NEW-4: reordered same-item lines with unequal reservations ──
+
+/**
+ * GLM round 3 of 5c08286b: the per-item queue still paired reservations by
+ * ARRAY POSITION. Swapping two same-item lines whose reservations hold
+ * different quantities hands the larger line the smaller reservation, which
+ * overdraws it and returns 400. With equal quantities it does not fail at all -
+ * it silently links each line to the other's reservation. Neither is
+ * acceptable, so the match must use the reservation_id the client sends, or
+ * another durable line identity, never the position.
+ */
+describe('Finding 20: reordered same-item lines pair by reservation, not position', () => {
+  it('keeps each line on its own reservation when the order is swapped', async () => {
+    setFeatureEnabled(db, FLAG, true);
+    const item = await createItem(`S1R reorder ${Date.now()}`, cookie);
+    await purchaseStock(item, warehouseA, 10, 40, cookie, '2026-10-01');
+    const [b1] = batchIdsOf(item, warehouseA);
+    const loc = defaultLocation(warehouseA);
+
+    const small = StockReservationModel.create({
+      item_id: item, warehouse_id: warehouseA, quantity_reserved: 2,
+      reference_doctype: 'SALES_ORDER', reference_docno: seedSalesOrder('Confirmed'), reference_line_id: 1,
+      bins: [{ batch_id: b1, location_id: loc, quantity: 2 }],
+    }, db);
+    const large = StockReservationModel.create({
+      item_id: item, warehouse_id: warehouseA, quantity_reserved: 3,
+      reference_doctype: 'SALES_ORDER', reference_docno: seedSalesOrder('Confirmed'), reference_line_id: 1,
+      bins: [{ batch_id: b1, location_id: loc, quantity: 3 }],
+    }, db);
+
+    // Sold in ONE order: the 2-unit line first, then the 3-unit line.
+    const create = await request(app)
+      .post('/api/invoices')
+      .set('Cookie', cookie)
+      .set('Idempotency-Key', nextIdemKey('s1r-reorder'))
+      .send({
+        customer_id: customerId,
+        invoice_date: AS_OF,
+        warehouse_id: warehouseA,
+        items: [
+          { item_id: item, quantity: 2, unit_price: 50, tax_rate: 0, reservation_id: small.id },
+          { item_id: item, quantity: 3, unit_price: 50, tax_rate: 0, reservation_id: large.id },
+        ],
+      });
+    expect(create.status).toBe(201);
+    const invoice = lastInvoiceId();
+
+    // Edit with the SAME two lines in the OPPOSITE order, each still naming its
+    // own reservation. The client is explicit, so there is nothing to infer.
+    const res = await request(app)
+      .put(`/api/invoices/${invoice}`)
+      .set('Cookie', cookie)
+      .send({
+        customer_id: customerId,
+        invoice_date: AS_OF,
+        warehouse_id: warehouseA,
+        items: [
+          { item_id: item, quantity: 3, unit_price: 50, tax_rate: 0, reservation_id: large.id },
+          { item_id: item, quantity: 2, unit_price: 50, tax_rate: 0, reservation_id: small.id },
+        ],
+      });
+    expect(res.status).toBe(200);
+
+    // Each line still points at the reservation it names, in the new order.
+    const linked = db.prepare('SELECT quantity, reservation_id FROM invoice_items WHERE invoice_id = ? ORDER BY id')
+      .all(invoice) as Array<{ quantity: number; reservation_id: number | null }>;
+    expect(linked).toEqual([
+      { quantity: 3, reservation_id: large.id },
+      { quantity: 2, reservation_id: small.id },
+    ]);
+
+    expect(reservationRow(small.id)).toEqual({ status: 'CONSUMED', quantity_reserved: 0 });
+    expect(reservationRow(large.id)).toEqual({ status: 'CONSUMED', quantity_reserved: 0 });
+    expect(binRow(b1, loc)).toEqual({ physical: 5, reserved: 0, available: 5 });
+    expectHeaderMatchesChildren(small.id);
+    expectHeaderMatchesChildren(large.id);
+  });
+});
+
+describe('Finding 21: equal-quantity reorder must not swap the links', () => {
+  it('links each line to the reservation it names, not its neighbours\'', async () => {
+    setFeatureEnabled(db, FLAG, true);
+    const item = await createItem(`S1R equal ${Date.now()}`, cookie);
+    await purchaseStock(item, warehouseA, 10, 40, cookie, '2026-10-01');
+    const [b1] = batchIdsOf(item, warehouseA);
+    const loc = defaultLocation(warehouseA);
+
+    // Same quantity on both lines, so a positional swap CANNOT fail - it just
+    // silently links each line to the other's reservation. This is the case
+    // GLM warned about and the reason equality is not a safety net.
+    const r1 = StockReservationModel.create({
+      item_id: item, warehouse_id: warehouseA, quantity_reserved: 2,
+      reference_doctype: 'SALES_ORDER', reference_docno: seedSalesOrder('Confirmed'), reference_line_id: 1,
+      bins: [{ batch_id: b1, location_id: loc, quantity: 2 }],
+    }, db);
+    const r2 = StockReservationModel.create({
+      item_id: item, warehouse_id: warehouseA, quantity_reserved: 2,
+      reference_doctype: 'SALES_ORDER', reference_docno: seedSalesOrder('Confirmed'), reference_line_id: 1,
+      bins: [{ batch_id: b1, location_id: loc, quantity: 2 }],
+    }, db);
+
+    const create = await request(app)
+      .post('/api/invoices')
+      .set('Cookie', cookie)
+      .set('Idempotency-Key', nextIdemKey('s1r-equal'))
+      .send({
+        customer_id: customerId, invoice_date: AS_OF, warehouse_id: warehouseA,
+        items: [
+          { item_id: item, quantity: 2, unit_price: 50, tax_rate: 0, reservation_id: r1.id },
+          { item_id: item, quantity: 2, unit_price: 50, tax_rate: 0, reservation_id: r2.id },
+        ],
+      });
+    expect(create.status).toBe(201);
+    const invoice = lastInvoiceId();
+
+    // Swap the two lines. Both stay 2 units, so nothing can fail on quantity.
+    const res = await request(app)
+      .put(`/api/invoices/${invoice}`)
+      .set('Cookie', cookie)
+      .send({
+        customer_id: customerId, invoice_date: AS_OF, warehouse_id: warehouseA,
+        items: [
+          { item_id: item, quantity: 2, unit_price: 50, tax_rate: 0, reservation_id: r2.id },
+          { item_id: item, quantity: 2, unit_price: 50, tax_rate: 0, reservation_id: r1.id },
+        ],
+      });
+    expect(res.status).toBe(200);
+
+    const linked = db.prepare('SELECT reservation_id FROM invoice_items WHERE invoice_id = ? ORDER BY id')
+      .all(invoice) as Array<{ reservation_id: number | null }>;
+    expect(linked.map((l) => l.reservation_id)).toEqual([r2.id, r1.id]);
+    expect(reservationRow(r1.id)).toEqual({ status: 'CONSUMED', quantity_reserved: 0 });
+    expect(reservationRow(r2.id)).toEqual({ status: 'CONSUMED', quantity_reserved: 0 });
+    expect(binRow(b1, loc)).toEqual({ physical: 6, reserved: 0, available: 6 });
+  });
+});
+
+// ── 22. line-count change (investigation only, behaviour NOT changed) ──
+
+/**
+ * GLM round 3 asked for the line-count scenario reproduced concretely before
+ * any behaviour change. This test DRIVES the scenarios and prints the state; it
+ * asserts only what is currently true, so it documents the defects instead of
+ * fixing them. Fill in the expectations once Gull decides the semantics.
+ */
+describe('Finding 22: an edit changes the NUMBER of lines', () => {
+  async function setup(tag: string) {
+    setFeatureEnabled(db, FLAG, true);
+    const item = await createItem(`S1R count ${tag} ${Date.now()}`, cookie);
+    await purchaseStock(item, warehouseA, 10, 40, cookie, '2026-10-01');
+    const [b1] = batchIdsOf(item, warehouseA);
+    const loc = defaultLocation(warehouseA);
+    return { item, b1, loc };
+  }
+
+  it('a) two reserved lines collapsed into one line', async () => {
+    const { item, b1, loc } = await setup('a');
+    const r1 = StockReservationModel.create({
+      item_id: item, warehouse_id: warehouseA, quantity_reserved: 2,
+      reference_doctype: 'SALES_ORDER', reference_docno: seedSalesOrder('Confirmed'), reference_line_id: 1,
+      bins: [{ batch_id: b1, location_id: loc, quantity: 2 }],
+    }, db);
+    const r2 = StockReservationModel.create({
+      item_id: item, warehouse_id: warehouseA, quantity_reserved: 2,
+      reference_doctype: 'SALES_ORDER', reference_docno: seedSalesOrder('Confirmed'), reference_line_id: 1,
+      bins: [{ batch_id: b1, location_id: loc, quantity: 2 }],
+    }, db);
+    const create = await request(app).post('/api/invoices').set('Cookie', cookie)
+      .set('Idempotency-Key', nextIdemKey('s1r-count-a'))
+      .send({ customer_id: customerId, invoice_date: AS_OF, warehouse_id: warehouseA, items: [
+        { item_id: item, quantity: 2, unit_price: 50, tax_rate: 0, reservation_id: r1.id },
+        { item_id: item, quantity: 2, unit_price: 50, tax_rate: 0, reservation_id: r2.id },
+      ] });
+    expect(create.status).toBe(201);
+    const invoice = lastInvoiceId();
+
+    // Collapse both lines into ONE line of 4.
+    const res = await request(app).put(`/api/invoices/${invoice}`).set('Cookie', cookie)
+      .send({ customer_id: customerId, invoice_date: AS_OF, warehouse_id: warehouseA, items: [
+        { item_id: item, quantity: 4, unit_price: 50, tax_rate: 0 },
+      ] });
+    // MEASURED, not changed: collapsing two reserved lines into one fails with
+    // 400 "sellable stock 0, requested 4". Both reservations were reopened (the
+    // bins hold 6 physical with 0 reserved), but the survival of exactly ONE
+    // reservation forces the whole 4-unit line onto a reservation that holds 2,
+    // and a reservation-backed line never falls back to FIFO - so it asks for 4
+    // from a 2-unit reserve. Two reservations cannot serve one line.
+    expect(res.status).toBe(400);
+    // The whole edit is one transaction, so the failed edit rolls back
+    // completely: the invoice and both reservations stay exactly as sold.
+    const linkedA = db.prepare('SELECT reservation_id FROM invoice_items WHERE invoice_id = ? ORDER BY id')
+      .all(invoice) as Array<{ reservation_id: number | null }>;
+    expect(linkedA.map((l) => l.reservation_id)).toEqual([r1.id, r2.id]);
+    expect(reservationRow(r1.id)).toEqual({ status: 'CONSUMED', quantity_reserved: 0 });
+    expect(reservationRow(r2.id)).toEqual({ status: 'CONSUMED', quantity_reserved: 0 });
+    expect(binRow(b1, loc)).toEqual({ physical: 6, reserved: 0, available: 6 });
+  });
+
+  it('b) one reserved line split into two lines', async () => {
+    const { item, b1, loc } = await setup('b');
+    const r1 = StockReservationModel.create({
+      item_id: item, warehouse_id: warehouseA, quantity_reserved: 4,
+      reference_doctype: 'SALES_ORDER', reference_docno: seedSalesOrder('Confirmed'), reference_line_id: 1,
+      bins: [{ batch_id: b1, location_id: loc, quantity: 4 }],
+    }, db);
+    const create = await request(app).post('/api/invoices').set('Cookie', cookie)
+      .set('Idempotency-Key', nextIdemKey('s1r-count-b'))
+      .send({ customer_id: customerId, invoice_date: AS_OF, warehouse_id: warehouseA, items: [
+        { item_id: item, quantity: 4, unit_price: 50, tax_rate: 0, reservation_id: r1.id },
+      ] });
+    expect(create.status).toBe(201);
+    const invoice = lastInvoiceId();
+
+    // Split into two lines of 2, neither naming a reservation.
+    const res = await request(app).put(`/api/invoices/${invoice}`).set('Cookie', cookie)
+      .send({ customer_id: customerId, invoice_date: AS_OF, warehouse_id: warehouseA, items: [
+        { item_id: item, quantity: 2, unit_price: 50, tax_rate: 0 },
+        { item_id: item, quantity: 2, unit_price: 50, tax_rate: 0 },
+      ] });
+    // MEASURED, not changed: splitting one 4-unit reserved line into two 2-unit
+    // lines SUCCEEDS, but only the first new line takes the reservation. The
+    // second is left unlinked, and the reservation keeps 2 units reserved that
+    // nothing owes - the same stranded hold as NEW-2, reached by splitting.
+    expect(res.status).toBe(200);
+    expect(reservationRow(r1.id)).toEqual({ status: 'ACTIVE', quantity_reserved: 2 });
+    expect(binRow(b1, loc)).toEqual({ physical: 6, reserved: 2, available: 4 });
+    const splitLinked = db.prepare('SELECT reservation_id FROM invoice_items WHERE invoice_id = ? ORDER BY id')
+      .all(invoice) as Array<{ reservation_id: number | null }>;
+    expect(splitLinked.map((l) => l.reservation_id)).toEqual([r1.id, null]);
+  });
+
+  it('c) an unreserved line has no reservation to relink', async () => {
+    const { item, b1, loc } = await setup('c');
+    const create = await request(app).post('/api/invoices').set('Cookie', cookie)
+      .set('Idempotency-Key', nextIdemKey('s1r-count-c'))
+      .send({ customer_id: customerId, invoice_date: AS_OF, warehouse_id: warehouseA, items: [
+        { item_id: item, quantity: 3, unit_price: 50, tax_rate: 0 },
+      ] });
+    expect(create.status).toBe(201);
+    const invoice = lastInvoiceId();
+
+    const res = await request(app).put(`/api/invoices/${invoice}`).set('Cookie', cookie)
+      .send({ customer_id: customerId, invoice_date: AS_OF, warehouse_id: warehouseA, items: [
+        { item_id: item, quantity: 3, unit_price: 50, tax_rate: 0 },
+      ] });
+    // An unreserved line is the control: nothing to relink, and the reverse
+    // plus re-consume round-trips exactly.
+    expect(res.status).toBe(200);
+    expect(binRow(b1, loc)).toEqual({ physical: 7, reserved: 0, available: 7 });
+  });
+});
+
+// ── 23. partial return of a line sold from two bins (analysis only) ──
+
+/**
+ * GLM round 3 finding, unreproduced until now: a line sold from TWO bins returns
+ * a PARTIAL quantity, and the return is proportional, so it cannot say which bin
+ * the customer physically brought back. This test DRIVES that case and records
+ * the current split. The allocation rule is a product decision and is NOT
+ * changed here - the assertions document today's behaviour, and the options are
+ * written up for Gull.
+ */
+describe('Finding 23: partial return of one line sold from two bins', () => {
+  it('cannot be exact today: an unreserved sale records no per-bin draw', async () => {
+    setFeatureEnabled(db, FLAG, true);
+    const item = await createItem(`S1R two-bin ${Date.now()}`, cookie);
+    await purchaseStock(item, warehouseA, 10, 40, cookie, AS_OF);
+    const [b1] = batchIdsOf(item, warehouseA);
+    const rack = rackLocation(warehouseA, `S1R-TWOBIN-${Date.now()}`);
+    const dl = defaultLocation(warehouseA);
+
+    // ONE batch, 4 on the rack and 6 in DEFAULT.
+    moveToRack(b1, warehouseA, rack, 4);
+    const create = await request(app).post('/api/invoices').set('Cookie', cookie)
+      .set('Idempotency-Key', nextIdemKey('s1r-twobin'))
+      .send({ customer_id: customerId, invoice_date: AS_OF, warehouse_id: warehouseA, items: [
+        { item_id: item, quantity: 8, unit_price: 50, tax_rate: 0 },
+      ] });
+    expect(create.status).toBe(201);
+    const invoice = lastInvoiceId();
+    // The sale really did span both bins.
+    const rackLeft = binRow(b1, rack).physical;
+    const dlLeft = binRow(b1, dl).physical;
+    expect({ rackLeft, dlLeft }).toEqual({ rackLeft: 2, dlLeft: 0 });
+
+    // ROOT CAUSE, measured: the per-bin ledger is written ONLY for a
+    // reservation-backed line, so a plain FIFO sale has no record of which bin
+    // each unit came from. A partial return can therefore only be split by
+    // re-walking the batch's bins, never by replaying what actually happened.
+    const lineId = (db.prepare('SELECT id FROM invoice_items WHERE invoice_id = ?').get(invoice) as { id: number }).id;
+    const draws = db.prepare('SELECT * FROM invoice_item_bin_consumption WHERE invoice_item_id = ?').all(lineId);
+    expect(draws).toEqual([]);
+
+    // A partial return of 2 goes to ONE bin - whichever the walk reaches first -
+    // and DEFAULT gained the 2 even though the sale drew mostly from it. This is
+    // the behaviour under discussion; it is recorded, NOT endorsed and NOT
+    // changed, pending Gull's decision on allocation.
+    const ret = await request(app).post(`/api/invoices/${invoice}/return`).set('Cookie', cookie)
+      .set('Idempotency-Key', nextIdemKey('s1r-twobin-ret'))
+      .send({ items: [{ invoice_item_id: lineId, return_quantity: 2 }], reason: 'two-bin partial' });
+    expect(ret.status).toBe(200);
+    const returned = { dl: binRow(b1, dl).physical, rack: binRow(b1, rack).physical };
+    expect(returned).toEqual({ dl: 2, rack: 2 });
+  });
+});

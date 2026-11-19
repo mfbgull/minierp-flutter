@@ -702,18 +702,22 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
         // === FIX #4: Reverse old stock before inserting new items ===
         const oldItems = InvoiceModel.getInvoiceItemsForStockReverse(db, invoiceId);
         const oldDraws = InvoiceModel.readLineBinDraws(db, oldItems);
-        // MEDIUM-1 / NEW-1: remember which reservation backed each old line
-        // BEFORE the rows are deleted, so the re-created lines can relink to
-        // it. A map keyed by item_id is NOT enough: one invoice may carry two
-        // lines of the same item on DIFFERENT reservations, and the second
-        // write would overwrite the first, leaving one reservation orphaned
-        // and the other drained twice. Queue per item and hand them out in
-        // line order instead, so each re-created line takes its own.
+        // MEDIUM-1 / NEW-1 / NEW-4: remember which reservation backed each old
+        // line BEFORE the rows are deleted. A map keyed by item_id is NOT
+        // enough (NEW-1): one invoice may carry two lines of the same item on
+        // DIFFERENT reservations. A per-item QUEUE is also not enough (NEW-4):
+        // it pairs by ARRAY POSITION, so reordering two same-item lines hands
+        // the larger line the smaller reservation - a 400 when the quantities
+        // differ, and a silent wrong link when they match. Keep both: an index
+        // by reservation id for the explicit case, and the queue as a fallback
+        // for a client that does not resend the link.
+        const reservationById = new Map<number, StockReservation>();
         const reservationsByItem = new Map<number, StockReservation[]>();
         for (const old of oldItems) {
             if (!old.reservation_id) continue;
             const reservation = StockReservationModel.getById(old.reservation_id, db);
             if (!reservation) continue;
+            reservationById.set(reservation.id, reservation);
             const queue = reservationsByItem.get(old.item_id) ?? [];
             queue.push(reservation);
             reservationsByItem.set(old.item_id, queue);
@@ -729,12 +733,27 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
         InvoiceModel.deleteInvoiceItems(db, invoiceId);
 
         // Insert new invoice items and create new stock movements
+        const claimed = new Set<number>();
         const updatedCogsTotal = consumeInvoiceItemsAndPostCogs(
             db, invoiceId, items, invoice_date, resolvedInvoiceNo, userId,
             (item) => {
-                const queue = reservationsByItem.get(item.item_id);
-                const captured = queue?.shift();
+                // NEW-4: an explicit reservation_id from the client is the
+                // only durable identity here - never infer it from position.
+                // This line must also BE that reservation's item, or the edit
+                // is really an item change (see NEW-2 in audit/DECISIONS.md).
+                let captured: StockReservation | undefined;
+                if (item.reservation_id != null) {
+                    const named = reservationById.get(item.reservation_id);
+                    if (named && named.item_id === item.item_id && !claimed.has(named.id)) captured = named;
+                }
+                if (!captured) {
+                    // Fallback for a client that does not resend the link: take
+                    // the next unclaimed reservation for the item. Positional,
+                    // so it is only correct for the order the lines were sold in.
+                    captured = reservationsByItem.get(item.item_id)?.find((r) => !claimed.has(r.id));
+                }
                 if (!captured) return undefined;
+                claimed.add(captured.id);
                 // Re-read: the reopen above changed the status, and only a
                 // reservation it made ACTIVE can be taken again - a closed
                 // order stays unreserved by the rule.
