@@ -1311,7 +1311,7 @@ fixed on branch `mfbgull/reservation-bin-decisions`:
 recorded draws as `bin_consumption`. The Flutter return dialog asks for a bin on
 exactly those lines and sends it as `location_id`. The client learns the bins
 from `GET /api/inventory/locations?warehouse_id=`, the first location API in the
-product. Tests: `server/src/__tests__/invoiceReturnBinChoice.test.ts` (11),
+product. Tests: `server/src/__tests__/invoiceReturnBinChoice.test.ts` (13),
 `server/src/__tests__/locationsRoute.test.ts` (5), Finding 23 in
 `server/src/__tests__/reservationWorkflowRegressions.test.ts` rewritten to pin
 the fix, `test/features/sales/invoice_return_bin_choice_test.dart` (3).
