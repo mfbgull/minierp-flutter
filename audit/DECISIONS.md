@@ -1155,3 +1155,64 @@ zeroBalances 2 → 0, batchQty 35 → 35, locationQty 0 → 35.
 **Decision — record the status next to the artifact that proves it.** Each line
 above names the file or the command that produced it. A status without its
 check is a claim, and D23/D24 are the cost of writing one.
+
+---
+
+## OPEN-DECISION — a reserved invoice line changed to a different item
+
+**Status:** OPEN-DECISION. Waiting on Gull. Nothing is implemented and no path is
+changed. PR #41 stays draft at `2dd97a4b`.
+
+**The situation.** An invoice line sold item A against reservation A. The user
+edits the invoice and changes that line to item B. An edit reverses the line and
+re-creates it, so the reversal reopens reservation A (it returns item A's units
+to its bin and marks A ACTIVE again). The re-created line is item B, so nothing
+links to A and nothing takes it back. Reservation A stays ACTIVE with its
+quantity held, on an invoice that no longer contains item A.
+
+**What I measured, not assumed.** `Finding 19` in
+`server/src/__tests__/reservationWorkflowRegressions.test.ts` pins the current
+outcome. Setup: item A has 5, a 3-unit reservation, sold, then the line is
+edited to item B. Result:
+
+| Reading | Value | Meaning |
+|---|---|---|
+| reservation A status | ACTIVE, quantity 3 | the hold came back and stayed |
+| item A bin | physical 5, reserved 3, available 2 | 3 units held and never owed |
+| reservation A child rows | 3 reserved, 3 allocated | header and children agree |
+| item A `quantity_remaining` | 5 | the batch is whole |
+| invoice line `reservation_id` | NULL | the line no longer names A |
+| item B bin | physical 2, reserved 0 | B is unaffected |
+
+So this is a **stranded hold**, not corruption. The header and child rows agree,
+the batch is whole, and no stock is lost or double-counted. The cost is that 3
+units of item A are reserved forever and the quantity, reference and ledger row
+of reservation A outlive the sale. I first expected negative availability; the
+measurement showed otherwise, and the table records the real state.
+
+**Options.**
+
+1. **Release the old reservation when the line's item changes.** On edit, if a
+   line's reservation no longer matches the new item, release rather than
+   reopen it. Cheapest and safest: no stranded hold, and the "closed order stays
+   unreserved" rule is untouched. Consequence: if the user restores the line to
+   item A afterwards, the reservation must be re-created or re-taken, so a
+   change-then-change-back is not perfectly symmetric.
+2. **Block the change while the reservation is active.** Return 409 asking the
+   user to release the reservation first. Most explicit and the least
+   surprising accounting, but it turns a data cleanup into a workflow refusal.
+3. **Re-link by item, not by position.** Keep the reopen, then link the new line
+   to the active reservation whose `item_id` matches. Silent and convenient, but
+   it can attach a line to a reservation the user never chose, and with two
+   reservations for one item it is ambiguous again - the same class of bug as
+   NEW-1.
+
+**My recommendation.** Option 1. It fixes the leak at the point the mismatch
+becomes known, keeps every reservation traceable to a line that exists, and
+reuses `release`, which already has the accounting and bin logic and is covered
+by tests. It is also the smallest diff. Options 2 and 3 change user-visible
+behaviour or reintroduce positional guessing.
+
+**What I need from Gull.** Pick 1, 2 or 3, or say what should happen when a user
+changes a line back to the original item. On a decision I will write the
+red-first regression, implement it, and add the reason here.
