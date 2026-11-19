@@ -1216,3 +1216,88 @@ behaviour or reintroduce positional guessing.
 **What I need from Gull.** Pick 1, 2 or 3, or say what should happen when a user
 changes a line back to the original item. On a decision I will write the
 red-first regression, implement it, and add the reason here.
+
+---
+
+## OPEN-DECISION — partial return of a line sold from two bins
+
+**Status:** OPEN-DECISION. Waiting on Gull. Behaviour is unchanged; `Finding 23`
+pins it. PR #41 stays draft.
+
+**Root cause (found, not guessed).** The per-bin ledger is written only for a
+reservation-backed line — `recordLineBinDraw` in `InvoiceCreationService.ts` sits
+inside `if (reservation)`. A plain FIFO sale records **no** per-bin draw at all.
+So the exact mapping this PR relies on does not exist for the most common sale,
+and a partial return cannot replay it.
+
+**Reproduced.** One batch, 4 units on rack R and 6 in DEFAULT. A single
+unreserved line sells 8, drawing from both bins (R 4 → 0, DEFAULT 6 → 2). The
+line's `invoice_item_bin_consumption` rows are empty. A 2-unit return puts both
+units into DEFAULT:
+
+| | before sale | after sale | after 2-unit return |
+|---|---|---|---|
+| rack R | 4 | 0 | 0 |
+| DEFAULT | 6 | 2 | 4 |
+
+**Options.**
+
+1. **Record the per-bin draw for every sale (recommended).** Move
+   `recordLineBinDraw` out of the reservation branch and write the FIFO
+   consumption of every line. The return then replays what actually happened,
+   exactly. Cost: a write per sale line on the hottest path, and a backfill
+   question for existing rows — those fall back to the current walk. This is the
+   only option that makes a partial return *correct* rather than merely
+   consistent.
+2. **Allocate proportionally to the original draw.** No new writes; when a draw
+   exists, return the quantity in the same ratio. Not exact — a customer returns
+   physical goods, not a ratio — and needs option 1's data anyway to be exact.
+3. **Ask the user which bin the goods came back to.** The only fully truthful
+   answer, and the only one that works for a batch with no history. Cost: a UI
+   decision on every partial return, and it does not help a same-batch case
+   where the user has no reason to know which bin paid.
+4. **Return to DEFAULT always (today's behaviour).** Simple and predictable, but
+   it moves stock to a bin that may never have held it and leaves the real bin
+   short — the same defect GLM reported for racks.
+
+**My recommendation.** Option 1, then option 3 only where no draw exists. Option
+2 is a heuristic dressed as a rule; option 4 is a known-wrong answer that only
+looks tidy.
+
+**What I need from Gull.** Pick an option for (a) a sale whose bins ARE now
+recorded and (b) a historical sale with no record. Do not expect option 1 alone
+to fix old invoices.
+
+---
+
+## OPEN-DECISION — an edit that changes the number of lines
+
+**Status:** OPEN-DECISION. Waiting on Gull. Behaviour is unchanged; `Finding 22`
+pins all three cases.
+
+**(a) Two reserved lines collapsed into one.** Returns 400: `sellable stock 0,
+requested 4`. Both reservations reopen, but an edit can keep only one per line,
+so the whole 4-unit line is forced onto a 2-unit reservation, and a
+reservation-backed line never falls back to FIFO. The transaction rolls back
+fully, so nothing is corrupted — the edit simply cannot be made.
+
+**(b) One reserved line split into two.** Returns 200, but only the first new
+line takes the reservation. The second is unlinked, and the reservation keeps 2
+units held that nothing owes — the stranded hold from NEW-2, reached by
+splitting.
+
+**(c) An unreserved line.** Round-trips exactly. This is the control.
+
+**Options.** (1) Split the reservation proportionally across the new lines,
+rejecting a collapse that exceeds it. (2) Refuse both resizing edits with a
+clear 409 and tell the user to release first, matching Option 2 of the NEW-2
+entry. (3) Leave as is — accept the 400 as the answer for (a), and accept the
+stranded hold in (b).
+
+**My recommendation.** Option 1 for (b), because a split is a normal edit and
+leaving a stranded hold behind is silent damage. Option 2 for (a), because one
+line cannot honestly consume two reservations and a 409 is clearer than a 400
+about "sellable stock". Both are cheap; neither blocks this PR.
+
+**What I need from Gull.** Confirm 1 + 2, or say that a resize should always be
+refused.
