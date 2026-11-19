@@ -1321,6 +1321,22 @@ about "sellable stock". Both are cheap; neither blocks this PR.
 divide one reservation across the resulting lines; return a clear 409 when a
 single resulting line would need to consume multiple reservations.
 
+**Identity (ruled by Gull).** An edit identifies each line by the optional
+per-line `id` from the invoice detail response. The server validates that every
+submitted `id` belongs to the invoice being edited and rejects a duplicate. A
+retained line whose item changed releases its old reservation. An old line whose
+`id` is absent counts as deleted, so its reservation reopens only when the source
+order is active. A split keeps the old `id` on one resulting line; the added
+lines omit it and the one reservation is divided across them. For older clients
+that send no ids, `reservation_id` is used only when it identifies a line
+unambiguously; otherwise the edit fails closed with 409. Pairing by array
+position or by quantity is never done.
+
+**Implemented on PR #41.** Id-based pairing replaces the positional pairing that
+GLM flagged as HIGH. The collapse rule is enforced twice: once on line counts per
+item, and once on the per-reservation budget. Any reservation quantity that no
+resulting line takes is released, so a resize cannot strand a hold.
+
 ---
 
 ## Verification correction — GLM server suite count at f3b4c5f6

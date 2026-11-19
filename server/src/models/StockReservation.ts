@@ -325,18 +325,38 @@ export class StockReservationModel {
    * release is a write and must work in both flag states, like every other
    * reservation write here.
    */
-  static releaseById(db: Database.Database, reservationId: number): void {
+  static releaseById(db: Database.Database, reservationId: number, quantity?: number): void {
     const existing = this.getById(reservationId, db);
     if (!existing) return;
     // Already released is not an error - a second edit must stay idempotent.
     if (existing.status === 'RELEASED') return;
 
-    this.drainAllocation(db, existing, Number(existing.quantity_reserved));
+    const held = roundQty(Number(existing.quantity_reserved));
+    // A partial release gives back only the unused remainder, so the part a
+    // resulting line still needs stays held. Default is the whole reservation.
+    const partialRequest = quantity != null && roundQty(Math.max(0, quantity)) < held;
+    const releasing = quantity == null ? held : roundQty(Math.min(held, Math.max(0, quantity)));
+    // A CONSUMED reservation holds nothing, so there is no quantity to give
+    // back - but a terminal release must still happen, because the point is to
+    // stop it being reopened for a line that no longer carries its item.
+    if (releasing <= 0 && partialRequest) return;
+    if (releasing > 0) this.drainAllocation(db, existing, releasing, partialRequest);
+    // Releasing only part leaves the reservation ACTIVE for the rest: the edit
+    // is not finished with it, so it must not go terminal.
+    const partial = partialRequest;
+
+    StockMovementModel.syncStockBalancesExtension(existing.item_id, existing.warehouse_id, db);
+
+    if (partial) {
+      // Keep the child rows: drainAllocation(zeroRows=false) zeroed only what
+      // was released, and the remaining lines still need the rest.
+      db.prepare('UPDATE stock_reservations SET quantity_reserved = ? WHERE id = ?')
+        .run(roundQty(held - releasing), existing.id);
+      return;
+    }
     // Release is terminal: drop the allocations entirely, so a later reopen or
     // restore has nothing to hand back and the bin cannot be double-freed.
     db.prepare('DELETE FROM stock_reservation_bins WHERE reservation_id = ?').run(existing.id);
-    StockMovementModel.syncStockBalancesExtension(existing.item_id, existing.warehouse_id, db);
-
     db.prepare(`
       UPDATE stock_reservations
       SET status = 'RELEASED', quantity_reserved = 0, released_at = CURRENT_TIMESTAMP
