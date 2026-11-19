@@ -31,7 +31,6 @@ import db from '../config/database';
 import { AccountingService } from './accountingService';
 import { PaymentRecordingService } from './PaymentRecordingService';
 import { invoiceAdjustmentAmount } from '../utils/partyAdjustmentBalances';
-import { isFeatureEnabled } from '../utils/featureFlags';
 import {
   computeReturnedLine,
   allocateHeaderDiscount,
@@ -305,11 +304,11 @@ function resolveReturnBins(
   items: ProcessReturnInput['items'],
 ): Map<number, number> {
   const chosenBins = new Map<number, number>();
-  // The bin ledger belongs to the flag-on model. With the flag off a sale
-  // records no draw at all, so demanding a bin here would refuse every legacy
-  // return whose stock sits in a batch. The flag decides the model, not the
-  // document: the return keeps the legacy restock target.
-  if (!isFeatureEnabled(db, 'feature_batch_locations')) return chosenBins;
+  // NOT gated on feature_batch_locations. The flag chooses which source a READ
+  // trusts; it never decides whether the second source is WRITTEN. A flag-off
+  // sale still drains `batch_stock_by_location` and records its draw, so this
+  // refusal holds in both flag states: a line with no recorded draw is never
+  // silently parked in the warehouse DEFAULT bin.
   const drawCount = db.prepare(
     'SELECT COUNT(*) AS n FROM invoice_item_bin_consumption WHERE invoice_item_id = ?');
   const batchedSaleCount = db.prepare(`

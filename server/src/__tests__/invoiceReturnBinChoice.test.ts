@@ -454,3 +454,68 @@ describe('Decision 2: a second partial return continues where the first stopped'
     expect(binRow(b1, r3)).toEqual(before.r3);
   });
 });
+
+/**
+ * The flag chooses which source a READ trusts; it never decides whether the
+ * second source is WRITTEN. A flag-off sale must still drain the bin rows it
+ * took and record the draw, and a line with no draw must still be refused
+ * instead of being parked in the warehouse DEFAULT bin. Gating the return rule
+ * on the flag hid both properties.
+ */
+describe('Feature flag off: the bin ledger is written and never inferred', () => {
+  /** The shape of a batch created before every ADD path mirrored (BUG-013). */
+  function dropMirror(batchId: number): void {
+    db.prepare('DELETE FROM batch_stock_by_location WHERE batch_id = ?').run(batchId);
+  }
+
+  it('drains the mirror and records the draw of a flag-off sale', async () => {
+    setFeatureEnabled(db, FLAG, false);
+    try {
+      const item = await createItem(`BINOFF-${Date.now()}-${++seq}`, cookie);
+      await purchaseStock(item, warehouseA, 8, 40, cookie, AS_OF);
+      const [b1] = batchIdsOf(item, warehouseA);
+      const dl = defaultLocation(warehouseA);
+      expect(binRow(b1, dl)).toEqual({ physical: 8, reserved: 0, available: 8 });
+
+      const { lineId } = await sellFifo(item, 5, 'flagoff-draw');
+
+      expect(drawsOf(lineId)).toEqual([{ batch_id: b1, location_id: dl, quantity: 5 }]);
+      expect(binRow(b1, dl)).toEqual({ physical: 3, reserved: 0, available: 3 });
+    } finally {
+      setFeatureEnabled(db, FLAG, true);
+    }
+  });
+
+  it('refuses a no-draw return instead of inferring the DEFAULT bin', async () => {
+    setFeatureEnabled(db, FLAG, false);
+    try {
+      const { item, b1, r2, dl } = await twoRackBins('flagoff-nodraw');
+      dropMirror(b1);
+
+      const { invoiceId, lineId } = await sellFifo(item, 4, 'flagoff-nodraw');
+      expect(drawsOf(lineId)).toEqual([]);
+
+      const refused = await returnRaw(invoiceId, {
+        items: [{ invoice_item_id: lineId, return_quantity: 2 }],
+        reason: 'no bin chosen',
+      }, 'flagoff-nodraw');
+
+      expect(refused.status).toBe(400);
+      expect(String(refused.body.error)).toContain('no recorded bin draw');
+      expect(binRow(b1, dl)).toEqual({ physical: 0, reserved: 0, available: 0 });
+      expect(returnBatchRows(invoiceId)).toEqual([]);
+
+      const chosen = await returnRaw(invoiceId, {
+        items: [{ invoice_item_id: lineId, return_quantity: 2, location_id: r2 }],
+        reason: 'user chose the second rack',
+      }, 'flagoff-chosen');
+
+      expect(chosen.status).toBe(200);
+      expect(returnBatchRows(invoiceId)).toEqual([{ batch_id: b1, location_id: r2, quantity: 2 }]);
+      expect(binRow(b1, r2)).toEqual({ physical: 2, reserved: 0, available: 2 });
+      expect(binRow(b1, dl)).toEqual({ physical: 0, reserved: 0, available: 0 });
+    } finally {
+      setFeatureEnabled(db, FLAG, true);
+    }
+  });
+});

@@ -1651,9 +1651,9 @@ class InvoiceModel {
       byLine.set(row.invoice_item_id, bucket);
     }
 
-    // A draw only exists in the flag-on model, so with the flag off the field
-    // stays false and the client never asks for a bin the server will not use.
-    const binLocationsEnabled = isFeatureEnabled(db, 'feature_batch_locations');
+    // The server refuses a no-draw return in BOTH flag states, so the client
+    // must be told to ask in both. Gating this on the flag sent a flag-off user
+    // a 400 it had no way to answer.
     return lines.map(({ draw_count, batched_sale_count, ...line }) => ({
       ...line,
       bin_consumption: (byLine.get(line.id) ?? []).map((row) => ({
@@ -1661,7 +1661,7 @@ class InvoiceModel {
         location_id: row.location_id,
         quantity: row.quantity,
       })),
-      requires_return_bin: binLocationsEnabled && batched_sale_count > 0 && draw_count === 0,
+      requires_return_bin: batched_sale_count > 0 && draw_count === 0,
     }));
   }
 
