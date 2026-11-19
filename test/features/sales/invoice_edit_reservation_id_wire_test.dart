@@ -97,6 +97,49 @@ Map<String, Object> _invoiceDetail(List<_Line> lines) => <String, Object>{
       ],
     };
 
+/// One row of `GET /invoices` (the sales-grid list) for invoice 42, with the
+/// nested `items[]` the list route embeds (`InvoiceModel.getAll`). PR #41 head
+/// 7cf66102 added `invoice_items.reservation_id` to that select, so each item
+/// now carries its own `id` and `reservation_id` — the list-shaped invoice the
+/// grid pushes into the edit form (`sales_row_actions.dart`:
+/// `context.push('/sales/form', extra: invoice)`).
+///
+/// The row carries its items, so the form renders them and never fetches the
+/// detail; the adapter still serves the detail shape, so a stray detail GET
+/// would be visible rather than failing the load.
+Map<String, Object> _listRow(List<_Line> lines) => <String, Object>{
+      'id': 42,
+      'invoice_no': 'INV-EDIT-RES',
+      'customer_id': 1,
+      'customer_name': 'Acme Corp',
+      'invoice_date': '2026-08-11',
+      'total_amount': 500.0,
+      'paid_amount': 0.0,
+      'balance_amount': 500.0,
+      'status': 'Unpaid',
+      'discount_scope': 'item',
+      'warehouse_id': 1,
+      'items': <Object>[
+        for (final line in lines)
+          <String, Object?>{
+            'id': line.id,
+            'invoice_id': 42,
+            'item_id': 1,
+            'item_name': 'Widget',
+            'item_code': 'ITM-1',
+            'quantity': line.quantity,
+            'unit_price': 100,
+            'amount': line.quantity * 100,
+            'tax_rate': 0,
+            'discount_type': 'none',
+            'discount_value': 0,
+            'returned_qty': 0,
+            // The field PR #41 head 7cf66102 added to the list select.
+            'reservation_id': line.reservationId,
+          },
+      ],
+    };
+
 /// Serves the invoice detail (`GET /invoices/:id`), accepts the edit
 /// (`PUT /invoices/:id`), and captures both requests for assertions.
 class _EditWireAdapter implements HttpClientAdapter {
@@ -108,6 +151,10 @@ class _EditWireAdapter implements HttpClientAdapter {
   RequestOptions? putRequest;
   RequestOptions? getRequest;
 
+  /// Every request the form issued, in order, as `'METHOD /path'` — lets a
+  /// test assert that a request was (or was not) made.
+  final List<String> requests = [];
+
   @override
   Future<ResponseBody> fetch(
     RequestOptions options,
@@ -115,6 +162,7 @@ class _EditWireAdapter implements HttpClientAdapter {
     Future<void>? cancelFuture,
   ) {
     final path = options.uri.path;
+    requests.add('${options.method} $path');
     if (options.method == 'PUT' && RegExp(r'/invoices/\d+$').hasMatch(path)) {
       putRequest = options;
       return Future.value(
@@ -451,6 +499,84 @@ void main() {
         reason: 'a newly added line must omit id',
       );
       expect(added['reservation_id'], isNull);
+    },
+  );
+
+  testWidgets(
+    'sales-grid (list-shaped) edit: no detail GET, and each same-item line '
+    'keeps its own id + reservation_id in the PUT',
+    (tester) async {
+      // The sales grid pushes the LIST row straight into the form
+      // (sales_row_actions.dart: `context.push('/sales/form', extra: invoice)`),
+      // and that row already embeds `items[]` with each line's own `id` and
+      // `reservation_id` (PR #41 head 7cf66102). The form therefore renders
+      // the row's own lines and never needs the detail.
+      final row = Invoice.fromJson(_listRow(_linesInLoadOrder));
+      expect(
+        row.items,
+        isNotEmpty,
+        reason: 'the list row must carry its own items',
+      );
+
+      final adapter = _EditWireAdapter();
+      final dio = Dio(BaseOptions(baseUrl: 'http://test'))
+        ..httpClientAdapter = adapter;
+      await _pumpEdit(tester, dio, row);
+      await _save(tester);
+
+      // Non-vacuous: the form did reach the wire (it reads the payments), so
+      // the emptiness check below means "no detail GET", not "no traffic".
+      expect(
+        adapter.requests,
+        isNotEmpty,
+        reason: 'the form must have made its usual requests',
+      );
+      expect(
+        adapter.requests.where((r) => r == 'GET /invoices/42'),
+        isEmpty,
+        reason: 'a list-shaped invoice must not trigger a detail GET',
+      );
+      expect(adapter.getRequest, isNull);
+
+      final request = adapter.putRequest;
+      expect(request, isNotNull, reason: 'the edit form must PUT /invoices/:id');
+      expect(request!.method, 'PUT');
+      expect(request.uri.path, endsWith('/invoices/42'));
+
+      final items =
+          (request.data! as Map<String, dynamic>)['items'] as List<dynamic>;
+      expect(items, hasLength(2), reason: 'both loaded lines must be sent');
+
+      // Two SAME-ITEM lines (both item_id 1). Key the emitted lines by the row
+      // id each carried in, so the assertion is about the PAIRING (a line and
+      // its own reservation), not the array position. The ids and the
+      // reservations run in OPPOSITE orders (id 1 → 102, id 2 → 101), so a
+      // positional emission cannot satisfy both pairs at once.
+      final byId = <Object?, Map<String, dynamic>>{
+        for (final raw in items.cast<Map<String, dynamic>>()) raw['id']: raw,
+      };
+      expect(
+        byId.keys,
+        containsAll(<Object>[1, 2]),
+        reason: 'each line must be sent with the id it was loaded with',
+      );
+      for (final id in <int>[1, 2]) {
+        expect(
+          byId[id]!['item_id'],
+          1,
+          reason: 'line id $id is one of the two same-item lines',
+        );
+      }
+      expect(
+        byId[1]!['reservation_id'],
+        102,
+        reason: 'line id 1 keeps its own reservation 102',
+      );
+      expect(
+        byId[2]!['reservation_id'],
+        101,
+        reason: 'line id 2 keeps its own reservation 101',
+      );
     },
   );
 }
