@@ -197,6 +197,18 @@ class LineRowData implements CalculableLine, FillableLine {
 
   set reservationId(int? value) => _setCell('reservation_id', value);
 
+  /// The invoice-item row id this line was loaded with (`null` for a line
+  /// added in this edit). Preserved and re-emitted on edit so the server can
+  /// match the line by id rather than by array position; see `_buildBody`.
+  int? get lineId {
+    final v = _cell('line_id');
+    if (v == null || v == '') return null;
+    if (v is num) return v.toInt();
+    return int.tryParse('$v');
+  }
+
+  set lineId(int? value) => _setCell('line_id', value);
+
   num _num(String field) {
     final v = _cell(field);
     if (v is num) return v;

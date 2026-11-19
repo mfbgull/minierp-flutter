@@ -1,22 +1,30 @@
-// GLM (PR #41 follow-up): reservation_id on the invoice-edit wire.
+// GLM (PR #41 follow-up): reservation_id AND the invoice-item id on the
+// invoice-edit wire.
 //
-// REAL wire contract test for the EDIT path, now run against the shape the
-// server actually returns after PI's field landed (PR #41 head f3b4c5f6:
-// `InvoiceModel.getItems` selects `ii.reservation_id`, and `getInvoice`
-// returns the bare invoice row with `items[]`). This test drives the real
+// REAL wire contract test for the EDIT path, driven against the shape the
+// server returns: `getInvoice` returns the bare invoice row with `items[]`,
+// each item carrying its `id` and (nullable) `reservation_id` (PR #41 head
+// f3b4c5f6: `InvoiceModel.getItems` selects `ii.reservation_id`; the id comes
+// from the existing invoice-item row). This test drives the real
 // InvoiceRepository through a Dio HttpClientAdapter:
 //
-//   * GET /invoices/:id       — the two-line invoice the form loads (same item,
-//                              two lines, each with its own reservation_id)
+//   * GET /invoices/:id       — the invoice the form loads (two same-item
+//                              lines, each with its own id + reservation_id)
 //   * PUT /invoices/:id       — the edit the form posts
 //
-// and asserts the actual method, path, and per-line reservation_id in the
-// PUT body. No fake repository, no source-text assertion, no manual fromJson.
+// and asserts the actual method, path, and per-line `id` + `reservation_id` in
+// the PUT body. No fake repository, no source-text assertion, no manual
+// fromJson.
 //
-// Both tests serve the ids OPPOSITE to the line order (and the second serves
-// the two lines themselves reversed), so a positional (index-based) emission
-// would put the wrong id on each line; the assertions require each line's own
-// id, which can only come from decoding `reservation_id` off the GET response.
+// The lines serve the two ids OPPOSITE to their order (and one test serves the
+// two lines themselves reversed), so a positional (index-based) emission would
+// put the wrong id/reservation_id on each line; the assertions require each
+// line's own ids, which can only come from decoding them off the GET response.
+//
+// Two extra cases cover the amendments PI asked for:
+//   * changing a line's ITEM keeps that line's original id + reservation_id;
+//   * a NEWLY added line OMITS `id` (it has no row yet) while the retained
+//     line keeps its original id.
 
 import 'dart:async';
 import 'dart:convert';
@@ -31,6 +39,7 @@ import 'package:minierp_app/data/models/invoice.dart';
 import 'package:minierp_app/data/models/item.dart';
 import 'package:minierp_app/data/repositories/repository_client.dart';
 import 'package:minierp_app/features/sales/invoice_providers.dart';
+import 'package:minierp_app/features/sales/line_cells.dart' show DescriptionCell;
 import 'package:minierp_app/features/sales/sales_invoice_form_page.dart';
 import 'package:minierp_app/l10n/app_localizations.dart';
 
@@ -175,7 +184,19 @@ Future<void> _pumpEdit(WidgetTester tester, Dio dio, Invoice invoice) async {
               currentStock: 10,
               sellableQty: 10,
               isFinishedGood: true,
-              standardSellingPrice: 100,
+              standardSellingPrice: 25,
+            ),
+            // A SECOND item so a test can change a line's item (id 1 → id 2),
+            // which is the case that must keep the line's original id.
+            Item(
+              id: 2,
+              itemCode: 'ITM-2',
+              itemName: 'Gadget',
+              unitOfMeasure: 'Nos',
+              currentStock: 10,
+              sellableQty: 10,
+              isFinishedGood: true,
+              standardSellingPrice: 40,
             ),
           ],
         ),
@@ -216,11 +237,22 @@ Future<_EditWireAdapter> _pumpAndSave(
   WidgetTester tester, {
   List<_Line> lines = _linesInLoadOrder,
 }) async {
+  final adapter = await _pumpEditOnly(tester, lines: lines);
+  await _save(tester);
+  return adapter;
+}
+
+/// Pump the edit form over the wire adapter but DO NOT save — a test that
+/// changes the form (adds a line, changes an item) starts here, mutates the
+/// UI, then calls `_save` itself.
+Future<_EditWireAdapter> _pumpEditOnly(
+  WidgetTester tester, {
+  List<_Line> lines = _linesInLoadOrder,
+}) async {
   final adapter = _EditWireAdapter(lines);
   final dio = Dio(BaseOptions(baseUrl: 'http://test'))
     ..httpClientAdapter = adapter;
   await _pumpEdit(tester, dio, _editShell());
-  await _save(tester);
   return adapter;
 }
 
@@ -261,6 +293,10 @@ void main() {
       final second = items[1] as Map<String, dynamic>;
       expect(first['item_id'], 1);
       expect(second['item_id'], 1);
+      // Each line must carry the DB id it was loaded with (the server matches
+      // by id) — NOT the other line's.
+      expect(first['id'], 1, reason: 'line 1 keeps its own id');
+      expect(second['id'], 2, reason: 'line 2 keeps its own id');
       // Each line must carry the reservation_id it was loaded with — NOT the
       // other line's (a positional emission would swap them).
       expect(
@@ -292,16 +328,129 @@ void main() {
           _putItems(adapter)['items']! as List<dynamic>;
       expect(items, hasLength(2));
 
-      // Build id → quantity from the ACTUAL wire payload.
-      final idToQty = <int?, num>{};
+      // Build id → quantity from the ACTUAL wire payload, keyed by BOTH the
+      // preserved row id and the reservation id, so a positional emission
+      // would break at least one of the pairs.
+      final byRowId = <Object?, num>{};
+      final byReservation = <int?, num>{};
       for (final raw in items) {
         final line = raw as Map<String, dynamic>;
-        idToQty[line['reservation_id'] as int?] = line['quantity'] as num;
+        byRowId[line['id']] = line['quantity'] as num;
+        byReservation[line['reservation_id'] as int?] = line['quantity'] as num;
       }
       // Loaded pairing regardless of position: (id 1, qty 2) → 102 and
       // (id 2, qty 3) → 101.
-      expect(idToQty[102], 2, reason: 'reservation 102 stays on qty-2 line');
-      expect(idToQty[101], 3, reason: 'reservation 101 stays on qty-3 line');
+      expect(byRowId[1], 2, reason: 'row id 1 stays on the qty-2 line');
+      expect(byRowId[2], 3, reason: 'row id 2 stays on the qty-3 line');
+      expect(
+        byReservation[102],
+        2,
+        reason: 'reservation 102 stays on qty-2 line',
+      );
+      expect(
+        byReservation[101],
+        3,
+        reason: 'reservation 101 stays on qty-3 line',
+      );
+    },
+  );
+
+  testWidgets(
+    'GET decode + PUT: changing a line\'s ITEM keeps that line\'s original id '
+    'and reservation_id, and the payload order does not shift them',
+    (tester) async {
+      // Serve the two same-item lines reversed, then change the FIRST loaded
+      // line's item (Widget → Gadget) via the real UI, and save. The changed
+      // line must still carry its own id + reservation_id; the untouched line
+      // keeps its own.
+      final adapter = await _pumpEditOnly(
+        tester,
+        lines: const [_Line(11, 2, 102), _Line(12, 3, 101)],
+      );
+
+      // Change the first row's item to Gadget (id 2). Tapping the description
+      // cell opens the item dropdown; type to filter then select.
+      await tester.tap(find.byType(DescriptionCell).first);
+      await tester.pump();
+      final editor = find.descendant(
+        of: find.byType(DescriptionCell).first,
+        matching: find.byType(TextField),
+      );
+      await tester.enterText(editor, 'Gad');
+      await tester.pump(const Duration(milliseconds: 80));
+      await tester.tap(find.text('Gadget').first);
+      await tester.pumpAndSettle();
+      await _save(tester);
+
+      final items = _putItems(adapter)['items']! as List<dynamic>;
+      expect(items, hasLength(2), reason: 'still two lines');
+
+      // Map each emitted line by its (preserved) id.
+      final byId = <Object?, Map<String, dynamic>>{};
+      for (final raw in items) {
+        final line = raw as Map<String, dynamic>;
+        byId[line['id']] = line;
+      }
+      // Line id 11 changed item to Gadget but KEEPS its id and reservation.
+      expect(byId[11], isNotNull, reason: 'changed line keeps id 11');
+      expect(byId[11]!['item_id'], 2, reason: 'line 11 now sells Gadget');
+      expect(byId[11]!['reservation_id'], 102);
+      // Line id 12 was untouched: same item, id, reservation.
+      expect(byId[12], isNotNull, reason: 'untouched line keeps id 12');
+      expect(byId[12]!['item_id'], 1);
+      expect(byId[12]!['reservation_id'], 101);
+    },
+  );
+
+  testWidgets(
+    'GET decode + PUT: a NEWLY added line omits id, while the retained line '
+    'keeps its original id',
+    (tester) async {
+      // Serve a single existing line (id 11), then add a brand-new line and
+      // give it an item. The new line has no DB id yet, so it must OMIT the
+      // `id` key; the retained line must keep id 11.
+      final adapter = await _pumpEditOnly(
+        tester,
+        lines: const [_Line(11, 2, 102)],
+      );
+
+      // Add a second line and select an item for it.
+      final addButton = find.text('Add Item');
+      await tester.ensureVisible(addButton);
+      await tester.pumpAndSettle();
+      await tester.tap(addButton);
+      await tester.pumpAndSettle();
+      // The new line autofocuses its description cell, opening the dropdown.
+      final editor = find.descendant(
+        of: find.byType(DescriptionCell).last,
+        matching: find.byType(TextField),
+      );
+      await tester.enterText(editor, 'Gad');
+      await tester.pump(const Duration(milliseconds: 80));
+      await tester.tap(find.text('Gadget').first);
+      await tester.pumpAndSettle();
+      await _save(tester);
+
+      final items = _putItems(adapter)['items']! as List<dynamic>;
+      expect(items, hasLength(2), reason: 'retained + new line');
+
+      final retained = items
+          .cast<Map<String, dynamic>>()
+          .firstWhere((l) => l['item_id'] == 1);
+      final added = items
+          .cast<Map<String, dynamic>>()
+          .firstWhere((l) => l['item_id'] == 2);
+
+      // Retained line keeps its id and reservation.
+      expect(retained['id'], 11, reason: 'retained line keeps id 11');
+      expect(retained['reservation_id'], 102);
+      // New line must NOT carry an id (it has no DB row yet).
+      expect(
+        added.containsKey('id'),
+        isFalse,
+        reason: 'a newly added line must omit id',
+      );
+      expect(added['reservation_id'], isNull);
     },
   );
 }
