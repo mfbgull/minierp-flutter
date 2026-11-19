@@ -896,3 +896,127 @@ describe('Finding 11: stock_balances mirror tracks reservations', () => {
     expect(balanceRow(item, warehouseA)).toEqual({ reserved: 6, available: 0 });
   });
 });
+
+// ── 12. Invoice edit and delete→restore follow the same reservation rule ──
+
+/**
+ * Gull approved extending the cancel rule to the other two stock-reversing
+ * invoice operations: when an operation reverses the sale, reopen the linked
+ * reservation only if its source order is still active, and reserve it again
+ * when a deleted invoice is restored. Closed and cancelled source orders stay
+ * unreserved in every direction. The per-invoice bin ledger must be preserved
+ * across the round trip so the exact bins come back, exactly once.
+ */
+describe('Finding 12: edit and delete/restore follow the reservation rule', () => {
+  function ledgerRows(invoiceId: number): Array<{ batch_id: number; location_id: number; quantity: number }> {
+    return db.prepare(
+      `SELECT batch_id, location_id, quantity FROM invoice_item_bin_consumption
+       WHERE invoice_item_id IN (SELECT id FROM invoice_items WHERE invoice_id = ?) ORDER BY id`,
+    ).all(invoiceId) as Array<{ batch_id: number; location_id: number; quantity: number }>;
+  }
+
+  async function deleteInvoice(invoiceId: number): Promise<number> {
+    const res = await request(app).delete(`/api/invoices/${invoiceId}`).set('Cookie', cookie);
+    return res.status;
+  }
+
+  async function restoreInvoice(invoiceId: number): Promise<number> {
+    const res = await request(app).post(`/api/invoices/${invoiceId}/restore`).set('Cookie', cookie).send({});
+    if (res.status >= 400) console.log('RESTORE_FAIL', res.status, JSON.stringify(res.body));
+    return res.status;
+  }
+
+  it('reopens the reservation when an active-order invoice is deleted, and re-reserves on restore', async () => {
+    setFeatureEnabled(db, FLAG, true);
+    const item = await createItem(`S1R del-restore ${Date.now()}`, cookie);
+    await purchaseStock(item, warehouseA, 6, 40, cookie, '2026-10-01');
+    const [b1] = batchIdsOf(item, warehouseA);
+    const loc = defaultLocation(warehouseA);
+
+    const reservation = StockReservationModel.create({
+      item_id: item, warehouse_id: warehouseA, quantity_reserved: 4,
+      reference_doctype: 'SALES_ORDER', reference_docno: seedSalesOrder('Confirmed'), reference_line_id: 1,
+      bins: [{ batch_id: b1, location_id: loc, quantity: 4 }],
+    }, db);
+
+    expect(await sell(item, 4, 'dr-1', reservation.id)).toBe(201);
+    const invoice = lastInvoiceId();
+    expect(reservationRow(reservation.id)).toEqual({ status: 'CONSUMED', quantity_reserved: 0 });
+    expect(binRow(b1, loc)).toEqual({ physical: 2, reserved: 0, available: 2 });
+
+    // Delete reverses the sale: the reserve comes back from the ledger bins.
+    expect(await deleteInvoice(invoice)).toBe(200);
+    expect(reservationRow(reservation.id)).toEqual({ status: 'ACTIVE', quantity_reserved: 4 });
+    expect(binRow(b1, loc)).toEqual({ physical: 6, reserved: 4, available: 2 });
+    expectHeaderMatchesChildren(reservation.id);
+
+    // Restore reserves it again, exactly once.
+    expect(await restoreInvoice(invoice)).toBe(200);
+    expect(reservationRow(reservation.id)).toEqual({ status: 'CONSUMED', quantity_reserved: 0 });
+    expect(binRow(b1, loc)).toEqual({ physical: 2, reserved: 0, available: 2 });
+    // Children stay as zeroed rows (the ledger that lets a later void restore
+    // the exact allocation), never as live reservations.
+    expect(liveBinRows(reservation.id)).toEqual([]);
+    expectHeaderMatchesChildren(reservation.id);
+  });
+
+  it('leaves a closed-order reservation unreserved across delete and restore', async () => {
+    setFeatureEnabled(db, FLAG, true);
+    const item = await createItem(`S1R del-closed ${Date.now()}`, cookie);
+    await purchaseStock(item, warehouseA, 6, 40, cookie, '2026-10-01');
+    const [b1] = batchIdsOf(item, warehouseA);
+    const loc = defaultLocation(warehouseA);
+
+    const reservation = StockReservationModel.create({
+      item_id: item, warehouse_id: warehouseA, quantity_reserved: 4,
+      reference_doctype: 'SALES_ORDER', reference_docno: seedSalesOrder('Closed'), reference_line_id: 1,
+      bins: [{ batch_id: b1, location_id: loc, quantity: 4 }],
+    }, db);
+
+    expect(await sell(item, 4, 'dc-1', reservation.id)).toBe(201);
+    const invoice = lastInvoiceId();
+
+    expect(await deleteInvoice(invoice)).toBe(200);
+    expect(reservationRow(reservation.id)).toEqual({ status: 'CONSUMED', quantity_reserved: 0 });
+    expect(binRow(b1, loc)).toEqual({ physical: 6, reserved: 0, available: 6 });
+
+    expect(await restoreInvoice(invoice)).toBe(200);
+    expect(reservationRow(reservation.id)).toEqual({ status: 'CONSUMED', quantity_reserved: 0 });
+    expect(binRow(b1, loc)).toEqual({ physical: 2, reserved: 0, available: 2 });
+  });
+
+  it('reopens the reservation when an active-order invoice is edited to a smaller quantity', async () => {
+    setFeatureEnabled(db, FLAG, true);
+    const item = await createItem(`S1R edit ${Date.now()}`, cookie);
+    await purchaseStock(item, warehouseA, 6, 40, cookie, '2026-10-01');
+    const [b1] = batchIdsOf(item, warehouseA);
+    const loc = defaultLocation(warehouseA);
+
+    const reservation = StockReservationModel.create({
+      item_id: item, warehouse_id: warehouseA, quantity_reserved: 4,
+      reference_doctype: 'SALES_ORDER', reference_docno: seedSalesOrder('Confirmed'), reference_line_id: 1,
+      bins: [{ batch_id: b1, location_id: loc, quantity: 4 }],
+    }, db);
+
+    expect(await sell(item, 4, 'ed-1', reservation.id)).toBe(201);
+    const invoice = lastInvoiceId();
+
+    // Edit to 2: the stock reverses and the reserve must come back, not stay
+    // stuck at CONSUMED with nothing reserved.
+    const res = await request(app)
+      .put(`/api/invoices/${invoice}`)
+      .set('Cookie', cookie)
+      .send({
+        customer_id: customerId,
+        invoice_date: AS_OF,
+        items: [{ item_id: item, quantity: 2, unit_price: 50, tax_rate: 0 }],
+        warehouse_id: warehouseA,
+      });
+    expect(res.status).toBe(200);
+
+    // The 4-unit sale reversed (physical back to 6, reserve restored to 4),
+    // then the edited line re-sold 2 -> physical 4, all 4 still reserved.
+    expect(binRow(b1, loc)).toEqual({ physical: 4, reserved: 4, available: 0 });
+    expectHeaderMatchesChildren(reservation.id);
+  });
+});

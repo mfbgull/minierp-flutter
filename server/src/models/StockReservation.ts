@@ -470,6 +470,36 @@ export class StockReservationModel {
   }
 
   /**
+   * S-1 restore: a deleted invoice coming back takes its reservation again.
+   * The delete reopened the reserve (it holds the units again), so restore
+   * DRAINS those bins a second time and marks the reservation CONSUMED, which
+   * is exactly the state the invoice was in before it was deleted. A
+   * reservation whose source order is no longer active is left alone -
+   * symmetric with the reopen.
+   */
+  static reconsumedRestoredBins(
+    db: Database.Database,
+    reservationId: number,
+    draw: Array<{ batch_id: number; location_id: number; quantity: number }>,
+  ): void {
+    const existing = this.getById(reservationId, db);
+    if (!existing) return;
+    if (!this.sourceOrderIsActive(db, existing)) return;
+    const total = roundQty(draw.reduce((s, d) => s + Number(d.quantity), 0));
+    if (total <= 0) return;
+    // drainAllocation both releases the bin reserve and zeroes the child rows,
+    // so the header still matches its children afterwards.
+    this.drainAllocation(db, existing, total, true);
+    const remaining = roundQty(Number(existing.quantity_reserved) - total);
+    if (remaining <= 0) {
+      db.prepare(`UPDATE stock_reservations SET status = 'CONSUMED', quantity_reserved = 0, consumed_at = CURRENT_TIMESTAMP WHERE id = ?`)
+        .run(existing.id);
+    } else {
+      db.prepare('UPDATE stock_reservations SET quantity_reserved = ? WHERE id = ?').run(remaining, existing.id);
+    }
+  }
+
+  /**
    * S-1: restore the exact bins an invoice line drained, using the durable
    * per-line ledger. It names each bin explicitly,
    * so voiding one of several invoices against a reservation restores only

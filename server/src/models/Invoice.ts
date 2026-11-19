@@ -1102,6 +1102,69 @@ class InvoiceModel {
     }
   }
 
+  /**
+   * Reopen the reservations behind these invoice lines, restoring the exact
+   * bins each line drained from the per-line ledger. Used by every operation
+   * that reverses the sale (cancel, edit, delete): the rule is one place so no
+   * path can drift. A line with no ledger row falls back to the reservation's
+   * own stored allocations. Rows are deleted once applied, so a second
+   * reversal of the same line cannot restore twice.
+   *
+   * Returns the draws it applied, keyed by invoice_items.id, so the stock
+   * reversal can put physical units back on the SAME bins.
+   */
+  static readLineBinDraws(
+    db: Database.Database,
+    lines: Array<{ id: number; reservation_id?: number | null }>,
+  ): Map<number, Array<{ batch_id: number; location_id: number; quantity: number }>> {
+    const draws = new Map<number, Array<{ batch_id: number; location_id: number; quantity: number }>>();
+    const stmt = db.prepare(
+      'SELECT batch_id, location_id, quantity FROM invoice_item_bin_consumption WHERE invoice_item_id = ? ORDER BY id');
+    for (const line of lines) {
+      if (!line.reservation_id) continue;
+      const draw = stmt.all(line.id) as Array<{ batch_id: number; location_id: number; quantity: number }>;
+      if (draw.length > 0) draws.set(line.id, draw);
+    }
+    return draws;
+  }
+
+  /**
+   * Reopen each line's reservation from the draws read above.
+   * `keepLedger` is set by a soft delete, which stays reversible: the rows are
+   * replayed by a restore instead of being dropped.
+   */
+  static reopenReservationsForLines(
+    db: Database.Database,
+    lines: Array<{ id: number; reservation_id?: number | null; quantity: number }>,
+    draws: Map<number, Array<{ batch_id: number; location_id: number; quantity: number }>>,
+    keepLedger = false,
+  ): void {
+    for (const line of lines) {
+      if (!line.reservation_id) continue;
+      const draw = draws.get(line.id);
+      if (draw) {
+        StockReservationModel.restoreConsumedBins(
+          db, line.reservation_id, draw.map((d) => ({ batch_id: d.batch_id, location_id: d.location_id, quantity_reserved: roundQty(Number(d.quantity)) })));
+        if (!keepLedger) db.prepare('DELETE FROM invoice_item_bin_consumption WHERE invoice_item_id = ?').run(line.id);
+      } else {
+        StockReservationModel.reopenForInvoiceLine(db, line.reservation_id, roundQty(Math.abs(line.quantity)));
+      }
+    }
+  }
+
+  /** S-1 restore: replay the kept ledger rows so the reservation is taken again. */
+  static reconsumeRestoredLines(
+    db: Database.Database,
+    lines: Array<{ id: number; reservation_id?: number | null }>,
+    draws: Map<number, Array<{ batch_id: number; location_id: number; quantity: number }>>,
+  ): void {
+    for (const line of lines) {
+      if (!line.reservation_id) continue;
+      const draw = draws.get(line.id);
+      if (draw) StockReservationModel.reconsumedRestoredBins(db, line.reservation_id, draw);
+    }
+  }
+
   static getInvoiceItemsForStockReverse(db: Database.Database, invoiceId: number): Array<{ id: number; item_id: number; quantity: number; unit_price: number; reservation_id?: number | null }> {
     return db.prepare(`SELECT id, item_id, quantity, unit_price, reservation_id FROM invoice_items WHERE invoice_id = ?`).all(invoiceId) as Array<{ id: number; item_id: number; quantity: number; unit_price: number; reservation_id?: number | null }>;
   }
@@ -1228,14 +1291,7 @@ class InvoiceModel {
     // HIGH-1: the physical reversal must land on the bin the sale drained,
     // not on the warehouse's DEFAULT bin. The per-line ledger is the only
     // record of that bin, so read it before the reservation restore deletes it.
-    const lineDraws = new Map<number, Array<{ batch_id: number; location_id: number; quantity: number }>>();
-    const drawStmt = db.prepare(
-      'SELECT batch_id, location_id, quantity FROM invoice_item_bin_consumption WHERE invoice_item_id = ? ORDER BY id');
-    for (const line of items) {
-      if (!line.reservation_id) continue;
-      const draw = drawStmt.all(line.id) as Array<{ batch_id: number; location_id: number; quantity: number }>;
-      if (draw.length > 0) lineDraws.set(line.id, draw);
-    }
+    const lineDraws = InvoiceModel.readLineBinDraws(db, items);
     if (items.length > 0) {
       InvoiceModel.reverseStockForItems(db, items, invoice.invoice_no, userId, 'INVOICE_CANCEL', undefined, lineDraws);
     }
@@ -1244,23 +1300,7 @@ class InvoiceModel {
     // when the reservation's source order is still active. The stock reversal
     // above restored the physical quantity; this restores the reserve. Runs
     // inside the caller's transaction so both commit together.
-    for (const line of items) {
-      if (line.reservation_id) {
-        // S-1: restore exactly the bins THIS line drained, from the durable
-        // per-line ledger. A quantity-only reopen cannot tell which bins the
-        // line took, so it over-reserves when one reservation backed several
-        // invoices. Falls back to the quantity reopen for historical lines
-        // written before the ledger existed.
-        const draw = lineDraws.get(line.id);
-        if (draw) {
-          StockReservationModel.restoreConsumedBins(
-            db, line.reservation_id, draw.map((d) => ({ batch_id: d.batch_id, location_id: d.location_id, quantity_reserved: roundQty(Number(d.quantity)) })));
-          db.prepare('DELETE FROM invoice_item_bin_consumption WHERE invoice_item_id = ?').run(line.id);
-        } else {
-          StockReservationModel.reopenForInvoiceLine(db, line.reservation_id, roundQty(Math.abs(line.quantity)));
-        }
-      }
-    }
+    InvoiceModel.reopenReservationsForLines(db, items, lineDraws);
 
     // ---- 2. GL void (canonical journal_lines) ----
     const voidReason = `Invoice ${invoice.invoice_no} cancelled`;

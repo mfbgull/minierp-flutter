@@ -691,8 +691,14 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
 
         // === FIX #4: Reverse old stock before inserting new items ===
         const oldItems = InvoiceModel.getInvoiceItemsForStockReverse(db, invoiceId);
+        const oldDraws = InvoiceModel.readLineBinDraws(db, oldItems);
 
-        InvoiceModel.reverseStockForItems(db, oldItems, originalInvoice.invoice_no, userId, 'INVOICE_UPDATE');
+        InvoiceModel.reverseStockForItems(db, oldItems, originalInvoice.invoice_no, userId, 'INVOICE_UPDATE', undefined, oldDraws);
+
+        // S-1: an edit reverses the sale, so it follows the same reservation
+        // rule as a cancel - reopen only when the source order is still
+        // active. Runs after the stock reversal, in the same transaction.
+        InvoiceModel.reopenReservationsForLines(db, oldItems, oldDraws);
 
         InvoiceModel.deleteInvoiceItems(db, invoiceId);
 
@@ -796,10 +802,17 @@ function deleteInvoice(req: AuthRequest, res: Response): Response | void {
       assertLegacyInvoiceAllocationsAllowed(db, invoiceId);
       assertNoPartyAdjustment(db, 'invoice', invoiceId);
 
-      const invoiceItems = InvoiceModel.getItemsForStockReverse(invoiceId, db);
+      const invoiceItems = InvoiceModel.getInvoiceItemsForStockReverse(db, invoiceId);
+      const deleteDraws = InvoiceModel.readLineBinDraws(db, invoiceItems);
 
       // Reverse stock movements
-      InvoiceModel.reverseStockForItems(db, invoiceItems, freshInvoice.invoice_no, userId, 'INVOICE_DELETE');
+      InvoiceModel.reverseStockForItems(db, invoiceItems, freshInvoice.invoice_no, userId, 'INVOICE_DELETE', undefined, deleteDraws);
+
+      // S-1: a delete reverses the sale, so it follows the same reservation
+      // rule as a cancel - reopen only when the source order is still active.
+      // The ledger rows are KEPT because a delete is reversible: a restore
+      // replays them to take the reservation again.
+      InvoiceModel.reopenReservationsForLines(db, invoiceItems, deleteDraws, true);
 
       // Void ALL related journal lines (invoice + returns). Must affect rows.
       // Return GL groups are keyed to the return document, not the invoice,
@@ -898,6 +911,14 @@ function restoreInvoice(req: AuthRequest, res: Response): Response | void {
     );
 
     const transaction = db.transaction(() => {
+      // 0. S-1: the restored invoice holds its reservation again BEFORE the
+      //    stock re-consume below, from the ledger rows the delete kept. The
+      //    re-consume then draws the units it just reserved. Same active-order
+      //    rule as the reopen, inside this transaction so stock and reserve
+      //    commit together.
+      const restoredItems = InvoiceModel.getInvoiceItemsForStockReverse(db, invoiceId);
+      InvoiceModel.reconsumeRestoredLines(db, restoredItems, InvoiceModel.readLineBinDraws(db, restoredItems));
+
       // 1. Re-consume stock — BUG-010: batch-faithful, not today's FIFO.
       //    Re-use the exact batches and unit costs the invoice's original
       //    SALE movements used, so the stock ledger agrees with the COGS
@@ -910,6 +931,7 @@ function restoreInvoice(req: AuthRequest, res: Response): Response | void {
         invoice.invoice_date.slice(0, 10),
         userId
       );
+
 
       // 2. Un-void the journal lines the delete voided (GL is restored to
       //    its pre-delete state — no new posting, no double counting).
