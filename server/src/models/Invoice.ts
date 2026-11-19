@@ -6,6 +6,7 @@ import { sanitizeSortParams, INVOICE_SORT_COLUMNS, INVOICE_RETURN_SORT_COLUMNS }
 import Database from 'better-sqlite3';
 import logger from '../utils/logger';
 import StockMovementModel from './StockMovement';
+import { StockReservationModel } from './StockReservation';
 import AccountingService from '../services/accountingService';
 import InvoiceReturnModel from './InvoiceReturn';
 import { isFeatureEnabled } from '../utils/featureFlags';
@@ -102,6 +103,11 @@ export interface InvoiceItem {
   returned_qty: number;
   expiry_date?: string | null;
   is_expired_at_sale?: boolean;
+  /** S-1: the active reservation this line fulfils, or null/absent when the
+   * sale held none. The list route returns it so a grid-loaded edit can resend
+   * each line's own reservation identity — the same field the detail route
+   * (`getItems`) already exposes (NEW-4). */
+  reservation_id?: number | null;
 }
 
 interface CreateInvoiceDTO {
@@ -141,6 +147,11 @@ export interface CreateInvoiceItemDTO {
   discount_value?: number;
   /** Loose amount-driven lines: entered bill amount as the gross base. */
   amount?: number;
+  /** S-1: the ACTIVE reservation this line fulfils (persisted for audit).
+   * `null` is accepted as "no reservation" so a read invoice (whose items
+   * expose `reservation_id: number | null`) can round-trip straight into an
+   * edit payload. */
+  reservation_id?: number | null;
 }
 
 export interface InvoiceFilters {
@@ -457,6 +468,7 @@ class InvoiceModel {
           ii.id, ii.invoice_id, ii.item_id, ii.quantity, ii.returned_qty, ii.unit_price, ii.amount,
           ii.tax_rate, ii.discount_type, ii.discount_value,
           ii.expiry_date, ii.is_expired_at_sale,
+          ii.reservation_id,
           i.item_code, i.item_name
         FROM invoice_items ii
         LEFT JOIN items i ON ii.item_id = i.id
@@ -579,13 +591,48 @@ class InvoiceModel {
    * Restores quantity_remaining on stock_batches and creates ADJUSTMENT movements
    * to fix stock_balances. Used during invoice update and delete.
    */
+  /**
+   * Credit `qty` of a batch back to ONE bin, and record it for audit. Used by
+   * the reversal path, which may spread a single batch across several bins.
+   */
+  private static restoreBatchToBin(
+    db: Database.Database,
+    batchId: number,
+    locationId: number,
+    qty: number,
+    invoiceNo: string,
+  ): void {
+    if (qty <= 0) return;
+    db.prepare(`
+      INSERT INTO batch_stock_by_location (batch_id, location_id, quantity_physical, quantity_reserved, quantity_available)
+      VALUES (?, ?, ?, 0, ?)
+      ON CONFLICT(batch_id, location_id) DO UPDATE SET
+        quantity_physical = quantity_physical + excluded.quantity_physical,
+        quantity_available = quantity_available + excluded.quantity_available
+    `).run(batchId, locationId, qty, qty);
+
+    // Record the restoration for audit — identified by the invoice itself
+    // (there is no separate return header table).
+    const invRow = db.prepare(`
+      SELECT id FROM invoices WHERE invoice_no = ? LIMIT 1
+    `).get(invoiceNo) as { id: number } | undefined;
+    if (invRow) {
+      db.prepare(`
+        INSERT INTO invoice_return_batches (invoice_id, batch_id, location_id, quantity, reference_doctype, reference_docno)
+        VALUES (?, ?, ?, ?, 'RETURN', ?)
+      `).run(invRow.id, batchId, locationId, qty, invoiceNo);
+    }
+  }
+
   static reverseStockForItems(
     db: Database.Database,
-    items: Array<{ item_id: number; quantity: number; unit_price: number }>,
+    items: Array<{ id?: number; item_id: number; quantity: number; unit_price: number }>,
     invoiceNo: string,
     userId: number,
     referenceDoctype: string,
-    explicitWarehouseId?: number
+    explicitWarehouseId?: number,
+    /** S-1 HIGH-1: per-line bin draws, keyed by invoice_items.id. */
+    lineDraws?: Map<number, Array<{ batch_id: number; location_id: number; quantity: number }>>
   ): Array<{ item_id: number; movement_id: number; quantity: number; warehouse_id: number; unit_cost: number }> {
     const posted: Array<{ item_id: number; movement_id: number; quantity: number; warehouse_id: number; unit_cost: number }> = [];
     const reverseInvoiceItemStock = (item: typeof items[number]): void => {
@@ -645,6 +692,10 @@ class InvoiceModel {
       const ratio = Math.abs(totalSold) < 0.001 ? 1 : Math.min(effectiveQty / totalSold, 1);
 
       const restoreSaleBatchQuantities = (): void => {
+        // Per item+batch position in the ledger, so successive movements of
+        // the same batch restore to successive bins.
+        const binCursors = new Map<string, number>();
+        const binTaken = new Map<string, number>();
         // Restore quantity on each consumed batch (new path: batch_stock_by_location)
         const restoreSaleBatch = (movement: typeof saleMovements[number]): void => {
           if (movement.batch_id !== null) {
@@ -654,29 +705,53 @@ class InvoiceModel {
             // behind whenever the flag was off, and a later flip showed the
             // sold units as still gone.
             const targetWarehouseId = explicitWarehouseId ?? movement.warehouse_id;
-            const locRow = db.prepare(`
-              SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
-            `).get(targetWarehouseId) as { id: number } | undefined;
-            if (locRow) {
-              db.prepare(`
-                INSERT INTO batch_stock_by_location (batch_id, location_id, quantity_physical, quantity_reserved, quantity_available)
-                VALUES (?, ?, ?, 0, ?)
-                ON CONFLICT(batch_id, location_id) DO UPDATE SET
-                  quantity_physical = quantity_physical + excluded.quantity_physical,
-                  quantity_available = quantity_available + excluded.quantity_available
-              `).run(movement.batch_id, locRow.id, restoreQty, restoreQty);
-
-              // Record the restoration for audit — identified by the
-              // invoice itself (there is no separate return header table).
-              const invRow = db.prepare(`
-                SELECT id FROM invoices WHERE invoice_no = ? LIMIT 1
-              `).get(invoiceNo) as { id: number } | undefined;
-              if (invRow) {
-                db.prepare(`
-                  INSERT INTO invoice_return_batches (invoice_id, batch_id, location_id, quantity, reference_doctype, reference_docno)
-                  VALUES (?, ?, ?, ?, 'RETURN', ?)
-                `).run(invRow.id, movement.batch_id, locRow.id, restoreQty, invoiceNo);
+            // S-1 HIGH-1: a reservation-backed sale drained a NAMED bin. Put
+            // the physical units back on that exact bin, not the warehouse
+            // DEFAULT, or the stock reappears where it never was while the
+            // reservation restore re-reserves the original (now-empty) bin.
+            //
+            // GLM review of fa84cf61: ONE BATCH CAN SPAN SEVERAL BINS, so the
+            // restore must be split across that batch's ledger rows in the
+            // order they were written. `find` returned only the first match
+            // and reassembled the whole quantity there, over-filling that bin
+            // and leaving the others short.
+            const ledgerBins = item.id != null
+              ? (lineDraws?.get(item.id)?.filter((d) => d.batch_id === movement.batch_id) ?? [])
+              : [];
+            if (ledgerBins.length > 0) {
+              // A sale of one batch can produce SEVERAL movements (one per bin
+              // drain). Walk a cursor per item+batch so the second movement
+              // continues where the first stopped instead of restarting at the
+              // first bin, which would over-fill it.
+              const cursorKey = `${item.id}:${movement.batch_id}`;
+              let cursor = binCursors.get(cursorKey) ?? 0;
+              let left = restoreQty;
+              while (left > 0 && cursor < ledgerBins.length) {
+                const bin = ledgerBins[cursor];
+                // How much of this ledger row has already been restored.
+                const takenKey = `${cursorKey}:${cursor}`;
+                const already = binTaken.get(takenKey) ?? 0;
+                const availableInRow = roundQty(Number(bin.quantity) - already);
+                if (availableInRow <= 0) { cursor += 1; continue; }
+                const take = roundQty(Math.min(left, availableInRow));
+                this.restoreBatchToBin(db, movement.batch_id, bin.location_id, take, invoiceNo);
+                binTaken.set(takenKey, roundQty(already + take));
+                left = roundQty(left - take);
+                if (roundQty(Number(bin.quantity) - (binTaken.get(takenKey) ?? 0)) <= 0) cursor += 1;
               }
+              binCursors.set(cursorKey, cursor);
+              // Ledger covered less than the movement (e.g. a prior partial
+              // return): the remainder belongs on the last named bin rather
+              // than DEFAULT, because that bin is where the sale came from.
+              if (left > 0) {
+                const last = ledgerBins[ledgerBins.length - 1];
+                this.restoreBatchToBin(db, movement.batch_id, last.location_id, left, invoiceNo);
+              }
+            } else {
+              const locRow = db.prepare(`
+                  SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
+                `).get(targetWarehouseId) as { id: number } | undefined;
+              if (locRow) this.restoreBatchToBin(db, movement.batch_id, locRow.id, restoreQty, invoiceNo);
             }
 
             // Credit the master batch row on every flag state. Consumption
@@ -776,7 +851,7 @@ class InvoiceModel {
     movementDate: string,
     userId: number
   ): void {
-    const items = this.getItemsForStockReverse(invoiceId, db);
+    const items = this.getInvoiceItemsForStockReverse(db, invoiceId);
     const findSaleMovements = db.prepare(`
       SELECT warehouse_id, quantity, unit_cost, batch_id
       FROM stock_movements
@@ -788,17 +863,24 @@ class InvoiceModel {
       itemId: number,
       warehouseId: number,
       batchId: number,
-      qty: number
+      qty: number,
+      locationId?: number,
     ): void => {
       if (isFeatureEnabled(db, 'feature_batch_locations')) {
-        const locRow = db.prepare(`
-          SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
-        `).get(warehouseId) as { id: number } | undefined;
-        if (locRow) {
+        // HIGH-2: a reservation-backed sale came from a NAMED bin. Reading
+        // DEFAULT alone made a rack sale look empty and refused the restore.
+        let targetLocationId = locationId;
+        if (targetLocationId == null) {
+          const locRow = db.prepare(`
+            SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
+          `).get(warehouseId) as { id: number } | undefined;
+          targetLocationId = locRow?.id;
+        }
+        if (targetLocationId != null) {
           const avail = db.prepare(`
             SELECT quantity_available FROM batch_stock_by_location
             WHERE batch_id = ? AND location_id = ?
-          `).get(batchId, locRow.id) as { quantity_available: number } | undefined;
+          `).get(batchId, targetLocationId) as { quantity_available: number } | undefined;
           if (!avail || roundQty(avail.quantity_available) < qty) {
             throw new Error(
               `restore invoice ${invoiceNo}: batch ${batchId} has insufficient location stock ` +
@@ -811,7 +893,7 @@ class InvoiceModel {
       // `stock_batches` draw-down below. The guard above stays flag-gated
       // because it is a READ of the location source; the WRITE must happen
       // either way or the bin keeps stock its batch no longer has.
-      StockMovementModel.mirrorBatchLocationDelta(batchId, warehouseId, -qty, db);
+      StockMovementModel.mirrorBatchLocationDelta(batchId, warehouseId, -qty, db, locationId);
       const batchRow = db.prepare(`SELECT quantity_remaining FROM stock_batches WHERE id = ?`)
         .get(batchId) as { quantity_remaining: number } | undefined;
       if (!batchRow || roundQty(batchRow.quantity_remaining) < qty) {
@@ -833,11 +915,23 @@ class InvoiceModel {
         );
       }
       const warehouseId = saleMovements[0].warehouse_id;
+      // Replay the bins this line actually sold from, in ledger order, so a
+      // rack sale comes back to its own rack.
+      const lineDraws = this.readLineBinDraws(db, [{ id: item.id }]);
+      const itemDraws = lineDraws.get(item.id) ?? [];
+      let drawCursor = 0;
       for (const sale of saleMovements) {
         const qty = roundQty(Math.abs(sale.quantity));
         if (qty <= 0) continue;
+        let locationId: number | undefined;
+        while (drawCursor < itemDraws.length && Number(itemDraws[drawCursor].quantity) <= 0) drawCursor += 1;
+        const nextDraw = itemDraws[drawCursor];
+        if (sale.batch_id !== null && nextDraw && nextDraw.batch_id === sale.batch_id) {
+          locationId = nextDraw.location_id;
+          drawCursor += 1;
+        }
         if (sale.batch_id !== null) {
-          consumeBatch(item.item_id, warehouseId, sale.batch_id, qty);
+          consumeBatch(item.item_id, warehouseId, sale.batch_id, qty, locationId);
         }
         StockMovementModel.recordMovement(
           {
@@ -902,21 +996,20 @@ class InvoiceModel {
   /**
    * Create a new invoice item
    */
-  static createInvoiceItem(db: Database.Database, invoiceId: number, item: CreateInvoiceItemDTO): void {
+  static createInvoiceItem(db: Database.Database, invoiceId: number, item: CreateInvoiceItemDTO): number {
     // ACC-18 interim: the stored amount is always the server-computed
     // line total — round(base − discount) with tax applied at the line
     // boundary. The base is qty × price, or the entered `amount` for
     // loose amount-driven lines (the same base the validation summed).
     const { amount, netAmount, taxAmount } = decomposeLineAmount(item);
-    db.prepare(`
+    const result = db.prepare(`
       INSERT INTO invoice_items (
         invoice_id, item_id, quantity, unit_price, amount,
         tax_rate, discount_type, discount_value,
-        net_amount, tax_amount
+        net_amount, tax_amount, reservation_id
       )
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     `).run(
-      invoiceId,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     `).run(      invoiceId,
       item.item_id,
       item.quantity,
       item.unit_price,
@@ -925,8 +1018,10 @@ class InvoiceModel {
       item.discount_type || 'percentage',
       item.discount_value || 0,
       netAmount,
-      taxAmount
+      taxAmount,
+      item.reservation_id ?? null
     );
+    return Number(result.lastInsertRowid);
   }
 
   /**
@@ -1071,8 +1166,92 @@ class InvoiceModel {
   /**
    * Get invoice items for stock reversal
    */
-  static getInvoiceItemsForStockReverse(db: Database.Database, invoiceId: number): Array<{ item_id: number; quantity: number; unit_price: number }> {
-    return db.prepare(`SELECT item_id, quantity, unit_price FROM invoice_items WHERE invoice_id = ?`).all(invoiceId) as Array<{ item_id: number; quantity: number; unit_price: number }>;
+  /**
+   * S-1: record which bins an invoice line drained, so a void can restore
+   * exactly those bins. Entries without a resolved bin are skipped - only the
+   * reservation path sets locationId, and it always has one.
+   */
+  static recordLineBinDraw(
+    db: Database.Database,
+    invoiceItemId: number,
+    draw: Array<{ batchId: number | null; locationId?: number; consumed: number }>,
+  ): void {
+    const ins = db.prepare(
+      'INSERT INTO invoice_item_bin_consumption (invoice_item_id, batch_id, location_id, quantity) VALUES (?, ?, ?, ?)');
+    for (const entry of draw) {
+      if (entry.batchId == null || entry.locationId == null) continue;
+      ins.run(invoiceItemId, entry.batchId, entry.locationId, entry.consumed);
+    }
+  }
+
+  /**
+   * Reopen the reservations behind these invoice lines, restoring the exact
+   * bins each line drained from the per-line ledger. Used by every operation
+   * that reverses the sale (cancel, edit, delete): the rule is one place so no
+   * path can drift. A line with no ledger row falls back to the reservation's
+   * own stored allocations. Rows are deleted once applied, so a second
+   * reversal of the same line cannot restore twice.
+   *
+   * Returns the draws it applied, keyed by invoice_items.id, so the stock
+   * reversal can put physical units back on the SAME bins.
+   */
+  static readLineBinDraws(
+    db: Database.Database,
+    lines: Array<{ id: number }>,
+  ): Map<number, Array<{ batch_id: number; location_id: number; quantity: number }>> {
+    const draws = new Map<number, Array<{ batch_id: number; location_id: number; quantity: number }>>();
+    const stmt = db.prepare(
+      'SELECT batch_id, location_id, quantity FROM invoice_item_bin_consumption WHERE invoice_item_id = ? ORDER BY id');
+    for (const line of lines) {
+      // No reservation_id filter: this is a pure read of where the line's
+      // units came from, and every reversal needs it (the return path has no
+      // reservation). Callers that act on a reservation check that field
+      // themselves - see reopenReservationsForLines.
+      const draw = stmt.all(line.id) as Array<{ batch_id: number; location_id: number; quantity: number }>;
+      if (draw.length > 0) draws.set(line.id, draw);
+    }
+    return draws;
+  }
+
+  /**
+   * Reopen each line's reservation from the draws read above.
+   * `keepLedger` is set by a soft delete, which stays reversible: the rows are
+   * replayed by a restore instead of being dropped.
+   */
+  static reopenReservationsForLines(
+    db: Database.Database,
+    lines: Array<{ id: number; reservation_id?: number | null; quantity: number }>,
+    draws: Map<number, Array<{ batch_id: number; location_id: number; quantity: number }>>,
+    keepLedger = false,
+  ): void {
+    for (const line of lines) {
+      if (!line.reservation_id) continue;
+      const draw = draws.get(line.id);
+      if (draw) {
+        StockReservationModel.restoreConsumedBins(
+          db, line.reservation_id, draw.map((d) => ({ batch_id: d.batch_id, location_id: d.location_id, quantity_reserved: roundQty(Number(d.quantity)) })));
+        if (!keepLedger) db.prepare('DELETE FROM invoice_item_bin_consumption WHERE invoice_item_id = ?').run(line.id);
+      } else {
+        StockReservationModel.reopenForInvoiceLine(db, line.reservation_id, roundQty(Math.abs(line.quantity)));
+      }
+    }
+  }
+
+  /** S-1 restore: replay the kept ledger rows so the reservation is taken again. */
+  static reconsumeRestoredLines(
+    db: Database.Database,
+    lines: Array<{ id: number; reservation_id?: number | null }>,
+    draws: Map<number, Array<{ batch_id: number; location_id: number; quantity: number }>>,
+  ): void {
+    for (const line of lines) {
+      if (!line.reservation_id) continue;
+      const draw = draws.get(line.id);
+      if (draw) StockReservationModel.reconsumedRestoredBins(db, line.reservation_id, draw);
+    }
+  }
+
+  static getInvoiceItemsForStockReverse(db: Database.Database, invoiceId: number): Array<{ id: number; item_id: number; quantity: number; unit_price: number; reservation_id?: number | null }> {
+    return db.prepare(`SELECT id, item_id, quantity, unit_price, reservation_id FROM invoice_items WHERE invoice_id = ? ORDER BY id`).all(invoiceId) as Array<{ id: number; item_id: number; quantity: number; unit_price: number; reservation_id?: number | null }>;
   }
 
   /**
@@ -1194,9 +1373,19 @@ class InvoiceModel {
 
     // ---- 1. Stock reversal ----
     const items = InvoiceModel.getInvoiceItemsForStockReverse(db, invoice.id);
+    // HIGH-1: the physical reversal must land on the bin the sale drained,
+    // not on the warehouse's DEFAULT bin. The per-line ledger is the only
+    // record of that bin, so read it before the reservation restore deletes it.
+    const lineDraws = InvoiceModel.readLineBinDraws(db, items);
     if (items.length > 0) {
-      InvoiceModel.reverseStockForItems(db, items, invoice.invoice_no, userId, 'INVOICE_CANCEL');
+      InvoiceModel.reverseStockForItems(db, items, invoice.invoice_no, userId, 'INVOICE_CANCEL', undefined, lineDraws);
     }
+
+    // Decision A: a void reopens each line's consumed reservation, but only
+    // when the reservation's source order is still active. The stock reversal
+    // above restored the physical quantity; this restores the reserve. Runs
+    // inside the caller's transaction so both commit together.
+    InvoiceModel.reopenReservationsForLines(db, items, lineDraws);
 
     // ---- 2. GL void (canonical journal_lines) ----
     const voidReason = `Invoice ${invoice.invoice_no} cancelled`;
@@ -1314,9 +1503,11 @@ class InvoiceModel {
     return db.prepare(
       `SELECT ii.id, ii.item_id, ii.quantity, ii.returned_qty, ii.unit_price, ii.amount, ii.tax_rate,
              ii.discount_type, ii.discount_value, ii.expiry_date, ii.is_expired_at_sale,
+             ii.reservation_id,
              item.item_name, item.item_code
       FROM invoice_items ii LEFT JOIN items item ON ii.item_id = item.id
-      WHERE ii.invoice_id = ?`
+      WHERE ii.invoice_id = ?
+      ORDER BY ii.id`
     ).all(invoiceId);
   }
 

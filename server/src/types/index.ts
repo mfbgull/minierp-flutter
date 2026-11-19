@@ -25,6 +25,13 @@ export type InvoiceStatus =
   | 'Partially Returned';
 
 export interface InvoiceItemDTO {
+  /** Optional. The EXISTING invoice line this submission continues, on an
+   * edit. It is the only durable identity for release/reopen: `item_id` alone
+   * cannot tell "line changed item" from "line deleted, line added", and array
+   * position shifts on any reorder or deletion. Validated to belong to the
+   * invoice being edited; a split keeps the id on one line and omits it on the
+   * rest. Omitted by older clients. */
+  id?: number;
   item_id: number;
   description?: string;
   quantity: number;
@@ -36,6 +43,9 @@ export interface InvoiceItemDTO {
   /** Loose amount-driven lines: the entered bill amount is the line's
    * gross base (sales form flip model §5.2); otherwise qty × unit_price. */
   amount?: number;
+  /** S-1: the ACTIVE reservation this line fulfils. When set, the sale
+   * consumes EXACTLY that reservation and releases its bin reserved. */
+  reservation_id?: number;
 }
 
 export interface PaymentDTO {

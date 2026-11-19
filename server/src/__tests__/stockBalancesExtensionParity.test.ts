@@ -268,13 +268,12 @@ describe('S-3: stock_balances extension mirror parity on ADD paths', () => {
    * /api/inventory/reservations with flag ON.
    *
    * This is the reservation write path, NOT one of S-3's three ADD paths and
-   * NOT the S-1 consume/release path. It is left UNFIXED in this branch (no
-   * StockReservation production edits here) — the reservation writer is NOT
-   * fixed. The probe below asserts the CURRENT, WRONG behaviour as
-   * characterisation only; it is NOT an intended regression contract. When the
-   * separate finding is fixed, flip these assertions to EQUALITY.
+   * NOT the S-1 consume/release path. It was left UNFIXED when this probe was
+   * written; MEDIUM-1 (GLM review of 90d57a3a) has since fixed it by syncing
+   * the mirror inside reserveBins, so the assertions below are now EQUALITY,
+   * as the original comment instructed.
    */
-  it('CHARACTERIZATION (open defect, separate finding): a reservation alone leaves the mirror stale', async () => {
+  it('the mirror tracks a reservation write instead of going stale (MEDIUM-1)', async () => {
     setFeatureEnabled(db, 'feature_batch_locations', true);
     const itemId = await createItem('S3 reservation-probe item', cookie);
     await drivePurchase(itemId, whId, 10);
@@ -287,9 +286,9 @@ describe('S-3: stock_balances extension mirror parity on ADD paths', () => {
     });
     expect(reserved.status).toBe(201);
 
-    // Bins moved; the mirror did not.
+    // Bins moved and the mirror followed in the same transaction.
     expect(binSums(itemId, whId)).toEqual({ physical: 10, reserved: 4, available: 6 });
     expect({ physical: mirror(itemId, whId).physical, reserved: mirror(itemId, whId).reserved, available: mirror(itemId, whId).available })
-      .toEqual({ physical: 10, reserved: 0, available: 10 }); // stale — the gap
+      .toEqual({ physical: 10, reserved: 4, available: 6 });
   });
 });

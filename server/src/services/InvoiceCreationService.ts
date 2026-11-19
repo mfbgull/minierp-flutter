@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import AccountingService from './accountingService';
 import InvoiceModel from '../models/Invoice';
 import StockMovementModel from '../models/StockMovement';
+import { StockReservationModel } from '../models/StockReservation';
 import ledgerUtils from '../utils/ledgerUtils';
 import { PaymentRecordingService } from './PaymentRecordingService';
 import { addCurrency, computeInvoiceGrandTotal, parseCurrency, subtractCurrency } from '../utils/currency';
@@ -294,7 +295,26 @@ export class InvoiceCreationService {
     for (let li = 0; li < input.items.length; li++) {
       const item = input.items[li];
       const warehouseId = lineWarehouses[li].warehouseId;
-      InvoiceModel.createInvoiceItem(this.db, invoiceId, {
+
+      // S-1: the line names the reservation it fulfils. Validate BEFORE any
+      // write: an id for another item/warehouse/bin must not drain or consume
+      // anything. Reads are flag-independent, so this works flag-on and off.
+      const reservation = item.reservation_id !== undefined
+        ? StockReservationModel.getActiveById(item.reservation_id, this.db)
+        : undefined;
+      if (item.reservation_id !== undefined) {
+        if (!reservation) {
+          throw new BusinessRuleError(409, `Reservation ${item.reservation_id} is not active or does not exist`);
+        }
+        if (reservation.item_id !== item.item_id || reservation.warehouse_id !== warehouseId) {
+          throw new BusinessRuleError(409, `Reservation ${item.reservation_id} does not belong to this item and warehouse`);
+        }
+        if (reservation.quantity_reserved < item.quantity) {
+          throw new BusinessRuleError(409, `Reservation ${item.reservation_id} reserves only ${reservation.quantity_reserved}, but ${item.quantity} were sold`);
+        }
+      }
+
+      const invoiceItemId = InvoiceModel.createInvoiceItem(this.db, invoiceId, {
         item_id: item.item_id,
         quantity: item.quantity,
         unit_price: item.unit_price,
@@ -302,9 +322,28 @@ export class InvoiceCreationService {
         discount_type: item.discount_type,
         discount_value: item.discount_value,
         amount: item.amount,
+        reservation_id: item.reservation_id,
       });
+
+      // S-1: a named reservation drains ITS OWN batch/bin; otherwise FIFO.
       const { consumption, backdatedBeforeReceipt: backdatedLine, firstReceiptDate, warnings: stockWarnings } =
-        StockMovementModel.consumeForSale(item.item_id, warehouseId, item.quantity, this.db, input.invoiceDate);
+        reservation
+          ? {
+              consumption: StockMovementModel.consumeAgainstReservation(reservation, item.quantity, this.db),
+              backdatedBeforeReceipt: false,
+              firstReceiptDate: null as string | null,
+              warnings: [] as string[],
+            }
+          : StockMovementModel.consumeForSale(item.item_id, warehouseId, item.quantity, this.db, input.invoiceDate);
+
+      // S-1: fulfil the named reservation by exactly the sold quantity — a
+      // partial sale leaves the remainder ACTIVE and reserved.
+      if (reservation) {
+        // S-1: record the exact per-bin draw of THIS line so a void restores
+        // only what this line took (see Invoice.recordLineBinDraw).
+        InvoiceModel.recordLineBinDraw(this.db, invoiceItemId, consumption);
+        StockReservationModel.markConsumedPartial(this.db, reservation, item.quantity);
+      }
       // BUG-013 R1/R2: damaged-bin and bin-under-coverage notes from the
       // consume path ride the SAME warnings[] channel as ACCT-006 below.
       warnings.push(...stockWarnings);

@@ -5,6 +5,7 @@ import type Database from 'better-sqlite3';
 import db from '../config/database';
 import { AuthRequest, CreateInvoiceDTO, Invoice, InvoiceItemDTO, PaymentDTO, InvoiceStatus, SellableStockUnavailableError } from '../types';
 import StockMovementModel from '../models/StockMovement';
+import { StockReservationModel, type StockReservation } from '../models/StockReservation';
 import InvoiceModel from '../models/Invoice';
 import { InvoiceCancellationGuardError } from '../models/Invoice';
 import PaymentModel from '../models/Payment';
@@ -22,6 +23,8 @@ import {
   computeInvoiceGrandTotal,
 } from '../utils/currency';
 import { isValidPaymentMethod } from '../services/cashService';
+import { roundQty } from '../utils/quantity';
+import { BusinessRuleError } from '../utils/businessRuleError';
 import { handleBusinessError } from '../utils/businessRuleError';
 import { assertLegacyInvoiceAllocationsAllowed } from '../services/unappliedPaymentGuard';
 import { assertNoPartyAdjustment } from '../utils/partyAdjustmentBalances';
@@ -115,6 +118,10 @@ interface InvoiceItemRow {
   tax_rate: number;
   discount_type: string;
   discount_value: number;
+  /** S-1: the reservation this line fulfilled. Nullable on purpose - every
+   * pre-128 line predates the link, and an unreserved sale has none. The edit
+   * form resends it so a same-item line keeps its own reservation (NEW-4). */
+  reservation_id: number | null;
   item_name?: string;
   item_code?: string;
 }
@@ -398,19 +405,25 @@ function consumeInvoiceItemsAndPostCogs(
     items: InvoiceItemDTO[],
     invoiceDate: string,
     resolvedInvoiceNo: string,
-    userId: number
+    userId: number,
+    /** MEDIUM-1: reservation per re-created line, keyed by item+warehouse. */
+    reservationFor?: (item: InvoiceItemDTO) => StockReservation | undefined,
 ): number {
     let updatedCogsTotal = 0;
     for (const item of items) {
+        const reservation = reservationFor?.(item);
         // Intentionally bypasses InvoiceCreationService (post-create amendment, not invoice creation).
-        InvoiceModel.createInvoiceItem(db, invoiceId, {
+        const invoiceItemId = InvoiceModel.createInvoiceItem(db, invoiceId, {
             item_id: item.item_id,
             quantity: item.quantity,
             unit_price: item.unit_price,
             tax_rate: item.tax_rate,
             discount_type: item.discount_type,
             discount_value: item.discount_value,
-            amount: item.amount
+            amount: item.amount,
+            // MEDIUM-1: keep the reservation link across the edit, so the line
+            // is not orphaned from the reservation that backed the sale.
+            reservation_id: reservation?.id,
         });
 
         // FIX #3: Stock validation with warning
@@ -421,13 +434,16 @@ function consumeInvoiceItemsAndPostCogs(
             item.warehouse_id
         );
 
-        // FIFO batch consumption for new/updated items
-        const consumption = InvoiceModel.consumeFromOldestBatches(
-            item.item_id,
-            warehouseId,
-            item.quantity,
-            db
-        );
+        // MEDIUM-1: a linked reservation drains ITS OWN bins; otherwise FIFO.
+        // Draining FIFO while the reserve sits on top asks for stock the
+        // reservation already holds, which is the 400 this path produced.
+        const consumption = reservation
+            ? StockMovementModel.consumeAgainstReservation(reservation, item.quantity, db)
+            : InvoiceModel.consumeFromOldestBatches(item.item_id, warehouseId, item.quantity, db);
+        if (reservation) {
+            InvoiceModel.recordLineBinDraw(db, invoiceItemId, consumption);
+            StockReservationModel.markConsumedPartial(db, reservation, item.quantity);
+        }
 
         // Create one stock movement per consumed batch with actual COGS
         for (const entry of consumption) {
@@ -691,14 +707,292 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
 
         // === FIX #4: Reverse old stock before inserting new items ===
         const oldItems = InvoiceModel.getInvoiceItemsForStockReverse(db, invoiceId);
+        const oldDraws = InvoiceModel.readLineBinDraws(db, oldItems);
+        // MEDIUM-1 / NEW-1 / NEW-4: remember which reservation backed each old
+        // line BEFORE the rows are deleted. A map keyed by item_id is NOT
+        // enough (NEW-1): one invoice may carry two lines of the same item on
+        // DIFFERENT reservations. A per-item QUEUE is also not enough (NEW-4):
+        // it pairs by ARRAY POSITION, so reordering two same-item lines hands
+        // the larger line the smaller reservation - a 400 when the quantities
+        // differ, and a silent wrong link when they match. Keep both: an index
+        // by reservation id for the explicit case, and the queue as a fallback
+        // for a client that does not resend the link.
+        const reservationById = new Map<number, StockReservation>();
+        const reservationsByItem = new Map<number, StockReservation[]>();
+        for (const old of oldItems) {
+            if (!old.reservation_id) continue;
+            // A released reservation is never handed back to a new line.
+            const reservation = StockReservationModel.getById(old.reservation_id, db);
+            if (!reservation || reservation.status === 'RELEASED') continue;
+            reservationById.set(reservation.id, reservation);
+            const queue = reservationsByItem.get(old.item_id) ?? [];
+            queue.push(reservation);
+            reservationsByItem.set(old.item_id, queue);
+        }
 
-        InvoiceModel.reverseStockForItems(db, oldItems, originalInvoice.invoice_no, userId, 'INVOICE_UPDATE');
+        // NEW-2 Option 1: a line whose item CHANGED no longer belongs to the
+        // reservation that backed it, so that reservation is RELEASED rather
+        // than reopened - reopening would hold the units on a sale that no
+        // longer contains the item (the stranded hold Finding 19 pins). Release
+        // is terminal: a later change back must reserve again.
+        //
+        // Identity is the submitted `id` of an existing line. Nothing weaker is
+        // safe: an array index shifts on any reorder or deletion (GLM HIGH on
+        // e390321a released r1 while the KEPT item-A line stayed unreserved),
+        // and comparing quantity or arrival order is the same guess that caused
+        // NEW-1 and NEW-4. When identity cannot be established the edit fails
+        // closed with 409 instead of pairing something plausible.
+        const oldById = new Map<number, (typeof oldItems)[number]>();
+        for (const old of oldItems) oldById.set(old.id, old);
+
+        const submittedIds = new Set<number>();
+        for (const item of items) {
+          if (item.id == null) continue;
+          // The id must name a line of THIS invoice - otherwise a client could
+          // drive a release on someone else's line.
+          if (!oldById.has(item.id)) {
+            throw new BusinessRuleError(409,
+              `Invoice line ${item.id} does not belong to invoice ${resolvedInvoiceNo}`);
+          }
+          if (submittedIds.has(item.id)) {
+            throw new BusinessRuleError(409,
+              `Invoice line ${item.id} is submitted more than once`);
+          }
+          submittedIds.add(item.id);
+        }
+
+        // reservation_id -> the submitted line that claims it. Only meaningful
+        // with an explicit link; it names the surviving line for a split.
+        const itemByReservation = new Map<number, InvoiceItemDTO>();
+        const reservationsPerItem = new Map<number, number>();
+        for (const item of items) {
+          if (item.reservation_id == null) continue;
+          if (!itemByReservation.has(item.reservation_id)) {
+            itemByReservation.set(item.reservation_id, item);
+          }
+          reservationsPerItem.set(item.item_id, (reservationsPerItem.get(item.item_id) ?? 0) + 1);
+        }
+
+        // A line is continued when the edit resubmits its id. With no ids at all
+        // (an older client) the edit must be unambiguous per item: exactly one
+        // old line and one submitted line for that item, both unreserved. Any
+        // other shape is refused rather than guessed.
+        const legacyMode = !items.some((item) => item.id != null);
+        const oldPerItem = new Map<number, number>();
+        const newPerItem = new Map<number, number>();
+        for (const old of oldItems) oldPerItem.set(old.item_id, (oldPerItem.get(old.item_id) ?? 0) + 1);
+        for (const item of items) newPerItem.set(item.item_id, (newPerItem.get(item.item_id) ?? 0) + 1);
+
+        const releasedIds = new Set<number>();
+        const linesToReopen: typeof oldItems = [];
+        for (const old of oldItems) {
+          const explicit = itemByReservation.get(old.reservation_id ?? -1);
+          let continued: InvoiceItemDTO | undefined;
+          let itemChanged: boolean;
+
+          if (!legacyMode) {
+            // The submitted line that carries this old id continues it.
+            continued = items.find((item) => item.id === old.id);
+            if (!continued) {
+              // The old line is gone. Its reservation can only be reopened if
+              // the edit did not hand that reservation to another line.
+              if (old.reservation_id != null && explicit) {
+                throw new BusinessRuleError(409,
+                  `Reservation ${old.reservation_id} is still claimed by another line but its own line was removed`);
+              }
+              linesToReopen.push(old);
+              continue;
+            }
+            itemChanged = continued.item_id !== old.item_id;
+          } else {
+            // Older client: no ids. Accept only shapes with one obvious answer.
+            const ambiguity = old.reservation_id != null
+              ? (oldPerItem.get(old.item_id) ?? 0) > 1 || (newPerItem.get(old.item_id) ?? 0) > 1
+              : false;
+            if (ambiguity) {
+              throw new BusinessRuleError(409,
+                `Invoice contains more than one line for item ${old.item_id}; resend each line id to edit it`);
+            }
+            // A line of a different item that is the only submitted line of ITS
+            // item is the continuation of this one (an item change); otherwise
+            // this line was removed or resized.
+            const candidates = items.filter((item) => item.id == null && item.reservation_id == null
+              && (newPerItem.get(item.item_id) ?? 0) === 1);
+            continued = candidates[0];
+            itemChanged = !!continued && continued.item_id !== old.item_id;
+          }
+
+          if (itemChanged && old.reservation_id) {
+            StockReservationModel.releaseById(db, old.reservation_id);
+            releasedIds.add(old.reservation_id);
+            continue;
+          }
+          linesToReopen.push(old);
+        }
+
+        InvoiceModel.reverseStockForItems(db, oldItems, originalInvoice.invoice_no, userId, 'INVOICE_UPDATE', undefined, oldDraws);
+
+        // S-1: an edit reverses the sale, so it follows the same reservation
+        // rule as a cancel - reopen only when the source order is still
+        // active. Runs after the stock reversal, in the same transaction.
+        InvoiceModel.reopenReservationsForLines(db, linesToReopen, oldDraws);
+
+        // NEW-2 wire contract (PR #42): the edit form resends BOTH the line `id`
+        // and its `reservation_id`, and it KEEPS the old link on a line whose
+        // item changed - the client has no other way to say "this line still
+        // exists". The loop above already RELEASED that hold, so the resent link
+        // is void, not a claim on it. Only a line that still sells the
+        // reservation's item may budget that hold or be rejected for naming an
+        // unknown one. Without this, an ordinary item change sent by the real
+        // client 409s with "reservation N holds 0 but the line requests X".
+        const claimsReservation = (item: (typeof items)[number]): boolean => {
+          if (item.reservation_id == null) return false;
+          if (item.id == null) return true;
+          const old = oldById.get(item.id);
+          return old == null || old.item_id === item.item_id;
+        };
+
+        // Line-count rule (audit/DECISIONS.md): one reservation may SPLIT across
+        // several resulting lines, but one line must never consume two distinct
+        // reservations. Count by durable reservation id, never by position - a
+        // line can be reordered, and after a split one reservation legitimately
+        // appears on several lines.
+        const wantedIds = new Map<number, number>();
+        for (const item of items) {
+          if (!claimsReservation(item)) continue;
+          const reservationId = item.reservation_id as number;
+          wantedIds.set(reservationId, (wantedIds.get(reservationId) ?? 0) + 1);
+        }
+        const unknown = items.find((item) => claimsReservation(item)
+          && !reservationById.has(item.reservation_id as number));
+        if (unknown) {
+          // The line names a reservation this invoice never held - it would have
+          // to consume someone else's hold. Reject before any row changes.
+          throw new BusinessRuleError(409,
+            `Invoice line ${unknown.item_id}: reservation ${unknown.reservation_id} does not belong to this invoice`);
+        }
+
+        // Collapse check: the old invoice held N distinct reservations for an
+        // item, but the edit keeps fewer LINES for that item. One line cannot
+        // honestly consume two reservations, and the surplus is not the user's
+        // to lose - refuse rather than silently drop a hold. Reads durable ids
+        // only, so a reorder or a resize of lines does not trip this.
+        const oldReservedPerItem = new Map<number, number>();
+        for (const old of oldItems) {
+          if (old.reservation_id == null) continue;
+          oldReservedPerItem.set(old.item_id, (oldReservedPerItem.get(old.item_id) ?? 0) + 1);
+        }
+        const keptLinesPerItem = new Map<number, number>();
+        for (const item of items) {
+          keptLinesPerItem.set(item.item_id, (keptLinesPerItem.get(item.item_id) ?? 0) + 1);
+        }
+        for (const [itemId, reserved] of oldReservedPerItem) {
+          const kept = keptLinesPerItem.get(itemId) ?? 0;
+          // A line that CHANGED item is meant to lose its hold, so it is not a
+          // collapse. Count only old lines whose item is still this item.
+          const releasedByChange = oldItems.filter((old) => old.item_id === itemId
+            && old.reservation_id != null
+            && releasedIds.has(old.reservation_id)).length;
+          // A line DELETED by the edit also leaves the count, and its
+          // reservation correctly reopens - that is a removal, not a collapse.
+          // Only a client that sends ids can express a deletion; without them
+          // every old line "looks removed", which would fake a collapse.
+          const removedLines = legacyMode ? 0 : oldItems.filter((old) => old.item_id === itemId
+            && old.reservation_id != null
+            && !items.some((item) => item.id === old.id)).length;
+          // A removed line is only harmless when nothing absorbs its quantity.
+          // If a surviving line of the same item grew past what the kept
+          // reservations hold, it is a collapse wearing a deletion's clothes.
+          // Compare against the reservations that SURVIVE the edit, so a plain
+          // quantity change on a kept line is never mistaken for a collapse.
+          const keptIds = new Set(items.map((item) => item.id));
+          const keptHeld = oldItems
+            .filter((old) => old.item_id === itemId && old.reservation_id != null
+              && keptIds.has(old.id))
+            .reduce((sum, old) => sum + roundQty(Number(old.quantity)), 0);
+          const keptRequested = items
+            .filter((item) => item.item_id === itemId)
+            .reduce((sum, item) => sum + roundQty(Number(item.quantity)), 0);
+          const absorbed = removedLines > 0 && keptRequested > keptHeld;
+          if (kept + releasedByChange + removedLines < reserved || absorbed) {
+            throw new BusinessRuleError(409,
+              `Cannot collapse reservations into one line: item ${itemId} had ${reserved} reserved lines but the edit keeps ${kept}`);
+          }
+        }
+
+        // Budget per reservation: its remaining held quantity, spent down as each
+        // line takes its share. A line asking for more than is left is a
+        // collapse that cannot be honoured - it would need a second reservation.
+        // Read the LIVE row, not the pre-reopen snapshot: a CONSUMED
+        // reservation had quantity_reserved = 0 until reopenReservationsForLines
+        // put it back, so a stale read would budget 0 and 409 on a legal edit.
+        const budget = new Map<number, number>();
+        for (const [id] of wantedIds) {
+          const row = StockReservationModel.getById(id, db);
+          if (row) budget.set(id, roundQty(Number(row.quantity_reserved)));
+        }
+        for (const item of items) {
+          if (!claimsReservation(item)) continue;
+          const reservationId = item.reservation_id as number;
+          const left = budget.get(reservationId) ?? 0;
+          const want = roundQty(Number(item.quantity));
+          if (want > left) {
+            // Two reservations collapsed into one line lands here: the line
+            // names one reservation and asks for more than it holds.
+            throw new BusinessRuleError(409,
+              `Cannot collapse reservations into one line: reservation ${reservationId} holds ${left} but the line requests ${want}`);
+          }
+          budget.set(reservationId, roundQty(left - want));
+        }
+
+        // Any reservation quantity no resulting line takes is stranded, so it is
+        // released - the same rule as an item change (NEW-2 Option 1), reached
+        // by resizing. Done BEFORE the lines are inserted so the consume calls
+        // below see the right remaining amounts, and it never releases a
+        // reservation that some line still needs.
+        for (const [id, left] of budget) {
+          if (left <= 0) continue;
+          const live = StockReservationModel.getById(id, db);
+          if (!live || live.status !== 'ACTIVE') continue;
+          // Give back exactly the part no line takes; a line still needs the rest.
+          StockReservationModel.releaseById(db, id, left);
+        }
 
         InvoiceModel.deleteInvoiceItems(db, invoiceId);
 
         // Insert new invoice items and create new stock movements
+        const claimed = new Set<number>();
         const updatedCogsTotal = consumeInvoiceItemsAndPostCogs(
-            db, invoiceId, items, invoice_date, resolvedInvoiceNo, userId
+            db, invoiceId, items, invoice_date, resolvedInvoiceNo, userId,
+            (item) => {
+                // NEW-4: an explicit reservation_id from the client is the
+                // only durable identity here - never infer it from position.
+                // This line must also BE that reservation's item, or the edit
+                // is really an item change (see NEW-2 in audit/DECISIONS.md).
+                // Line-count rule: one reservation MAY back several lines, so a
+                // reservation already taken is not a reason to skip it - the
+                // budget and the live bin rows below keep the total exact.
+                let captured: StockReservation | undefined;
+                if (item.reservation_id != null) {
+                    const named = reservationById.get(item.reservation_id);
+                    if (named && named.item_id === item.item_id) captured = named;
+                }
+                if (!captured) {
+                    // Fallback for a client that does not resend the link: take
+                    // a reservation for the item that still has quantity left.
+                    // Never take a reservation this edit just released: it is
+                    // terminal, and handing it out would undo the release.
+                    captured = reservationsByItem.get(item.item_id)
+                        ?.find((r) => !claimed.has(r.id) && !releasedIds.has(r.id));
+                }
+                if (!captured) return undefined;
+                claimed.add(captured.id);
+                // Re-read: the reopen above changed the status, and only a
+                // reservation it made ACTIVE can be taken again - a closed
+                // order stays unreserved by the rule.
+                const fresh = StockReservationModel.getById(captured.id, db);
+                return fresh?.status === 'ACTIVE' ? fresh : undefined;
+            },
         );
 
         // GL consistency (ACC-08): void the invoice's INVOICE + COGS lines
@@ -796,10 +1090,17 @@ function deleteInvoice(req: AuthRequest, res: Response): Response | void {
       assertLegacyInvoiceAllocationsAllowed(db, invoiceId);
       assertNoPartyAdjustment(db, 'invoice', invoiceId);
 
-      const invoiceItems = InvoiceModel.getItemsForStockReverse(invoiceId, db);
+      const invoiceItems = InvoiceModel.getInvoiceItemsForStockReverse(db, invoiceId);
+      const deleteDraws = InvoiceModel.readLineBinDraws(db, invoiceItems);
 
       // Reverse stock movements
-      InvoiceModel.reverseStockForItems(db, invoiceItems, freshInvoice.invoice_no, userId, 'INVOICE_DELETE');
+      InvoiceModel.reverseStockForItems(db, invoiceItems, freshInvoice.invoice_no, userId, 'INVOICE_DELETE', undefined, deleteDraws);
+
+      // S-1: a delete reverses the sale, so it follows the same reservation
+      // rule as a cancel - reopen only when the source order is still active.
+      // The ledger rows are KEPT because a delete is reversible: a restore
+      // replays them to take the reservation again.
+      InvoiceModel.reopenReservationsForLines(db, invoiceItems, deleteDraws, true);
 
       // Void ALL related journal lines (invoice + returns). Must affect rows.
       // Return GL groups are keyed to the return document, not the invoice,
@@ -898,6 +1199,14 @@ function restoreInvoice(req: AuthRequest, res: Response): Response | void {
     );
 
     const transaction = db.transaction(() => {
+      // 0. S-1: the restored invoice holds its reservation again BEFORE the
+      //    stock re-consume below, from the ledger rows the delete kept. The
+      //    re-consume then draws the units it just reserved. Same active-order
+      //    rule as the reopen, inside this transaction so stock and reserve
+      //    commit together.
+      const restoredItems = InvoiceModel.getInvoiceItemsForStockReverse(db, invoiceId);
+      InvoiceModel.reconsumeRestoredLines(db, restoredItems, InvoiceModel.readLineBinDraws(db, restoredItems));
+
       // 1. Re-consume stock — BUG-010: batch-faithful, not today's FIFO.
       //    Re-use the exact batches and unit costs the invoice's original
       //    SALE movements used, so the stock ledger agrees with the COGS
@@ -910,6 +1219,7 @@ function restoreInvoice(req: AuthRequest, res: Response): Response | void {
         invoice.invoice_date.slice(0, 10),
         userId
       );
+
 
       // 2. Un-void the journal lines the delete voided (GL is restored to
       //    its pre-delete state — no new posting, no double counting).

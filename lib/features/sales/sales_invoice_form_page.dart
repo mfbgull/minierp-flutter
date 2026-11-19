@@ -301,6 +301,9 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     'round_step': PlutoCell(value: ''),
     'last_edited': PlutoCell(value: ''),
     'amount_driven': PlutoCell(value: false),
+    // Hidden carrier for the loaded invoice-item row id (null for a new line).
+    'line_id': PlutoCell(value: null),
+    'reservation_id': PlutoCell(value: null),
     'remove': PlutoCell(value: ''),
   };
 
@@ -313,6 +316,14 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
       'qty': PlutoCell(value: item.quantity),
       'rate': PlutoCell(value: item.unitPrice),
       'tax': PlutoCell(value: item.taxRate),
+      // Preserve the line's DB id across an edit so the server matches the
+      // re-saved line by id, not by array position. Zero means the loader had
+      // no id (a brand-new line) → keep null so it is omitted on save.
+      'line_id': PlutoCell(value: item.id == 0 ? null : item.id),
+      // Preserve the line's stock reservation across an edit so the re-saved
+      // line keeps its own link (the server pairs by this id, not by line
+      // position). Null when the line has no reservation.
+      'reservation_id': PlutoCell(value: item.reservationId),
     },
   );
 
@@ -1043,6 +1054,16 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
             'discount_type': line.row.cells['discount_type']?.value ?? 'none',
             'discount_value': line.discountValue,
             if (line.isLoose) 'amount': line.amount,
+            // Preserve the line's DB id on edit so the server matches the
+            // re-saved line by id, not by array position (which mispairs lines
+            // when the order or count changes). Omitted for a newly added line,
+            // which has no row id yet.
+            if (line.lineId != null) 'id': line.lineId,
+            // Preserve the line's stock reservation on edit so the server
+            // pairs each line with the reservation it names rather than by
+            // position (which mispairs two same-item lines). Omitted when the
+            // line has no reservation.
+            if (line.reservationId != null) 'reservation_id': line.reservationId,
           },
       ],
       'total_amount': calculateTotal(filled, _scope, _invoiceDiscount),

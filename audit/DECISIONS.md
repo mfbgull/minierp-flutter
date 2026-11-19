@@ -1155,3 +1155,206 @@ zeroBalances 2 → 0, batchQty 35 → 35, locationQty 0 → 35.
 **Decision — record the status next to the artifact that proves it.** Each line
 above names the file or the command that produced it. A status without its
 check is a claim, and D23/D24 are the cost of writing one.
+
+---
+
+## DECIDED — a reserved invoice line changed to a different item
+
+**Status:** DECIDED by Gull. Release the old reservation when an invoice edit
+changes the line to a different item. If the user changes the line back later,
+they must create or take a new reservation. PR #41 stays draft until reviewed.
+
+**The situation.** An invoice line sold item A against reservation A. The user
+edits the invoice and changes that line to item B. An edit reverses the line and
+re-creates it, so the reversal reopens reservation A (it returns item A's units
+to its bin and marks A ACTIVE again). The re-created line is item B, so nothing
+links to A and nothing takes it back. Reservation A stays ACTIVE with its
+quantity held, on an invoice that no longer contains item A.
+
+**What I measured, not assumed.** `Finding 19` in
+`server/src/__tests__/reservationWorkflowRegressions.test.ts` pins the current
+outcome. Setup: item A has 5, a 3-unit reservation, sold, then the line is
+edited to item B. Result:
+
+| Reading | Value | Meaning |
+|---|---|---|
+| reservation A status | ACTIVE, quantity 3 | the hold came back and stayed |
+| item A bin | physical 5, reserved 3, available 2 | 3 units held and never owed |
+| reservation A child rows | 3 reserved, 3 allocated | header and children agree |
+| item A `quantity_remaining` | 5 | the batch is whole |
+| invoice line `reservation_id` | NULL | the line no longer names A |
+| item B bin | physical 2, reserved 0 | B is unaffected |
+
+So this is a **stranded hold**, not corruption. The header and child rows agree,
+the batch is whole, and no stock is lost or double-counted. The cost is that 3
+units of item A are reserved forever and the quantity, reference and ledger row
+of reservation A outlive the sale. I first expected negative availability; the
+measurement showed otherwise, and the table records the real state.
+
+**Options.**
+
+1. **Release the old reservation when the line's item changes.** On edit, if a
+   line's reservation no longer matches the new item, release rather than
+   reopen it. Cheapest and safest: no stranded hold, and the "closed order stays
+   unreserved" rule is untouched. Consequence: if the user restores the line to
+   item A afterwards, the reservation must be re-created or re-taken, so a
+   change-then-change-back is not perfectly symmetric.
+2. **Block the change while the reservation is active.** Return 409 asking the
+   user to release the reservation first. Most explicit and the least
+   surprising accounting, but it turns a data cleanup into a workflow refusal.
+3. **Re-link by item, not by position.** Keep the reopen, then link the new line
+   to the active reservation whose `item_id` matches. Silent and convenient, but
+   it can attach a line to a reservation the user never chose, and with two
+   reservations for one item it is ambiguous again - the same class of bug as
+   NEW-1.
+
+**My recommendation.** Option 1. It fixes the leak at the point the mismatch
+becomes known, keeps every reservation traceable to a line that exists, and
+reuses `release`, which already has the accounting and bin logic and is covered
+by tests. It is also the smallest diff. Options 2 and 3 change user-visible
+behaviour or reintroduce positional guessing.
+
+**Decision.** Gull approved Option 1: release the old reservation when the item
+changes. A later change back requires a new reservation; do not silently reuse
+the released reservation.
+
+**Implemented on PR #41.** `StockReservationModel.releaseById` is the release
+path: id-based, because the existing `release` looks up by reference
+doctype/docno and an edit knows the id; ungated, because the flag selects what is
+READ while a release is a write. It drains the allocation, deletes the child
+rows and sets `RELEASED` with `quantity_reserved = 0`, so release is terminal and
+a later reopen or restore has nothing to hand back. The edit releases the old
+reservation for a line whose `item_id` changed instead of reopening it, and the
+relink resolver now skips a `RELEASED` reservation, so the new line links to
+nothing and behaves as an ordinary unreserved sale. A same-item edit still
+follows the normal reopen rule. `Finding 25` covers the four cases (release,
+change-back, cancelled source order, same-item control); `Finding 19` was
+rewritten to read the same scenario the other way rather than deleted, so the
+stranded hold cannot return unnoticed.
+
+---
+
+## DECIDED — partial return of a line sold from two bins
+
+**Status:** DECIDED by Gull. Record exact per-bin draws for every new sale and
+return goods to those recorded bins. For historical sales with no bin record,
+ask the user to choose the return bin. PR #41 stays draft until reviewed.
+
+**Root cause (found, not guessed).** The per-bin ledger is written only for a
+reservation-backed line — `recordLineBinDraw` in `InvoiceCreationService.ts` sits
+inside `if (reservation)`. A plain FIFO sale records **no** per-bin draw at all.
+So the exact mapping this PR relies on does not exist for the most common sale,
+and a partial return cannot replay it.
+
+**Reproduced.** One batch, 4 units on rack R and 6 in DEFAULT. A single
+unreserved line sells 8, drawing from both bins (R 4 → 0, DEFAULT 6 → 2). The
+line's `invoice_item_bin_consumption` rows are empty. A 2-unit return puts both
+units into DEFAULT:
+
+| | before sale | after sale | after 2-unit return |
+|---|---|---|---|
+| rack R | 4 | 0 | 0 |
+| DEFAULT | 6 | 2 | 4 |
+
+**Options.**
+
+1. **Record the per-bin draw for every sale (recommended).** Move
+   `recordLineBinDraw` out of the reservation branch and write the FIFO
+   consumption of every line. The return then replays what actually happened,
+   exactly. Cost: a write per sale line on the hottest path, and a backfill
+   question for existing rows — those fall back to the current walk. This is the
+   only option that makes a partial return *correct* rather than merely
+   consistent.
+2. **Allocate proportionally to the original draw.** No new writes; when a draw
+   exists, return the quantity in the same ratio. Not exact — a customer returns
+   physical goods, not a ratio — and needs option 1's data anyway to be exact.
+3. **Ask the user which bin the goods came back to.** The only fully truthful
+   answer, and the only one that works for a batch with no history. Cost: a UI
+   decision on every partial return, and it does not help a same-batch case
+   where the user has no reason to know which bin paid.
+4. **Return to DEFAULT always (today's behaviour).** Simple and predictable, but
+   it moves stock to a bin that may never have held it and leaves the real bin
+   short — the same defect GLM reported for racks.
+
+**My recommendation.** Option 1, then option 3 only where no draw exists. Option
+2 is a heuristic dressed as a rule; option 4 is a known-wrong answer that only
+looks tidy.
+
+**Decision.** Gull approved Option 1 for new sales and Option 3 for historical
+sales with no draw: persist exact bin consumption for every sale, replay it for
+returns, and require a user-selected bin when historical data has no location
+record. Do not infer missing historical allocations.
+
+---
+
+## DECIDED — an edit that changes the number of lines
+
+**Status:** DECIDED by Gull. Split one reservation across multiple edited lines.
+Reject an edit that collapses multiple reservations into one line with a clear
+409. PR #41 stays draft until reviewed.
+
+**(a) Two reserved lines collapsed into one.** Returns 400: `sellable stock 0,
+requested 4`. Both reservations reopen, but an edit can keep only one per line,
+so the whole 4-unit line is forced onto a 2-unit reservation, and a
+reservation-backed line never falls back to FIFO. The transaction rolls back
+fully, so nothing is corrupted — the edit simply cannot be made.
+
+**(b) One reserved line split into two.** Returns 200, but only the first new
+line takes the reservation. The second is unlinked, and the reservation keeps 2
+units held that nothing owes — the stranded hold from NEW-2, reached by
+splitting.
+
+**(c) An unreserved line.** Round-trips exactly. This is the control.
+
+**Options.** (1) Split the reservation proportionally across the new lines,
+rejecting a collapse that exceeds it. (2) Refuse both resizing edits with a
+clear 409 and tell the user to release first, matching Option 2 of the NEW-2
+entry. (3) Leave as is — accept the 400 as the answer for (a), and accept the
+stranded hold in (b).
+
+**My recommendation.** Option 1 for (b), because a split is a normal edit and
+leaving a stranded hold behind is silent damage. Option 2 for (a), because one
+line cannot honestly consume two reservations and a 409 is clearer than a 400
+about "sellable stock". Both are cheap; neither blocks this PR.
+
+**Decision.** Gull approved Option 1 for splits and Option 2 for collapses:
+divide one reservation across the resulting lines; return a clear 409 when a
+single resulting line would need to consume multiple reservations.
+
+**Identity (ruled by Gull).** An edit identifies each line by the optional
+per-line `id` from the invoice detail response. The server validates that every
+submitted `id` belongs to the invoice being edited and rejects a duplicate. A
+retained line whose item changed releases its old reservation. An old line whose
+`id` is absent counts as deleted, so its reservation reopens only when the source
+order is active. A split keeps the old `id` on one resulting line; the added
+lines omit it and the one reservation is divided across them. For older clients
+that send no ids, `reservation_id` is used only when it identifies a line
+unambiguously; otherwise the edit fails closed with 409. Pairing by array
+position or by quantity is never done.
+
+**Implemented on PR #41.** Id-based pairing replaces the positional pairing that
+GLM flagged as HIGH. The collapse rule is enforced twice: once on line counts per
+item, and once on the per-reservation budget. Any reservation quantity that no
+resulting line takes is released, so a resize cannot strand a hold.
+
+**Combined-branch follow-up (PR #41 + PR #42).** PR #42's form keeps the
+`reservation_id` on a line whose item changed, because the form has no other way
+to say the line still exists. The server therefore treats that resent link as
+VOID, not as a claim on the hold it just released: the link is not budgeted, and
+the edit does not fail. Without this, an ordinary item change from the real client
+returned 409 "reservation N holds 0 but the line requests X". Covered by Finding 29
+in `server/src/__tests__/reservationWorkflowRegressions.test.ts`.
+
+---
+
+## Verification correction — GLM server suite count at f3b4c5f6
+
+GLM's first review report overstated neither the pass result nor a failing test,
+but its reported count of 294 suites / 2,380 tests was from a filtered Jest run.
+The command `npx jest src/__tests__` treated that path as a filter and omitted
+`src/services/__tests__/accountingCashLookup.test.ts` (1 suite, 18 tests).
+
+GLM reran the exact server CI command, `npm test`, at commit
+`f3b4c5f6a16880da363422c70f3aeda6b175014a`. It passed 295 suites / 2,398 tests,
+matching both CI runs on that commit. GLM corrected its report and confirmed the
+worktree remained clean with no code changes.

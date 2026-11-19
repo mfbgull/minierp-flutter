@@ -82,6 +82,7 @@ class InvoiceItem {
     required this.discountType,
     required this.discountValue,
     required this.returnedQty,
+    this.reservationId,
     this.expiryDate,
     this.isExpiredAtSale = false,
   });
@@ -99,6 +100,7 @@ class InvoiceItem {
     discountType: asString(json['discount_type']) ?? 'none',
     discountValue: asNum(json['discount_value']) ?? 0,
     returnedQty: asNum(json['returned_qty']) ?? 0,
+    reservationId: asInt(json['reservation_id']),
     expiryDate: asString(json['expiry_date']),
     isExpiredAtSale: asBool(json['is_expired_at_sale']),
   );
@@ -115,6 +117,11 @@ class InvoiceItem {
   final String discountType; // 'none' | 'percentage' | 'flat'
   final num discountValue;
   final num returnedQty;
+  /// The ACTIVE stock reservation this line fulfils, when the server returns
+  /// it (nullable). Carried through the edit form so a re-saved line keeps the
+  /// same reservation link instead of letting the server re-pair it
+  /// positionally (see `_buildBody`).
+  final int? reservationId;
   final String? expiryDate;
   final bool isExpiredAtSale;
 
@@ -131,6 +138,7 @@ class InvoiceItem {
     'discount_type': discountType,
     'discount_value': discountValue,
     'returned_qty': returnedQty,
+    if (reservationId != null) 'reservation_id': reservationId,
     if (expiryDate != null) 'expiry_date': expiryDate,
     'is_expired_at_sale': isExpiredAtSale ? 1 : 0,
   };
