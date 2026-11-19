@@ -1371,11 +1371,18 @@ class StockMovementModel {
     warehouseId: number,
     delta: number,
     db: Database.Database,
+    /** Named bin to move. Omitted = the warehouse DEFAULT (legacy behaviour). */
+    explicitLocationId?: number,
   ): void {
-    const locRow = db.prepare(`
-      SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
-    `).get(warehouseId) as { id: number } | undefined;
-    if (!locRow) return;
+    let locationId = explicitLocationId;
+    if (locationId == null) {
+      const locRow = db.prepare(`
+        SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
+      `).get(warehouseId) as { id: number } | undefined;
+      if (!locRow) return;
+      locationId = locRow.id;
+    }
+    const locRow = { id: locationId };
     // Get-or-create first, so a batch that never had a row still gets one.
     db.prepare(`
       INSERT OR IGNORE INTO batch_stock_by_location

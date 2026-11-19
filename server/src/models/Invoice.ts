@@ -582,6 +582,39 @@ class InvoiceModel {
    * Restores quantity_remaining on stock_batches and creates ADJUSTMENT movements
    * to fix stock_balances. Used during invoice update and delete.
    */
+  /**
+   * Credit `qty` of a batch back to ONE bin, and record it for audit. Used by
+   * the reversal path, which may spread a single batch across several bins.
+   */
+  private static restoreBatchToBin(
+    db: Database.Database,
+    batchId: number,
+    locationId: number,
+    qty: number,
+    invoiceNo: string,
+  ): void {
+    if (qty <= 0) return;
+    db.prepare(`
+      INSERT INTO batch_stock_by_location (batch_id, location_id, quantity_physical, quantity_reserved, quantity_available)
+      VALUES (?, ?, ?, 0, ?)
+      ON CONFLICT(batch_id, location_id) DO UPDATE SET
+        quantity_physical = quantity_physical + excluded.quantity_physical,
+        quantity_available = quantity_available + excluded.quantity_available
+    `).run(batchId, locationId, qty, qty);
+
+    // Record the restoration for audit — identified by the invoice itself
+    // (there is no separate return header table).
+    const invRow = db.prepare(`
+      SELECT id FROM invoices WHERE invoice_no = ? LIMIT 1
+    `).get(invoiceNo) as { id: number } | undefined;
+    if (invRow) {
+      db.prepare(`
+        INSERT INTO invoice_return_batches (invoice_id, batch_id, location_id, quantity, reference_doctype, reference_docno)
+        VALUES (?, ?, ?, ?, 'RETURN', ?)
+      `).run(invRow.id, batchId, locationId, qty, invoiceNo);
+    }
+  }
+
   static reverseStockForItems(
     db: Database.Database,
     items: Array<{ id?: number; item_id: number; quantity: number; unit_price: number }>,
@@ -650,6 +683,10 @@ class InvoiceModel {
       const ratio = Math.abs(totalSold) < 0.001 ? 1 : Math.min(effectiveQty / totalSold, 1);
 
       const restoreSaleBatchQuantities = (): void => {
+        // Per item+batch position in the ledger, so successive movements of
+        // the same batch restore to successive bins.
+        const binCursors = new Map<string, number>();
+        const binTaken = new Map<string, number>();
         // Restore quantity on each consumed batch (new path: batch_stock_by_location)
         const restoreSaleBatch = (movement: typeof saleMovements[number]): void => {
           if (movement.batch_id !== null) {
@@ -663,32 +700,49 @@ class InvoiceModel {
             // the physical units back on that exact bin, not the warehouse
             // DEFAULT, or the stock reappears where it never was while the
             // reservation restore re-reserves the original (now-empty) bin.
-            const ledgerBin = item.id != null ? lineDraws?.get(item.id)?.find((d) => d.batch_id === movement.batch_id) : undefined;
-            const locRow = ledgerBin
-              ? { id: ledgerBin.location_id }
-              : (db.prepare(`
-                  SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
-                `).get(targetWarehouseId) as { id: number } | undefined);
-            if (locRow) {
-              db.prepare(`
-                INSERT INTO batch_stock_by_location (batch_id, location_id, quantity_physical, quantity_reserved, quantity_available)
-                VALUES (?, ?, ?, 0, ?)
-                ON CONFLICT(batch_id, location_id) DO UPDATE SET
-                  quantity_physical = quantity_physical + excluded.quantity_physical,
-                  quantity_available = quantity_available + excluded.quantity_available
-              `).run(movement.batch_id, locRow.id, restoreQty, restoreQty);
-
-              // Record the restoration for audit — identified by the
-              // invoice itself (there is no separate return header table).
-              const invRow = db.prepare(`
-                SELECT id FROM invoices WHERE invoice_no = ? LIMIT 1
-              `).get(invoiceNo) as { id: number } | undefined;
-              if (invRow) {
-                db.prepare(`
-                  INSERT INTO invoice_return_batches (invoice_id, batch_id, location_id, quantity, reference_doctype, reference_docno)
-                  VALUES (?, ?, ?, ?, 'RETURN', ?)
-                `).run(invRow.id, movement.batch_id, locRow.id, restoreQty, invoiceNo);
+            //
+            // GLM review of fa84cf61: ONE BATCH CAN SPAN SEVERAL BINS, so the
+            // restore must be split across that batch's ledger rows in the
+            // order they were written. `find` returned only the first match
+            // and reassembled the whole quantity there, over-filling that bin
+            // and leaving the others short.
+            const ledgerBins = item.id != null
+              ? (lineDraws?.get(item.id)?.filter((d) => d.batch_id === movement.batch_id) ?? [])
+              : [];
+            if (ledgerBins.length > 0) {
+              // A sale of one batch can produce SEVERAL movements (one per bin
+              // drain). Walk a cursor per item+batch so the second movement
+              // continues where the first stopped instead of restarting at the
+              // first bin, which would over-fill it.
+              const cursorKey = `${item.id}:${movement.batch_id}`;
+              let cursor = binCursors.get(cursorKey) ?? 0;
+              let left = restoreQty;
+              while (left > 0 && cursor < ledgerBins.length) {
+                const bin = ledgerBins[cursor];
+                // How much of this ledger row has already been restored.
+                const takenKey = `${cursorKey}:${cursor}`;
+                const already = binTaken.get(takenKey) ?? 0;
+                const availableInRow = roundQty(Number(bin.quantity) - already);
+                if (availableInRow <= 0) { cursor += 1; continue; }
+                const take = roundQty(Math.min(left, availableInRow));
+                this.restoreBatchToBin(db, movement.batch_id, bin.location_id, take, invoiceNo);
+                binTaken.set(takenKey, roundQty(already + take));
+                left = roundQty(left - take);
+                if (roundQty(Number(bin.quantity) - (binTaken.get(takenKey) ?? 0)) <= 0) cursor += 1;
               }
+              binCursors.set(cursorKey, cursor);
+              // Ledger covered less than the movement (e.g. a prior partial
+              // return): the remainder belongs on the last named bin rather
+              // than DEFAULT, because that bin is where the sale came from.
+              if (left > 0) {
+                const last = ledgerBins[ledgerBins.length - 1];
+                this.restoreBatchToBin(db, movement.batch_id, last.location_id, left, invoiceNo);
+              }
+            } else {
+              const locRow = db.prepare(`
+                  SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
+                `).get(targetWarehouseId) as { id: number } | undefined;
+              if (locRow) this.restoreBatchToBin(db, movement.batch_id, locRow.id, restoreQty, invoiceNo);
             }
 
             // Credit the master batch row on every flag state. Consumption
@@ -788,7 +842,7 @@ class InvoiceModel {
     movementDate: string,
     userId: number
   ): void {
-    const items = this.getItemsForStockReverse(invoiceId, db);
+    const items = this.getInvoiceItemsForStockReverse(db, invoiceId);
     const findSaleMovements = db.prepare(`
       SELECT warehouse_id, quantity, unit_cost, batch_id
       FROM stock_movements
@@ -800,17 +854,24 @@ class InvoiceModel {
       itemId: number,
       warehouseId: number,
       batchId: number,
-      qty: number
+      qty: number,
+      locationId?: number,
     ): void => {
       if (isFeatureEnabled(db, 'feature_batch_locations')) {
-        const locRow = db.prepare(`
-          SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
-        `).get(warehouseId) as { id: number } | undefined;
-        if (locRow) {
+        // HIGH-2: a reservation-backed sale came from a NAMED bin. Reading
+        // DEFAULT alone made a rack sale look empty and refused the restore.
+        let targetLocationId = locationId;
+        if (targetLocationId == null) {
+          const locRow = db.prepare(`
+            SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
+          `).get(warehouseId) as { id: number } | undefined;
+          targetLocationId = locRow?.id;
+        }
+        if (targetLocationId != null) {
           const avail = db.prepare(`
             SELECT quantity_available FROM batch_stock_by_location
             WHERE batch_id = ? AND location_id = ?
-          `).get(batchId, locRow.id) as { quantity_available: number } | undefined;
+          `).get(batchId, targetLocationId) as { quantity_available: number } | undefined;
           if (!avail || roundQty(avail.quantity_available) < qty) {
             throw new Error(
               `restore invoice ${invoiceNo}: batch ${batchId} has insufficient location stock ` +
@@ -823,7 +884,7 @@ class InvoiceModel {
       // `stock_batches` draw-down below. The guard above stays flag-gated
       // because it is a READ of the location source; the WRITE must happen
       // either way or the bin keeps stock its batch no longer has.
-      StockMovementModel.mirrorBatchLocationDelta(batchId, warehouseId, -qty, db);
+      StockMovementModel.mirrorBatchLocationDelta(batchId, warehouseId, -qty, db, locationId);
       const batchRow = db.prepare(`SELECT quantity_remaining FROM stock_batches WHERE id = ?`)
         .get(batchId) as { quantity_remaining: number } | undefined;
       if (!batchRow || roundQty(batchRow.quantity_remaining) < qty) {
@@ -845,11 +906,23 @@ class InvoiceModel {
         );
       }
       const warehouseId = saleMovements[0].warehouse_id;
+      // Replay the bins this line actually sold from, in ledger order, so a
+      // rack sale comes back to its own rack.
+      const lineDraws = this.readLineBinDraws(db, [{ id: item.id, reservation_id: item.reservation_id }]);
+      const itemDraws = lineDraws.get(item.id) ?? [];
+      let drawCursor = 0;
       for (const sale of saleMovements) {
         const qty = roundQty(Math.abs(sale.quantity));
         if (qty <= 0) continue;
+        let locationId: number | undefined;
+        while (drawCursor < itemDraws.length && Number(itemDraws[drawCursor].quantity) <= 0) drawCursor += 1;
+        const nextDraw = itemDraws[drawCursor];
+        if (sale.batch_id !== null && nextDraw && nextDraw.batch_id === sale.batch_id) {
+          locationId = nextDraw.location_id;
+          drawCursor += 1;
+        }
         if (sale.batch_id !== null) {
-          consumeBatch(item.item_id, warehouseId, sale.batch_id, qty);
+          consumeBatch(item.item_id, warehouseId, sale.batch_id, qty, locationId);
         }
         StockMovementModel.recordMovement(
           {

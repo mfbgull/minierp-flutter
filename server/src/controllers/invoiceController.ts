@@ -5,6 +5,7 @@ import type Database from 'better-sqlite3';
 import db from '../config/database';
 import { AuthRequest, CreateInvoiceDTO, Invoice, InvoiceItemDTO, PaymentDTO, InvoiceStatus, SellableStockUnavailableError } from '../types';
 import StockMovementModel from '../models/StockMovement';
+import { StockReservationModel, type StockReservation } from '../models/StockReservation';
 import InvoiceModel from '../models/Invoice';
 import { InvoiceCancellationGuardError } from '../models/Invoice';
 import PaymentModel from '../models/Payment';
@@ -398,19 +399,25 @@ function consumeInvoiceItemsAndPostCogs(
     items: InvoiceItemDTO[],
     invoiceDate: string,
     resolvedInvoiceNo: string,
-    userId: number
+    userId: number,
+    /** MEDIUM-1: reservation per re-created line, keyed by item+warehouse. */
+    reservationFor?: (item: InvoiceItemDTO) => StockReservation | undefined,
 ): number {
     let updatedCogsTotal = 0;
     for (const item of items) {
+        const reservation = reservationFor?.(item);
         // Intentionally bypasses InvoiceCreationService (post-create amendment, not invoice creation).
-        InvoiceModel.createInvoiceItem(db, invoiceId, {
+        const invoiceItemId = InvoiceModel.createInvoiceItem(db, invoiceId, {
             item_id: item.item_id,
             quantity: item.quantity,
             unit_price: item.unit_price,
             tax_rate: item.tax_rate,
             discount_type: item.discount_type,
             discount_value: item.discount_value,
-            amount: item.amount
+            amount: item.amount,
+            // MEDIUM-1: keep the reservation link across the edit, so the line
+            // is not orphaned from the reservation that backed the sale.
+            reservation_id: reservation?.id,
         });
 
         // FIX #3: Stock validation with warning
@@ -421,13 +428,16 @@ function consumeInvoiceItemsAndPostCogs(
             item.warehouse_id
         );
 
-        // FIFO batch consumption for new/updated items
-        const consumption = InvoiceModel.consumeFromOldestBatches(
-            item.item_id,
-            warehouseId,
-            item.quantity,
-            db
-        );
+        // MEDIUM-1: a linked reservation drains ITS OWN bins; otherwise FIFO.
+        // Draining FIFO while the reserve sits on top asks for stock the
+        // reservation already holds, which is the 400 this path produced.
+        const consumption = reservation
+            ? StockMovementModel.consumeAgainstReservation(reservation, item.quantity, db)
+            : InvoiceModel.consumeFromOldestBatches(item.item_id, warehouseId, item.quantity, db);
+        if (reservation) {
+            InvoiceModel.recordLineBinDraw(db, invoiceItemId, consumption);
+            StockReservationModel.markConsumedPartial(db, reservation, item.quantity);
+        }
 
         // Create one stock movement per consumed batch with actual COGS
         for (const entry of consumption) {
@@ -692,6 +702,15 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
         // === FIX #4: Reverse old stock before inserting new items ===
         const oldItems = InvoiceModel.getInvoiceItemsForStockReverse(db, invoiceId);
         const oldDraws = InvoiceModel.readLineBinDraws(db, oldItems);
+        // MEDIUM-1: remember which reservation backed each old line BEFORE the
+        // rows are deleted, so the re-created lines can relink to it. Keyed by
+        // item, because an edited line carries no line id.
+        const reservationByItem = new Map<number, StockReservation>();
+        for (const old of oldItems) {
+            if (!old.reservation_id) continue;
+            const reservation = StockReservationModel.getById(old.reservation_id, db);
+            if (reservation) reservationByItem.set(old.item_id, reservation);
+        }
 
         InvoiceModel.reverseStockForItems(db, oldItems, originalInvoice.invoice_no, userId, 'INVOICE_UPDATE', undefined, oldDraws);
 
@@ -704,7 +723,16 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
 
         // Insert new invoice items and create new stock movements
         const updatedCogsTotal = consumeInvoiceItemsAndPostCogs(
-            db, invoiceId, items, invoice_date, resolvedInvoiceNo, userId
+            db, invoiceId, items, invoice_date, resolvedInvoiceNo, userId,
+            (item) => {
+                const captured = reservationByItem.get(item.item_id);
+                if (!captured) return undefined;
+                // Re-read: the reopen above changed the status, and only a
+                // reservation it made ACTIVE can be taken again - a closed
+                // order stays unreserved by the rule.
+                const fresh = StockReservationModel.getById(captured.id, db);
+                return fresh?.status === 'ACTIVE' ? fresh : undefined;
+            },
         );
 
         // GL consistency (ACC-08): void the invoice's INVOICE + COGS lines
