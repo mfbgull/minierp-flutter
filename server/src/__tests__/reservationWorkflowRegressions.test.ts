@@ -1736,3 +1736,81 @@ describe('Finding 23: partial return of one line sold from two bins', () => {
     expect(returned).toEqual({ dl: 2, rack: 2 });
   });
 });
+
+// ── 24. the detail read must carry reservation_id (GLM: Flutter is blocked) ──
+
+/**
+ * GLM is blocked on the Flutter fix because GET /api/invoices/:id never
+ * returned reservation_id, so an edit form cannot resend the link that NEW-4
+ * now matches on. Without it the client falls back to the positional queue -
+ * the very defect Finding 20 exists to catch - so the field is not cosmetic:
+ * it is what makes the round trip of line identity possible at all.
+ */
+describe('Finding 24: GET /api/invoices/:id exposes each line reservation', () => {
+  it('returns the right reservation_id for two same-item lines, and null when unreserved', async () => {
+    setFeatureEnabled(db, FLAG, true);
+    const item = await createItem(`S1R detail ${Date.now()}`, cookie);
+    await purchaseStock(item, warehouseA, 10, 40, cookie, AS_OF);
+    const [b1] = batchIdsOf(item, warehouseA);
+    const loc = defaultLocation(warehouseA);
+
+    const r1 = StockReservationModel.create({
+      item_id: item, warehouse_id: warehouseA, quantity_reserved: 2,
+      reference_doctype: 'SALES_ORDER', reference_docno: seedSalesOrder('Confirmed'), reference_line_id: 1,
+      bins: [{ batch_id: b1, location_id: loc, quantity: 2 }],
+    }, db);
+    // Same item, different reservation, different quantity: if the read ever
+    // returned a positional or item-based guess, these two could not be told
+    // apart - which is exactly why the assertions name each one.
+    const r2 = StockReservationModel.create({
+      item_id: item, warehouse_id: warehouseA, quantity_reserved: 3,
+      reference_doctype: 'SALES_ORDER', reference_docno: seedSalesOrder('Confirmed'), reference_line_id: 1,
+      bins: [{ batch_id: b1, location_id: loc, quantity: 3 }],
+    }, db);
+
+    const create = await request(app)
+      .post('/api/invoices')
+      .set('Cookie', cookie)
+      .set('Idempotency-Key', nextIdemKey('s1r-detail'))
+      .send({
+        customer_id: customerId,
+        invoice_date: AS_OF,
+        warehouse_id: warehouseA,
+        items: [
+          { item_id: item, quantity: 2, unit_price: 50, tax_rate: 0, reservation_id: r1.id },
+          { item_id: item, quantity: 3, unit_price: 50, tax_rate: 0, reservation_id: r2.id },
+          { item_id: item, quantity: 1, unit_price: 50, tax_rate: 0 },
+        ],
+      });
+    expect(create.status).toBe(201);
+    const invoice = lastInvoiceId();
+
+    const res = await request(app).get(`/api/invoices/${invoice}`).set('Cookie', cookie);
+    expect(res.status).toBe(200);
+    const items = res.body.items as Array<{ quantity: number; reservation_id: number | null }>;
+    expect(items).toHaveLength(3);
+
+    // Each line carries its own link, matched by quantity so the assertion
+    // proves identity rather than position. The third line was never reserved
+    // and must stay null - a legacy/unreserved line is not an error.
+    const byQty = items.map((i) => ({ quantity: i.quantity, reservation_id: i.reservation_id }))
+      .sort((a, b) => a.quantity - b.quantity);
+    expect(byQty).toEqual([
+      { quantity: 1, reservation_id: null },
+      { quantity: 2, reservation_id: r1.id },
+      { quantity: 3, reservation_id: r2.id },
+    ]);
+    // The field must be PRESENT, not merely undefined on every row: an absent
+    // key and a null value are the same thing to some serializers but not to a
+    // client that checks `hasOwnProperty`.
+    for (const line of items) {
+      expect(Object.prototype.hasOwnProperty.call(line, 'reservation_id')).toBe(true);
+    }
+
+    // Line order must be stable between two reads, or the client cannot pair
+    // its rows with its own state.
+    const again = await request(app).get(`/api/invoices/${invoice}`).set('Cookie', cookie);
+    expect((again.body.items as Array<{ id: number }>).map((i) => i.id))
+      .toEqual((items as unknown as Array<{ id: number }>).map((i) => i.id));
+  });
+});

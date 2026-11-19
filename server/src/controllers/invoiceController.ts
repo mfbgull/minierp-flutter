@@ -116,6 +116,10 @@ interface InvoiceItemRow {
   tax_rate: number;
   discount_type: string;
   discount_value: number;
+  /** S-1: the reservation this line fulfilled. Nullable on purpose - every
+   * pre-128 line predates the link, and an unreserved sale has none. The edit
+   * form resends it so a same-item line keeps its own reservation (NEW-4). */
+  reservation_id: number | null;
   item_name?: string;
   item_code?: string;
 }

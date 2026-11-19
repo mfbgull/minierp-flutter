@@ -1494,9 +1494,11 @@ class InvoiceModel {
     return db.prepare(
       `SELECT ii.id, ii.item_id, ii.quantity, ii.returned_qty, ii.unit_price, ii.amount, ii.tax_rate,
              ii.discount_type, ii.discount_value, ii.expiry_date, ii.is_expired_at_sale,
+             ii.reservation_id,
              item.item_name, item.item_code
       FROM invoice_items ii LEFT JOIN items item ON ii.item_id = item.id
-      WHERE ii.invoice_id = ?`
+      WHERE ii.invoice_id = ?
+      ORDER BY ii.id`
     ).all(invoiceId);
   }
 

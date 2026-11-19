@@ -414,6 +414,12 @@ List invoices with optional filters.
 ### GET /invoices/:id
 Get invoice with items and customer details.
 
+Each item carries `reservation_id`: the stock reservation that line fulfilled,
+or `null` when the line was not reserved (every line created before migration
+128, and any unreserved sale). Items are ordered by `id`, so the client can pair
+its rows with its own state. Send the value back on `PUT /invoices/:id` so each
+line keeps its own reservation when two lines share an item.
+
 ### POST /invoices
 Create invoice. Optionally records payment in the same transaction.
 
