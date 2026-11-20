@@ -336,12 +336,14 @@ export class InvoiceCreationService {
             }
           : StockMovementModel.consumeForSale(item.item_id, warehouseId, item.quantity, this.db, input.invoiceDate);
 
+      // Every batched line records its exact per-bin draw, reserved or not:
+      // a void restores those bins, and a later return replays them. A line
+      // with no bin draw is the case the return form must ask the user about.
+      InvoiceModel.recordLineBinDraw(this.db, invoiceItemId, consumption);
+
       // S-1: fulfil the named reservation by exactly the sold quantity — a
       // partial sale leaves the remainder ACTIVE and reserved.
       if (reservation) {
-        // S-1: record the exact per-bin draw of THIS line so a void restores
-        // only what this line took (see Invoice.recordLineBinDraw).
-        InvoiceModel.recordLineBinDraw(this.db, invoiceItemId, consumption);
         StockReservationModel.markConsumedPartial(this.db, reservation, item.quantity);
       }
       // BUG-013 R1/R2: damaged-bin and bin-under-coverage notes from the

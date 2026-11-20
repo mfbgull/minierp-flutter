@@ -162,7 +162,12 @@ function addReturnItems(
 
 export interface ProcessReturnInput {
   invoiceId: number;
-  items: Array<{ invoice_item_id: number; return_quantity: number }>;
+  /**
+   * `location_id` is required for a line whose sale recorded no bin draw. The
+   * service refuses such a line without it rather than guessing a bin (see
+   * resolveReturnBins below).
+   */
+  items: Array<{ invoice_item_id: number; return_quantity: number; location_id?: number | null }>;
   feeType?: FeeType;
   feeValue?: number;
   /** 'YYYY-MM-DD'; defaults to today (D14). */
@@ -273,6 +278,85 @@ interface PostedSettlement {
 // Service
 // ────────────────────────────────────────────────────────────────────────
 
+/**
+ * Decide the restock bin of every returned line, BEFORE anything is written.
+ *
+ * A line whose sale recorded its exact bin draws replays that ledger: the
+ * recorded draws are the only truth about where the goods came from, and the
+ * client cannot override them.
+ *
+ * A line whose sale recorded NO draw has no honest answer. That happens for a
+ * batched sale made before draws were recorded, or for stock that had no bin
+ * coverage. The service never invents one: the user must choose the bin, and
+ * the choice is validated here. A missing choice, an unknown bin, or a bin
+ * outside the warehouse the user is restocking into fails the whole return with
+ * 400 before any write, so a refusal moves no stock and leaves
+ * `invoice_returns` untouched.
+ *
+ * An UNBATCHED line (a legacy sale that drew from no batch at all) needs no
+ * choice, because no bin ever held its units.
+ *
+ * @returns line id -> chosen bin, for the lines that needed a choice only.
+ */
+function resolveReturnBins(
+  db: Database.Database,
+  invoiceNo: string,
+  lines: Array<{ invoice_item_id: number; item_id: number }>,
+  items: ProcessReturnInput['items'],
+  /** The warehouse the user chose to restock into, or null when not given. */
+  targetWarehouseId: number | null,
+): Map<number, number> {
+  const chosenBins = new Map<number, number>();
+  // NOT gated on feature_batch_locations. The flag chooses which source a READ
+  // trusts; it never decides whether the second source is WRITTEN. A flag-off
+  // sale still drains `batch_stock_by_location` and records its draw, so this
+  // refusal holds in both flag states: a line with no recorded draw is never
+  // silently parked in the warehouse DEFAULT bin.
+  const drawCount = db.prepare(
+    'SELECT COUNT(*) AS n FROM invoice_item_bin_consumption WHERE invoice_item_id = ?');
+  const batchedSaleCount = db.prepare(`
+    SELECT COUNT(*) AS n FROM stock_movements
+    WHERE item_id = ? AND reference_docno = ? AND movement_type = 'SALE' AND batch_id IS NOT NULL`);
+  const saleWarehouse = db.prepare(`
+    SELECT warehouse_id FROM stock_movements
+    WHERE item_id = ? AND reference_docno = ? AND movement_type = 'SALE' AND batch_id IS NOT NULL
+    ORDER BY id LIMIT 1`);
+  const locationRow = db.prepare(
+    'SELECT id, warehouse_id, location_code FROM locations WHERE id = ?');
+
+  for (const line of lines) {
+    const recorded = (drawCount.get(line.invoice_item_id) as { n: number }).n;
+    if (recorded > 0) continue;
+    const batched = (batchedSaleCount.get(line.item_id, invoiceNo) as { n: number }).n;
+    if (batched === 0) continue;
+
+    const requested = items.find((i) => Number(i.invoice_item_id) === line.invoice_item_id)?.location_id;
+    const chosen = requested == null ? NaN : Number(requested);
+    if (!Number.isInteger(chosen) || chosen <= 0) {
+      throw new ReturnError(400,
+        `Line ${line.invoice_item_id} has no recorded bin draw; choose the bin to restock it into`);
+    }
+    const bin = locationRow.get(chosen) as { id: number; warehouse_id: number; location_code: string } | undefined;
+    if (!bin) {
+      throw new ReturnError(400, `Return bin ${chosen} does not exist`);
+    }
+    // Validate against the warehouse the user is restocking INTO (`warehouse_id`),
+    // because that is the warehouse whose bins the return form loaded. Without
+    // an explicit choice the goods go back to the dispatch warehouse, so that
+    // becomes the target. Comparing against the dispatch warehouse instead
+    // rejected a valid bin the form itself offered in another warehouse.
+    const dispatchedFrom = saleWarehouse.get(line.item_id, invoiceNo) as { warehouse_id: number } | undefined;
+    const effectiveTarget = targetWarehouseId ?? dispatchedFrom?.warehouse_id ?? null;
+    if (effectiveTarget != null && bin.warehouse_id !== effectiveTarget) {
+      throw new ReturnError(400,
+        `Return bin ${chosen} belongs to warehouse ${bin.warehouse_id}, ` +
+        `but the goods are restocked into warehouse ${effectiveTarget}`);
+    }
+    chosenBins.set(line.invoice_item_id, bin.id);
+  }
+  return chosenBins;
+}
+
 function requireReturnableInvoice(invoiceId: number): NonNullable<ReturnType<typeof InvoiceModel.getById>> {
   const invoice = InvoiceModel.getById(invoiceId, db);
   if (!invoice) throw new ReturnError(404, 'Invoice not found');
@@ -352,6 +436,9 @@ export class InvoiceReturnService {
       assertPeriodOpen(returnDate);
 
       const lines = discountedReturnLines(input, fresh);
+      // Restock bins are decided before any write: a line whose sale recorded
+      // no bin draw must carry a valid user choice, or the whole return fails.
+      const fallbackBins = resolveReturnBins(db, fresh.invoice_no, lines, input.items, warehouseId);
 
       const returnedGross = roundCurrency(lines.reduce((s, l) => s + l.returnedGross, 0));
 
@@ -416,6 +503,7 @@ export class InvoiceReturnService {
         'RETURN',
         warehouseId ?? undefined,
         returnDraws,
+        fallbackBins,
       );
       movements.forEach((m) => {
         const idx = lines.findIndex((l) => l.item_id === m.item_id);

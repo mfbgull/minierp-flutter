@@ -10,6 +10,13 @@
  *   allocated across bins, and consume/release act on every bin it covers.
  *   The invoice line still carries ONE durable `reservation_id`.
  *
+ * Decision C: an EDIT that removes the link between a line and its
+ *   reservation reopens the hold only while the source order is still ACTIVE
+ *   (the same rule as Decision A). When the reopen is impossible - a terminal
+ *   order, or a reference that is not a sales order - the edit RELEASES that
+ *   reservation by id: terminal RELEASED, quantity_reserved 0. It must never
+ *   be left CONSUMED as if the sale still stood.
+ *
  * Sales-order terminal rule is read from SalesOrderModel's own transition
  * matrix (Draft|Confirmed|Delivered active; Invoiced|Completed|Cancelled
  * terminal), so "active order" is not guessed.
@@ -482,5 +489,131 @@ describe('Batch-only reservation (no location_id) still works end to end', () =>
       .set('Cookie', cookie);
     expect(released.status).toBe(200);
     expect(released.body.status).toBe('RELEASED');
+  });
+});
+
+// ────── Decision C: an edit releases a hold it cannot reopen ──────
+
+/**
+ * Approved rule (audit/DECISIONS.md, this round's follow-up): an edit that
+ * removes the link between a line and its reservation can only hand the hold
+ * back while the source sales order is still active. A terminal order, or a
+ * reference that is not a sales order, makes the reopen impossible, and the
+ * hold must be RELEASED by id (terminal, quantity_reserved 0) instead of
+ * being left CONSUMED as if the sale still stood. Void and cancel keep the
+ * CONSUMED rule that Decision A pins.
+ */
+describe('Decision C: an edit that drops a reservation link releases a hold it cannot reopen', () => {
+  /** Line ids of an invoice, in stored order - the identity an edit resends. */
+  function lineIdsOf(invoiceId: number): number[] {
+    return (db.prepare('SELECT id FROM invoice_items WHERE invoice_id = ? ORDER BY id')
+      .all(invoiceId) as Array<{ id: number }>).map((r) => r.id);
+  }
+
+  /** `orderStatus` null seeds a reference that is NOT a sales order. */
+  async function setup(tag: string, orderStatus: string | null) {
+    setFeatureEnabled(db, FLAG, true);
+    const item = await createItem(`S1D edit-release ${tag} ${Date.now()}`, cookie);
+    await purchaseStock(item, warehouseA, 5, 40, cookie, AS_OF);
+    const [batchId] = batchIdsOf(item, warehouseA);
+    const loc = defaultLocation(warehouseA);
+
+    const reservation = StockReservationModel.create({
+      item_id: item, warehouse_id: warehouseA, quantity_reserved: 3,
+      reference_doctype: orderStatus === null ? 'TRANSFER' : 'SALES_ORDER',
+      reference_docno: orderStatus === null ? `TR-${Date.now()}` : seedSalesOrder(orderStatus),
+      reference_line_id: 1,
+      bins: [{ batch_id: batchId, location_id: loc, quantity: 3 }],
+    }, db);
+
+    expect(await sell(item, 3, `edit-release-${tag}`, reservation.id)).toBe(201);
+    expect(reservationRow(reservation.id)).toEqual({ status: 'CONSUMED', quantity_reserved: 0 });
+    const invoice = lastInvoiceId();
+    return { item, batchId, loc, reservation, invoice, lineId: lineIdsOf(invoice)[0] };
+  }
+
+  /** The edit keeps the line and its item, but DROPS the reservation link. */
+  function editWithoutLink(invoice: number, lineId: number, itemId: number, qty = 3) {
+    return request(app)
+      .put(`/api/invoices/${invoice}`)
+      .set('Cookie', cookie)
+      .send({
+        customer_id: customerId,
+        invoice_date: AS_OF,
+        warehouse_id: warehouseA,
+        items: [{ id: lineId, item_id: itemId, quantity: qty, unit_price: 50, tax_rate: 0 }],
+      });
+  }
+
+  function linkedReservations(invoice: number): Array<number | null> {
+    return (db.prepare('SELECT reservation_id FROM invoice_items WHERE invoice_id = ? ORDER BY id')
+      .all(invoice) as Array<{ reservation_id: number | null }>).map((r) => r.reservation_id);
+  }
+
+  it('releases the hold when the source order is Completed (the reopen is impossible)', async () => {
+    const { item, batchId, loc, reservation, invoice, lineId } = await setup('completed', 'Completed');
+
+    expect((await editWithoutLink(invoice, lineId, item)).status).toBe(200);
+
+    // Released by id: terminal, no quantity held, no child allocation left.
+    expect(reservationRow(reservation.id)).toEqual({ status: 'RELEASED', quantity_reserved: 0 });
+    expect(db.prepare('SELECT * FROM stock_reservation_bins WHERE reservation_id = ?')
+      .all(reservation.id)).toEqual([]);
+    // The bin is free: 5 bought, the re-sale of 3 came from unreserved stock.
+    expect(binRow(batchId, loc)).toEqual({ physical: 2, reserved: 0, available: 2 });
+    expect(linkedReservations(invoice)).toEqual([null]);
+  });
+
+  it('releases the hold when the source order is Cancelled', async () => {
+    const { item, batchId, loc, reservation, invoice, lineId } = await setup('cancelled', 'Cancelled');
+
+    expect((await editWithoutLink(invoice, lineId, item)).status).toBe(200);
+
+    expect(reservationRow(reservation.id)).toEqual({ status: 'RELEASED', quantity_reserved: 0 });
+    expect(binRow(batchId, loc)).toEqual({ physical: 2, reserved: 0, available: 2 });
+  });
+
+  it('releases the hold when the reference is not a sales order', async () => {
+    const { item, batchId, loc, reservation, invoice, lineId } = await setup('nonorder', null);
+
+    expect((await editWithoutLink(invoice, lineId, item)).status).toBe(200);
+
+    expect(reservationRow(reservation.id)).toEqual({ status: 'RELEASED', quantity_reserved: 0 });
+    expect(binRow(batchId, loc)).toEqual({ physical: 2, reserved: 0, available: 2 });
+  });
+
+  it('negative control: an active-order hold is still reopened and re-linked', async () => {
+    const { item, batchId, loc, reservation, invoice, lineId } = await setup('active', 'Confirmed');
+
+    expect((await editWithoutLink(invoice, lineId, item)).status).toBe(200);
+
+    // Unchanged behaviour: the reopen puts the hold back, and the line picks it
+    // up again, so the sale is still linked and consumed.
+    expect(reservationRow(reservation.id)).toEqual({ status: 'CONSUMED', quantity_reserved: 0 });
+    expect(binRow(batchId, loc)).toEqual({ physical: 2, reserved: 0, available: 2 });
+    expect(linkedReservations(invoice)).toEqual([reservation.id]);
+  });
+
+  it('negative control: a terminal-order edit that still claims the hold fails closed and rolls back', async () => {
+    const { item, batchId, loc, reservation, invoice, lineId } = await setup('claimed', 'Completed');
+
+    // The line keeps its link while the order is terminal: the hold cannot be
+    // reopened, so the edit has nothing to satisfy the claim with and must
+    // refuse. The release that this edit performs first must roll back with it.
+    const res = await request(app)
+      .put(`/api/invoices/${invoice}`)
+      .set('Cookie', cookie)
+      .send({
+        customer_id: customerId,
+        invoice_date: AS_OF,
+        warehouse_id: warehouseA,
+        items: [{ id: lineId, item_id: item, quantity: 3, unit_price: 50, tax_rate: 0, reservation_id: reservation.id }],
+      });
+    expect(res.status).toBe(409);
+
+    // Nothing was half-applied: the hold is exactly where the sale left it.
+    expect(reservationRow(reservation.id)).toEqual({ status: 'CONSUMED', quantity_reserved: 0 });
+    expect(binRow(batchId, loc)).toEqual({ physical: 2, reserved: 0, available: 2 });
+    expect(linkedReservations(invoice)).toEqual([reservation.id]);
   });
 });

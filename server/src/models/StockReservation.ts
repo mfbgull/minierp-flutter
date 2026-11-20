@@ -498,6 +498,19 @@ export class StockReservationModel {
   }
 
   /**
+   * Decision C (audit/DECISIONS.md): can an edit hand this reservation back?
+   * The reopen is possible only while the source sales order is still active.
+   * A terminal order, or a reference that is not a sales order, makes it
+   * impossible, and the caller must RELEASE the hold instead of leaving it
+   * CONSUMED as if the sale still stood.
+   */
+  static canReopenById(id: number, db: Database.Database): boolean {
+    const existing = this.getById(id, db);
+    if (!existing) return false;
+    return this.sourceOrderIsActive(db, existing);
+  }
+
+  /**
    * Decision A: reopen a reservation for a voided/cancelled sale, but only
    * while its source sales order is still active. A terminal (Invoiced /
    * Completed / Cancelled) source order, or a non-order reference, stays

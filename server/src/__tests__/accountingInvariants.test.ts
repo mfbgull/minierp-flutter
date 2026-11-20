@@ -30,6 +30,7 @@ import app from '../app';
 import db from '../config/database';
 import { expectAllInvariantsHold, arImbalances, apImbalances, cashImbalances, inventoryImbalances, glImbalances, stockImbalances, customerArImbalances, supplierApImbalances, type Violation } from './helpers/accountingInvariants';
 import AccountingService from '../services/accountingService';
+import StockMovementModel from '../models/StockMovement';
 
 const TEST_PASSWORD = process.env.TEST_ADMIN_PASSWORD;
 if (!TEST_PASSWORD) {
@@ -128,7 +129,7 @@ function postOpeningInventoryGL(amount: number, label: string): void {
 }
 
 async function seedStock(itemId: number, warehouseId: number, qty: number, unitCost: number): Promise<void> {
-  db.prepare(`
+  const seeded = db.prepare(`
     INSERT INTO stock_batches (
       batch_no, item_id, warehouse_id, source_type, source_id,
       quantity_original, quantity_remaining, unit_cost, received_date
@@ -137,6 +138,12 @@ async function seedStock(itemId: number, warehouseId: number, qty: number, unitC
   db.prepare(`
     INSERT INTO stock_balances (item_id, warehouse_id, quantity) VALUES (?, ?, ?)
   `).run(itemId, warehouseId, qty);
+  // The app's own OPENING path mirrors its batch into the warehouse DEFAULT bin
+  // (StockMovement.recordMovement). Without that row the sale of this batch has
+  // no bin coverage, so it records no draw and the return of its line is
+  // refused as a no-draw line.
+  StockMovementModel.syncBatchStockByLocationForNewBatch(
+    Number(seeded.lastInsertRowid), warehouseId, qty, db);
   postOpeningInventoryGL(qty * unitCost, `item ${itemId}`);
 }
 
@@ -589,7 +596,7 @@ describe('Reconciliation invariants F-I over transaction lifecycle', () => {
   function uniqueSeed(itemId: number, warehouseId: number, qty: number, unitCost: number): void {
     seedCounter += 1;
     const batchNo = `FI-SEED-${seedCounter}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-    db.prepare(`
+    const seeded = db.prepare(`
       INSERT INTO stock_batches (
         batch_no, item_id, warehouse_id, source_type, source_id,
         quantity_original, quantity_remaining, unit_cost, received_date
@@ -597,6 +604,13 @@ describe('Reconciliation invariants F-I over transaction lifecycle', () => {
     `).run(batchNo, itemId, warehouseId, qty, qty, unitCost);
     db.prepare(`INSERT OR REPLACE INTO stock_balances (item_id, warehouse_id, quantity) VALUES (?, ?, ?)`)
       .run(itemId, warehouseId, qty);
+    // The app's own OPENING path mirrors its batch into the warehouse DEFAULT
+    // bin (StockMovement.recordMovement). A fixture batch seeded WITHOUT that
+    // row is a shape no ADD path produces: it has no bin coverage, so a sale
+    // cannot record a draw and the return of the line is refused as a
+    // no-draw line. Seed the same two rows the app seeds.
+    StockMovementModel.syncBatchStockByLocationForNewBatch(
+      Number(seeded.lastInsertRowid), warehouseId, qty, db);
     postOpeningInventoryGL(qty * unitCost, `item ${itemId}`);
   }
 

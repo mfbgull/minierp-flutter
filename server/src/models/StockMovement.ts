@@ -112,7 +112,22 @@ interface RecordMovementDTO {
   skipAdjustmentFinancialPosting?: boolean;
 }
 
-type ConsumptionEntry = { batchId: number | null; consumed: number; unitCost: number; /** Set by the reservation path, which must record an exact per-bin draw. */ locationId?: number };
+/** One bin the take came out of, in the order it was drained. */
+type BinTake = { locationId: number; quantity: number };
+
+export type ConsumptionEntry = {
+  batchId: number | null;
+  consumed: number;
+  unitCost: number;
+  /** Set by the reservation path, which must record an exact per-bin draw. */
+  locationId?: number;
+  /**
+   * Every bin this entry drained, oldest bin first. Set by the FIFO/FEFO
+   * allocators so a sale records its exact per-bin draw (Decision: partial
+   * return of a line sold from two bins) instead of only the reservation path.
+   */
+  bins?: BinTake[];
+};
 
 type LocationBatchRow = {
   id: number;
@@ -173,12 +188,13 @@ function pushUniqueWarning(warnings: string[], message: string): void {
  */
 function drainBinsForTake(
   db: Database.Database,
-  locRows: Array<{ id: number; quantity_available: number; status_override: string | null }>,
+  locRows: Array<{ id: number; location_id?: number; quantity_available: number; status_override: string | null }>,
   take: number,
   clampToZero: boolean
-): { consumed: number; hitDamaged: boolean } {
+): { consumed: number; hitDamaged: boolean; bins: BinTake[] } {
   let remaining = take;
   let hitDamaged = false;
+  const bins: BinTake[] = [];
   for (const loc of locRows) {
     if (remaining <= 0) break;
     const amount = roundQty(Math.min(remaining, roundQty(loc.quantity_available)));
@@ -187,9 +203,13 @@ function drainBinsForTake(
       ? 'quantity_physical = MAX(0, quantity_physical - ?)'
       : 'quantity_physical = quantity_physical - ?';
     db.prepare(`UPDATE batch_stock_by_location SET ${setExpr} WHERE id = ?`).run(amount, loc.id);
+    // Report only what actually left a bin, and only when the caller selected
+    // the bin with its location id (the ledger row needs it; the audit-only
+    // callers pass rows without one).
+    if (amount > 0 && loc.location_id != null) bins.push({ locationId: loc.location_id, quantity: amount });
     remaining -= amount;
   }
-  return { consumed: roundQty(take - Math.max(0, remaining)), hitDamaged };
+  return { consumed: roundQty(take - Math.max(0, remaining)), hitDamaged, bins };
 }
 
 /** BUG-013 R2: warn when the sellable bins under-cover the batch take. */
@@ -465,16 +485,16 @@ function selectBatchBins(
   db: Database.Database,
   batchId: number,
   warehouseId: number
-): Array<{ id: number; quantity_available: number; status_override: string | null; created_at: string }> {
+): Array<{ id: number; location_id: number; quantity_available: number; status_override: string | null; created_at: string }> {
   return db.prepare(`
-    SELECT bsl.id, bsl.quantity_available, bsl.status_override, l.created_at
+    SELECT bsl.id, bsl.location_id, bsl.quantity_available, bsl.status_override, l.created_at
     FROM batch_stock_by_location bsl
     JOIN locations l ON bsl.location_id = l.id
     WHERE bsl.batch_id = ? AND l.warehouse_id = ?
       AND bsl.quantity_available > 0
       AND ${sellableStatusClause('bsl.status_override')}
     ORDER BY l.created_at ASC, bsl.id ASC
-  `).all(batchId, warehouseId) as Array<{ id: number; quantity_available: number; status_override: string | null; created_at: string }>;
+  `).all(batchId, warehouseId) as Array<{ id: number; location_id: number; quantity_available: number; status_override: string | null; created_at: string }>;
 }
 
 /**
@@ -508,7 +528,7 @@ function consumeBatchesByLocation(
     // BUG-013 R1 (flag ON): selling from a DAMAGED bin is allowed, but never
     // silent. The warning is raised from the bins the take ACTUALLY hit — a
     // DAMAGED bin the allocator never reached must not cry wolf.
-    const { hitDamaged } = drainBinsForTake(db, locRows, consumeFromThis, false);
+    const { hitDamaged, bins } = drainBinsForTake(db, locRows, consumeFromThis, false);
 
     if (hitDamaged) pushUniqueWarning(warnings, damagedWarning(db, itemId));
 
@@ -519,7 +539,7 @@ function consumeBatchesByLocation(
       WHERE id = ?
     `).run(consumeFromThis, batch.id);
 
-    consumption.push({ batchId: batch.id, consumed: consumeFromThis, unitCost: batch.unit_cost });
+    consumption.push({ batchId: batch.id, consumed: consumeFromThis, unitCost: batch.unit_cost, bins });
     remaining -= consumeFromThis;
   }
 
@@ -651,7 +671,7 @@ function consumeLegacyBatches(
       WHERE id = ?
     `).run(consumeFromThis, batch.id);
 
-    const { hitDamaged } = drainBinsForTake(db, locRows, consumeFromThis, true);
+    const { hitDamaged, bins } = drainBinsForTake(db, locRows, consumeFromThis, true);
 
     // R1: warn only when the take actually reached a DAMAGED bin, and once
     // per sale (deduped by the caller-visible text), not once per batch.
@@ -664,7 +684,7 @@ function consumeLegacyBatches(
       warnMirrorShortfall(warnings, db, itemId, binAvailable, consumeFromThis);
     }
 
-    consumption.push({ batchId: batch.id, consumed: consumeFromThis, unitCost: batch.unit_cost });
+    consumption.push({ batchId: batch.id, consumed: consumeFromThis, unitCost: batch.unit_cost, bins });
     remaining -= consumeFromThis;
   }
 
@@ -1654,7 +1674,7 @@ class StockMovementModel {
     db: Database.Database,
     asOfDate?: string,
     warnings?: string[]
-  ): Array<{ batchId: number | null; consumed: number; unitCost: number }> {
+  ): ConsumptionEntry[] {
     // Eligibility is judged as of the document date; absent one, today.
     const asOf = asOfDate ?? new Date().toISOString().slice(0, 10);
     const roundedQty = roundQty(quantity);

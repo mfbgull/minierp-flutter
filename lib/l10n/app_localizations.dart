@@ -11468,6 +11468,24 @@ abstract class AppLocalizations {
   /// **'Select a warehouse to restock into'**
   String get salesreturnsReturnwarehouserequired;
 
+  /// No description provided for @salesreturnsReturnbin.
+  ///
+  /// In en, this message translates to:
+  /// **'Restock Bin'**
+  String get salesreturnsReturnbin;
+
+  /// No description provided for @salesreturnsReturnbinhint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select the bin to restock into'**
+  String get salesreturnsReturnbinhint;
+
+  /// No description provided for @salesreturnsReturnbinrequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the restock bin for every returned line that has no recorded bin'**
+  String get salesreturnsReturnbinrequired;
+
   /// No description provided for @salesreturnsReturnreasonplaceholder.
   ///
   /// In en, this message translates to:

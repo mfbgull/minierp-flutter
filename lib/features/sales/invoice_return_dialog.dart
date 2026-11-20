@@ -17,9 +17,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/idempotency_key.dart';
 import '../../data/models/invoice.dart' show Invoice, InvoiceItem;
+import '../../data/models/json_helpers.dart' show asInt, asString;
 import '../../data/models/sales_return.dart';
 import '../../data/models/stock_batch.dart' show StockBatch;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
+import '../../data/repositories/inventory_repository.dart'
+    show inventoryRepositoryProvider;
 import '../../data/repositories/invoice_repository.dart'
     show InvoiceFilters, invoiceRepositoryProvider;
 import '../../l10n/app_localizations.dart';
@@ -67,6 +70,17 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
   /// The warehouse the returned goods are restocked into — required
   /// (invoices never record one, so the user must choose).
   int? _warehouseId;
+
+  /// Bins of [_warehouseId], for the per-line restock-bin picker. Null
+  /// until a warehouse is chosen (and again while its bins load).
+  List<_BinOption>? _bins;
+  String? _binsError;
+
+  /// Chosen restock bin per invoice-line id. Sent as `location_id` for a
+  /// line the server marked `requires_return_bin` — a line sold from a
+  /// batch whose per-bin draw was never recorded, where the server
+  /// refuses to guess (see InvoiceReturnService.resolveReturnBins).
+  final Map<int, int> _returnBinByLine = {};
 
   /// Return date (spec §5.1 / D14) — `yyyy-MM-dd`, defaults to today
   /// and the server posts ledger entries dated today regardless.
@@ -177,6 +191,42 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
         setState(() => _targetOptions = data);
       case ApiFailure():
         break; // Informational — adjust falls back to auto-pick.
+    }
+  }
+
+  /// A new restock warehouse invalidates every bin choice: the bins are
+  /// warehouse-scoped, so the old choices may not even exist there.
+  void _onWarehouseChanged(int? id) {
+    setState(() {
+      _warehouseId = id;
+      _bins = null;
+      _binsError = null;
+      _returnBinByLine.clear();
+    });
+    if (id != null) unawaited(_loadBins(id));
+  }
+
+  /// Load the bins of [warehouseId] for the per-line restock-bin picker.
+  /// A bin with no stock still appears — the customer can bring goods
+  /// back to a bin the sale emptied.
+  Future<void> _loadBins(int warehouseId) async {
+    final result = await ref
+        .read(inventoryRepositoryProvider)
+        .getLocations(warehouseId);
+    if (!mounted || _warehouseId != warehouseId) return;
+    switch (result) {
+      case ApiSuccess(:final data):
+        setState(() {
+          _bins = [for (final row in data) _BinOption.fromJson(row)];
+          _binsError = null;
+          final ids = {for (final bin in _bins!) bin.id};
+          _returnBinByLine.removeWhere((_, binId) => !ids.contains(binId));
+        });
+      case ApiFailure(:final error):
+        setState(() {
+          _bins = null;
+          _binsError = error.message;
+        });
     }
   }
 
@@ -299,11 +349,18 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
 
     final items = <Map<String, dynamic>>[];
     for (var i = 0; i < _returnableItems.length; i++) {
+      final item = _returnableItems[i];
       final qty = double.tryParse(_qtyControllers[i].text.trim()) ?? 0;
       if (qty > 0) {
+        final bin = _returnBinByLine[item.id];
+        if (item.requiresReturnBin && bin == null) {
+          setState(() => _error = l10n.salesreturnsReturnbinrequired);
+          return;
+        }
         items.add({
-          'invoice_item_id': _returnableItems[i].id,
+          'invoice_item_id': item.id,
           'return_quantity': qty,
+          'location_id': ?bin,
         });
       }
     }
@@ -455,9 +512,20 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
               child: _WarehousePicker(
                 selected: _warehouseId,
                 enabled: !_submitting,
-                onChanged: (id) => setState(() => _warehouseId = id),
+                onChanged: _onWarehouseChanged,
               ),
             ),
+            // The restock-bin list failed to load: the user cannot choose a
+            // bin for a line that needs one until this succeeds.
+            if (_binsError != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                _binsError!,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.error,
+                ),
+              ),
+            ],
             // Batch-aware restock note — shown only when the server
             // sends per-location batch data (feature flag on): the
             // server restocks the returned quantity into the chosen
@@ -499,6 +567,30 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
                         !(_expandedBatches[lineId] ?? false);
                   }),
                 ),
+                // This line's sale recorded no bin draw (an invoice raised
+                // before the draw ledger existed), so the server will not
+                // guess where the goods go back — ask for the bin.
+                if (_returnableItems[i].requiresReturnBin) ...[
+                  const SizedBox(height: 6),
+                  FormFieldShell(
+                    label: l10n.salesreturnsReturnbin,
+                    required: true,
+                    child: _ReturnBinPicker(
+                      bins: _bins,
+                      selected: _returnBinByLine[_returnableItems[i].id],
+                      enabled: !_submitting,
+                      hint: l10n.salesreturnsReturnbinhint,
+                      onChanged: (binId) => setState(() {
+                        final lineId = _returnableItems[i].id;
+                        if (binId == null) {
+                          _returnBinByLine.remove(lineId);
+                        } else {
+                          _returnBinByLine[lineId] = binId;
+                        }
+                      }),
+                    ),
+                  ),
+                ],
               ],
             ],
             const SizedBox(height: 12),
@@ -706,6 +798,60 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// One bin of a warehouse as `GET /inventory/locations` returns it.
+class _BinOption {
+  const _BinOption({required this.id, required this.code, required this.name});
+
+  factory _BinOption.fromJson(Map<String, dynamic> json) => _BinOption(
+    id: asInt(json['location_id']) ?? 0,
+    code: asString(json['location_code']) ?? '',
+    name: asString(json['location_name']) ?? '',
+  );
+
+  final int id;
+  final String code;
+  final String name;
+
+  String get label => name.isEmpty || name == code ? code : '$code — $name';
+}
+
+/// Restock-bin select for a return line whose sale recorded no bin draw.
+/// Disabled with a hint until the warehouse (and so the bin list) is
+/// known — the bins belong to the warehouse, not to the line.
+class _ReturnBinPicker extends StatelessWidget {
+  const _ReturnBinPicker({
+    required this.bins,
+    required this.selected,
+    required this.enabled,
+    required this.hint,
+    required this.onChanged,
+  });
+
+  final List<_BinOption>? bins;
+  final int? selected;
+  final bool enabled;
+  final String hint;
+  final ValueChanged<int?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final options = bins ?? const <_BinOption>[];
+    return SearchableSelect<int>(
+      items: [for (final bin in options) bin.id],
+      selected: selected,
+      hint: hint,
+      isDense: true,
+      enabled: enabled && options.isNotEmpty,
+      labelBuilder: (id) {
+        final match = options.where((bin) => bin.id == id);
+        return match.isEmpty ? '$id' : match.first.label;
+      },
+      decoration: formInputDecoration(),
+      onChanged: onChanged,
     );
   }
 }

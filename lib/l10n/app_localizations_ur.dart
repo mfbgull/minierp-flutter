@@ -5910,6 +5910,16 @@ class AppLocalizationsUr extends AppLocalizations {
       'اسٹاک بحال کرنے کے لیے گودام منتخب کریں';
 
   @override
+  String get salesreturnsReturnbin => 'Restock Bin';
+
+  @override
+  String get salesreturnsReturnbinhint => 'Select the bin to restock into';
+
+  @override
+  String get salesreturnsReturnbinrequired =>
+      'Choose the restock bin for every returned line that has no recorded bin';
+
+  @override
   String get salesreturnsReturnreasonplaceholder => 'واپسی کی وجہ درج کریں...';
 
   @override

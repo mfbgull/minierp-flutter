@@ -35,6 +35,8 @@
 //   correction of a Completed count: reverses original adjustment + GL,
 //   re-applies corrected quantities; server rejects double correction)
 // - `DELETE /inventory/physical-counts/:id` → `{success, message}`
+// - `GET /inventory/locations?warehouse_id=` → `{success, data: [Location]}`
+//   (bins of one warehouse, for the return dialog's restock-bin choice)
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -656,7 +658,7 @@ class InventoryRepository {
   // ============================================
 
   Future<ApiResult<List<Map<String, dynamic>>>> getLocations(int warehouseId) =>
-      _api.getRawList(
+      _api.getList(
         ApiEndpoints.locations,
         queryParameters: {'warehouse_id': warehouseId.toString()},
         parseItem: (json) => Map<String, dynamic>.from(json as Map),

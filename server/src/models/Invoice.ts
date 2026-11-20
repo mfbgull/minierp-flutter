@@ -6,6 +6,7 @@ import { sanitizeSortParams, INVOICE_SORT_COLUMNS, INVOICE_RETURN_SORT_COLUMNS }
 import Database from 'better-sqlite3';
 import logger from '../utils/logger';
 import StockMovementModel from './StockMovement';
+import type { ConsumptionEntry } from './StockMovement';
 import { StockReservationModel } from './StockReservation';
 import AccountingService from '../services/accountingService';
 import InvoiceReturnModel from './InvoiceReturn';
@@ -43,6 +44,44 @@ export type InvoiceReturnRow = {
   created_by_username: string | null;
   customer_name: string | null;
   customer_id: number | null;
+};
+
+/** One bin an invoice line drew from, in the order the units left the bins. */
+export type InvoiceLineBinDraw = {
+  batch_id: number;
+  location_id: number;
+  quantity: number;
+};
+
+/**
+ * A line of an invoice as the detail route returns it. `bin_consumption` is
+ * where the line's units came from: the return form restocks those exact bins
+ * and asks the user only for a line that has no draw (see
+ * InvoiceReturnService.resolveReturnBins).
+ */
+export type InvoiceLineRow = {
+  id: number;
+  item_id: number;
+  quantity: number;
+  returned_qty: number;
+  unit_price: number;
+  amount: number;
+  tax_rate: number | null;
+  discount_type: string | null;
+  discount_value: number | null;
+  expiry_date: string | null;
+  is_expired_at_sale: number | null;
+  reservation_id: number | null;
+  item_name: string | null;
+  item_code: string | null;
+  bin_consumption: InvoiceLineBinDraw[];
+  /**
+   * True when a return of this line must name the bin to restock into: the
+   * line was sold from a batch, but no per-bin draw was recorded for it
+   * (every sale made before the draw ledger existed). The return form asks
+   * the user for those lines and sends `location_id`.
+   */
+  requires_return_bin: boolean;
 };
 
 export class InvoiceCancellationGuardError extends Error {
@@ -271,7 +310,7 @@ class InvoiceModel {
     quantity: number,
     db: Database.Database,
     asOfDate?: string
-  ): Array<{ batchId: number | null; consumed: number; unitCost: number }> {
+  ): ConsumptionEntry[] {
     return StockMovementModel.consumeFromOldestBatches(itemId, warehouseId, quantity, db, asOfDate);
   }
 
@@ -601,6 +640,8 @@ class InvoiceModel {
     locationId: number,
     qty: number,
     invoiceNo: string,
+    /** invoice_items.id this restock belongs to, or null when the caller does not know it. */
+    invoiceItemId: number | null,
   ): void {
     if (qty <= 0) return;
     db.prepare(`
@@ -618,9 +659,9 @@ class InvoiceModel {
     `).get(invoiceNo) as { id: number } | undefined;
     if (invRow) {
       db.prepare(`
-        INSERT INTO invoice_return_batches (invoice_id, batch_id, location_id, quantity, reference_doctype, reference_docno)
-        VALUES (?, ?, ?, ?, 'RETURN', ?)
-      `).run(invRow.id, batchId, locationId, qty, invoiceNo);
+        INSERT INTO invoice_return_batches (invoice_id, invoice_item_id, batch_id, location_id, quantity, reference_doctype, reference_docno)
+        VALUES (?, ?, ?, ?, ?, 'RETURN', ?)
+      `).run(invRow.id, invoiceItemId, batchId, locationId, qty, invoiceNo);
     }
   }
 
@@ -632,7 +673,15 @@ class InvoiceModel {
     referenceDoctype: string,
     explicitWarehouseId?: number,
     /** S-1 HIGH-1: per-line bin draws, keyed by invoice_items.id. */
-    lineDraws?: Map<number, Array<{ batch_id: number; location_id: number; quantity: number }>>
+    lineDraws?: Map<number, Array<{ batch_id: number; location_id: number; quantity: number }>>,
+    /**
+     * Per-line bin the USER chose, keyed by invoice_items.id. Used only when a
+     * sale recorded no draw for that line, which the return path refuses to
+     * guess (see InvoiceReturnService.resolveReturnBins). Without it the
+     * reversal falls back to the warehouse DEFAULT, which is right for a
+     * cancellation of an old sale but wrong for a return the user priced.
+     */
+    lineFallbackBins?: Map<number, number>
   ): Array<{ item_id: number; movement_id: number; quantity: number; warehouse_id: number; unit_cost: number }> {
     const posted: Array<{ item_id: number; movement_id: number; quantity: number; warehouse_id: number; unit_cost: number }> = [];
     const reverseInvoiceItemStock = (item: typeof items[number]): void => {
@@ -696,6 +745,39 @@ class InvoiceModel {
         // the same batch restore to successive bins.
         const binCursors = new Map<string, number>();
         const binTaken = new Map<string, number>();
+        // A SECOND partial return must continue where the first stopped. The
+        // audit rows every restore writes name the bin that received units, so
+        // they answer "how much of this draw is already back?" — without them
+        // the walk restarts at the first bin and over-fills it. Only the return
+        // path seeds: a cancel or an edit restores the whole remaining amount
+        // against the same invoice, so its own earlier rows must not subtract.
+        if (referenceDoctype === 'RETURN' && item.id != null && lineDraws) {
+          // Scoped to the returning LINE. Invoice-wide summing looked right
+          // until two lines of the same item were returned in turn: the
+          // sibling line's restores then counted as this line's and pushed its
+          // units past the bins they came from.
+          const restoredRows = db.prepare(`
+            SELECT batch_id, location_id, COALESCE(SUM(quantity), 0) AS qty
+            FROM invoice_return_batches
+            WHERE invoice_item_id = ?
+            GROUP BY batch_id, location_id`).all(item.id) as Array<{
+            batch_id: number; location_id: number; qty: number;
+          }>;
+          if (restoredRows.length > 0) {
+            const restoredByBin = new Map<string, number>();
+            for (const row of restoredRows) {
+              restoredByBin.set(`${row.batch_id}:${row.location_id}`, roundQty(Number(row.qty)));
+            }
+            // The walk below names a draw by its batch AND its bin. Seeding by
+            // position in the line's draw list instead would address the wrong
+            // slot as soon as a line spans two batches, because a batch's draws
+            // restart at 0 in the walk's own filtered view.
+            (lineDraws.get(item.id) ?? []).forEach((draw) => {
+              const seeded = restoredByBin.get(`${draw.batch_id}:${draw.location_id}`);
+              if (seeded) binTaken.set(`${item.id}:${draw.batch_id}:${draw.location_id}`, seeded);
+            });
+          }
+        }
         // Restore quantity on each consumed batch (new path: batch_stock_by_location)
         const restoreSaleBatch = (movement: typeof saleMovements[number]): void => {
           if (movement.batch_id !== null) {
@@ -716,7 +798,7 @@ class InvoiceModel {
             // and reassembled the whole quantity there, over-filling that bin
             // and leaving the others short.
             const ledgerBins = item.id != null
-              ? (lineDraws?.get(item.id)?.filter((d) => d.batch_id === movement.batch_id) ?? [])
+              ? (lineDraws?.get(item.id) ?? []).filter((d) => d.batch_id === movement.batch_id)
               : [];
             if (ledgerBins.length > 0) {
               // A sale of one batch can produce SEVERAL movements (one per bin
@@ -728,13 +810,14 @@ class InvoiceModel {
               let left = restoreQty;
               while (left > 0 && cursor < ledgerBins.length) {
                 const bin = ledgerBins[cursor];
-                // How much of this ledger row has already been restored.
-                const takenKey = `${cursorKey}:${cursor}`;
+                // How much of this ledger row has already been restored. The
+                // seed above writes the same key.
+                const takenKey = `${cursorKey}:${bin.location_id}`;
                 const already = binTaken.get(takenKey) ?? 0;
                 const availableInRow = roundQty(Number(bin.quantity) - already);
                 if (availableInRow <= 0) { cursor += 1; continue; }
                 const take = roundQty(Math.min(left, availableInRow));
-                this.restoreBatchToBin(db, movement.batch_id, bin.location_id, take, invoiceNo);
+                this.restoreBatchToBin(db, movement.batch_id, bin.location_id, take, invoiceNo, item.id ?? null);
                 binTaken.set(takenKey, roundQty(already + take));
                 left = roundQty(left - take);
                 if (roundQty(Number(bin.quantity) - (binTaken.get(takenKey) ?? 0)) <= 0) cursor += 1;
@@ -745,13 +828,22 @@ class InvoiceModel {
               // than DEFAULT, because that bin is where the sale came from.
               if (left > 0) {
                 const last = ledgerBins[ledgerBins.length - 1];
-                this.restoreBatchToBin(db, movement.batch_id, last.location_id, left, invoiceNo);
+                this.restoreBatchToBin(db, movement.batch_id, last.location_id, left, invoiceNo, item.id ?? null);
               }
             } else {
-              const locRow = db.prepare(`
+              // No recorded draw. A user-chosen bin wins (a return of a line
+              // whose sale predates draw recording), otherwise the warehouse
+              // DEFAULT — correct for cancelling an old sale, never a guess
+              // on the return path, which refuses such a line upstream.
+              const chosenBin = item.id != null ? lineFallbackBins?.get(item.id) : undefined;
+              if (chosenBin != null) {
+                this.restoreBatchToBin(db, movement.batch_id, chosenBin, restoreQty, invoiceNo, item.id ?? null);
+              } else {
+                const locRow = db.prepare(`
                   SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
                 `).get(targetWarehouseId) as { id: number } | undefined;
-              if (locRow) this.restoreBatchToBin(db, movement.batch_id, locRow.id, restoreQty, invoiceNo);
+                if (locRow) this.restoreBatchToBin(db, movement.batch_id, locRow.id, restoreQty, invoiceNo, item.id ?? null);
+              }
             }
 
             // Credit the master batch row on every flag state. Consumption
@@ -1167,19 +1259,32 @@ class InvoiceModel {
    * Get invoice items for stock reversal
    */
   /**
-   * S-1: record which bins an invoice line drained, so a void can restore
-   * exactly those bins. Entries without a resolved bin are skipped - only the
-   * reservation path sets locationId, and it always has one.
+   * Record which bins an invoice line drained, so a reversal can restore
+   * exactly those bins and a return can replay them. Every batched sale line
+   * writes this now, not only a reservation-backed one: an unreserved FIFO
+   * sale would otherwise leave no record of where its units came from, and a
+   * partial return could only guess (see the Decision record on partial
+   * returns of a line sold from two bins).
+   *
+   * An entry reports its own bins when the allocator kept them (`bins`), and
+   * otherwise the single bin the reservation path named (`locationId`).
+   * Entries with no bin at all are skipped: an unbatched legacy sale drew from
+   * no bin, so it has no bin to restore.
    */
   static recordLineBinDraw(
     db: Database.Database,
     invoiceItemId: number,
-    draw: Array<{ batchId: number | null; locationId?: number; consumed: number }>,
+    draw: Array<{ batchId: number | null; locationId?: number; consumed: number; bins?: Array<{ locationId: number; quantity: number }> }>,
   ): void {
     const ins = db.prepare(
       'INSERT INTO invoice_item_bin_consumption (invoice_item_id, batch_id, location_id, quantity) VALUES (?, ?, ?, ?)');
     for (const entry of draw) {
-      if (entry.batchId == null || entry.locationId == null) continue;
+      if (entry.batchId == null) continue;
+      if (entry.bins && entry.bins.length > 0) {
+        for (const bin of entry.bins) ins.run(invoiceItemId, entry.batchId, bin.locationId, bin.quantity);
+        continue;
+      }
+      if (entry.locationId == null) continue;
       ins.run(invoiceItemId, entry.batchId, entry.locationId, entry.consumed);
     }
   }
@@ -1499,16 +1604,65 @@ class InvoiceModel {
              c.phone as customer_phone, c.billing_address as customer_address
       FROM invoices i LEFT JOIN customers c ON i.customer_id = c.id WHERE i.id = ?
     `).get(id);
-  }  static getItems(invoiceId: number, db: Database.Database) {
-    return db.prepare(
+  }  /**
+   * Invoice lines of one invoice, each carrying the bins it drew from as
+   * `bin_consumption` (oldest draw first). The return form needs them: a line
+   * WITH draws is restocked to those exact bins and the user is not asked,
+   * while a line WITHOUT them has no recorded answer and the user must choose
+   * (see InvoiceReturnService.resolveReturnBins).
+   *
+   * Only the ids and the quantity travel — the client labels the bin from the
+   * warehouse's location list, which the return form loads anyway.
+   */
+  static getItems(invoiceId: number, db: Database.Database): InvoiceLineRow[] {
+    const lines = db.prepare(
       `SELECT ii.id, ii.item_id, ii.quantity, ii.returned_qty, ii.unit_price, ii.amount, ii.tax_rate,
              ii.discount_type, ii.discount_value, ii.expiry_date, ii.is_expired_at_sale,
              ii.reservation_id,
-             item.item_name, item.item_code
+             item.item_name, item.item_code,
+             (SELECT COUNT(*) FROM invoice_item_bin_consumption bc WHERE bc.invoice_item_id = ii.id)
+               AS draw_count,
+             (SELECT COUNT(*) FROM stock_movements sm
+               JOIN invoices inv ON inv.id = ii.invoice_id
+              WHERE sm.item_id = ii.item_id AND sm.reference_docno = inv.invoice_no
+                AND sm.movement_type = 'SALE' AND sm.batch_id IS NOT NULL)
+               AS batched_sale_count
       FROM invoice_items ii LEFT JOIN items item ON ii.item_id = item.id
       WHERE ii.invoice_id = ?
       ORDER BY ii.id`
-    ).all(invoiceId);
+    ).all(invoiceId) as Array<
+      Omit<InvoiceLineRow, 'bin_consumption' | 'requires_return_bin'>
+      & { draw_count: number; batched_sale_count: number }
+    >;
+
+    const drawRows = db.prepare(
+      `SELECT bc.invoice_item_id, bc.batch_id, bc.location_id, bc.quantity
+       FROM invoice_item_bin_consumption bc
+       JOIN invoice_items ii ON ii.id = bc.invoice_item_id
+       WHERE ii.invoice_id = ?
+       ORDER BY bc.id`).all(invoiceId) as Array<{
+      invoice_item_id: number; batch_id: number; location_id: number; quantity: number;
+    }>;
+
+    const byLine = new Map<number, typeof drawRows>();
+    for (const row of drawRows) {
+      const bucket = byLine.get(row.invoice_item_id) ?? [];
+      bucket.push(row);
+      byLine.set(row.invoice_item_id, bucket);
+    }
+
+    // The server refuses a no-draw return in BOTH flag states, so the client
+    // must be told to ask in both. Gating this on the flag sent a flag-off user
+    // a 400 it had no way to answer.
+    return lines.map(({ draw_count, batched_sale_count, ...line }) => ({
+      ...line,
+      bin_consumption: (byLine.get(line.id) ?? []).map((row) => ({
+        batch_id: row.batch_id,
+        location_id: row.location_id,
+        quantity: row.quantity,
+      })),
+      requires_return_bin: batched_sale_count > 0 && draw_count === 0,
+    }));
   }
 
   static getPayments(invoiceId: number, db: Database.Database) {
