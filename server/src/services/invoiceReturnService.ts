@@ -288,9 +288,10 @@ interface PostedSettlement {
  * A line whose sale recorded NO draw has no honest answer. That happens for a
  * batched sale made before draws were recorded, or for stock that had no bin
  * coverage. The service never invents one: the user must choose the bin, and
- * the choice is validated here. A missing choice, an unknown bin, or a bin in
- * another warehouse fails the whole return with 400 before any write, so a
- * refusal moves no stock and leaves `invoice_returns` untouched.
+ * the choice is validated here. A missing choice, an unknown bin, or a bin
+ * outside the warehouse the user is restocking into fails the whole return with
+ * 400 before any write, so a refusal moves no stock and leaves
+ * `invoice_returns` untouched.
  *
  * An UNBATCHED line (a legacy sale that drew from no batch at all) needs no
  * choice, because no bin ever held its units.
@@ -302,6 +303,8 @@ function resolveReturnBins(
   invoiceNo: string,
   lines: Array<{ invoice_item_id: number; item_id: number }>,
   items: ProcessReturnInput['items'],
+  /** The warehouse the user chose to restock into, or null when not given. */
+  targetWarehouseId: number | null,
 ): Map<number, number> {
   const chosenBins = new Map<number, number>();
   // NOT gated on feature_batch_locations. The flag chooses which source a READ
@@ -337,11 +340,17 @@ function resolveReturnBins(
     if (!bin) {
       throw new ReturnError(400, `Return bin ${chosen} does not exist`);
     }
+    // Validate against the warehouse the user is restocking INTO (`warehouse_id`),
+    // because that is the warehouse whose bins the return form loaded. Without
+    // an explicit choice the goods go back to the dispatch warehouse, so that
+    // becomes the target. Comparing against the dispatch warehouse instead
+    // rejected a valid bin the form itself offered in another warehouse.
     const dispatchedFrom = saleWarehouse.get(line.item_id, invoiceNo) as { warehouse_id: number } | undefined;
-    if (dispatchedFrom && bin.warehouse_id !== dispatchedFrom.warehouse_id) {
+    const effectiveTarget = targetWarehouseId ?? dispatchedFrom?.warehouse_id ?? null;
+    if (effectiveTarget != null && bin.warehouse_id !== effectiveTarget) {
       throw new ReturnError(400,
         `Return bin ${chosen} belongs to warehouse ${bin.warehouse_id}, ` +
-        `but the goods were dispatched from warehouse ${dispatchedFrom.warehouse_id}`);
+        `but the goods are restocked into warehouse ${effectiveTarget}`);
     }
     chosenBins.set(line.invoice_item_id, bin.id);
   }
@@ -429,7 +438,7 @@ export class InvoiceReturnService {
       const lines = discountedReturnLines(input, fresh);
       // Restock bins are decided before any write: a line whose sale recorded
       // no bin draw must carry a valid user choice, or the whole return fails.
-      const fallbackBins = resolveReturnBins(db, fresh.invoice_no, lines, input.items);
+      const fallbackBins = resolveReturnBins(db, fresh.invoice_no, lines, input.items, warehouseId);
 
       const returnedGross = roundCurrency(lines.reduce((s, l) => s + l.returnedGross, 0));
 

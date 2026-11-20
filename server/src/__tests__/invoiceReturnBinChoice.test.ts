@@ -40,6 +40,13 @@ function defaultLocation(wh: number): number {
   ).get(wh) as { id: number }).id;
 }
 
+function createWarehouse(tag: string): number {
+  seq += 1;
+  db.prepare('INSERT INTO warehouses (warehouse_code, warehouse_name, is_active) VALUES (?, ?, 1)')
+    .run(`BIN-${tag}-${Date.now()}-${seq}`, `BIN ${tag} ${seq}`);
+  return (db.prepare('SELECT id FROM warehouses ORDER BY id DESC LIMIT 1').get() as { id: number }).id;
+}
+
 function rackLocation(wh: number, code: string): number {
   db.prepare('INSERT INTO locations (warehouse_id, location_code, location_name) VALUES (?, ?, ?)')
     .run(wh, code, code);
@@ -273,11 +280,8 @@ describe('Decision 2: a line with no recorded draw requires a chosen bin', () =>
     const { invoiceId, lineId } = await sellFifo(item, 8, 'foreign-bin');
     forgetDraws(lineId);
 
-    seq += 1;
-    db.prepare("INSERT INTO warehouses (warehouse_code, warehouse_name, is_active) VALUES (?, ?, 1)")
-      .run(`BIN-OTHER-${Date.now()}-${seq}`, `BIN Other ${seq}`);
-    const otherWh = (db.prepare('SELECT id FROM warehouses ORDER BY id DESC LIMIT 1')
-      .get() as { id: number }).id;
+    // No restock warehouse is named, so the dispatch warehouse is the target.
+    const otherWh = createWarehouse('other');
     const otherBin = rackLocation(otherWh, `BIN-OTHER-R1-${Date.now()}-${seq}`);
 
     const res = await returnRaw(invoiceId, {
@@ -290,6 +294,72 @@ describe('Decision 2: a line with no recorded draw requires a chosen bin', () =>
     expect(binRow(b1, r2)).toEqual({ physical: 2, reserved: 0, available: 2 });
     expect(returnedQtyOf(lineId)).toBe(0);
     expect(returnBatchRows(invoiceId)).toEqual([]);
+  });
+
+  /**
+   * The return form lets the user pick the RESTOCK warehouse (`warehouse_id`)
+   * and then loads THAT warehouse's bins. A no-draw line must validate the
+   * chosen bin against that selected target warehouse, not the invoice
+   * dispatch warehouse — otherwise a bin the form itself offered is refused
+   * with 400. Fix for the independent PR #44 review.
+   */
+  it('accepts a chosen bin in the user-selected target warehouse, not the dispatch warehouse', async () => {
+    setFeatureEnabled(db, FLAG, true);
+    const { item, b1, r2 } = await twoRackBins('target-wh');
+
+    // Sold from warehouse A: the invoice dispatch warehouse.
+    const { invoiceId, lineId } = await sellFifo(item, 8, 'target-wh');
+    forgetDraws(lineId);
+
+    // A second warehouse B with its own rack bin, holding no units of this batch.
+    const warehouseB = createWarehouse('target-wh');
+    const binB = rackLocation(warehouseB, `BIN-TARGET-R1-${Date.now()}-${seq}`);
+
+    const masterBefore = Number((db.prepare('SELECT quantity_remaining FROM stock_batches WHERE id = ?')
+      .get(b1) as { quantity_remaining: number }).quantity_remaining);
+
+    const res = await returnRaw(invoiceId, {
+      warehouse_id: warehouseB,
+      items: [{ invoice_item_id: lineId, return_quantity: 2, location_id: binB }],
+      reason: 'restock into the warehouse the user chose',
+    }, 'target-wh');
+
+    expect(res.status).toBe(200);
+    // The chosen bin in the selected warehouse received the units.
+    expect(binRow(b1, binB)).toEqual({ physical: 2, reserved: 0, available: 2 });
+    expect(returnBatchRows(invoiceId)).toEqual([{ batch_id: b1, location_id: binB, quantity: 2 }]);
+    // Mirror kept: the master batch row is credited the same quantity.
+    const masterAfter = Number((db.prepare('SELECT quantity_remaining FROM stock_batches WHERE id = ?')
+      .get(b1) as { quantity_remaining: number }).quantity_remaining);
+    expect(masterAfter - masterBefore).toBeCloseTo(2, 6);
+    expect(returnedQtyOf(lineId)).toBe(2);
+  });
+
+  it('rejects a chosen bin outside the selected target warehouse and moves nothing', async () => {
+    setFeatureEnabled(db, FLAG, true);
+    const { item, b1, r2 } = await twoRackBins('mismatch-wh');
+
+    const { invoiceId, lineId } = await sellFifo(item, 8, 'mismatch-wh');
+    forgetDraws(lineId);
+
+    // The user selects warehouse B but names a bin that belongs to warehouse C.
+    const warehouseB = createWarehouse('mismatch-wh');
+    const warehouseC = createWarehouse('mismatch-wh');
+    const binC = rackLocation(warehouseC, `BIN-MISMATCH-R1-${Date.now()}-${seq}`);
+
+    const res = await returnRaw(invoiceId, {
+      warehouse_id: warehouseB,
+      items: [{ invoice_item_id: lineId, return_quantity: 2, location_id: binC }],
+      reason: 'bin outside the selected warehouse',
+    }, 'mismatch-wh');
+
+    expect(res.status).toBe(400);
+    expect(String(res.body.error)).toContain('warehouse');
+    // No stock writes: neither the chosen bin nor any other bin changed.
+    expect(binRow(b1, binC)).toEqual({ physical: 0, reserved: 0, available: 0 });
+    expect(binRow(b1, r2)).toEqual({ physical: 2, reserved: 0, available: 2 });
+    expect(returnBatchRows(invoiceId)).toEqual([]);
+    expect(returnedQtyOf(lineId)).toBe(0);
   });
 
   it('rejects a chosen bin that does not exist', async () => {
