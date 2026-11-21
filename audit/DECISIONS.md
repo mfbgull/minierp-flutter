@@ -1834,3 +1834,34 @@ remains a separate mechanism.
   it double-counted transfer-void and other paths that maintain their own bin
   rows. Red-first evidence is unaffected: `ownerWithdrawalVoidBinRestore` fails
   on the pre-fix code and on a fix-only revert, and passes with the fix.
+
+## DECIDED — owner-withdrawal documents created or edited before migration 134 (2026-11-21)
+
+**PR #50** (`fix/owner-withdrawal-repeat-edit-void`, head `ac32089e`).
+**Decision by Gull:** do not backfill and do not change runtime behaviour for
+these old records. The dev database is disposable and its records are test data.
+
+- **Why this is needed.** Migration 134 gives each owner-withdrawal document a
+  live consumption ledger (`owner_withdrawal_consumption`, plus `consumption_id`
+  on `owner_withdrawal_bin_consumption`). A document posted **before** 134 has
+  no ledger row and no lot id on its draw row. Its reversal therefore falls back
+  to the outbound `stock_movements` rows.
+- **Exact limitation.** If such a document was **edited before 134**, its
+  superseded outbound rows are still present and no new lot was recorded. The
+  fallback cannot tell a live line from a superseded one, so it reverses the
+  **summed** outbound rows. Void of that document is correct, because the sum is
+  what was actually consumed. A **further edit after the upgrade** reverses that
+  sum while the batch holds only the active amount. It then either fails the
+  INV-21 CHECK `quantity_remaining <= quantity_original` (HTTP 500) or, on a
+  batch with enough headroom, restores too much. A pre-134 document that was
+  never edited is unaffected: history and active lines are the same.
+- **Why no repair.** The active lines of a pre-134 edited document are not
+  recoverable from the recorded data, so a backfill cannot be derived and a
+  runtime guess would be unsafe on real stock.
+- **Why this is acceptable.** No real production deployment occurred before
+  migration 134, so no live document can be in that state. The dev database
+  (`database/erp.db`) will be refreshed, which removes every legacy row. No
+  legacy backfill is planned.
+- **Scope.** Comment-only correction to migration 134 and
+  `server/src/models/OwnerWithdrawal.ts`. No logic change, no test change, no
+  schema change. PR #50 stays a draft.
