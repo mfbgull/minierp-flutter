@@ -10,6 +10,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:minierp_app/core/utils/csv_export.dart';
+import 'package:minierp_app/core/utils/date_utils.dart';
 import 'package:minierp_app/core/utils/formatters.dart';
 import 'package:minierp_app/data/models/report.dart';
 import 'package:minierp_app/features/reports/balance_sheet_report_screen.dart';
@@ -22,6 +23,13 @@ import 'package:minierp_app/features/employees/salary_pay_dialog.dart';
 
 import '../test_helpers.dart';
 
+
+// Fixed audit date. The committed artifacts under
+// audit/accounting-audit/remediation/ were produced with this toolbar/payment
+// date, so the tests must pin it instead of DateTime.now(). This keeps the
+// tracked screenshot/JSON artifacts byte-stable on every run.
+const String auditStableToolbarDate = 'Nov 15, 2026';
+final DateTime auditStableDate = DateTime(2026, 11, 15);
 
 // Audit-only input: independent balanced accounting equation, no database or writes.
 // Cash 1,000 + inventory 200 + AR 300 + other assets 400 = assets 1,900.
@@ -84,8 +92,8 @@ void main() {
     tester.view.physicalSize = const Size(1400, 1400);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    final now = DateTime.now();
-    final month = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    final month =
+        '${auditStableDate.year}-${auditStableDate.month.toString().padLeft(2, '0')}';
     const employee = Employee(
       id: 1,
       employeeCode: 'AUDIT',
@@ -123,6 +131,13 @@ void main() {
     final texts = tester
         .widgetList<Text>(find.byType(Text))
         .map((w) => w.data ?? w.textSpan?.toPlainText() ?? '')
+        // The dialog derives its payment-date label from DateTime.now(); pin it
+        // to the committed audit date so the saved artifact is date-stable.
+        .map(
+          (t) => t == Formatters.date(isoDate(DateTime.now()))
+              ? auditStableToolbarDate
+              : t,
+        )
         .toList();
     File(
       'audit/accounting-audit/remediation/flutter-salary-carryover-widget.json',
@@ -168,7 +183,12 @@ void main() {
             child: const Scaffold(body: BalanceSheetReportScreen()),
           ),
         ),
-        overrides: [balanceSheetProvider.overrideWith((ref) async => report)],
+        overrides: [
+          balanceSheetProvider.overrideWith((ref) async => report),
+          reportBalanceSheetAsOfDateProvider.overrideWith(
+            (ref) => auditStableDate,
+          ),
+        ],
       ),
     );
     await tester.pumpAndSettle();
@@ -211,6 +231,13 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('Balanced'), findsOneWidget);
     expect(
+      find.text(auditStableToolbarDate),
+      findsOneWidget,
+      reason:
+          'The toolbar date must use the fixed audit date so the generated '
+          'artifact stays byte-stable across runs.',
+    );
+    expect(
       find.text(Formatters.currency(400)),
       findsOneWidget,
       reason:
@@ -225,8 +252,8 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     const employee = Employee(id: 7, employeeCode: 'COVERED', firstName: 'Covered', lastName: 'Salary', salary: 1000, isActive: true);
-    final now = DateTime.now();
-    final month = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    final month =
+        '${auditStableDate.year}-${auditStableDate.month.toString().padLeft(2, '0')}';
     final row = SalaryMonthSummary.fromJson({'pay_period': month, 'employee_salary': 1000, 'total_paid': 1000, 'remaining': 0, 'advance_carryover': 1000, 'status': 'paid'});
     Map<String, dynamic>? submitted;
     final dio = createFakeDio({'/employees/7/salary/pay': successEnvelope({'id': 99})});
@@ -296,10 +323,15 @@ void main() {
         await tester.pumpWidget(buildTestable(RepaintBoundary(key: key, child: Theme(
           data: ThemeData(brightness: dark ? Brightness.dark : Brightness.light, fontFamily: 'AuditFont'),
           child: const Scaffold(body: BalanceSheetReportScreen()),
-        )), overrides: [balanceSheetProvider.overrideWith((ref) async {
-          loads++;
-          return BalanceSheetReport.fromJson(balanceSheetFixture());
-        })]));
+        )), overrides: [
+          balanceSheetProvider.overrideWith((ref) async {
+            loads++;
+            return BalanceSheetReport.fromJson(balanceSheetFixture());
+          }),
+          reportBalanceSheetAsOfDateProvider.overrideWith(
+            (ref) => auditStableDate,
+          ),
+        ]));
         await tester.pumpAndSettle();
         await tester.tap(find.byIcon(Icons.refresh));
         await tester.pumpAndSettle();
