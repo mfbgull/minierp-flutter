@@ -165,6 +165,11 @@ function restoreConsumption(
         ORDER BY id ASC
       `).all(withdrawalId) as Array<{ batch_id: number; location_id: number; quantity: number }>;
 
+  // Each batch's draw is replayed EXACTLY ONCE. Two withdrawal lines that draw
+  // the same batch produce two original movements for it; looping the whole
+  // ledger per movement restored that batch's draw twice (batch 10, bin 17).
+  const replayed = new Set<number>();
+
   for (const m of originals) {
     const qty = Math.abs(Number(m.quantity));
     const cost = m.unit_cost ?? 0;
@@ -187,10 +192,13 @@ function restoreConsumption(
       // that never held them whenever the batch lived in a named bin.)
       const drawn = drawnBins.filter((b) => b.batch_id === batchId);
       if (drawn.length > 0) {
-        for (const b of drawn) {
-          StockMovementModel.mirrorBatchLocationDelta(
-            batchId, m.warehouse_id, Number(b.quantity), db, b.location_id,
-          );
+        if (!replayed.has(batchId)) {
+          replayed.add(batchId);
+          for (const b of drawn) {
+            StockMovementModel.mirrorBatchLocationDelta(
+              batchId, m.warehouse_id, Number(b.quantity), db, b.location_id,
+            );
+          }
         }
       } else {
         StockMovementModel.mirrorBatchLocationDelta(batchId, m.warehouse_id, qty, db);

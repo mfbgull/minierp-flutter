@@ -275,4 +275,86 @@ describe('goods owner-withdrawal void restores the bin, not just the batch total
     expect(binRow(batchId, namedId)).toEqual({ physical: 10, reserved: 0, available: 10 });
     expect(binRow(batchId, defaultId)).toEqual({ physical: 0, reserved: 0, available: 0 });
   });
+
+  //
+  // Re-review finding (current logic, new records): two withdrawal LINES that
+  // draw the SAME batch produced two `stock_movements` rows for one batch. The
+  // restore looped over those rows and, for each one, replayed EVERY ledger row
+  // of that batch. Withdraw 4 + 3 from one batch therefore restored the batch
+  // draw twice: batch total 10 but bin physical 17. The batch total and the bin
+  // mirror disagreed, and the bin fabricated 7 units.
+  //
+  it('void of two lines drawing the same batch restores the bin once, not once per line', async () => {
+    const itemId = await createItem('OWV-DUP-VOID', cookie);
+    await purchaseStock(itemId, warehouseId, 10, 5, cookie);
+
+    setFeatureEnabled(db, FLAG, true);
+
+    const batchId = batchOf(itemId);
+    const locId = defaultLocation(warehouseId);
+    expect(batchRemaining(batchId)).toBe(10);
+    expect(binRow(batchId, locId)).toEqual({ physical: 10, reserved: 0, available: 10 });
+
+    // Two lines, same item and batch, 4 + 3 = 7.
+    const withdrawal = await post('/api/owner-equity/withdrawals', {
+      withdrawal_date: AS_OF,
+      kind: 'goods',
+      items: [
+        { item_id: itemId, warehouse_id: warehouseId, quantity: 4 },
+        { item_id: itemId, warehouse_id: warehouseId, quantity: 3 },
+      ],
+    });
+    expect([200, 201]).toContain(withdrawal.status);
+    const withdrawalId = (withdrawal.body?.data?.id ?? withdrawal.body?.id) as number;
+    expect(withdrawalId).toBeGreaterThan(0);
+
+    expect(batchRemaining(batchId)).toBe(3);
+    expect(binRow(batchId, locId)).toEqual({ physical: 3, reserved: 0, available: 3 });
+
+    const voided = await del(`/api/owner-equity/withdrawals/${withdrawalId}`);
+    expect([200, 204]).toContain(voided.status);
+
+    // Both stores must return to exactly 10. The defect left the bin at 17.
+    expect(batchRemaining(batchId)).toBe(10);
+    expect(binRow(batchId, locId)).toEqual({ physical: 10, reserved: 0, available: 10 });
+  });
+
+  it('edit/re-post of two same-batch lines restores each draw exactly once', async () => {
+    const itemId = await createItem('OWV-DUP-EDIT', cookie);
+    await purchaseStock(itemId, warehouseId, 10, 5, cookie);
+
+    setFeatureEnabled(db, FLAG, true);
+
+    const batchId = batchOf(itemId);
+    const locId = defaultLocation(warehouseId);
+
+    const withdrawal = await post('/api/owner-equity/withdrawals', {
+      withdrawal_date: AS_OF,
+      kind: 'goods',
+      items: [
+        { item_id: itemId, warehouse_id: warehouseId, quantity: 4 },
+        { item_id: itemId, warehouse_id: warehouseId, quantity: 3 },
+      ],
+    });
+    expect([200, 201]).toContain(withdrawal.status);
+    const withdrawalId = (withdrawal.body?.data?.id ?? withdrawal.body?.id) as number;
+    expect(batchRemaining(batchId)).toBe(3);
+    expect(binRow(batchId, locId)).toEqual({ physical: 3, reserved: 0, available: 3 });
+
+    // Replace both lines with a single 5-unit line: restore 7, then consume 5.
+    const edited = await request(app)
+      .put(`/api/owner-equity/withdrawals/${withdrawalId}`)
+      .set('Cookie', cookie)
+      .set('Idempotency-Key', nextIdemKey('owv-edit'))
+      .send({
+        withdrawal_date: AS_OF,
+        kind: 'goods',
+        items: [{ item_id: itemId, warehouse_id: warehouseId, quantity: 5 }],
+      });
+    expect([200, 201]).toContain(edited.status);
+
+    // Both stores must agree at exactly 5. The defect left the bin at 12.
+    expect(batchRemaining(batchId)).toBe(5);
+    expect(binRow(batchId, locId)).toEqual({ physical: 5, reserved: 0, available: 5 });
+  });
 });
