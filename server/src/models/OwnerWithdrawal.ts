@@ -49,6 +49,8 @@ interface ConsumptionEntry {
   batchId: number | null;
   consumed: number;
   unitCost: number;
+  /** Every bin this entry drained, oldest first. The void must reverse these. */
+  bins?: Array<{ locationId: number; quantity: number }>;
 }
 
 interface OriginalMovementRow {
@@ -109,6 +111,7 @@ function consumeForLines(
         batchId: e.batchId,
         consumed: e.consumed,
         unitCost: e.unitCost,
+        bins: e.bins,
       });
       totalCost += e.consumed * e.unitCost;
     }
@@ -149,6 +152,24 @@ function restoreConsumption(
   withdrawalNo: string,
   userId: number
 ): void {
+  // The bins this withdrawal actually drained (migration 133). Absent for
+  // documents posted before the ledger existed, which keep the old behaviour.
+  const withdrawalId = (db.prepare('SELECT id FROM owner_withdrawals WHERE withdrawal_no = ?')
+    .get(withdrawalNo) as { id: number } | undefined)?.id;
+  const drawnBins = withdrawalId == null
+    ? []
+    : db.prepare(`
+        SELECT batch_id, location_id, quantity
+        FROM owner_withdrawal_bin_consumption
+        WHERE withdrawal_id = ?
+        ORDER BY id ASC
+      `).all(withdrawalId) as Array<{ batch_id: number; location_id: number; quantity: number }>;
+
+  // Each batch's draw is replayed EXACTLY ONCE. Two withdrawal lines that draw
+  // the same batch produce two original movements for it; looping the whole
+  // ledger per movement restored that batch's draw twice (batch 10, bin 17).
+  const replayed = new Set<number>();
+
   for (const m of originals) {
     const qty = Math.abs(Number(m.quantity));
     const cost = m.unit_cost ?? 0;
@@ -164,6 +185,24 @@ function restoreConsumption(
           `${m.movement_no} no longer exists. Restore the batch or correct inventory manually first.`
         );
       }
+      // The consume moved the batch total AND the batch's bin rows, so the
+      // reversal must move both. Return each quantity to the bin that lost it;
+      // only a document with no recorded draw falls back to DEFAULT. (An
+      // earlier version always used DEFAULT, which parked the units in a bin
+      // that never held them whenever the batch lived in a named bin.)
+      const drawn = drawnBins.filter((b) => b.batch_id === batchId);
+      if (drawn.length > 0) {
+        if (!replayed.has(batchId)) {
+          replayed.add(batchId);
+          for (const b of drawn) {
+            StockMovementModel.mirrorBatchLocationDelta(
+              batchId, m.warehouse_id, Number(b.quantity), db, b.location_id,
+            );
+          }
+        }
+      } else {
+        StockMovementModel.mirrorBatchLocationDelta(batchId, m.warehouse_id, qty, db);
+      }
     } else {
       // Legacy NULL-batch consumption — recreate a cost-faithful batch.
       const inserted = db.prepare(`
@@ -177,7 +216,9 @@ function restoreConsumption(
       );
       batchId = inserted.lastInsertRowid as number;
       // BUG-013: the recreated batch needs its location row, or the flag-on
-      // sellable query cannot see it.
+      // sellable query cannot see it. (A brand-new batch, so the seed helper is
+      // the right call here — it also seeds the DEFAULT bin the movement below
+      // would otherwise find missing.)
       StockMovementModel.syncBatchStockByLocationForNewBatch(batchId, m.warehouse_id, qty, db);
     }
 
@@ -297,6 +338,18 @@ function create(db: Database.Database, data: CreateOwnerWithdrawalDTO): { id: nu
         movement_date: data.withdrawal_date,
         batch_id: e.batchId ?? undefined,
       }, data.created_by, db);
+    }
+
+    // Record the exact per-bin draw (migration 133). The void cannot rebuild it
+    // from history — stock_movements carries no bin — so without this the
+    // reversal falls back to the DEFAULT bin and strands the units there.
+    const insertDraw = db.prepare(`
+      INSERT INTO owner_withdrawal_bin_consumption (withdrawal_id, batch_id, location_id, quantity)
+      VALUES (?, ?, ?, ?)
+    `);
+    for (const e of consumption) {
+      if (e.batchId === null) continue;
+      for (const bin of e.bins ?? []) insertDraw.run(newId, e.batchId, bin.locationId, bin.quantity);
     }
 
     AccountingService.assertNoActivePosting(db, 'OWNER_WITHDRAWAL', newId);
@@ -561,6 +614,18 @@ function update(
       }, opts.userId, db);
     }
 
+    // The re-posted withdrawal drained new bins: replace the old draw so a
+    // later void reverses the CURRENT consumption, not the pre-edit one.
+    db.prepare('DELETE FROM owner_withdrawal_bin_consumption WHERE withdrawal_id = ?').run(id);
+    const insertDraw = db.prepare(`
+      INSERT INTO owner_withdrawal_bin_consumption (withdrawal_id, batch_id, location_id, quantity)
+      VALUES (?, ?, ?, ?)
+    `);
+    for (const e of consumption) {
+      if (e.batchId === null) continue;
+      for (const bin of e.bins ?? []) insertDraw.run(id, e.batchId, bin.locationId, bin.quantity);
+    }
+
     db.prepare(`
       UPDATE owner_withdrawals SET withdrawal_date = ?, amount = ?,
         note = COALESCE(?, note), updated_at = CURRENT_TIMESTAMP
@@ -596,6 +661,9 @@ function softVoid(
   db.transaction(() => {
     if (existing.kind === 'goods') {
       restoreConsumption(db, getOriginalMovements(db, existing.withdrawal_no), existing.withdrawal_no, opts.userId);
+      // The draw is consumed by the reversal above; keep the ledger describing
+      // live withdrawals only, so a re-void cannot restore twice.
+      db.prepare('DELETE FROM owner_withdrawal_bin_consumption WHERE withdrawal_id = ?').run(id);
     }
     AccountingService.voidJournalLinesByReference(db, 'OWNER_WITHDRAWAL', id, {
       voidedBy: opts.userId ?? null,

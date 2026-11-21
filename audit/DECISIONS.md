@@ -1816,3 +1816,21 @@ remains a separate mechanism.
   results themselves (GATE_EXIT=0, all pass) are unaffected — only the
   comparison in the report was wrong. Evidence: PR10 gate log
   `/home/fawad/logs/pr10-merge-d3a35510-gate.log` (290/2328).
+
+- **CORRECTION (2026-11-21, PR49 owner-withdrawal void bin restore, `91ad690c`):**
+  two errors in the PR49 report are corrected here; neither changes the fix or
+  its verification. (1) **Count overstated:** the report claimed "31 suites /
+  356 tests". That figure was the sum of per-batch counts from several separate
+  `jest` invocations, not one verified run. The exact combined command over the
+  30 affected files gives **30 suites / 353 tests passed**, independently
+  confirmed by the coordinator on clean head `91ad690c` (log
+  `/home/fawad/logs/pr49-30suite-coordinator-verify-20261121.log`). The earlier
+  overstatement is withdrawn. (2) **Wrong file path:** the PR body said the fix
+  changed a call site in `server/src/models/StockMovement.ts`. `git diff
+  origin/main` shows that file is **unchanged**; the only production change is
+  in `server/src/models/OwnerWithdrawal.ts` (`restoreConsumption` now calls
+  `StockMovementModel.mirrorBatchLocationDelta` for the restored batch). An
+  earlier attempt at the shared `recordMovement` call site was reverted because
+  it double-counted transfer-void and other paths that maintain their own bin
+  rows. Red-first evidence is unaffected: `ownerWithdrawalVoidBinRestore` fails
+  on the pre-fix code and on a fix-only revert, and passes with the fix.
