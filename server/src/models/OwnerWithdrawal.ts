@@ -184,6 +184,21 @@ function getLiveConsumption(db: Database.Database, withdrawalId: number): Consum
 /**
  * History fallback for documents posted before the consumption ledger: one
  * restore lot per outbound movement row, with no recorded bins.
+ *
+ * KNOWN LIMITATION (pre-134 documents only). An edit made before 134 left the
+ * superseded outbound rows behind and recorded no new lot, so this fallback
+ * cannot tell a live line from a superseded one. For those documents:
+ *
+ * - void is correct: it reverses the summed outbound rows, which is what was
+ *   actually consumed.
+ * - a FURTHER edit after the upgrade reverses that same sum while the batch
+ *   holds only the active amount, so it can fail the INV-21 CHECK and return
+ *   500, or succeed on a batch with enough headroom and restore too much.
+ *
+ * Migration 134 does not backfill (the active lines are not recoverable) and
+ * there is no runtime repair. Accepted 2026-11-21 because no production
+ * deployment predates 134 and the dev database is disposable test data.
+ * See audit/DECISIONS.md, "Owner-withdrawal pre-134 documents".
  */
 function getConsumptionFromHistory(db: Database.Database, withdrawalNo: string): ConsumptionLot[] {
   return (db.prepare(`
@@ -254,12 +269,15 @@ function restoreConsumption(
   withdrawalNo: string,
   userId: number
 ): void {
+  // Both absent = a document posted before migration 134. Its recorded state
+  // has no lot and no draw, so only lines never edited before 134 survive.
+  // See the pre-134 limitation in the history fallback below.
   const live = getLiveConsumption(db, withdrawalId);
   const lots = live.length > 0 ? live : getConsumptionFromHistory(db, withdrawalNo);
 
   // Draw rows written before migration 134 carry no lot id. Those batches keep
-  // the earlier rule "replay the batch's draw exactly once", so an edit of a
-  // withdrawal recorded before the ledger still reverses correctly.
+  // the earlier rule "replay the batch's draw exactly once", so the reversal of
+  // a pre-134 document does not double-count a batch drawn by two lines.
   const legacyDrawnOnce = new Set<number>();
 
   for (const lot of lots) {

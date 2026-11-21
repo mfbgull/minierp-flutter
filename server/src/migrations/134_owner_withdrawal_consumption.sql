@@ -17,9 +17,15 @@
 --
 -- No backfill: a historical document has no recorded lot, and its active lines
 -- cannot be distinguished from superseded ones. Those keep the previous
--- history-based reversal. Draw rows written before this migration carry a NULL
--- consumption_id; the reversal keeps the earlier per-batch once-only rule for
--- them, so an edit of a pre-existing withdrawal still restores each draw once.
+-- history-based reversal, and draw rows written before this migration keep a
+-- NULL consumption_id with the earlier per-batch once-only rule.
+--
+-- KNOWN LIMITATION (documents edited before this migration). Their void is
+-- correct, but a FURTHER edit after the upgrade has only the summed outbound
+-- rows to work from, while the batch holds the active amount. That edit can
+-- fail the INV-21 CHECK (HTTP 500) or, on a batch with headroom, over-restore.
+-- Accepted 2026-11-21: no production deployment predates this migration and
+-- the dev database is disposable test data, so no backfill is planned.
 CREATE TABLE IF NOT EXISTS owner_withdrawal_consumption (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     withdrawal_id INTEGER NOT NULL REFERENCES owner_withdrawals(id) ON DELETE CASCADE,
