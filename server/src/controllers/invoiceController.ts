@@ -7,6 +7,7 @@ import { AuthRequest, CreateInvoiceDTO, Invoice, InvoiceItemDTO, PaymentDTO, Inv
 import StockMovementModel from '../models/StockMovement';
 import { StockReservationModel, type StockReservation } from '../models/StockReservation';
 import InvoiceModel from '../models/Invoice';
+import InvoiceReturnModel from '../models/InvoiceReturn';
 import { InvoiceCancellationGuardError, type InvoiceLineRow } from '../models/Invoice';
 import PaymentModel from '../models/Payment';
 import AccountingService from '../services/accountingService';
@@ -602,6 +603,18 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
         // Re-read invoice INSIDE transaction for fresh data
         const originalInvoice = InvoiceModel.getById(invoiceId, db);
         if (!originalInvoice) throw new Error('Invoice not found');
+        // A recorded return references this invoice's line rows through
+        // invoice_return_items.invoice_item_id, which has no ON DELETE
+        // cascade. An edit deletes and recreates those rows, so the delete
+        // would fail with a FOREIGN KEY error (a 500) partway through the
+        // transaction. Refuse the whole edit up front, before any line,
+        // stock, reservation or accounting write. Any recorded return line
+        // blocks the edit, partial or full; a voided return keeps its rows,
+        // so its reference is still live and it blocks too.
+        if (InvoiceReturnModel.hasRecordedReturnForInvoice(db, invoiceId)) {
+          throw new BusinessRuleError(409,
+            'This invoice cannot be edited after a return has been recorded.');
+        }
 
         AccountingService.assertPeriodNotClosed(db, originalInvoice.invoice_date, `Invoice ${originalInvoice.invoice_no}`);
 

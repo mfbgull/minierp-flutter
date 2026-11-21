@@ -1427,3 +1427,28 @@ GLM reran the exact server CI command, `npm test`, at commit
 `f3b4c5f6a16880da363422c70f3aeda6b175014a`. It passed 295 suites / 2,398 tests,
 matching both CI runs on that commit. GLM corrected its report and confirmed the
 worktree remained clean with no code changes.
+---
+## DECIDED — an invoice edit is refused once a return has been recorded
+**Status:** DECIDED by Gull (2026-11-20). Branch
+`mfbgull/reject-edit-after-return`, stacked on PR #45
+(`mfbgull/fix-new-g-stock-precision`, commit `439ed80a`).
+**The case.** GLM found this in the PR #45 review. `invoice_return_items
+.invoice_item_id` references `invoice_items(id)` with no ON DELETE cascade. An
+invoice edit deletes and recreates the invoice line rows. Once a return exists,
+that delete violates the foreign key and SQLite aborts with `FOREIGN KEY
+constraint failed` — a raw 500 thrown deep inside the update transaction.
+**Decision.** Refuse the edit with HTTP 409 before any write, using the existing
+`BusinessRuleError` and route response pattern. The message is: "This invoice
+cannot be edited after a return has been recorded."
+**Scope.** The guard fires for ANY recorded `invoice_return_items` row for the
+invoice, partial or full. A voided return keeps its item rows, so its reference
+is still live and it blocks the edit too. This is one referential-integrity rule,
+not a new workflow choice. No migration and no data backfill: the reference is
+what it is; the edit is what must stop.
+**Tests.** `server/src/__tests__/invoiceEditAfterReturn.test.ts` — two real-route
+cases (partial return, full return) that create the invoice, record the return,
+then attempt a normal PUT with the client's line `id` and `reservation_id`. Both
+assert 409, the exact message, and that invoice item ids/quantities, return-to-line
+references, `stock_batches`, `batch_stock_by_location`, reservations, stock
+movements and journal lines are byte-for-byte unchanged. Red-first: both cases
+returned 500 before the guard. Revert-proof: removing the guard restored the 500.

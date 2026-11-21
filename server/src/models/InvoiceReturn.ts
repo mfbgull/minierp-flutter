@@ -268,6 +268,23 @@ export class InvoiceReturnModel {
       'SELECT * FROM invoice_return_items WHERE return_id = ? ORDER BY id'
     ).all(returnId) as InvoiceReturnItemRow[];
   }
+  /**
+   * True when ANY return line references a line of this invoice. The
+   * reference (`invoice_return_items.invoice_item_id`) has no ON DELETE
+   * cascade, so an invoice edit that deletes and recreates its lines would
+   * hit a FOREIGN KEY failure. Voided returns keep their item rows, so a
+   * voided return blocks an edit too - the reference is still there.
+   */
+  static hasRecordedReturnForInvoice(db: Database.Database, invoiceId: number): boolean {
+    const row = db.prepare(`
+      SELECT 1 AS present
+      FROM invoice_return_items iri
+      JOIN invoice_items ii ON ii.id = iri.invoice_item_id
+      WHERE ii.invoice_id = ?
+      LIMIT 1
+    `).get(invoiceId) as { present: number } | undefined;
+    return row !== undefined;
+  }
 
   // ───────────────────────────────────────────────────────────────
   // Void support (spec §5.3)
