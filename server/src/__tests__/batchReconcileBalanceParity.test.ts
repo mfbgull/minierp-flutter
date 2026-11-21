@@ -109,10 +109,11 @@ function seedBatchForItem(
   };
 }
 
+// PR #52: a reason is required for a real count change (Gull's product rule).
 const correct = (body: Record<string, unknown>) =>  request(app)
     .post('/api/inventory/batch-reconciliation/correct')
     .set('Cookie', cookie)
-    .send(body);
+    .send({ reason: 'Recount adjustment', ...body });
 
 // A location in a given warehouse (no bin row), for cross-location and
 // cross-warehouse probes.
