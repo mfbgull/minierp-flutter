@@ -717,7 +717,31 @@ class InvoiceModel {
         WHERE item_id = ? AND reference_docno = ? AND movement_type = 'ADJUSTMENT' AND reference_doctype = 'RETURN'
       `).get(item.item_id, invoiceNo) as { total_returned: number };
 
-      const totalSold = roundQty(saleMovements.reduce((sum, m) => sum + Math.abs(m.quantity), 0));
+      // NEW-G: a line with a live consumption ledger is restored from that
+      // ledger, not from the invoice's SALE movements. An edit reuses the
+      // invoice_no, so the movements still hold the ORIGINAL sale alongside
+      // the edit's re-sale ([-2,-3] plus [-2,-2]); summing them shrank the
+      // ratio and a following cancel restored 19.998 instead of 20. The
+      // ledger already names the batches, bins and quantities this line still
+      // has out, so it is rebuilt into one movement per batch — the same
+      // granularity the sale wrote — and the proven walk below runs over it.
+      // A line with no ledger (a legacy unbatched sale) keeps the movements.
+      const lineLedger = item.id != null ? (lineDraws?.get(item.id) ?? []) : [];
+      let restoreMovements = saleMovements;
+      if (lineLedger.length > 0) {
+        const perBatch = new Map<number, number>();
+        for (const draw of lineLedger) {
+          perBatch.set(draw.batch_id, roundQty((perBatch.get(draw.batch_id) ?? 0) + Number(draw.quantity)));
+        }
+        restoreMovements = [...perBatch].map(([batch_id, qty]) => ({
+          warehouse_id: saleMovements[0].warehouse_id,
+          quantity: -qty,
+          unit_cost: 0,
+          batch_id,
+        }));
+      }
+
+      const totalSold = roundQty(restoreMovements.reduce((sum, m) => sum + Math.abs(m.quantity), 0));
       const totalToReturn = roundQty(Math.abs(item.quantity));
       const alreadyReturnedQty = roundQty(Math.abs(alreadyReturned.total_returned));
       const remainingToReturn = roundQty(Math.max(0, totalToReturn - alreadyReturnedQty));
@@ -860,7 +884,7 @@ class InvoiceModel {
             `).run(restoreQty, movement.batch_id);
           }
         };
-        for (const movement of saleMovements) {
+        for (const movement of restoreMovements) {
           restoreSaleBatch(movement);
         }
       };
