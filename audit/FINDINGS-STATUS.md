@@ -1998,3 +1998,31 @@ batch truth.
   `accountingInvariants.test.ts` (33 tests); `npm run typecheck` and
   `npm run lint` in `server/`. Full suites and `scripts/check.sh` were **not**
   run.
+
+### PR #52 review — multi-bin guard gap (2026-11-22)
+
+**Status: FIXED in the same draft PR, not merged.**
+
+| # | Setup | Old result | New result |
+|---|---|---|---|
+| 4 | original 10, bins 5+5, one bin to 10 | **HTTP 500** (sum 15 vs CHECK) | **HTTP 400**, zero writes |
+
+- **Cause.** The guard compared one bin's requested count with
+  `quantity_original`. The batch master is set from the SUM of all bins, so a
+  per-bin value inside the original could still overflow the sum and reach the
+  DB CHECK.
+- **Fix.** The summed guard now runs inside the correction transaction, after
+  the bin update and before the batch write. A rejected sum throws, the
+  transaction rolls back, and the route answers HTTP 400.
+- **Test label corrected.** The old case "a multi-batch item still rejects when
+  the TOTAL batch quantity would exceed the original" had a one-batch fixture.
+  It is renamed "…when the item has several bins" and now uses a real two-bin
+  fixture. Three multi-bin cases were added: overflow rejected with no writes,
+  a same-sum request still allowed, and a normal cross-bin reduction.
+- **Red-first.** The overflow case failed on the unfixed code
+  (`Expected 400, Received 500`) and again on a fix-only revert. The 9-case
+  suite passes with the fix.
+- **Also pinned.** The -4 vs -40 distinction from `audit/DECISIONS.md`
+  ("Mirror-only resets are not stock movements").
+- **Unchanged.** Batch-truth policy, migration 127, `feature_batch_locations`
+  default OFF, and the ungated writes to both stock stores.

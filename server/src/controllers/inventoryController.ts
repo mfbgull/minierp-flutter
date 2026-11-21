@@ -1417,6 +1417,16 @@ export function correctBatchReconciliation(req: AuthRequest, res: Response): Res
         WHERE batch_id = ?
       `).get(batch_id) as { total: number };
 
+      // PR #52 review: the per-bin guard above proves only that THIS bin fits
+      // inside the original. The batch master is set from the SUM of every
+      // bin, so a batch split 5 + 5 with original 10 lets one bin go to 10 and
+      // the sum 15 trips CHECK(quantity_remaining <= quantity_original) as an
+      // HTTP 500. Check the sum that was actually written, inside the same
+      // transaction, so a rejected sum rolls the bin update back.
+      if (totalPhysical.total > originalQty.quantity_original + 0.0005) {
+        throw new BatchReconcileExceedsOriginalError(newQty, originalQty.quantity_original, totalPhysical.total);
+      }
+
       db.prepare(`UPDATE stock_batches SET quantity_remaining = ? WHERE id = ?`).run(totalPhysical.total, batch_id);
 
       // S-4 (issue #15) + PR #40 follow-up: stock_balances.quantity is the
@@ -1464,8 +1474,25 @@ export function correctBatchReconciliation(req: AuthRequest, res: Response): Res
 
     return res.json({ success: true, batch_id, location_id, old_quantity: oldQty, new_quantity: newQty, diff });
   } catch (error: unknown) {
+    // The summed guard runs inside the transaction, so the throw rolls back
+    // every write. Translate it to a clear 4xx rather than a generic 500.
+    if (error instanceof BatchReconcileExceedsOriginalError) {
+      return res.status(400).json({ error: error.message });
+    }
     logger.error('[BatchReconciliation] correct failed:', error);
     return res.status(500).json({ error: errorMessage(error) });
+  }
+}
+
+/** Thrown inside the correction transaction when the summed bins overflow the
+ *  batch original, so the caller can answer 400 after the rollback. */
+class BatchReconcileExceedsOriginalError extends Error {
+  constructor(requested: number, original: number, total: number) {
+    super(
+      `new_quantity_physical (${requested}) would make the total across all bins (${total}) ` +
+        `exceed the batch quantity_original (${original})`
+    );
+    this.name = 'BatchReconcileExceedsOriginalError';
   }
 }
 

@@ -1898,3 +1898,28 @@ route must remove it.
   (`batch_stock_by_location` and `stock_balances`) still receive ungated writes,
   and migration 127 is not renamed or touched.
 - **Reference.** PR #40 follow-up draft. Confirmed defects 1, 2 and 3.
+
+### Mirror-only resets are not stock movements (2026-11-22)
+
+**Clarified by Gull.** `stock_balances` is a derived mirror of the batch rows.
+The batch sum is the full physical truth. Therefore a reset of a stale mirror
+is counter repair, and **not** a stock movement.
+
+- **Example.** The mirror holds 50 and the batch total is 10. A correction to 6
+  writes a batch delta of **-4**. The mirror moves by **-40**, from 50 to 6.
+  Only the -4 is a real stock movement.
+- **Rule.** Do not post an extra GL or journal adjustment for the -40
+  mirror-only delta. The single reconciliation movement represents the -4. The
+  mirror reset is carried by the same movement, because the mirror is derived.
+- **Pinned by test.** `server/src/__tests__/batchReconcileBatchTruth.test.ts`,
+  "the movement and its GL entry record the real -4 batch correction, never the
+  -40 stale-mirror repair". It asserts one movement of -4 and no new journal
+  entry for the mirror delta.
+- **Current fact, not a new policy.** The route inserts its `stock_movements`
+  row directly and never calls the GL posting path, so the movement carries
+  `financial_value = 0` and `journal_entry_id = NULL`. That is pre-existing
+  behaviour on `origin/main`, not introduced by PR #52. The test pins it as it
+  is. Posting GL for a real batch correction is a separate decision and stays
+  open.
+- **Do not change without Gull.** This policy is not to be altered without an
+  explicit decision from Gull.
