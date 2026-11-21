@@ -13,19 +13,26 @@
 -- the batch (NULL for the legacy unbatched bucket), the units taken, and the
 -- unit cost. Every re-post replaces it; void deletes it. restoreConsumption
 -- reads it first and falls back to the movement history only when a document
--- predates this table, so old documents still reverse.
+-- predates this table.
 --
 -- No backfill: a historical document has no recorded lot, and its active lines
 -- cannot be distinguished from superseded ones. Those keep the previous
 -- history-based reversal, and draw rows written before this migration keep a
--- NULL consumption_id with the earlier per-batch once-only rule.
+-- NULL consumption_id.
 --
--- KNOWN LIMITATION (documents edited before this migration). Their void is
--- correct, but a FURTHER edit after the upgrade has only the summed outbound
--- rows to work from, while the batch holds the active amount. That edit can
--- fail the INV-21 CHECK (HTTP 500) or, on a batch with headroom, over-restore.
--- Accepted 2026-11-21: no production deployment predates this migration and
--- the dev database is disposable test data, so no backfill is planned.
+-- KNOWN LIMITATIONS (pre-134 documents only; the fallback reads movement
+-- history and nothing else):
+--   1. A document EDITED before this migration keeps its superseded outbound
+--      rows, so the fallback reverses their sum. Void can then add back more
+--      than the batch holds and fail INV-21 (HTTP 500). A further edit after
+--      the upgrade fails the same way or over-restores.
+--   2. A document posted after 133 but before this migration has bin draw rows
+--      with a NULL consumption_id. The fallback ignores them and restores to
+--      the warehouse DEFAULT bin instead of the named bin that lost the units.
+--      Totals stay right, so the void returns 200 with stock in the wrong bin.
+-- Accepted 2026-11-21, not repaired: no production deployment predates this
+-- migration and the dev database is disposable test data. Documents created or
+-- edited under this migration always have a lot, so neither applies to them.
 CREATE TABLE IF NOT EXISTS owner_withdrawal_consumption (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     withdrawal_id INTEGER NOT NULL REFERENCES owner_withdrawals(id) ON DELETE CASCADE,

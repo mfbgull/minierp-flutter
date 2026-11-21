@@ -1846,15 +1846,32 @@ these old records. The dev database is disposable and its records are test data.
   on `owner_withdrawal_bin_consumption`). A document posted **before** 134 has
   no ledger row and no lot id on its draw row. Its reversal therefore falls back
   to the outbound `stock_movements` rows.
-- **Exact limitation.** If such a document was **edited before 134**, its
-  superseded outbound rows are still present and no new lot was recorded. The
-  fallback cannot tell a live line from a superseded one, so it reverses the
-  **summed** outbound rows. Void of that document is correct, because the sum is
-  what was actually consumed. A **further edit after the upgrade** reverses that
-  sum while the batch holds only the active amount. It then either fails the
-  INV-21 CHECK `quantity_remaining <= quantity_original` (HTTP 500) or, on a
-  batch with enough headroom, restores too much. A pre-134 document that was
-  never edited is unaffected: history and active lines are the same.
+- **Exact limitation 1 — a pre-134 edit poisons history, so VOID can fail too.**
+  If such a document was **edited before 134**, its superseded outbound rows
+  are still present and no new lot was recorded. The fallback cannot tell a
+  live line from a superseded one, so it reverses the **summed** outbound
+  rows. On void that sum exceeds what the batch actually holds (4 superseded
+  + 5 live = 9 against a batch of 10 holding 5), so the INV-21 CHECK
+  `quantity_remaining <= quantity_original` rejects the UPDATE and the void
+  returns **HTTP 500**. The same sum is what a **further edit after the
+  upgrade** reverses, so that edit fails the same way; on a batch with enough
+  headroom it succeeds but restores too much. An earlier version of this note
+  claimed void was correct for such documents. That was wrong: for a pre-134
+  edited document, void fails exactly like the next edit does.
+- **Exact limitation 2 — a 133-only draw with named bins voids into DEFAULT.**
+  A document posted after migration 133 but before 134 has bin draw rows in
+  `owner_withdrawal_bin_consumption` with `consumption_id` NULL, and no
+  `owner_withdrawal_consumption` lot. Because the fallback
+  (`getConsumptionFromHistory`) produces lots with no bins, the reversal never
+  consults those 133 draw rows; the `legacyBinStmt` lookup is only reached when
+  a 134 lot row exists. The units are therefore returned to the warehouse
+  **DEFAULT** bin instead of the named bin that lost them. Batch totals are
+  right and no CHECK fails, so the void returns 200 with stock stranded in the
+  wrong bin. This is the same defect PR #49 fixed for post-133 documents, still
+  present for documents that straddle 133 and 134.
+- **What is unaffected.** A pre-134 document that was never edited voids
+  correctly on batch totals, and only limitation 2 can apply to it. Documents
+  created or edited under 134 always have a lot, so neither limitation applies.
 - **Why no repair.** The active lines of a pre-134 edited document are not
   recoverable from the recorded data, so a backfill cannot be derived and a
   runtime guess would be unsafe on real stock.
@@ -1862,6 +1879,7 @@ these old records. The dev database is disposable and its records are test data.
   migration 134, so no live document can be in that state. The dev database
   (`database/erp.db`) will be refreshed, which removes every legacy row. No
   legacy backfill is planned.
-- **Scope.** Comment-only correction to migration 134 and
-  `server/src/models/OwnerWithdrawal.ts`. No logic change, no test change, no
-  schema change. PR #50 stays a draft.
+- **Scope.** Comment and decision-record correction only
+  (`server/src/migrations/134_owner_withdrawal_consumption.sql`,
+  `server/src/models/OwnerWithdrawal.ts`, this file). No logic change, no test
+  change, no schema change, no backfill.
