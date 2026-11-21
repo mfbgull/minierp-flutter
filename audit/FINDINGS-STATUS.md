@@ -1,5 +1,265 @@
 # Audit findings status
 
+## Review cycle state — 2026-11-16 (coordinator record)
+
+*(2026-11-18 correction: this 2026-11-16 record is superseded. Main is now
+`1f6a2905` (post PR #40). D21 merged via PR #3; the UX parks were cleared by
+merged PR #4 (`d1075cd2`) and F-3 by merged PR #9 (`29457260`) — no findings
+remain parked (see "Finding-tagged tests" below). Only PR #5 remains open.
+The text below is kept as a dated historical record.)*
+
+This section records the state of the GLM/PI review cycle. It is a status note,
+not a re-audit; nothing below was re-derived.
+
+**Main.** `main` and `origin/main` are both at `7a96e6d8`. CI is green on that
+exact SHA (server, flutter, fallow).
+
+**Open draft PRs.** Three, all drafts, none ready to merge:
+`#3` `glm/extract-cash-timeline-only` (D21 extraction), `#4` `glm/ux-review-tests`
+(UX fixes + parked tests), `#5` `glm/audit-reviews` (review docs). A reconciled
+successor of `#4` is staged as `glm/reconcile-cycle2` (see below).
+
+**D21 — implemented, not merged/resolved.** PR `#3` implements the D21
+extraction (the lazy `require` between `accountingService` and
+`cashBalanceGuard` becomes a leaf module, `services/cashTimeline.ts`). "Implemented
+in a draft PR" is not "merged"; D21 stays open until that PR merges.
+
+**Stock findings — not reproduced.** The stock-path review
+(`audit/GLM-STOCK-REVIEW.md`, findings S-1..S-7 after the rename) is a read-only
+reasoning pass. No stock finding was reproduced against a live database or a test.
+They stay unconfirmed. PI is doing a **read-only** review/environment task this
+cycle, including `#3`; PI produced no code changes on these files.
+*(2026-11-18 correction: that file was never merged to main — it exists only on
+the local branches `glm/stock-review` / `glm/stock-review-ids` (added `28a46e95`,
+S-renamed `66e09945`) and on no remote branch. The S-2/S-3/S-4 fixes have since
+merged via PRs #6, #10 (`d3a35510`) and #40 (`1f6a2905`).)*
+
+**Full-suite lock.** Unassigned. No agent holds the exclusive full-suite slot.
+
+**Next order (coordinator).** S-2, then the F-3 dating decision and reproduction,
+then S-3, S-4, S-1, S-5, S-6, S-7.
+
+**F-2 un-parked (this cycle).** `7a96e6d8` fixed F-2 (a claim carrying a standing
+write-off can no longer be cancelled). The parked `it.failing` wrapper was removed
+and the case is now a normal regression guard. Red-first proof: with the `cancel`
+guard in `SupplierRefundClaim.ts` temporarily reverted, the un-parked case failed
+`Expected: >= 400 / Received: 200`; restored, it passes. Five tests remain parked:
+four UX (UX-3, UX-6, UX-11, UX-13) and F-3. See the "Finding-tagged tests" section
+below.
+
+**PR #4 reconciliation (this cycle).** `glm/ux-review-tests` (old head `2e4a101a`)
+was rebased onto `7a96e6d8` as `glm/reconcile-cycle2`. Overlapping files:
+`audit/FINDINGS-STATUS.md`, `lib/data/repositories/purchase_repository.dart`,
+`lib/features/purchases/refund_claim_write_off_dialog.dart`,
+`server/src/__tests__/supplierRefundClaims.test.ts`,
+`server/src/models/SupplierRefundClaim.ts`; plus `scripts/check.sh` and the
+generated l10n (mine only, no main-side collision). PI's `653dfe43` and `7a96e6d8`
+are preserved; one write-off implementation survives (the GLM superset with amount
+and date fields subsumes PI's key-only fix; PI's `voidRefund` fix is kept verbatim).
+`key_mandatory_endpoints_test.dart` (PI's wire-level spec) was adapted only in its
+field selector (`.first` → `.last`, because the reconciled dialog has three
+fields); every assertion is unchanged.
+
+**Correction — the "no keyless Flutter caller" claim was partially wrong, and the
+"void is key-mandatory" half is wrong.** The write-off route
+`POST /supplier-refunds/claims/:id/write-off` **is** key-mandatory, and the Flutter
+caller sent none, so the UI write-off would have been refused — `653dfe43` fixes
+that. But `653dfe43` also named `POST /supplier-refunds/:id/void` as mandatory,
+and that half is false. `653dfe43` is a **Flutter-only** commit and its message
+says two routes mandate an Idempotency-Key via `startRequiredIdempotentRequest`;
+only the write-off one is true. The void route
+(`server/src/routes/supplierRefunds.ts:34`) and handler
+(`server/src/controllers/supplierRefundController.ts:162`) call **no** idempotency
+helper, and there is **no** `SUPPLIER_REFUND_VOID` scope (only
+`SUPPLIER_REFUND_CREATE`, `SUPPLIER_REFUND_CLAIM_CREATE`,
+`SUPPLIER_REFUND_CLAIM_WRITE_OFF`). **Runtime verification (GLM, isolated
+test-only worktree):** a keyless void returned `HTTP 200`, so the route is not
+key-mandatory. The wire-level Flutter test still proves the *client* sends the
+header (it rejects at the Dio interceptor), but that is a client contract — it
+does **not** prove a server mandate. The coordinator independently confirmed the
+correction. The client comment `lib/features/purchases/void_refund_dialog.dart:53`
+(PI-owned) still repeats the false server claim; recorded here, not edited.
+
+**PI read-only reports (2026-11-16).** `readonly-cycle-report.md` (superseded) and
+`readonly-cycle-report-v2.md` (the record). PI's cycles were read-only; no code
+changes and no file overlap with this cycle's work.
+
+- **PR #3 @ `971c4f5b`: NO FINDINGS** (behaviour-preserving). Reviewed by PI and
+  **independently re-run by the coordinator** — 7 suites / 67 tests, exit 0, on a
+  clean ext4 review worktree at the exact SHA (107.959s; log
+  `/home/fawad/logs/minierp-orchestration-20261116/coordinator-pr3-targeted.log`;
+  clean status after, `diff --check` passes, CI green on the exact SHA). Suites:
+  `supplierRefundClaims`, `settlementCashIntegrity`, `supplierRefund`,
+  `cashOutflowEditTimeline`, `moneyPathReviewGaps`, `cashInflowReversal`,
+  `supplierRefundValidation`. **PR #3 remains draft — review is not merge
+  approval, and the full suites / `scripts/check.sh` were NOT run.**
+  The earlier 2-test delta is the F-2 two-test block from `7a96e6d8`, not a
+  PR #3 regression.
+- **Reconciliation clean rerun (2026-11-16) — `glm/reconcile-cycle2` @ `25820165`.**
+  The coordinator reran, on a **clean ext4 worktree with real `npm ci`
+  dependencies** (no NTFS symlink), `moneyPathFindingsRed`, `supplierRefundClaims`,
+  and `supplierRefund.test.ts`: **3 suites / 34 tests, exit 0**, 154.519s
+  (`/home/fawad/logs/minierp-orchestration-20261116/coordinator-reconcile-clean-targeted.log`).
+  This includes **one expected failure (F-3, `it.failing`)** — F-3 is **not**
+  fixed. Clean status before and after.
+- **Environment correction (2026-11-16).** An earlier `glm-reconcile-346d` run of
+  the same three suites was **deliberately terminated with SIGTERM (exit 143)**
+  and produced **no completed result** — it was **not** a pass or a failure, and
+  there is **no** pre-existing claim about those suites from it. Cause: that
+  worktree carried an untracked `server/node_modules` **symlink** to the NTFS main
+  checkout, which is **not clean** under the baseline rule. GLM removed the
+  symlink. The retained clean baseline is the Orca-managed verification worktree
+  `/home/fawad/orca/workspaces/minierp-flutter/glm-verify-25820165` at exact
+  `25820165` with a real ext4 `npm ci` (exit 0; `better_sqlite3.node` is a
+  2091520-byte regular file; smoke test `{ x: 42 }`). Dependency links are **not**
+  hidden with `assume-unchanged`.
+- **Evidence-file labels.** `f3-unwrapped-keyless-void.md` and
+  `f2-reverted-guard-red.md` are **short reports with the key verbatim excerpts**,
+  not full raw transcripts; relabelled accordingly. A full raw re-capture can be
+  produced on request.
+- **PR #6 (stock S-2) @ `819034da`: READ-ONLY review filed (v2, corrected).**
+  `/home/fawad/logs/pr6-stock-s2-readonly-review.md`. Direction is right and the
+  two named defects (full-take-per-bin, cross-warehouse) are real and fixed.
+  **Review v2 corrections (coordinator-verified against the source graph;
+  v1 claims withdrawn):**
+  - flag-ON **returns** `consumeBatchesByLocation` and flag-OFF calls
+    `consumeLegacyStock` — they are **not** both executed in one request, so the
+    commit's "2 pre-fix red (OFF) + 2 green ON controls" is coherent and four red
+    is **not** implied.
+  - `consumeBatchesByLocation`'s final guard checks allocation **across batches**
+    (`remaining`), not its inner `batchRemaining` bin remainder; the "opposite
+    inner guard" v1 claimed does **not** exist.
+  - the F2 example was corrected: master 10, bin 4, sell 6 → diff **4**, and the
+    gap **pre-existed** the sale — not "bins drift 6 below the master".
+  - the F1 fixture `physical=0, available=5` was invalid (a trigger keeps
+    `available = MAX(0, physical − reserved)`); replaced by a reachable
+    `DAMAGED` bin with `physical=5, reserved=0`.
+  - the "pre-existing" label on the reserved-quantity point was removed (no
+    clean known-good run), and `quantity_available > 0` **does** account for
+    reservations, so that claim was overstated.
+  Remaining hypotheses (R1 different bin predicates, R2 legacy drain can
+  under-cover silently, R4 reservations) are routed to **PI for test-only
+  reproduction** after the full run. No stock code changed; no tests run.
+- **PR #6 (stock S-2) FULL GATE PASSED; slot released (2026-11-16, evening).**
+  PI's full gate on `819034da`: **284 suites / 2273 tests, exit 0**
+  (`scripts/check.sh --server` on the clean ext4 worktree). Coordinator
+  independent clean rerun of S-2 + accounting invariants: **2 suites / 37
+  tests, exit 0, 17.352s**
+  (`/home/fawad/logs/minierp-orchestration-20261116/coordinator-s2-focused.log`).
+  **Flag-OFF-only correction confirmed:** the pre-fix reds for the S-2 bin
+  write are **flag-OFF only** (flag-ON controls green) — consistent with the
+  coherent "2 pre-fix red (OFF) + 2 green ON controls" reading, not four red.
+  Review v2's remaining findings (R1/R2/R4) stay **UNCONFIRMED hypotheses**;
+  R2 is **not** a product choice for PI — PI reproduces/investigates the
+  documented fallback, Gull owns the business tradeoff. With the gate green
+  the test slot is **free**; UX work resumed on `glm/ux-fixes` (see
+  `/home/fawad/logs/ux-redfirst-chronology.md` for the red-first evidence
+  matrix).
+- **PI S-2 triage recorded (2026-11-17, msg_d9c2829138fd).** Confirmed
+  discrepancies with exact evidence: **R1** (legacy bin predicate omits the
+  `status_override` filter the flag-ON predicate applies) and **R4**
+  (reservations: legacy reads `physical`, not net-of-reserved `available`)
+  are **real flag differences — DECIDED by Gull, see D28**; **R2** (legacy
+  drain under-coverage as a NEW defect) is **dismissed as a defect** and
+  **DECIDED as clamp-and-warn by Gull (D28)**. Review v2's findings may not
+  be labelled confirmed/pre-existing without a run (D22). PI commits triage
+  test-only; no stock overlap with `glm/ux-fixes`. The `d687e6bd` triage
+  tests are **characterization** (pin today's behaviour), not
+  corrected-semantics regression.
+- **UX-11 loading round complete (2026-11-17).** The
+  error-only UX-11 fix (`0535ffa0`) was a partial: the original scope is
+  loading AND error. Coordinator rejected the done claim
+  (msg_d9c2829138fd); the loading feedback was then implemented genuine
+  red-first — `42c1b469` on `glm/ux-fixes`, evidence in
+  `/home/fawad/logs/ux-redfirst-chronology.md` (pending test failed with
+  `Found 0 widgets with type LinearProgressIndicator` BEFORE the change;
+  revert-proof failed the same way; 4/4 green after restore; UX-3/6/13
+  regression 3/3).
+- **FLUTTER GATE on `0186b8d9`: PASSED — phase gate GREEN (2026-11-17).**
+  Exclusive-slot run per msg_2834f953b232: clean ext4 detached worktree
+  `glm-gate-0186b8d9`, `bash scripts/check.sh --flutter` only (server NOT
+  rerun — unchanged tree; server evidence stays at `42c1b469`). **Result:
+  exit 0, "all checks passed"** — flutter analyze ok, l10n drift ok,
+  **flutter test 1212 passed / 1 skipped / 0 failed** ("All other tests
+  passed!"), finding-tagged `it.failing=1` (expected F-3), RED-BY-DESIGN
+  files=0. Raw log `/home/fawad/logs/gate-0186b8d9/check-flutter-raw.log`.
+  The 42c1b469 gate's 3 failures are the same tests that now pass; no other
+  flutter state changed. **Bounded combined evidence (stated honestly, not
+  all on one SHA): server 284/284 suites, 2273/2273 tests, typecheck, lint,
+  fallow @ `42c1b469`; flutter @ `0186b8d9`.** The only diff
+  `42c1b469..0186b8d9` is `test/widgets/cash_blockers_list_test.dart`.
+  **CORRECTION of an earlier wrong claim:** in the 42c1b469 result report
+  (msg_80986a5a4c44) GLM claimed "status after CLEAN" without verifying.
+  Actual: BOTH gate runs regenerated the 11
+  `audit/accounting-audit/remediation/` render artifacts (PNG/JSON
+  screenshots — environment-dependent pixel output of a test that refreshes
+  the audit evidence). Not a code change; not committed; both retained
+  worktrees restored to pristine at their exact SHAs (verified: 0 dirty
+  paths each). Gate workspaces retained for independent reruns. Slot
+  released.
+- **FULL GATE on `42c1b469`: FAILED on 3 stale PRET-002 tests; fix committed
+  (2026-11-17).** Exclusive-slot run, clean ext4 detached worktree
+  `glm-gate-42c1b469`, `bash scripts/check.sh` (attempt 1 `./scripts/check.sh`
+  exited 126 — the script is committed mode 100644; no tree change).
+  **Server side fully green:** typecheck ok, lint ok, **284/284 suites,
+  2273/2273 tests, exit 0** (1408s), fallow ok (0 changed files),
+  flutter analyze ok, l10n drift ok, server `it.failing=1` = expected F-3,
+  flutter RED-BY-DESIGN files=0. **Flutter test: 3 failures** (~1209 passed,
+  1 skipped), ALL in `test/widgets/cash_blockers_list_test.dart` — they pinned
+  the OLD raw rendering (`SALE`/`EXPENSE`, ISO dates) that UX-6 (`9cd46127`)
+  was tasked to replace: `Expected: exactly one/3 matching candidates /
+  Actual: Found 0 widgets with text containing SALE`. **Cause: the UX-6
+  commit changed the row contract without updating its sibling
+  characterization tests — a gate catch, not a pre-existing failure.** Fix:
+  the three tests re-expressed to the new contract (localized/humanized
+  labels, `Formatters.date` output; structural assertions unchanged in kind),
+  `0186b8d9` on `glm/ux-fixes`; after the update 6/6 green
+  (`cash-blockers-updated-green-raw.log`). Full log
+  `/home/fawad/logs/gate-42c1b469/check-full-raw.log`. The gate workspace is
+  retained at `42c1b469` for independent reruns. **New exclusive gate slot
+  requested for `0186b8d9`; the phase gate remains pending until it passes.**
+- **PI v2 corrections (do not propagate v1).** Withdrawn: the NTFS→BUG-011
+  *causal* claim (unsupported), and the F-3 "the ONLY reversal that breaks the
+  rule" universal claim (only the complete `reverseLedgerEntry` **caller**
+  inventory is known — `invoiceReturnService.ts:1481`, `Payment.ts:198/:222/:726/:732`,
+  `SupplierBill.ts:145`, `Purchase.ts:736`, `Invoice.ts:1099` — which covers
+  callers, not every ledger write). `.gitignore` alone, `assume-unchanged`, and
+  commit-once are **not** accepted as recurring-churn fixes. F-3 was a hypothesis
+  in v1 and is now runtime-reproduced by GLM (see the correction above).
+- **D21:** implemented in draft PR #3 and independently reviewed clean at
+  `971c4f5b`; **still not merged and not resolved.**
+- **Environment:** the repository and its dependencies are on NTFS
+  (`/dev/nvme0n1p4`, ntfs-3g/FUSE); PI confirmed this. The ext4 move is **pending
+  Gull's approval** — not executed.
+- **Regenerated artifacts:** generator is
+  `test/features/accounting_report_regressions_test.dart` (a test side-effect).
+  Two JSON files change **one date line each** (`"Nov 15, 2026"` →
+  `"Nov 16, 2026"`). The nine PNGs change **nine rendered date glyphs** (one
+  8×12 px digit per image, `5`→`6`). **No broader claim of substantive
+  non-date change is made** — the change is the date glyph, and that is all that
+  is asserted.
+- **Artifact policy:** do **not** accept `.gitignore` alone for tracked
+  artifacts, `git update-index --assume-unchanged`, or "commit once" as a
+  recurring-churn fix. The preferred direction is a **deterministic test clock**,
+  pending Gull.
+- **Money F-3:** PI escalated the discrepancy. **No dating implementation exists.**
+  Any decision must keep both stores consistent. The two coherent options are
+  (a) same-date reversal that respects the period lock, or (b) current-date
+  GL **and** subledger reversal together, preserving historical postings (wider
+  scope). A UTC-only adjustment does **not** resolve the as-of mismatch.
+- **PI state:** preparing a clean review worktree for the coordinator's rerun;
+  otherwise read-only.
+
+**Deferred backlog (unchanged, carried forward).** Stage-2 keys, D20 (fallow gate
+— no baseline change needed), BUG-011 (local `jest --coverage` ~11.6 h on three
+suites; CI unaffected), task 8.6 (drop the old stock columns — deliberately
+deferred, exit criteria not met), mobile keys, the remaining mutating-endpoint
+keys, and the first-deployment checklist (`audit/FIRST-DEPLOYMENT-CHECKLIST.md`).
+
+**OPEN-DECISION (proposals, not decisions taken).** Recorded in
+`audit/DECISIONS.md` D26: F-3 dating, F-1 semantics (money review), UX-5/7
+wording, audit-artifact policy, and the ext4 move.
+
 ## Accounting audit revalidation — 2026-10-26–27
 
 The current F-001–F-073 accounting remediation is tracked in
@@ -15,10 +275,10 @@ ledger. Older phase records below are dated evidence, not a new release assessme
 
 ## Finding-tagged tests (skipped / expected-failure)
 
-Five tests deliberately exercise known, unfixed findings (four UX + F-3). Each is
-tagged with its finding ID so it stays visible and flips to a real failure when the
-finding is fixed. `scripts/check.sh` prints the count (see "Finding-tagged test
-count").
+No findings remain parked on main (updated 2026-11-18: F-3 merged via PR9,
+see below). Parked tests are tagged with their finding ID so they stay visible
+and flip to a real failure when the finding is fixed.
+`scripts/check.sh` prints the count (see "Finding-tagged test count").
 
 F-2 was un-parked on 2026-11-16: `7a96e6d8` fixed it (a claim with a standing
 write-off can no longer be cancelled), so its `it.failing` wrapper was removed and
@@ -27,13 +287,33 @@ un-park: with the `cancel` guard in `SupplierRefundClaim.ts` temporarily reverte
 the un-parked case failed `Expected: >= 400 / Received: 200`; with the guard
 restored it passes.
 
+UX-3, UX-6, UX-11 and UX-13 were fixed and un-parked by the merged UX-review line
+(PR4, head `ea8f79cd`, merged as `d1075cd2` on 2026-11-17): their
+`skip: true, RED-BY-DESIGN` wrappers were removed and the tests now run as
+ordinary passing regressions. Evidence on current main (`91df221c`): the
+`scripts/check.sh` finding-tag audit reports flutter RED-BY-DESIGN files=0, and
+all four test files pass in the post-merge gates (1219 passed + 1 pre-existing
+non-finding skip).
+
+F-3 status (updated 2026-11-18): **the F-3 code fix and the test unpark
+companion are MERGED.** PR9 (`fix/f3-refund-void-original-date`, head
+`b209303a` — the fix dates the supplier-refund void's ledger reversal on the
+receipt's own date, plus the test-only companion `b209303a` that dropped the
+`it.failing` wrapper and updated the stale parked comment, assertions
+unchanged) merged as `29457260`. On main the F-3 regression
+(`server/src/__tests__/moneyPathFindingsRed.test.ts`) is now an ordinary
+passing regression guard — verified: no `it.failing` remains in the file and
+the describe reads "(F-2 fixed, F-3 fixed)" at `29457260`. Verified by PI's
+full post-merge gate + main CI run 44219220758 (fallow, server, flutter all
+SUCCESS at `29457260`). **No findings remain parked on main.**
+
 | Finding | Test | Tag | Fails today because |
 |---|---|---|---|
-| F-3 (GLM-REVIEW) | `server/src/__tests__/moneyPathFindingsRed.test.ts` | `it.failing` with `F-3:` in the name | GL AP vs supplier subledger differ by 3,000 at as-of 2026-11-05 (`Expected: 0, Received: 3000`). |
-| UX-3 (GLM-UX-REVIEW) | `test/features/supplier_refund_message_test.dart` | `skip: true`, `RED-BY-DESIGN … UX-3` | The refund-amount error contains "quantity" (`Found 1 widget with text containing quantity`). |
-| UX-6 (GLM-UX-REVIEW) | `test/widgets/cash_blockers_localization_test.dart` | `skip: true`, `RED-BY-DESIGN … UX-6` | The blocker row leaks `receipt_overpayment` and raw ISO `2026-11-15`. |
-| UX-11 (GLM-UX-REVIEW) | `test/features/sales_order_form_loading_test.dart` | `skip: true`, `RED-BY-DESIGN … UX-11` | A failed customer load renders as an empty picker; `Found 0 widgets with text containing Failed`. |
-| UX-13 (GLM-UX-REVIEW) | `test/features/sales_order_discount_validation_test.dart` | `skip: true`, `RED-BY-DESIGN … UX-13` | A flat discount above the line total passes validation (`errorText` is `null`). |
+| F-3 (GLM-REVIEW) | `server/src/__tests__/moneyPathFindingsRed.test.ts` | FIXED & UNPARKED — merged via PR9 (`29457260`, 2026-11-18) | None: the supplier-refund void now dates its ledger reversal on the receipt's own date; the former `it.failing` wrapper is gone (unpark companion `b209303a`, test-only, assertions unchanged) and the case runs as an ordinary passing regression. Verified by the post-merge gate + main CI run 44219220758 (3/3 SUCCESS at `29457260`). |
+| UX-3 (GLM-UX-REVIEW) | `test/features/supplier_refund_message_test.dart` | FIXED — un-parked by PR4 (`d1075cd2`) | None: refund amounts get their own refund-specific error strings, not return-quantity messages. Runs as an ordinary passing test. |
+| UX-6 (GLM-UX-REVIEW) | `test/widgets/cash_blockers_localization_test.dart` | FIXED — un-parked by PR4 (`d1075cd2`) | None: cash-blocker rows render localized type labels and formatted dates, not raw enums or ISO dates. Runs as an ordinary passing test. |
+| UX-11 (GLM-UX-REVIEW) | `test/features/sales_order_form_loading_test.dart` | FIXED — un-parked by PR4 (`d1075cd2`) | None: option-provider errors surface with loading feedback. Runs as an ordinary passing test. |
+| UX-13 (GLM-UX-REVIEW) | `test/features/sales_order_discount_validation_test.dart` | FIXED — un-parked by PR4 (`d1075cd2`) | None: a flat discount above the line total is rejected. Runs as an ordinary passing test. |
 
 
 ## Phase 0 baseline
@@ -118,7 +398,7 @@ Paths in evidence are repository files: models under `server/src/models/`, contr
 | ACCT-013 | GREEN (full verification) | f9a72d63 + current worktree | cashInflowReversal.test.ts, supplierRefund.test.ts, cashOutflowEditTimeline.test.ts, accountingInvariants.test.ts, settlementCashIntegrity.test.ts | SupplierRefundModel.void wraps all effects in a transaction, records GL void lineage, checks the original accounting period and asserts the chronological cash balance. Cash-timeline refusals now return 409 with structured blockers (id, date, amount, type) for the first deficit date; all cash-affecting controllers honor the embedded status. The ACCT-013 sweep found and fixed the same hole in OwnerWithdrawal.update and Expense.update (moved-earlier outflow overdraws a later day); both now run the double assertCashTimeline inside the re-post transaction. A source-scan tripwire pins the guard in all five cash-affecting models. Red regressions observed for every fix. Full server suite 266 suites / 2112 tests passed with invariants A–J; scripts/check.sh --quick passed (2026-11-13). | Residual: backdated creation of cash outflows still uses the point-in-time check only (D2/D19 scope was edits, voids and reversals); recorded in DECISIONS.md D19. Claim-lifecycle reset lands with PRET-002. |
 | PO-001 | ALREADY-FIXED | 8badf489 | auditRegression2 PO-001 | purchaseOrderController.ts:396-400 rejects nonnumeric, nonfinite, boolean and nonpositive quantities; regression passes. | Keep existing fix. |
 | PRET-001 | ALREADY-FIXED | 8badf489 | auditRegression2 PRET-001 | PurchaseReturn.ts:314,350,364 rounds lines and total as money; regression passes. | Keep existing fix. |
-| PRET-002 | GREEN (server) / corrected 2026-11-16: the UI write-off was broken | f31c511e / 3cab5c7d + current worktree | supplierRefundClaims.test.ts (new, 10), supplierRefund.test.ts, idempotencyRound2.test.ts, purchaseReturn.test.ts, creditOffsetSubledger, ledgerIntegrity, accountingInvariants, glBalanceInvariant, supplierPayment, **key_mandatory_endpoints_test.dart (new, 2)** | D19 full build: `supplier_refund_claims` + `refund_receipt_allocations` (SRC-… claim numbers, legacy backfill SRC-LEGACY-*), account 7300, receipts post `REFUND_RECEIPT` (Dr cash/bank / Cr AP) with allocation capped at claim remaining, excess rejected by default or booked as supplier credit on one entry (`treat_excess_as_advance`), write-offs Dr 7300 / Cr AP + supplier-ledger mirror with mandatory reason (owner-only above Rs 1,000 → role admin), claims API under /supplier-refunds/claims with mandatory Idempotency-Key, return void blocked (409 + blockers) while receipts are live, receipt void releases the claim, Flutter refund dialog shows the claim and cash/bank-only methods. Red-first: claims suite written before the model fixes; 12/12 refund-claim tests green (the suite has 12 `it(` cases, not 21 — that figure was wrong); targeted regression suites green. Flutter UI added 2026-11-14: refund-claim list tab with status chips and a default open-only filter, standalone + return-backed receipt dialog, write-off dialog (reason mandatory, admin-disabled above Rs 1,000), refunds-due badge on the supplier header and dashboard, and the 409 `cashBlockers` list. No void entry point yet — see BUG-008. **CORRECTION (2026-11-16, `653dfe43`):** the server mandates an Idempotency-Key on `POST /supplier-refunds/claims/:id/write-off` and on `POST /supplier-refunds/:id/void`, but the Flutter callers sent none, so both routes returned 400 from the UI. The earlier note in this row and an earlier report claiming "no keyless Flutter caller exists" were WRONG. `writeOffClaim` and `voidRefund` now take a required key and pass the header; both dialogs supply it from an `IdempotencyKeyCache`. Proved by a wire-level test that intercepts the real `RequestOptions` — red-first, both cases failed with `Actual: <null>` before the fix. | Full server suite verified 269/2139 (2026-11-14); Flutter suite + scripts/check.sh pending for the UI. **The UI write-off and refund void are now covered by an assertion on the actual request.** D13 residual: claim-lifecycle reset done, see DECISIONS.md D19 implementation record. |
+| PRET-002 | GREEN (server) / corrected 2026-11-16: the UI write-off was broken | f31c511e / 3cab5c7d + current worktree | supplierRefundClaims.test.ts (new, 10), supplierRefund.test.ts, idempotencyRound2.test.ts, purchaseReturn.test.ts, creditOffsetSubledger, ledgerIntegrity, accountingInvariants, glBalanceInvariant, supplierPayment, **key_mandatory_endpoints_test.dart (new, 2)** | D19 full build: `supplier_refund_claims` + `refund_receipt_allocations` (SRC-… claim numbers, legacy backfill SRC-LEGACY-*), account 7300, receipts post `REFUND_RECEIPT` (Dr cash/bank / Cr AP) with allocation capped at claim remaining, excess rejected by default or booked as supplier credit on one entry (`treat_excess_as_advance`), write-offs Dr 7300 / Cr AP + supplier-ledger mirror with mandatory reason (owner-only above Rs 1,000 → role admin), claims API under /supplier-refunds/claims with mandatory Idempotency-Key, return void blocked (409 + blockers) while receipts are live, receipt void releases the claim, Flutter refund dialog shows the claim and cash/bank-only methods. Red-first: claims suite written before the model fixes; 12/12 refund-claim tests green (the suite has 12 `it(` cases, not 21 — that figure was wrong); targeted regression suites green. Flutter UI added 2026-11-14: refund-claim list tab with status chips and a default open-only filter, standalone + return-backed receipt dialog, write-off dialog (reason mandatory, admin-disabled above Rs 1,000), refunds-due badge on the supplier header and dashboard, and the 409 `cashBlockers` list. No void entry point yet — see BUG-008. **CORRECTION (2026-11-16, `653dfe43`):** the server mandates an Idempotency-Key on `POST /supplier-refunds/claims/:id/write-off`, and the Flutter caller sent none, so the UI write-off would have been refused with 400. The earlier note in this row and an earlier report claiming "no keyless Flutter caller exists" were WRONG. `writeOffClaim` now takes a required key and passes the header; the dialog supplies it from an `IdempotencyKeyCache`. Proved by a wire-level test that intercepts the real `RequestOptions` — red-first, it failed with `Actual: <null>` before the fix. **CORRECTION 2 (2026-11-16):** `653dfe43` also named `POST /supplier-refunds/:id/void` as key-mandatory, but that is **false**. The void route/handler call no idempotency helper and there is no `SUPPLIER_REFUND_VOID` scope; a keyless void returns HTTP 200 (verified at runtime in an isolated test-only worktree). The client still sends a key there (harmless, optional contract) but no server mandate exists. | Full server suite verified 269/2139 (2026-11-14); Flutter suite + scripts/check.sh pending for the UI. **The UI write-off is now covered by an assertion on the actual request; the void's key is client-optional.** D13 residual: claim-lifecycle reset done, see DECISIONS.md D19 implementation record. |
 | PROD-001 | GREEN | 6eba103c | auditRegression4 PROD-001, PROD-001O, PROD-001G, PROD-001b | Material consumption now posts Dr production_clearing / Cr inventory_asset (`production_consume`), and overhead posts Dr production_clearing / Cr 2200 (`production_overhead`). All four regression4 cases pass. | Verified by targeted and full-suite runs. Joint-cost allocation for oil/cake is now implemented (D6, multi-output). |
 | PROD-002 | GREEN | 78e5c8e8 | auditRegression4 PROD-002 | Production.ts:341 posts roundCurrency(output_quantity * costPerUnit), matching batch value; its regression passes. | Verified by targeted and full-suite runs; preserve in subsequent patches. |
 | PROD-004 | GREEN | 78e5c8e8 | auditRegression4 PROD-004 | Production.ts:144-147 rejects nonnumeric, nonfinite or negative overhead; its regression passes. | Verified by targeted and full-suite runs; preserve in subsequent patches. |
@@ -843,3 +1123,841 @@ nothing to lose). The archived stale DB's 5 batches were bought while the flag
 was **already on**, so each got a location row at purchase time. The defect needs
 batches created while the flag was **off**, then a flip to **on** — the exact
 situation of every existing install at migration time.
+
+- **Warn-UI follow-up complete on `glm/warning-ui` (2026-11-17).** Branch
+  off frozen `0186b8d9`; commits `9cef8928` (POS sale warnings on the
+  receipt dialog), `d29b01c7` (invoice-create warnings before the form
+  closes), `6b4e9b5a` (doc-only: correct the false "void route mandates an
+  Idempotency-Key" claim — server truth verified: void performs no
+  idempotency handling; write-off DOES 400 without the key, that doc left
+  as-is). Both paths red-first with clean revert-proofs (POS: warnui-*.log;
+  invoice: warnui-invoice-*.log in /home/fawad/logs/ux-evidence/); combined
+  regression 88/88; analyze + l10n drift exit 0. Client accepts `warnings`
+  at envelope top OR inside data — no new API field; strings verbatim.
+  Targeted tests only; full gate NOT requested yet. **PI coordination
+  status: server field placement now confirmed by PI's diff
+  (`0fc5d41a`): POS sends envelope-top `warnings` (posController.ts:349);
+  invoice route unchanged (ACCT-006 merge). Both match the client.**
+- **Cross-review of PI's stock fix `0fc5d41a`: 5 findings + 1 minor, ALL
+  UNCONFIRMED until run (2026-11-17).** Read-only review
+  (`/home/fawad/logs/glm-cross-review-r1r2r4.md`): F1/F2 — DAMAGED warning
+  keyed on the candidate bin list, not actual takes (false-positive
+  warnings, both flag states); F3 — R2 under-coverage warning masked by
+  non-sellable bins' availability (silent bin-write shortfall); F4 —
+  pre-receipt fallback returns `warnings: []` (damaged sells silently on
+  that path — needs an explicit decision if intended); F5 — idempotent POS
+  replay drops the original sale's warnings; F6 minor — duplicate per-batch
+  warnings. Verified correct: reserved/blocked double-subtraction disjoint,
+  warehouse attribution (stock_batches warehouse-scoped), available caps,
+  transaction rollback (service-wide db.transaction; shortage throws roll
+  back), warning carrier on the live path. **Independent reviews NOT
+  finished** (PI has not reviewed GLM's UX diffs yet; findings not run);
+  PI's full-gate request pending — F1-F4 should be resolved or consciously
+  accepted first.
+
+- **Invoice warning wire-contract proof added (`52447ccc`, 2026-11-17).**
+  Closes the coordinator-identified gap: the fake-repo tests prove display;
+  this test drives the REAL InvoiceRepository over a Dio adapter serving the
+  exact 201 shape invoiceController.ts sends, asserting POST method/path,
+  Idempotency-Key header, body (customer_id, item_id, quantity) and the
+  warning rendered through the real Invoice.fromJson — plus the save-and-
+  print path (only the `net.nfet.printing` channel mocked: layoutPdf awaits
+  a native-only job callback). Honest chronology: the display fix went
+  red-first on the fake-repo harness; this wire test passes first-run by
+  design (honest green guard) and its sensitivity is PROVEN — with the
+  model parse neutralized, both wire tests fail 0/2
+  (warnui-invoice-wire-sensitivity-raw.log). Regression 80/80; analyze
+  exit 0. Cross-review findings F1-F6 remain UNCONFIRMED until PI's tests
+  run (unchanged).
+
+- **Migration 128 proposal: CONDITIONALLY ACCEPTED for implementation
+  validation — NOT SHIPPED, do not incorporate (2026-11-17).** GLM's
+  read-only architecture review (msg_92190dda7c9b; findings:
+  `/home/fawad/logs/glm-cross-review-migration128.md`) returned
+  **approve-with-evidence** on the DESIGN only: 10 items verified in source
+  (ledgered registration after 127, safe JSON parse, legacy NULL → [],
+  request-hash identity before replay, claim-with-warnings inside the create
+  transaction, replay reads only the invoice row — no stock re-consume or
+  duplicate cash, all 10 claim callers compile, POS covered at envelope top,
+  payload adequate, no simpler storage exists). Gull accepted the nullable-
+  column design **conditionally** (msg_73d2d3087643): acceptance is for
+  implementation validation, NOT shipping. PI was asked to provide, before
+  commit: pre-128 upgrade/replay/atomicity controls and a MIGRATION-SPECIFIC
+  partial-apply recovery proof; no broad migration-runner refactor. The false
+  "Idempotent" comment in the migration file MUST be corrected, but a comment
+  alone is not recovery evidence. **F-A (crash window between the ALTER commit
+  and the ledger-row insert) is recorded as a HYPOTHESIS, not a confirmed
+  inherited/pre-existing behavior** — the source reading is consistent with a
+  shared window across file migrations 121–127, but without a clean-baseline
+  targeted test the "inherited" label is unproven; PI's targeted test must
+  confirm or refute it. F-B (ON CONFLICT warnings downgrade guard) and F-C
+  (clean two-commit split: migration/replay commit vs stock-precision commit,
+  verified feasible both orders) stand as proposed. All findings UNCONFIRMED
+  until run (no tests were run — gate discipline). The patch remains
+  uncommitted in PI's worktree and must NOT be merged into any GLM branch.
+  PI's production result is NOT done; PI prepares tests now and executes them
+  AFTER the gate slot is released. The 11
+  audit/accounting-audit/remediation renders regenerate during gate runs and
+  are restored after — never committed.
+- **Flutter full-gate plan for the warning path (prepared, NOT requested —
+  slot unassigned, 2026-11-17).** Candidate: `glm/warning-ui` at exact
+  `52447ccc` (history: base `0186b8d9` + `9cef8928` POS warnings +
+  `d29b01c7` invoice warnings + `6b4e9b5a` doc-only + `52447ccc` wire
+  proof; tree clean — Flutter, l10n and test files only; server files
+  untouched. `0186b8d9`'s only server-lineage diff vs `42c1b469` was
+  the flutter test file, so the bounded-combined evidence stands: server
+  284/284 suites 2273/2273 @ `42c1b469`, no duplicate server rerun for an
+  unchanged server tree). Plan: exclusive slot; clean ext4 detached
+  worktree `glm-gate-52447ccc`; `bash scripts/check.sh --flutter` once
+  (no standalone duplicate flutter run); literal log
+  `/home/fawad/logs/gate-52447ccc/check-flutter-raw.log`; SHA + status
+  before/after recorded (artifacts: the 11 `audit/accounting-audit/
+  remediation/` renders regenerate during the run and are restored AFTER —
+  documented, not claimed clean-throughout); release the slot only after
+  the process exits; keep the workspace for independent reruns; report
+  exact exit/counts. NOT executed — awaiting Gull's assignment once the
+  cross-review and migration-128 question settle.
+
+- **Flutter full gate PASSED for the warning path at exact `52447ccc`
+  (2026-11-17 09:02 +05:00).** Exclusive slot, clean ext4 detached worktree
+  `glm-gate-52447ccc`, `bash scripts/check.sh --flutter` ONCE: **exit 0,
+  "all checks passed"**, flutter suite 1219 passed / 1 skipped (~1, the known
+  parked skip) / 0 failed, flutter RED-BY-DESIGN files=0 (server-side
+  `it.failing=1` is the parked F-3 tag, unchanged — server NOT rerun;
+  server evidence stands at 284/284 suites, 2273/2273 @ `42c1b469`).
+  Duration 08:45:30 → 09:02:32. The 11 regenerated
+  `audit/accounting-audit/remediation/` render artifacts were restored after
+  the run (documented; never claimed clean-throughout, never committed) —
+  both gate worktrees verified 0 dirty paths afterwards. Slot released.
+  Gate workspace retained for independent rerun.
+
+- **PR4 branch updated on the remote under Gull's explicit approval
+  (2026-11-17).** Guarded push executed verbatim as approved
+  (msg_3ae96e056674): `git push
+  --force-with-lease=refs/heads/glm/ux-review-tests:2e4a101a...` origin
+  `0186b8d9:refs/heads/glm/ux-review-tests` — exit 0, forced update
+  `2e4a101a → 0186b8d9`, lease matched the live remote at push time
+  (preflight ls-remote confirmed both SHAs before executing). Remote head
+  verified `0186b8d903cb182e6ed017d64ef2ca57f83af1a4`; PR #4 state OPEN,
+  **isDraft: true** (kept draft). Remote CI triggered: runs 44017092273 and
+  44017098422 — six checks (fallow ×2, flutter ×2, server ×2) PENDING at
+  report time. Approval scope: remote branch update ONLY — no ready, no
+  merge, no main push, candidate unaltered. No local suite rerun (PI holds
+  the exclusive full server slot; remote CI checks are the verification
+  path).
+
+- **PR4 CI fallow push-job failure: corrected diagnosis (fetch/base-
+  availability hypothesis) + fix proposal (2026-11-17).** Gull corrected
+  GLM's initial reading (msg_57d7140b6fa5): non-ancestor/diverged history
+  alone does NOT invalidate a git symmetric difference — the literal error
+  (`Invalid symmetric difference expression 2e4a101a...HEAD. Verify the ref
+  exists`, job 133817500194, push event, step "Dead-code / complexity /
+  duplication gate") proves the runner could not RESOLVE the old head
+  `2e4a101a` as an object: after the approved force-with-lease, the old tip
+  is unreachable from every fetched ref, so checkout@v7 (fetch-depth 0)
+  never downloads it. `ci.yml:67` selects `github.event.before` on push
+  events — hence the failure; the sibling pull_request run passed because
+  `pull_request.base.sha` resolves (API-verified events: run 44017092273 =
+  push/fallow-FAIL/flutter-PASS; run 44017098422 = pull_request/fallow-PASS/
+  flutter-in-progress; server PASS x2). Content NOT implicated (same tree
+  passed fallow in the PR run). No workflow edit, no blind rerun, no local
+  fallow baseline run. Minimal fix proposal with fixtures (force-push-
+  missing-base, new-branch zero-SHA, normal-case regression, PR-path
+  unchanged) prepared for Gull's decision:
+  `/home/fawad/logs/fallow-ci-base-ref-fix-proposal.md`. Workflow file owner:
+  Gull.
+
+- **Warning draft PR #8 published under Gull's authorization (2026-11-17,
+  msg_2a903977e3e6).** Frozen branch `glm/warning-ui` @ exact `52447ccc`
+  pushed as a NORMAL new-branch push (remote branch did not exist; no force
+  used — per directive, a non-FF conflict would have STOPPED the
+  publication). DRAFT stacked PR created: **PR #8**
+  https://github.com/mfbgull/minierp-flutter/pull/8 — head `52447ccc`
+  (verified via API `headRefOid`), base `glm/ux-review-tests` (PR #4),
+  `isDraft: true`, state OPEN, no ready/merge. Preflight: local SHA exact,
+  tree clean (tracked+untracked=0), diff vs `0186b8d9` inspected = warning
+  UI (5 lib files) + comment-only doc corrections (2 lib files) + tests
+  (3 files), zero server files. PR body includes: PR #7 dependency for
+  stock-warning semantics (display functions without it — ACCT-006's
+  existing carrier already usable), the real-repository wire proof,
+  chronology disclosures (red-first display fixes; green-guard wire test
+  with mutation-proven sensitivity), per-SHA gates, and not-run items.
+  CI on PR #8: 6 checks pending at publication time. **Bounded-combined
+  evidence stands per-SHA, NOT on one SHA:** full Flutter gate at exact
+  `52447ccc` (1219 pass/1 skip/0 failed, exit 0) + full server gate at
+  exact `7416280e` (287 suites/2307 tests, exit 0, PI's gate verified by
+  the coordinator's independent focused run: 3 suites/50 tests exit 0).
+- **PR4 CI final: 5 PASS / 1 FAIL — the sole failure is the diagnosed
+  fallow base-ref artifact (2026-11-17).** flutter PASS ×2 (push 6m47s job
+  133817500567; PR 8m26s job 133817520686), server PASS ×2, fallow PR-event
+  PASS; fallow PUSH-event FAIL (job 133817500194) on
+  `Invalid symmetric difference expression 2e4a101a...HEAD` — the recorded
+  fetch/base-availability hypothesis: `ci.yml:67` selects
+  `github.event.before` on push events; after the approved force-with-lease
+  the old tip is unreachable from any fetched ref, so checkout cannot
+  resolve it. PR #4 is otherwise fully green on content. Minimal workflow
+  fix proposal + fixtures await Gull's decision
+  (`/home/fawad/logs/fallow-ci-base-ref-fix-proposal.md`); no workflow edit,
+  no blind rerun. PR #8's push-event fallow may hit the same corner (new
+  branch → `event.before` = zero SHA) — predicted by the recorded proposal
+  fixture (b), to be confirmed from CI.
+- **F3 owner-note correction recorded (Gull msg_3c3b25eee7b3); F3 remains
+  OPEN — no product decision made.** PI's F3 note (msg_22a90e689fc8)
+  incorrectly characterized the original behavior and the fix as a
+  one-date+guard change. The coordinator verified at `741` (SupplierRefund
+  code paths 372/387/401): the GL void is retroactive while the ledger
+  reversal uses UTC today — the MIXED behavior is a bug. Owner options:
+  (a) original receipt date **with period protection**, or (b) current date
+  **with both stores preserving original history** — option (b) requires a
+  counter-posting design, not merely changing the date and the void guard.
+  Standing rule reaffirmed: historical as-of reporting must compare the
+  DATED ledger, never `current_balance`. This entry corrects the note only;
+  prior accepted decisions are untouched.
+
+- **PR7 quality gate: OPEN — fallow complexity findings on `7416280e`
+  (2026-11-17, Gull msg_7f9b07a53f34).** Both PR7 fallow jobs FAIL at exact
+  `7416280e` (jobs 133827661652/133827684740): the gate reached a structural
+  verdict — `✗ complexity: 4 findings · 6 changed files` — new-vs-base
+  findings in `server/src/models/StockMovement.ts` (×3) and
+  `server/src/services/InvoiceCreationService.ts` (×1). Routed to PI: exact
+  CI investigation + **behavior-preserving refactor** (GLM cross-reviews the
+  refactor diff read-only when it arrives; no stock edits by GLM).
+  **CORRECTION ON RECORD (owner explicit rule):** renewing the local fallow
+  baseline to absorb new findings is **FORBIDDEN**, as is lowering
+  thresholds or allowlisting new findings — GLM's earlier suggestion to
+  "renew the baseline" is retracted and must not be repeated. A changed-base
+  audit matching CI is allowed for DIAGNOSIS only, never to produce a new
+  baseline.
+- **Local verification limitation on the earlier focused run (disclosed).**
+  The coordinator's independent focused run at `7416280e`
+  (batchLocationWarningPrecision + idempotencyResponseWarningsUpgrade +
+  accounting invariants — 3 suites / 50 tests, exit 0) and PI's full server
+  gate (287 suites / 2307 tests, exit 0) remain valid as TEST evidence, but
+  that worktree ran a **zero-changes** fallow audit (no diff vs its own
+  HEAD), so it did NOT prove the PR's structural gate — which is exactly the
+  check CI's changed-base audit performs and which PR7 currently FAILS.
+  PR7 therefore remains quality-gate OPEN until PI's refactor lands and CI
+  passes.
+
+- **Correction to GLM's msg_6f9d11aff091 (Gull msg_edf9609a4c3f).** The
+  clause "PR4/PR7 PR-runs passed their fallow" was FALSE for PR7: **both** of
+  PR7's fallow jobs failed on CONTENT (the 4 complexity findings). Only
+  PR4's PR-event fallow passed; PR7's passed none. The clause is retracted
+  and must not be used to predict PR8's PR-event fallow outcome. PR8's
+  content verdict is pending; it will be reported when it finishes, without
+  plausibility guesses.
+
+- **Attribution correction: the 4 PR7 fallow findings are ALL
+  StockMovement.ts functions — GLM's "InvoiceCreationService ×1" retracted
+  (Gull msg_c6e3756d02d3).** Literal CI log (job 133827661652):
+  consumeFromOldestBatches (cyclomatic 22 / cognitive 22),
+  consumeLegacyBatches (cognitive 21), preReceiptFallback (cognitive 21),
+  consumeBatchesByLocation (cognitive 16). The earlier ×1 attribution was
+  inferred from the changed-files list, not the finding list. Kept separate
+  from the PR4/PR8 push-event base-ref failures (infra class).
+- **GLM read-only review of PI's refactor `e400f4cc` (parent `7416280e`,
+  StockMovement.ts only, 265+/201−): APPROVE-WITH-LIMITS** — full findings:
+  `/home/fawad/logs/glm-refactor-review-e400f4cc.md`. Verified equivalent at
+  the exact SHAs: clamp ON (legacy/fallback MAX(0)) vs OFF (flag-on plain
+  subtraction) preserved per path; the removed `quantity_reserved`
+  self-assign is value-identical (trigger `AFTER UPDATE OF
+  quantity_physical, quantity_reserved` still fires — `quantity_physical` is
+  listed — and recomputes available from NEW values); `selectBatchBins`,
+  `throwShortfall`/`assertAvailable`, `warnMirrorShortfall`,
+  `mergeUncoveredBatches`, `consumeFlagOn`,
+  `preReceiptFallbackWithLocations` all verbatim-equivalent; warning
+  text/precision, cost/order, and rollback unchanged. LIMITS: source-reading
+  only (no tests — PI's exclusive gate); the EXACT CI changed-base audit
+  with fresh coverage on the refactor is the authority and has not landed —
+  no final green claimed. Two proposed pinning tests recorded (trigger
+  recomputation invariant; clamp-difference pin).
+
+- **PR7 quality gate: changed-base proof OBTAINED at `e400f4cc` — remote CI
+  pending (2026-11-17, Gull msg_ee0f1afaca90).** PI's full server gate:
+  287 suites / 2307 tests, exit 0. The coordinator's independent clean-ext4
+  rerun: 3 suites / 62 tests, 23.719s, exit 0, AND the **EXACT fallow
+  3.34.1 `audit --base 7a96e6d8`: exit 0, "No issues", 9 changed files**,
+  status clean — this REPLACES the earlier zero-changed limitation with
+  actual independent changed-base proof, with NO baseline changes. Logs:
+  `/home/fawad/logs/coordinator-e400f4cc-focused.log` +
+  `coordinator-e400f4cc-fallow.log`. GLM's read-only review of the refactor
+  (approve-with-limits) stands, not repeated. PI pushed `e400f4cc` to PR7
+  (fast-forward, draft kept); remote CI runs 44026406745/44026414784
+  **PENDING — not counted as green until they resolve** (no guessed green).
+  PR7 leaves quality-gate OPEN status only when the remote changed-base
+  audit confirms.
+
+- **F3 status change: OPEN → DECIDED / implementation-pending (Gull
+  msg_ca9008067d4f).** Decision recorded in DECISIONS.md: existing VOID =
+  correction of an incorrect receipt entry; ORIGINAL RECEIPT DATE on both the
+  GL and the supplier ledger; audit trail preserved; existing period lock
+  respected — closed-period ordinary void BLOCKED. A later actual cash return
+  is a separate reversal workflow, out of scope for this fix; controlled
+  prior-period correction also separate. PI assigned: fresh branch,
+  SupplierRefund.ts + F3 server regressions, real-HTTP red-first (as-of/date,
+  closed-period guard, cash guard, A–J), revert-proof. GLM independently
+  reviews PI's money diff read-only before any merge. Status stays
+  implementation-pending — NOT FIXED until evidence lands.
+
+- **Test ownership coordination: `server/src/__tests__/moneyPathFindingsRed.test.ts`.**
+  The parked F-3 case (wrapped in `it.failing`, header documents the pending
+  dating decision) lives on the GLM line (glm/ux-review-tests, glm/warning-ui,
+  glm/ux-fixes). GLM owns this existing parked test; GLM will not edit it
+  concurrently with PI's fresh-branch work. Proposed single-owner unpark: PI's
+  branch owns the FIX + new regressions; once the fix is integrated, GLM
+  unparks the F-3 case on the GLM line (removes the `it.failing` wrapper) as
+  the one owner/branch — pending Gull's confirmation.
+
+- **PR7 remote CI GREEN at exact `e400f4cc` — quality gate CLOSED
+  (2026-11-17).** All 6 checks PASS on head `e400f4ccd755…` (verified via
+  `gh pr view`: headRefOid = e400f4cc…, draft=OPEN, untouched): fallow PASS
+  ×2 (3m59s job 133847689582 / 4m42s job 133847716288 — the remote
+  changed-base audit confirms no findings, matching the independent local
+  `fallow --base 7a96e6d8` proof), flutter PASS ×2 (8m26s/8m12s), server
+  PASS ×2 (4m08s/4m59s). The earlier OPEN status (4 StockMovement complexity
+  findings @ `7416280e`) is resolved by PI's refactor `e400f4cc` — GLM
+  read-only review: approve-with-limits; independent changed-base proof:
+  exit 0, no issues, 9 changed files. PR7 stays DRAFT; ready/merge remains
+  Gull's call. PR4/PR7/PR8 tested candidates stay frozen per
+  msg_ca9008067d4f.
+
+- **F3 ownership CONFIRMED (Gull msg_065193806caa):** single-owner plan
+  confirmed — PI owns SupplierRefund.ts + NEW F3 regressions; GLM alone owns
+  moneyPathFindingsRed.test.ts on the GLM line. Unpark only on a branch
+  containing the reviewed fixed commit through approved integration, with
+  the regression observed passing; header comment updated accurately at the
+  same edit; no concurrency. Ownership agreement sent to PI via the run.
+  F3 stays DECIDED/implementation-pending; GLM will independently review
+  PI's exact money diff when available.
+
+- **F3 status: implemented / validation-pending — GLM independent review of
+  PI's `859831aa` (parent main `7a96e6d8`): fix correct at source, test gap
+  confirmed (2026-11-17, Gull msg_5b991349abb0).** Full review:
+  `/home/fawad/logs/glm-f3-money-fix-review-859831aa.md`. [SOURCE] findings:
+  the one-line fix (`transaction_date: refund.refund_date`) matches the
+  decided rule and the codebase precedent
+  (`ledgerUtils.reverseLedgerEntry` same-date reversal); receipt path
+  already posts at `refundDate`, so both stores now cancel as a net-zero
+  pair ON the receipt date; ledger stays append-only (INSERT +
+  `rebuildBalances`, REVERSAL-RULES 1.6); period guard
+  (`assertPeriodNotClosed` on receipt_date + CODE-001 internal guard)
+  blocks closed-period void before any write; cash timeline guard
+  unchanged and consistent; `voided_at` stays wall-clock (attribution
+  metadata, not a money date). Coordinator's test gap VERIFIED PRECISE:
+  the as-of test filters REFUND types only and compares GL only
+  before-vs-2099 — it never asserts GL at the receipt date nor
+  cross-store GL-vs-ledger agreement; proposed test-only matrix recorded
+  (GL flat across before/atReceipt/now; whole-ledger unfiltered net
+  identical across dates; GL-vs-ledger delta constant). F3 = implemented /
+  validation-pending: NOT fully fixed until PI's refined tests pass the
+  full server gate. Parked moneyPathFindingsRed.test.ts untouched (unpark
+  only after approved integration, observed passing).
+
+- **F3 batched update (2026-11-17, Gull msg_f49350c2f842): PI test
+  refinement `7dc3deab` reviewed — approve-with-limits; ONE test-only date
+  defect before the gate.** Full review:
+  `/home/fawad/logs/glm-f3-test-refinement-review-7dc3deab.md`. [SOURCE]:
+  test-only (SupplierRefund.ts diff EMPTY — approved source fix at
+  `859831aa` unchanged). The refinement closes the earlier test gap:
+  `glApScopedAsOf` scopes GL AP 2000 to the supplier's own document refs
+  (PURCHASE/PAYMENT/PURCHASE_RETURN/REFUND_RECEIPT) and asserts
+  `gl === ledgerNetAsOf` at every sampled as-of date against the WHOLE
+  dated ledger net (unfiltered); exact 409 closed-period refusal (message
+  + row-equality on journal_lines/supplier_ledger/status) and exact 400
+  double-void (message + three stores row-equal); `.not.toBe` anti-vacuity
+  baseline guard. DEFECT (coordinator's, verified at exact SHA):
+  `INTERMEDIATE_DATE = '2026-03-12'` is BEFORE `RECEIPT_DATE = '2026-03-15'`
+  — the loop's "between receipt and today" claim is false; no sample
+  exists in (receipt, today). Receipt-date cancellation assertions still
+  catch wrong-dating, but the claimed mid-window coverage does not exist.
+  Fix: `INTERMEDIATE_DATE = '2026-03-20'` (test-only, one line, comment
+  updated), then focused test → PI's exclusive full server gate +
+  changed-base audit. F3 remains **implementation-pending-full-gate** —
+  not fixed until that gate passes; no final green claimed. Parked GLM
+  test untouched; frozen PR4/PR8 untouched.
+
+- **F3 batched update (2026-11-17, Gull msg_2442fda9bf0d): final test
+  refactor `dbfbe415` reviewed — APPROVE; date fix verified at `d1f5091b`;
+  gate pending at `dbfbe415`.** Full review:
+  `/home/fawad/logs/glm-f3-final-refactor-review-dbfbe415.md`. [SOURCE]:
+  (a) source byte-identical across 859831aa/d1f5091b/dbfbe415 (SupplierRefund.ts
+  blob 8b0ddf9d — approved fix untouched, no re-audit needed); (b) `d1f5091b`
+  lands exactly the proposed one-line date fix (INTERMEDIATE_DATE 03-12 →
+  03-20, corrected comment; sampled set now monotonic with a genuine
+  mid-window point); (c) `dbfbe415` helper split is verbatim-equivalent
+  (seed vs post decomposed, same sequence/constants/payloads/expects,
+  same wrapper return shape; describe split moves only the two state-guard
+  its, bodies untouched; file-level savepoint hooks unchanged; execution
+  order preserved). Evidence ledger: PI-reported [TEST] focused 4/4 +
+  changed-base audit no-issues (2 files, exit 0, fresh coverage) at
+  dbfbe415; full server gate RUNNING at dbfbe415 (single run); prior full
+  gate 284/2273 @ d1f5091b valid FOR THAT SHA only. F3 remains
+  **implementation-pending-full-gate** until the dbfbe415 run resolves —
+  no final green claimed, no baseline/threshold changes. Parked GLM test
+  untouched; frozen PR4/PR8 untouched.
+
+- **F3 batched update (2026-11-17, Gull msg_ef5a53431ebe): implementation
+  LOCALLY VERIFIED / remote CI pending / NOT merged.** [RESOLVED
+  2026-11-18: merged as `29457260` — see PR9 COMPLETION above.] Evidence at exact
+  `dbfbe415`: PI full server gate 284 suites / 2273 tests exit 0;
+  changed-base fallow audit no issues (2 files, exit 0, fresh coverage);
+  coordinator independent F3 + accountingInvariants rerun 2 suites /
+  37 tests, 58.857s, exit 0, clean before/after
+  (`/home/fawad/logs/coordinator-dbfbe415-focused.log`). GLM final review
+  APPROVE stands (no duplicate). Draft **PR9** head verified exact
+  `dbfbe415`; all 6 remote CI checks PENDING — monitored automatically.
+  F3 is NOT merged; no final green claimed until PR9 CI resolves.
+
+- **F3 unpark-before-merge sequencing rule + concrete integration plan
+  (per Gull msg_ef5a53431ebe).** Rule: the existing GLM
+  `moneyPathFindingsRed.test.ts` F-3 case (in `it.failing`) MUST be
+  unparked on a fix-containing integration branch BEFORE the combined fix
+  merges — jest fails a passing `it.failing`, so merging the fix while the
+  case is still wrapped would break CI with an unexpected pass. Concrete
+  plan (single owner per file, no silent candidate change):
+  1. PR9 CI green at `dbfbe415` (pending; monitored automatically) →
+     reported; ready/merge stays human-only.
+  2. On Gull's explicit integration approval: create an integration branch
+     containing BOTH the F3 fix (PR9 content) AND the GLM parked test
+     (from the GLM line).
+  3. GLM (sole owner of the file) removes the `it.failing` wrapper on that
+     branch in the SAME edit that updates the header comment accurately
+     (decision implemented at `859831aa`; case now a normal regression).
+  4. Targeted run: the previously-parked case observed PASSING on the
+     integration branch (no full-suite rerun without cause).
+  5. Only then the combined merge proceeds, as sequenced by Gull.
+  Frozen PR4/PR8 candidates stay untouched until explicitly sequenced; no
+  silent cherry-picks/force pushes.
+
+- **Slot + next assignment (Gull msg_ef5a53431ebe).** The exclusive full
+  server slot is FREE (F3 gate complete). PI assigned S3 only, on a fresh
+  branch from `e400f4cc`: reproduce then red-first
+  purchase/receipt/production `stock_balance` extension — stock/server
+  only. GLM cross-reviews the future S3 diff read-only when available.
+  GLM runs no tests in PI's slots.
+
+- **S-3 CONFIRMED SCOPE + flag-gated mirror-write correction (Gull
+  msg_c67507eb7509).** PI reproduced S-3 on `e400f4cc` through REAL
+  purchase/receipt/production routes: bin quantities present, the
+  `stock_balances` extension NULL; the control `recordMovement` path
+  passes. Gull independently read `syncStockBalancesExtension` and
+  confirmed it returns flag OFF — the mirror write is FLAG-GATED, the
+  confirmed defect class. PI routed: extend the red matrix to BOTH flag
+  states BEFORE code; then unconditional SHARED mirror refresh after
+  balance+bin creation at all three seams. Scope guards: no global
+  invariant widening; no schema/backfill/default/migration-127 changes.
+  Ownership: PI owns the model seams + StockMovement; GLM owns
+  Flutter/docs and cross-reviews the eventual stock diff READ-ONLY.
+  Status: **confirmed S-3 scope, fix NOT final until evidence** (red
+  matrix both states + gate + changed-base audit).
+
+- **PR9 remote CI final (2026-11-17): 5 PASS / 1 FAIL(artifact) at exact
+  `dbfbe415`.** Content verdict: PR-event fallow PASS (3m46s, job
+  133895665328) — changed-base audit clean. server PASS ×2, flutter PASS
+  ×2. Push-event fallow FAIL 4m46s (job 133895588740): literal log
+  "could not determine changed files for base ref '0000…': fatal:
+  Invalid symmetric difference expression", exit 2 — the SAME zero-SHA
+  base-ref INFRA artifact as PR4/PR8 push runs (new branch, `event.before`
+  = all-zero), NOT a content verdict. With the locally verified gate
+  (284/2273 exit 0 + independent 37-test rerun + changed-base clean),
+  F3 stands at: implementation locally verified, remote content verdict
+  clean, NOT merged — ready/merge remains human-only.
+
+- **S-3 batched update (2026-11-17, Gull msg_f23d3ecacd98): GLM review of
+  `360e1aa8` — APPROVE-WITH-LIMITS; reservation-only mirror gap CONFIRMED
+  as a separate linked finding.** Full review:
+  `/home/fawad/logs/glm-s3-review-360e1aa8.md`. [SOURCE] verified: all
+  three ADD-path sync calls inside the same transaction AFTER balance+bin
+  rows exist (Purchase writePurchaseRow:312 / PO:1123 / Production:547);
+  warehouse scope correct (bins batch-scoped, l.warehouse_id filter, same
+  warehouse as the writes); legacy/no-bin safe — the sync touches ONLY the
+  extension columns, never legacy `quantity`; no-bin → 0/0/0 is
+  semantically correct and read-inert (the only extension reader,
+  StockMovement.ts:280, reads quantity_available only with flag ON; no
+  COALESCE-fallback readers). Callers: recordMovement:879 call site STILL
+  self-gated (net behavior unchanged; inconsistency with the in-function
+  comment noted — protective for no-bin adjustments); PhysicalCount
+  399/669 now ungated (flag-OFF behavior change, consistent+inert).
+  LINKED FINDING (coordinator's, confirmed at source): StockReservation.ts
+  (reserve :104 / release via negative delta) updates bin rows but has
+  ZERO stock_balances references — mirror stale after every
+  reservation/release; SEPARATE from S-1 consume-release, NOT fixed by
+  360e1aa8; later ADD-path syncs repair staleness incidentally. Same
+  family, pre-existing, out of scope: PurchaseOrder.ts:758 PO-cancel
+  zeroing also does not sync. TEST FOLLOW-UP before the final gate
+  (coordinator): replace the downgraded reserved=0 control with a
+  meaningful existing-NONZERO-reservation THEN ADD case (reservation
+  preserved), red/revert proof; code frozen at 360e1aa8. S-3 =
+  implemented / validation-pending — final verdict waits on the corrected
+  case + PI's exclusive full gate + changed-base audit. No global
+  invariant widening, no schema/backfill/default/127 changes (verified in
+  diff); focused-coverage CRAP warnings inconclusive until full
+  same-worktree coverage; no baseline changes.
+
+- **CORRECTION to the S-3 review (Gull msg_c7abb19bc488): the
+  recordMovement caller gate is the SAME invariant, not a protective
+  exemption.** Gull independently verified StockMovement.ts:877-880 still
+  flag-gates the shared mirror refresh. Since the function is now
+  ungated, the caller-level gate is REDUNDANT and enforces nothing but an
+  inconsistency with the shared maintained-write rule ("the flag selects
+  what is READ, never what is MAINTAINED"). It must NOT be described as
+  protective for the no-bin case. Routed to PI (bounded, before the final
+  gate): narrow OFF real-route regression first, THEN remove the
+  redundant caller gate, alongside the meaningful
+  existing-NONZERO-reservation THEN ADD case with red/revert proof. S-3
+  stays validation-pending — no final approve until the bounded follow-up
+  is tested.
+
+- **Evidence-class relabeling (same message).** The tracker must
+  distinguish SOURCE-confirmed missing calls from runtime-confirmed
+  reproductions, and current-source observations must not carry
+  "pre-existing" labels unless a clean known-good baseline proves them:
+  - RUNTIME-CONFIRMED reproduction: S-3 itself — bins present, extension
+    NULL via real purchase/receipt/production routes (PI, e400f4cc).
+  - SOURCE-CONFIRMED missing calls (current source, runtime repro NOT
+    required for the code fact): StockReservation reserve/release updates
+    bins with zero stock_balances references; PurchaseOrder.ts:758
+    PO-cancel zeroing does not sync; recordMovement:877-880 caller gate.
+    All three remain UNRESOLVED gaps — none is fixed by 360e1aa8, and
+    none is permission for wider production cleanup beyond the routed
+    bounded follow-up.
+  - No-bin extension sum=0: already reviewed safe (read-inert; legacy
+    `quantity` stays authoritative with flag OFF).
+
+- **Discipline standing:** no GLM tests during PI's future full gate; no
+  stock edits; batched routine record updates.
+
+- **S-3 batched update (2026-11-17, Gull msg_0bba910f3970): final follow-up
+  `2692ab1e` reviewed — APPROVE; S-3 validation-pending on the running
+  gate.** Full review:
+  `/home/fawad/logs/glm-s3-final-followup-review-2692ab1e.md`. [SOURCE]:
+  production change is EXACTLY the routed caller-gate removal
+  (recordMovement ~877-880: `syncStockBalancesExtension` now unconditional,
+  accurate comment) — consistent with the shared maintained-write
+  invariant; no other production changes in the branch (4 model files + 1
+  spec only; no services/migrations). New cases verified meaningful:
+  (a) both-flag recordMovement parity (real-HTTP ADJUSTMENT, both states —
+  the OFF regression justifying the gate removal); (b) the coordinator's
+  existing-NONZERO-reservation THEN ADD case via the REAL reservation
+  route (10 → reserve 4 → ADD 5 ⇒ bins/mirror {15,4,11}, reservation
+  preserved); (c) legacy/no-bin control (quantity 42, no bins: nothing
+  fabricated, legacy column intact, mirror reads its true 0 coverage).
+  [TEST, PI-reported]: 13/13 focused, 27 suites / 205 dependents + A–J;
+  revert-all → 11 fail / 2 pass (survivors consistent: the PROBE asserting
+  current stale behavior + the tolerant legacy control). Full gate
+  RUNNING at `/home/fawad/verify-2692ab1e`
+  (`/home/fawad/logs/gate-2692ab1e.log`); exact changed-base audit with
+  fresh coverage follows; NO final green until both resolve.
+
+- **RESERVATION-ONLY STALE MIRROR: evidence class corrected to
+  RUNTIME-CONFIRMED (Gull msg_0bba910f3970).** PI's executed probe (green
+  in the focused run) asserts the concrete divergent state after a REAL
+  reservation with no ADD afterward: bins {physical:10, reserved:4,
+  available:6} vs stock_balances extension mirror {10, 0, 10}. This is a
+  runtime-confirmed CHARACTERIZATION of the defect — not UNCONFIRMED, and
+  NOT intended correct semantics. It remains a SEPARATE finding from the
+  S-1 consume/release issue, UNFIXED in S-3 (no StockReservation production
+  edits in the branch), and not permission for wider cleanup. The test
+  comment's "UNCONFIRMED PROBE" header is mislabeled; this tracker entry
+  is the authoritative record; the in-code label corrects naturally when
+  the separate finding is fixed and the assertions flip to equality.
+
+- **S-3 batched update (2026-11-17, Gull msg_cba41ac59db9): final gate
+  evidence + setup-claim correction.**
+  - **Gate VERIFIED at exact `2692ab1e`: 288 suites / 2320 tests, EXIT 0;
+    exact changed-base fallow audit: 14 changed files, "No issues",
+    EXIT 0.** Together with GLM's APPROVE of the follow-up diff, S-3 is
+    now **locally verified at source+gate level; not merged**; final
+    publication awaits Gull (proposed: S-3 draft stacked on the PR7
+    branch AFTER an independent check of the final snapshot, normal push
+    only — no force, no ready/merge).
+  - **Candidate `9fd41a39`** (parent line after `2692ab1e`): diff is
+    comments/test-name ONLY; production unchanged; inspected by the
+    coordinator; NO full rerun required for that delta.
+  - **SETUP-CLAIM CORRECTION (accurate evidence per SHA):** the retained
+    `verify-2692ab1e` worktree was reported clean-untracked-0 but ACTUALLY
+    carries an untracked symlink `server/node_modules ->
+    /home/fawad/s3-ext/server/node_modules` (verified by GLM: `??` in
+    status, symlink target confirmed). Source is unchanged and the test
+    results remain observed valid; the correction is recorded so per-SHA
+    evidence stays accurate. PI asked to prepare a CLEAN final `9fd41a39`
+    snapshot with a REAL npm ci for the coordinator's focused
+    verification — not a repeat of the full gate.
+  - **Fallow default note:** a default-base fallow run showed "1 changed
+    file" — likely the dependency link (the untracked node_modules
+    symlink); the AUTHORITATIVE result is the exact changed-base audit
+    (14 files, clean) recorded above.
+  - **Reservation-only stale mirror: remains RUNTIME-CONFIRMED** (executed
+    probe, bins {10,4,6} vs mirror {10,0,10}) — separate from S-1, unfixed
+    in S-3, not permission for wider cleanup.
+  - **Slots free**; no baseline changes, no ready/merge, no artifact
+    changes. GLM follow-up role: independent check of the clean final
+    snapshot when routed.
+
+- **S-3 batched update (2026-11-17, Gull msg_af4ac86d0e0d):
+  INDEPENDENTLY VERIFIED; draft publication routed.**
+  - Coordinator clean-final-snapshot verification at `9fd41a39` (real
+    deps, clean before/after): S-3 parity + accounting invariants —
+    2 suites / 46 tests, 52.339s, EXIT 0
+    (`/home/fawad/logs/coordinator-s3-9fd41a39-focused.log`).
+  - Combined bounded evidence: full server gate 288/2320 EXIT 0 +
+    exact changed-base fallow audit 14 files "No issues" EXIT 0 at
+    production-identical `2692ab1e`; setup correction (untracked
+    node_modules symlink in the retained verify worktree) retained
+    honestly. GLM source review APPROVE stands; no duplicate review.
+  - **S-3 status: independently verified / NOT merged.** PI authorized:
+    normal push + DRAFT S-3 PR stacked on PR7 — no force, no ready, no
+    merge. GLM monitors the new PR's CI at the exact SHA and reports
+    automatically.
+  - **PI next assignment: S-4 reproduction ONLY** — fresh branch from
+    `9fd41a39`, real reconciliation route + batch/bin/warehouse/GL
+    A–J evidence. NO confirmed status until an actual result exists.
+  - Reservation-only stale mirror and PO-cancel non-sync gaps remain
+    SEPARATELY UNRESOLVED.
+  - Full slots free; no extra broad tests; no baseline changes;
+    no ready/merge.
+
+- **Sequential ready/merge APPROVED by Gull (2026-11-17,
+  msg_7a814f5add58); GLM post-PR3 responsibilities prepared.** The
+  coordinator owns the merge sequence (PR3 first at reviewed `971c4f5b`);
+  GLM must NOT independently merge any PR. GLM owns, AFTER PR3 merges and
+  the coordinator's merged SHA is known (no dependent mutation before
+  that): rebasing PR4 (`glm/ux-review-tests` @ `0186b8d9`) and warning
+  PR8 (`glm/warning-ui` @ `52447ccc`, stacked on PR4) in GLM's own
+  worktrees, plus relevant targeted tests; coordinate exact file
+  ownership; preserve all reviewed changes. No force push until the
+  coordinator provides the exact expected lease after inspecting the
+  rebuilt candidate; never plain force, never overwriting unexpected
+  remote edits. After EVERY merge exactly ONE agent runs
+  `scripts/check.sh` exclusively and checks CI. PI pauses new S-4
+  production work during merge/rebase coordination. Product decisions /
+  default / migration-127 / 8.6 boundaries unchanged.
+
+- **GLM pre-flight (read-only, ready to execute on the merged SHA):**
+  PR3 touches ONLY server files (accountingService, cashBalanceGuard, new
+  cashTimeline) — ZERO file overlap with PR4 or PR8, so both rebases are
+  expected conflict-free vs PR3. PR4∩PR8 overlap:
+  `lib/data/repositories/purchase_repository.dart` (expected — PR8 is
+  stacked on PR4; rebase order PR4 first, then PR8 onto the rebased PR4).
+  Remote tips verified intact at the exact known SHAs (glm/ux-review-tests
+  = 0186b8d9, glm/warning-ui = 52447ccc, main = 7a96e6d8) — no unexpected
+  remote edits. Note: PR4 carries an `audit/FINDINGS-STATUS.md` change; if
+  PR5 (docs, base main) merges during the sequence, that file may conflict
+  on the PR4 rebase — will handle at rebase time with the reviewed content
+  preserved. Worktree plan: dedicated worktree for `glm/ux-review-tests`
+  (branch not checked out anywhere), `glm-warnui` for `glm/warning-ui`.
+  Targeted tests after each rebase (no full-suite reruns without cause;
+  the exclusive post-merge check.sh runner is a single agent per Gull).
+
+- **PR3 MERGED (merge commit `bf96ee1f`, 2026-11-17T10:26:01Z, all six
+  reviewed-head CI checks green) — GLM PR4 rebase COMPLETE, candidate
+  awaiting lease inspection.** Rebuilt in GLM's own worktree
+  (`glm-pr4-rebase`): local `glm/ux-review-tests` was stale at `2e4a101a`;
+  aligned to the reviewed remote head `0186b8d9` then rebased onto
+  `bf96ee1f`. Result: **9/9 commits replayed, ZERO conflicts, new tip
+  `ea8f79cd`**; `git range-diff` shows all 9 commits "=" (patch-identical),
+  and a diff-of-patch-bodies check is EMPTY — the reviewed candidate is
+  byte-preserved. Preservation verified in the tree: PI's write-off
+  idempotency/open-only-filter/manual-fields fix (commit 1), F-2 as
+  ordinary passing tests + exact-409 case, **F-3 still parked in
+  `it.failing`** (fix-containing integration not on this line), GLM UX
+  fixes and PRET-002 tests intact. Targeted regressions ONLY (PI owns the
+  exclusive full gate): server `supplierRefundClaims` +
+  `moneyPathFindingsRed` (parked F-3 semantics) + `moneyPathReviewGaps` +
+  `moneyPaths` — 4 suites / 29 tests PASS (41.6s); Flutter 10 touched test
+  files — 34 tests, ALL PASS (1m47s); `l10n-drift` clean (0 fallback gap,
+  0 orphaned). NOT RUN (intentionally): full server suite, full Flutter
+  suite, `scripts/check.sh` — PI exclusively owns the post-merge full
+  gate per Gull. Worktree clean (node_modules/.dart_tool correctly
+  ignored on this line — unlike the S-3 verify worktree noted earlier).
+  **NOT PUSHED**: awaiting the coordinator's inspection and the exact
+  old-head lease `0186b8d9…`; PR8 rebase DEFERRED until PR4 merges.
+
+- **PR4 rebased candidate PUSHED with exact lease (2026-11-17,
+  msg_1a04e8d02e28): `glm/ux-review-tests` = `ea8f79cd` (was `0186b8d9`).**
+  Fresh remote check matched the lease old-head exactly; push
+  `--force-with-lease` accepted; post-push remote verified `ea8f79cd…`.
+  CI runs at the exact SHA: 44066510602, 44066522702 (6 checks; pending at
+  report time — monitored automatically; PR4 merge waits for PI's
+  post-merge full gate + this rebased CI). Coordinator rerun package:
+  `/home/fawad/logs/pr4-ea8f79cd-rerun-evidence.md` — exact commands +
+  log paths: server targeted 4 suites/29 tests exit 0
+  (`pr4-ea8f79cd-server-targeted.log`), Flutter 10 touched files 34 tests
+  exit 0 (`pr4-ea8f79cd-flutter-targeted.log`), l10n-drift clean
+  (`pr4-ea8f79cd-l10n-drift.log`). F-3 parked test/comment NOT changed per
+  Gull; GLM owns its unpark on fix-containing integration later. PR8
+  rebase deferred until PR4 merges.
+
+- **PR4 MERGED (merge commit `d1075cd2`, 2026-11-17T11:17:48Z) — batched
+  status update (2026-11-17).** Coordinator independently verified PR4
+  candidate `ea8f79cd` in clean ext4 (`/home/fawad/verify-pr4-ea8f79cd`):
+  29/29 server, 34/34 Flutter, l10n clean, all 6 checks SUCCESS at exact
+  head; marked ready and merged; logs `coordinator-pr4-ea8f79cd-*.log`.
+  PI's PR3 post-merge gate (recorded here per msg_fdcc0951589a-style
+  batching): 283/2269 server, 1199 pass + 1 skip Flutter, exit 0, main CI
+  green, only the known 11 artifact outputs modified.
+- **PR6 (PI) verification batched:** rebuilt `94d12c6a` patch-identical to
+  `819034da` on main `d1075cd2`, clean ext4; PI 11 suites / 96 tests PASS;
+  coordinator reran S2 real-invoice flag OFF/ON + accountingInvariants —
+  2 suites / 37 tests PASS exit 0 (28.410s), clean afterward, log
+  `coordinator-pr6-94d12c6a-focused.log`. Lease push authorized, not yet
+  pushed; PR6 merge waits for GLM's post-PR4 full gate + new-head CI.
+- **GLM EXCLUSIVE FULL GATE at exact `d1075cd2` — PASS, exit 0
+  (2026-11-17).** Clean ext4 detached worktree
+  `/home/fawad/verify-pr4-merge-d1075cd2` (HEAD = `d1075cd2` exact), real
+  `npm ci` + `flutter pub get`, ran via `bash scripts/check.sh` (the
+  script is 100644 non-executable in git on this line; no chmod, no source
+  change). Results: **server 284/284 suites, 2273/2273 tests passed, 0
+  FAIL**; **Flutter 1212 passed + 1 skipped (the 1 skip recorded honestly;
+  consistent with PI's PR3-gate 1-skip pattern), "All other tests
+  passed!"**; l10n-drift clean (fallback gap 0, orphaned 0); finding-tag
+  audit: server it.failing=1 (the parked F-3), flutter RED-BY-DESIGN
+  files=0. Post-run worktree: exactly the 11 known
+  `audit/accounting-audit/remediation/` golden artifacts regenerated
+  (same known pattern as PI's PR3 gate; not source changes) — restored
+  with `git checkout --`, tracked dirty 0 / untracked 0 afterward.
+  Log: `/home/fawad/logs/gate-d1075cd2/check-full.log` (final line
+  `GATE_EXIT=0`). Main CI at `d1075cd2`: run 44072725619 — server
+  SUCCESS, fallow SUCCESS, flutter SUCCESS (3/3).
+- **PR8 REBASED onto merged `d1075cd2` → new tip `ef117084` (NOT
+  pushed).** Rebase `git rebase --onto d1075cd2 0186b8d9 glm/warning-ui`
+  (old-base `0186b8d9` = old PR4 head, so only the 4 PR8-only commits
+  replay). Range-diff old `0186b8d9..52447ccc` vs new
+  `d1075cd2..ef117084`: **all 4 commits "=" (patch-identical)**; diff of
+  patch bodies EMPTY; zero conflicts (expected `purchase_repository.dart`
+  overlap with PR4 resolved cleanly by the replay). Targeted regressions
+  (run AFTER the full gate, exclusive slot respected): Flutter
+  `pos_sale_warning_test.dart`, `invoice_create_warning_wire_test.dart`,
+  `sales_invoice_form_page_test.dart` — **68/68 PASS** (exit 0);
+  l10n-drift clean. NOT RUN (intentionally): full suites (this gate was
+  just run at the shared base), server suites (PR8 touches no server
+  files). **NOT PUSHED**: awaiting coordinator inspection of `ef117084`
+  and the exact old-head lease (`52447ccc…`).
+
+- **PR6 MERGED (merge commit `d60df612`, 2026-11-17) — GLM EXCLUSIVE
+  FULL GATE at exact `d60df612` — PASS, exit 0 (2026-11-17).** Clean ext4
+  detached worktree `/home/fawad/verify-pr6-merge-d60df612` (HEAD =
+  `d60df612` exact), real `npm ci` + `flutter pub get`, ran via
+  `bash scripts/check.sh` (100644 non-executable; no chmod, no source
+  change). Results: **server 285/285 suites, 2277/2277 tests passed, 0
+  FAIL** (285th suite = PR6's `batchLocationLegacyConsumeScope.test.ts`);
+  **Flutter 1212 passed + 1 skipped** (the 1 skip recorded honestly; same
+  single-skip pattern as the `d1075cd2` gate and PI's PR3 gate), "All
+  other tests passed!"; l10n-drift clean (0/0); finding-tag audit: server
+  it.failing=1 (parked F-3), flutter RED-BY-DESIGN files=0. Post-run
+  dirty: exactly the 11 known `audit/accounting-audit/remediation/`
+  golden artifacts regenerated — restored via `git checkout --`; tracked
+  dirty 0 / untracked 0 afterward. Log:
+  `/home/fawad/logs/gate-d60df612/check-full.log` (final line
+  `GATE_EXIT=0`). Main CI at `d60df612`: run 44089674320 — server
+  SUCCESS, fallow SUCCESS, flutter SUCCESS (3/3).
+- **PR8 status after PR6 merge:** candidate remains `ef117084` (based on
+  `d1075cd2`), NOT pushed (remote `glm/warning-ui` still old head
+  `52447ccc`; the old head's fallow CI failure is the known zero-SHA
+  push-event artifact class, not a content verdict). Overlap check:
+  PR6 (`d1075cd2..d60df612`) touched ONLY server files
+  (`StockMovement.ts` + its test); PR8 touches ONLY Flutter files — zero
+  overlap, so `ef117084` content is unaffected by the PR6 merge; an
+  optional re-parent onto `d60df612` would be a no-conflict formality.
+  Awaiting coordinator's exact lease (`52447ccc…` old head) after their
+  inspection; fresh-head CI follows the push.
+
+- **PR8 PUSHED with exact lease (2026-11-17, msg_0a8a534e8264):
+  `glm/warning-ui` = `ef117084` (was `52447ccc`).** Fresh remote check
+  matched the lease old-head exactly; `--force-with-lease` accepted;
+  post-push remote verified. New-head CI at `ef117084`: runs
+  44097109245 (push event) + 44097118947 (pull_request event).
+  Results: server SUCCESS + flutter SUCCESS in BOTH runs;
+  **pull_request fallow SUCCESS (the content verdict: PASS)**; push-event
+  fallow FAILURE — a NEW VARIANT of the known fallow push-event infra
+  class: not the zero-SHA `0000…` case but "could not determine changed
+  files for base ref `52447ccc…`: Invalid symmetric difference
+  expression … Verify the ref exists" (exit 2) — the force-push removed
+  the old head from the remote's reachable refs, so the push-event
+  fallow cannot compute the changed-file set. Not a content verdict.
+  The standing fallow workflow-fix proposal
+  (`/home/fawad/logs/fallow-ci-base-ref-fix-proposal.md`) covers this
+  class and still awaits Gull's decision. PR8 NOT merged (awaiting
+  Gull); PR8 base branch is still `glm/ux-review-tests` (its tip
+  `ea8f79cd` is merged into main via PR4) — base change to main NOT
+  required for CI; only on Gull's instruction.
+
+- **PR8 BASE SWITCHED TO MAIN (2026-11-17, msg_6bdc6b2e86dc) + FRESH
+  PR-EVENT CI ALL GREEN.** Head verified unchanged before the change
+  (`ef117084`, remote-checked). REST PATCH
+  `/repos/mfbgull/minierp-flutter/pulls/8` with base=main succeeded
+  (PI's `gh pr edit` GraphQL Projects-field deprecation avoided). Base
+  edit alone triggered NO new runs, so a fresh PR event was triggered by
+  close + reopen (no commit changes, head stays `ef117084`). New run
+  44105990414 (pull_request, base=main): **fallow SUCCESS + server
+  SUCCESS + flutter SUCCESS** — the required fresh PR event/content pass
+  is satisfied; the earlier push-event fallow base-ref artifact
+  (unreachable old head) is superseded for merge-readiness. PR8 remains
+  OPEN, NOT merged; awaiting Gull. No workflow edits made.
+
+- **PR8 MERGED (merge commit `87a425ea`, 2026-11-17T14:51:52Z; reviewed
+  head `ef117084`; fresh PR run 44105990414 3/3 SUCCESS) — GLM EXCLUSIVE
+  FULL GATE at exact `87a425ea` — PASS, exit 0 (2026-11-17).** Clean ext4
+  detached worktree `/home/fawad/verify-pr8-merge-87a425ea` (HEAD =
+  `87a425ea` exact), real `npm ci` + `flutter pub get`, via
+  `bash scripts/check.sh` (100644 non-executable; no chmod, no source
+  change). Results: **server 285/285 suites, 2277/2277 tests passed, 0
+  FAIL**; **Flutter 1219 passed + 1 skipped** (up from 1212 — PR8's 7
+  warning-path tests now on main; the 1 skip recorded honestly, same
+  single-skip pattern across the d1075cd2 / d60df612 / 87a425ea gates and
+  PI's PR3 gate), "All other tests passed!"; l10n-drift clean (0/0);
+  finding-tag audit: server it.failing=1 (parked F-3), flutter
+  RED-BY-DESIGN files=0. Post-run dirty: exactly the 11 known
+  `audit/accounting-audit/remediation/` golden artifacts — restored via
+  `git checkout --`; tracked dirty 0 / untracked 0 afterward. Log:
+  `/home/fawad/logs/gate-87a425ea/check-full.log` (final line
+  `GATE_EXIT=0`). Main CI at `87a425ea`: run 44107790691 — server
+  SUCCESS, fallow SUCCESS, flutter SUCCESS (3/3). Full gate slot
+  RELEASED after this report; PR7 merge unblocked from GLM's side.
+
+- **PR7 MERGED (merge commit `91df221c`, 2026-11-17T15:30:44Z; exact
+  reviewed head `4a98d95d`; push+PR runs all six checks PASS) — GLM
+  EXCLUSIVE FULL GATE at exact `91df221c` — PASS, exit 0 (2026-11-17).**
+  Clean ext4 detached worktree `/home/fawad/verify-pr7-merge-91df221c`
+  (HEAD = `91df221c` exact), real `npm ci` + `flutter pub get`, via
+  `bash scripts/check.sh` (100644 non-executable; no chmod, no source
+  change). Results: **server 288/288 suites, 2311/2311 tests passed, 0
+  FAIL** (up from 285/2277 at the previous gate — PR7's reviewed
+  refactor + test suites are now on main); **Flutter 1219 passed + 1
+  skipped** (unchanged — PR7 is server-side; the 1 skip recorded
+  honestly, same single-skip pattern across all recent gates), "All
+  other tests passed!"; l10n-drift clean (0/0); finding-tag audit:
+  server it.failing=1 (parked F-3), flutter RED-BY-DESIGN files=0.
+  Post-run dirty: exactly the 11 known
+  `audit/accounting-audit/remediation/` golden artifacts — restored via
+  `git checkout --`; tracked dirty 0 / untracked 0 afterward. Log:
+  `/home/fawad/logs/gate-91df221c/check-full.log` (final line
+  `GATE_EXIT=0`). Main CI at `91df221c`: run 44115170192 — server
+  SUCCESS, fallow SUCCESS, flutter SUCCESS (3/3). Full gate slot
+  RELEASED after this report; PI's PR9 (F-3) rebase onto `91df221c`
+  unblocked from GLM's side.
+
+- **NEXT ASSIGNMENT (2026-11-17, coordinator msg_b8bcc0316969): PR9 (F-3
+  fix line, PI) — rebase onto `91df221c` in PI's own worktree,
+  read-only/source prep only, NO test runs until GLM's post-PR7 gate
+  finished (it has: exit 0 at `91df221c`, see above); no fixes/code
+  beyond the previously reviewed candidate.** GLM owns the
+  `moneyPathFindingsRed.test.ts` unpark edit, only on a fix-containing
+  integration branch, after approved integration, observed passing, with
+  the header comment updated in the same edit; PI must not edit it.
+  PR5 remains LAST in merge order; PR10/S-4 deferred.
+  *(2026-11-18 correction: superseded — PR #10 (S-3) merged as `d3a35510` and
+  S-4 merged via PR #40 as `1f6a2905`; only PR #5 remains open.)*
+
+- **PR9 COMPLETION (2026-11-18):** the PR9 assignment above is CLOSED. The
+  F-3 fix line (`fix/f3-refund-void-original-date` @ `b209303a` — fix + the
+  test unpark companion) MERGED as `29457260`; PI's full post-merge gate and
+  main CI run 44219220758 passed (fallow, server, flutter 3/3 SUCCESS at
+  `29457260`). F-3 is now an ordinary passing regression on main; the
+  finding-tag table above is updated to match. Remaining open stock defect
+  (S-3 reservation-only mirror staleness) stays with PR10; PR5 remains last
+  in merge order.
+  *(2026-11-18 correction: superseded — PR #10 merged as `d3a35510`; its
+  `stockBalancesExtensionParity.test.ts` on main pins the mirror against
+  `quantity_reserved` (a reservation control included in the parity checks),
+  and S-4 merged via PR #40 as `1f6a2905`.)*
