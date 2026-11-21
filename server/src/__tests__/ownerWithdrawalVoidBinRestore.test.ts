@@ -76,6 +76,31 @@ function hasBinRow(batchId: number, locationId: number): boolean {
     .get(batchId, locationId) !== undefined;
 }
 
+function createLocation(wh: number, code: string): number {
+  const existing = db.prepare(
+    'SELECT id FROM locations WHERE warehouse_id = ? AND location_code = ?',
+  ).get(wh, code) as { id: number } | undefined;
+  if (existing) return existing.id;
+  const ins = db.prepare(
+    'INSERT INTO locations (warehouse_id, location_code, location_name) VALUES (?, ?, ?)',
+  ).run(wh, code, `Bin ${code}`);
+  return ins.lastInsertRowid as number;
+}
+
+/** Move a batch's whole physical stock between bins, keeping the total fixed. */
+function moveWholeBatchToBin(batchId: number, fromId: number, toId: number, qty: number): void {
+  db.prepare(`
+    UPDATE batch_stock_by_location
+    SET quantity_physical = 0, quantity_available = 0
+    WHERE batch_id = ? AND location_id = ?
+  `).run(batchId, fromId);
+  db.prepare(`
+    INSERT INTO batch_stock_by_location
+      (batch_id, location_id, quantity_physical, quantity_reserved, quantity_available)
+    VALUES (?, ?, ?, 0, ?)
+  `).run(batchId, toId, qty, qty);
+}
+
 function seedSalesOrder(status: string): string {
   const soNo = `SO-OWV-${status}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
   db.prepare(`
@@ -199,5 +224,55 @@ describe('goods owner-withdrawal void restores the bin, not just the batch total
     // Both stores agree after the legal sale: 4 physical, 4 reserved, 0 free.
     expect(batchRemaining(batchId)).toBe(4);
     expect(binRow(batchId, locId)).toEqual({ physical: 4, reserved: 4, available: 0 });
+  });
+
+  //
+  // Cross-review finding (current logic, new records): the void restored to the
+  // warehouse DEFAULT bin regardless of where the units were taken from. The
+  // stock came back to a bin that never held it, so the batch total agreed with
+  // neither bin: after void, batch 10 while DEFAULT held 4 and the true source
+  // bin still held 6. Selling from the source bin then under-reported stock and
+  // selling against DEFAULT fabricated 4 units.
+  //
+  it('void returns units to the bin they were taken from, not the DEFAULT bin', async () => {
+    const itemId = await createItem('OWV-NONDEF-ITEM', cookie);
+    await purchaseStock(itemId, warehouseId, 10, 5, cookie);
+
+    setFeatureEnabled(db, FLAG, true);
+
+    const batchId = batchOf(itemId);
+    const defaultId = defaultLocation(warehouseId);
+
+    // A real named bin, created through the same table the API validates
+    // against. The purchase landed everything in DEFAULT; move the whole
+    // batch into the named bin so the withdrawal has to consume from it.
+    const namedId = createLocation(warehouseId, 'OWV-AISLE-B');
+    moveWholeBatchToBin(batchId, defaultId, namedId, 10);
+
+    expect(binRow(batchId, defaultId)).toEqual({ physical: 0, reserved: 0, available: 0 });
+    expect(binRow(batchId, namedId)).toEqual({ physical: 10, reserved: 0, available: 10 });
+
+    // ── withdraw 4: the consumer must draw them from the named bin ────
+    const withdrawal = await post('/api/owner-equity/withdrawals', {
+      withdrawal_date: AS_OF,
+      kind: 'goods',
+      items: [{ item_id: itemId, warehouse_id: warehouseId, quantity: 4 }],
+    });
+    expect([200, 201]).toContain(withdrawal.status);
+    const withdrawalId = (withdrawal.body?.data?.id ?? withdrawal.body?.id) as number;
+    expect(withdrawalId).toBeGreaterThan(0);
+
+    expect(batchRemaining(batchId)).toBe(6);
+    expect(binRow(batchId, namedId)).toEqual({ physical: 6, reserved: 0, available: 6 });
+    expect(binRow(batchId, defaultId)).toEqual({ physical: 0, reserved: 0, available: 0 });
+
+    // ── void: the 4 units belong back in the NAMED bin ────────────────
+    const voided = await del(`/api/owner-equity/withdrawals/${withdrawalId}`);
+    expect([200, 204]).toContain(voided.status);
+
+    expect(batchRemaining(batchId)).toBe(10);
+    // The defect: these were restored to DEFAULT, leaving 4 / 0.
+    expect(binRow(batchId, namedId)).toEqual({ physical: 10, reserved: 0, available: 10 });
+    expect(binRow(batchId, defaultId)).toEqual({ physical: 0, reserved: 0, available: 0 });
   });
 });
