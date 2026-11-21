@@ -164,6 +164,14 @@ function restoreConsumption(
           `${m.movement_no} no longer exists. Restore the batch or correct inventory manually first.`
         );
       }
+      // The consume moved the batch total AND the batch's bin row, so the
+      // reversal must move both. The inbound movement recorded below reuses
+      // syncBatchStockByLocationForNewBatch, whose INSERT OR IGNORE only seeds a
+      // MISSING row — for this existing bin it changes nothing, which left the
+      // batch total at 10 while the bin held 6. mirrorBatchLocationDelta
+      // get-or-creates and then increments, and leaves quantity_reserved alone,
+      // so an outstanding reservation survives the void.
+      StockMovementModel.mirrorBatchLocationDelta(batchId, m.warehouse_id, qty, db);
     } else {
       // Legacy NULL-batch consumption — recreate a cost-faithful batch.
       const inserted = db.prepare(`
@@ -177,7 +185,9 @@ function restoreConsumption(
       );
       batchId = inserted.lastInsertRowid as number;
       // BUG-013: the recreated batch needs its location row, or the flag-on
-      // sellable query cannot see it.
+      // sellable query cannot see it. (A brand-new batch, so the seed helper is
+      // the right call here — it also seeds the DEFAULT bin the movement below
+      // would otherwise find missing.)
       StockMovementModel.syncBatchStockByLocationForNewBatch(batchId, m.warehouse_id, qty, db);
     }
 
