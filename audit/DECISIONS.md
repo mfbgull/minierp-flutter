@@ -1865,3 +1865,36 @@ these old records. The dev database is disposable and its records are test data.
 - **Scope.** Comment-only correction to migration 134 and
   `server/src/models/OwnerWithdrawal.ts`. No logic change, no test change, no
   schema change. PR #50 stays a draft.
+
+## DECIDED — batch truth is the whole stock count for batch-managed items (2026-11-22)
+
+**Decision by Gull.** Every item is tracked in a batch. Therefore, for any
+item and warehouse, `stock_batches` is the **full** stock count and
+`stock_balances.quantity` must equal the sum of the batch quantities. An
+unbatched residual is **not** preserved: it is drift, and the reconciliation
+route must remove it.
+
+- **Scope.** `POST /api/inventory/batch-reconciliation/correct` sets
+  `stock_balances.quantity` to the sum of `stock_batches.quantity_remaining`
+  for the item and warehouse. It does not move the mirror by the correction
+  delta.
+- **Why the delta was wrong.** A delta keeps whatever residual the mirror
+  already had. Example: the mirror holds 50 and the batch total is 10. A
+  correction to 6 returned HTTP 200 but left the mirror at 46. The mirror never
+  converges on the batch truth.
+- **Why the delta also failed on legitimate input.** Example: the mirror holds
+  3 and the batch total is 10. A correction to 0 applied a delta of -10. The
+  update left `quantity = -7`, and the INV-21 CHECK `quantity >= 0` raised
+  HTTP 500 on a correct operator action.
+- **Out-of-range physical counts.** A physical count above
+  `stock_batches.quantity_original` now returns HTTP 400 with a clear message.
+  It does not reach the DB CHECK, which raised HTTP 500. The route writes
+  nothing in that case.
+- **Consequences.** Where a mirror and its batches disagree, the reconciliation
+  now shrinks or grows the mirror to the batch sum. The existing
+  `runStockCoverageReconciliation` startup repair uses the same rule: it trims
+  batch over-coverage and mints a RECON batch for under-coverage. The two agree.
+- **Unchanged.** `feature_batch_locations` stays default OFF, both stock stores
+  (`batch_stock_by_location` and `stock_balances`) still receive ungated writes,
+  and migration 127 is not renamed or touched.
+- **Reference.** PR #40 follow-up draft. Confirmed defects 1, 2 and 3.

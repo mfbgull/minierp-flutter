@@ -1389,6 +1389,18 @@ export function correctBatchReconciliation(req: AuthRequest, res: Response): Res
     if (!oldRow) {
       return res.status(404).json({ error: 'No stock at this batch and location' });
     }
+
+    // Reconciliation brings the batch down to the physical count. It can never
+    // make the batch hold more than it was created with
+    // (stock_batches CHECK quantity_remaining <= quantity_original), so reject
+    // a count above the original here instead of letting SQLite throw a 500.
+    const originalQty = db.prepare('SELECT quantity_original FROM stock_batches WHERE id = ?').get(batch_id) as { quantity_original: number };
+    if (newQty > originalQty.quantity_original + 0.0005) {
+      return res.status(400).json({
+        error: `new_quantity_physical (${newQty}) exceeds the batch quantity_original (${originalQty.quantity_original})`
+      });
+    }
+
     const oldQty = oldRow.quantity_physical;
     const diff = newQty - oldQty;
 
@@ -1407,40 +1419,26 @@ export function correctBatchReconciliation(req: AuthRequest, res: Response): Res
 
       db.prepare(`UPDATE stock_batches SET quantity_remaining = ? WHERE id = ?`).run(totalPhysical.total, batch_id);
 
-      // S-4 (issue #15): the bin and the batch master alone are not the
-      // on-hand record. stock_balances.quantity is the item/warehouse mirror
-      // that every other stock write maintains, so a correction must move it
-      // by the same delta or Invariant E fails. Do it in the same transaction
-      // as the bin write.
+      // S-4 (issue #15) + PR #40 follow-up: stock_balances.quantity is the
+      // item/warehouse mirror that every other stock write maintains. Every
+      // item is batch-tracked, so the batch truth IS the on-hand quantity:
+      // set the mirror to the sum of the batch rows of this item+warehouse
+      // instead of moving it by the correction delta. A delta update kept a
+      // stale residual (50 stayed 46) and made a drifted-low mirror drive
+      // quantity below zero, which the CHECK(quantity >= 0) rejected as a 500
+      // on a legitimate correction.
       const itemId = batch.item_id;
-      const balanceRow = db.prepare(`
-        SELECT quantity FROM stock_balances WHERE item_id = ? AND warehouse_id = ?
-      `).get(itemId, locRow.warehouse_id) as { quantity: number } | undefined;
-      if (balanceRow) {
-        // Existing mirror: move it by the same delta the correction applied,
-        // so any non-batch-tracked quantity on the same item/warehouse stays.
-        db.prepare(`
-          UPDATE stock_balances SET quantity = quantity + ?, last_updated = CURRENT_TIMESTAMP
-          WHERE item_id = ? AND warehouse_id = ?
-        `).run(diff, itemId, locRow.warehouse_id);
-      } else {
-        // No mirror yet: stock_balances.quantity is per item+WAREHOUSE, so seed
-        // it from the on-hand of EVERY batch of this item in this warehouse,
-        // not just the corrected one. Sum bin physical across the warehouse
-        // (the same shape syncStockBalancesExtension mirrors), floored at 0
-        // because CHECK(quantity >= 0) forbids a negative seed.
-        const warehouseOnHand = db.prepare(`
-          SELECT COALESCE(SUM(bsl.quantity_physical), 0) AS total
-          FROM batch_stock_by_location bsl
-          JOIN locations l ON bsl.location_id = l.id
-          JOIN stock_batches sb ON sb.id = bsl.batch_id
-          WHERE l.warehouse_id = ? AND sb.item_id = ?
-        `).get(locRow.warehouse_id, itemId) as { total: number };
-        db.prepare(`
-          INSERT INTO stock_balances (item_id, warehouse_id, quantity, last_updated)
-          VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-        `).run(itemId, locRow.warehouse_id, Math.max(warehouseOnHand.total, 0));
-      }
+      const batchTotal = db.prepare(`
+        SELECT COALESCE(SUM(quantity_remaining), 0) AS total
+        FROM stock_batches
+        WHERE item_id = ? AND warehouse_id = ?
+      `).get(itemId, locRow.warehouse_id) as { total: number };
+      db.prepare(`
+        INSERT INTO stock_balances (item_id, warehouse_id, quantity, last_updated)
+        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(item_id, warehouse_id) DO UPDATE SET
+          quantity = excluded.quantity, last_updated = CURRENT_TIMESTAMP
+      `).run(itemId, locRow.warehouse_id, batchTotal.total);
       StockMovementModel.syncStockBalancesExtension(itemId, locRow.warehouse_id, db);
       StockMovementModel.refreshItemStockMirror(itemId, db);
 

@@ -1961,3 +1961,40 @@ situation of every existing install at migration time.
   `stockBalancesExtensionParity.test.ts` on main pins the mirror against
   `quantity_reserved` (a reservation control included in the parity checks),
   and S-4 merged via PR #40 as `1f6a2905`.)*
+
+## S-4 follow-up — three confirmed reconciliation defects (2026-11-22)
+
+**Status: FIXED in a draft PR, not merged.** Base `origin/main`
+`96cb4ba58d87d9793b108f58cd6c7d92d1557020`. PR #40 stays merged and unchanged.
+The decision that makes this a defect is recorded in
+[`audit/DECISIONS.md`](DECISIONS.md) ("batch truth is the whole stock count").
+
+All three defects are in `POST /api/inventory/batch-reconciliation/correct`
+(`server/src/controllers/inventoryController.ts`). The old code moved
+`stock_balances.quantity` by the correction delta instead of setting it to the
+batch truth.
+
+| # | Setup | Old result | New result |
+|---|---|---|---|
+| 1 | mirror 50, batch total 10, reconcile to 6 | HTTP 200, mirror left at **46** | HTTP 200, batch total 6, mirror **6** |
+| 2 | mirror 3, batch total 10, reconcile to 0 | **HTTP 500** from `CHECK(quantity >= 0)` | HTTP 200, batch total 0, mirror **0** |
+| 3 | `quantity_original` 5, request 50 | **HTTP 500** from `CHECK(quantity_remaining <= quantity_original)` | **HTTP 400** with a clear message, no writes |
+
+- **Fix.** Inside the existing transaction, the mirror is now set to
+  `SUM(stock_batches.quantity_remaining)` for the item and warehouse, via an
+  upsert. A request above `quantity_original` returns HTTP 400 before any
+  write. Both stock stores keep their ungated writes, and
+  `feature_batch_locations` stays default OFF.
+- **Red-first evidence.** New route-level suite
+  `server/src/__tests__/batchReconcileBatchTruth.test.ts` (5 tests) fails on
+  unmodified `origin/main` (2 tests observed as "Expected 6, Received 46", 3 as
+  "Expected 200/400, Received 500"). It fails again with the fix reverted and
+  the tests kept, then passes with the fix reapplied.
+- **Regression suites.** `batchReconcileBalanceParity.test.ts` (7 tests) and
+  `inventoryOpeningAndReconcileCoverage.test.ts` (8 tests) pass. The existing
+  parity case "seeds a missing stock_balances row from ALL batches" now pins the
+  batch sum (12), which is the same number the old seed produced.
+- **Checks run.** `npx jest` on the three suites above (20 tests) and
+  `accountingInvariants.test.ts` (33 tests); `npm run typecheck` and
+  `npm run lint` in `server/`. Full suites and `scripts/check.sh` were **not**
+  run.
