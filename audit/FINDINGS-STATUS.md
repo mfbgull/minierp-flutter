@@ -2026,3 +2026,33 @@ batch truth.
   ("Mirror-only resets are not stock movements").
 - **Unchanged.** Batch-truth policy, migration 127, `feature_batch_locations`
   default OFF, and the ungated writes to both stock stores.
+
+### PR #52 review round 2 — reason, accounting, and the decimal guard (2026-11-22)
+
+**Status: FIXED in the same draft PR, not merged.** Approved by Gull.
+
+| # | Setup | Old result | New result |
+|---|---|---|---|
+| 5 | `reason` missing, blank or >500 chars | accepted silently | **HTTP 400**, zero writes |
+| 6 | 10 -> 6 with a reason | no reason stored, no GL | **-4** movement with the reason, **one** GL entry Dr `inventory_shrinkage` / Cr `inventory_asset` at batch cost |
+| 7 | mirror 50 / batch 10 -> 6 | mirror repaired, no GL | mirror **6**, movement **-4**, GL amount for the **-4 only** |
+| 8 | original 5, request 5.0001..5.0005 | **HTTP 500** from the CHECK | **HTTP 400**, zero writes |
+
+- **Contract.** `reason` (1-500 chars) is now required. `gl_account` is an
+  optional 7200-family loss account. The response returns `reason`,
+  `gl_amount` and `journal_entry_id`. Flutter's form must send `reason`.
+- **Accounting reuse.** The route posts through
+  `AccountingService.postLegacyStockEntry` with the same accounts the write-off
+  route uses. No new mapping was invented.
+- **Mirror stays out of GL.** The reseat of `stock_balances` writes neither a
+  movement nor a journal line, so the -40 style repair cannot become a loss.
+- **Guard.** Both guards now compare at the persisted DECIMAL(15,3) precision
+  instead of a `+ 0.0005` slack, which was wider than the 0.001 step.
+- **Red-first.** With the fixed controller reverted and the tests kept, 14 of
+  26 cases failed, including all five decimal-boundary cases and every
+  reason/GL case. With the fix, 26/26 pass.
+- **Suites.** `batchReconcileBatchTruth`, `batchReconcileBalanceParity`,
+  `inventoryOpeningAndReconcileCoverage` and `accountingInvariants`:
+  74/74 pass. Typecheck and lint are clean.
+- **Unchanged.** Batch-truth policy, migration 127 (no diff),
+  `feature_batch_locations` default `'0'`, ungated writes to both stock stores.

@@ -46,7 +46,7 @@ afterEach(() => {
 type Seed = { batchId: number; locationId: number; itemId: number; warehouseId: number };
 
 function seed(
-  options: { original?: number; bin?: number; balance?: number | null }
+  options: { original?: number; bin?: number; balance?: number | null; unitCost?: number }
 ): Seed {
   const original = options.original ?? 10;
   const bin = options.bin ?? original;
@@ -63,9 +63,16 @@ function seed(
       `INSERT INTO stock_batches
          (batch_no, item_id, warehouse_id, source_type, source_id,
           quantity_original, quantity_remaining, unit_cost, received_date)
-       VALUES (?, ?, ?, 'PURCHASE', 1, ?, ?, 2, '2026-01-01')`
+       VALUES (?, ?, ?, 'PURCHASE', 1, ?, ?, ?, '2026-01-01')`
     )
-    .run(`BTR-BATCH-${suffix}`, item.lastInsertRowid, warehouse.lastInsertRowid, original, bin);
+    .run(
+      `BTR-BATCH-${suffix}`,
+      item.lastInsertRowid,
+      warehouse.lastInsertRowid,
+      original,
+      bin,
+      options.unitCost ?? 2
+    );
   const location = db
     .prepare(
       `INSERT INTO locations (warehouse_id, location_code, location_name)
@@ -90,11 +97,14 @@ function seed(
   };
 }
 
+// A reason is now REQUIRED (Gull's product rule), so the helper supplies a
+// default one; callers override or omit it to test the validation itself.
+const REASON = 'Damaged in the warehouse';
 const correct = (body: Record<string, unknown>) =>
   request(app)
     .post('/api/inventory/batch-reconciliation/correct')
     .set('Cookie', cookie)
-    .send(body);
+    .send({ reason: REASON, ...body });
 
 function state(seedRow: Seed) {
   const bin = db
@@ -242,17 +252,16 @@ describe('Finding 1: a stale balance mirror converges to the batch truth', () =>
     // The movement carries ONLY the batch delta. If the stale-mirror repair
     // ever leaked into the movement it would read -44 (or -40), not -4.
     //
-    // shortcut: this route inserts its stock_movements row directly and never
-    // calls the GL posting path, so financial_value stays 0 and
-    // journal_entry_id stays NULL. That is pre-existing on origin/main (not
-    // introduced here) and posting GL for it is Gull's decision, so the test
-    // pins the current fact instead of an assumed value. Upgrade when the
-    // route starts posting through StockMovementModel.
-    expect(movements[0].financial_value).toBe(0);
-    expect(movements[0].journal_entry_id).toBeNull();
+    // PR #52 follow-up (Gull approved): the real -4 is now accounted through
+    // the existing write-off flow - Dr inventory_shrinkage / Cr
+    // inventory_asset at batch cost (4 x 2 = 8). The -40 mirror repair is data
+    // synchronization and is NOT part of this quantity or amount.
+    expect(movements[0].financial_value).toBe(8);
+    expect(movements[0].journal_entry_id).not.toBeNull();
 
-    // No journal entry was created for a mirror-only delta.
-    expect(glCounts()).toEqual(glBefore);
+    // The only journal entry is for the -4, and there is exactly one.
+    const glAfter = glCounts();
+    expect(glAfter.entries - glBefore.entries).toBe(1);
   });
 
   it('balance mirror follows the batch truth with the flag ON too', async () => {
@@ -391,5 +400,302 @@ describe('Finding 4: the guard uses the SUM across all bins, not one bin', () =>
     expect(res.status).toBe(200);
     expect(binQuantities(seedRow.batchId)).toEqual([3, 5]);
     expect(state(seedRow)).toEqual({ binTotal: 8, batchTotal: 8, balanceQty: 8 });
+  });
+});
+
+/**
+ * Reason and accounting for the REAL -4 batch change.
+ *
+ * Gull's clarification: the user states WHY the physical count changed (loss,
+ * damage, or another reason). The real -4 adjustment must retain that reason
+ * and follow the existing accounting flow. The -40 stale-mirror repair is data
+ * synchronization only: no loss, no journal entry.
+ *
+ * These cases EVIDENCE the route as it actually behaves. They do not invent an
+ * account mapping, and they do not add GL to the reconciliation route.
+ */
+describe('Reason and accounting on the REAL batch delta', () => {
+  it('10 -> 6 with a reason: ONE movement of -4 carrying the reason, and one balanced GL entry', async () => {
+    setFeatureEnabled(db, 'feature_batch_locations', false);
+    const seedRow = seed({ original: 10, bin: 10, balance: 10 });
+    const glBefore = glCounts();
+
+    const res = await correct({
+      batch_id: seedRow.batchId,
+      location_id: seedRow.locationId,
+      new_quantity_physical: 6,
+      reason: 'Damaged in the warehouse',
+    });
+
+    expect(res.status).toBe(200);
+    // The route reports what it accounted.
+    expect(res.body).toMatchObject({ diff: -4, reason: 'Damaged in the warehouse', gl_amount: 8 });
+
+    const movement = db
+      .prepare(
+        `SELECT id, quantity, remarks, journal_entry_id, financial_value, financial_posted
+         FROM stock_movements
+         WHERE item_id = ? AND reference_doctype = 'BATCH_RECONCILIATION'`
+      )
+      .get(seedRow.itemId) as {
+      id: number; quantity: number; remarks: string; journal_entry_id: number | null;
+      financial_value: number | null; financial_posted: number;
+    };
+
+    // Exactly ONE movement, for the real -4.
+    expect(countMovements(seedRow)).toBe(1);
+    expect(movement.quantity).toBe(-4);
+    // The reason is retained on the movement.
+    expect(movement.remarks).toContain('reason=Damaged in the warehouse');
+    // The real removal is accounted at batch cost (4 x unit_cost 2).
+    expect(movement.financial_value).toBe(8);
+    expect(movement.financial_posted).toBe(1);
+    expect(movement.journal_entry_id).not.toBeNull();
+
+    // One journal entry, Dr inventory_shrinkage / Cr inventory_asset, 8.00.
+    const glAfter = glCounts();
+    expect(glAfter.entries - glBefore.entries).toBe(1);
+    const entry = db
+      .prepare(
+        `SELECT amount, debit_account, credit_account, reference_type, description
+         FROM journal_entries WHERE id = ?`
+      )
+      .get(movement.journal_entry_id) as {
+      amount: number; debit_account: string; credit_account: string;
+      reference_type: string; description: string;
+    };
+    // 7200's text code. Reuses the write-off mapping; nothing new invented.
+    expect(entry.debit_account).toBe('inventory_shrinkage');
+    expect(entry.credit_account).toBe('inventory_asset');
+    expect(entry.amount).toBe(8);
+    expect(entry.reference_type).toBe('BATCH_RECONCILIATION');
+    expect(entry.description).toContain('Damaged in the warehouse');
+
+    // The batch truth and mirror still converge.
+    expect(state(seedRow)).toEqual({ binTotal: 6, batchTotal: 6, balanceQty: 6 });
+  });
+
+  it('mirror 50 / batch 10 -> 6 reseats the mirror to 6 and accounts ONLY the -4', async () => {
+    setFeatureEnabled(db, 'feature_batch_locations', false);
+    // The -40 mirror repair is data synchronization. It must not appear in the
+    // movement quantity, the GL amount, or any second journal entry.
+    const seedRow = seed({ original: 10, bin: 10, balance: 50 });
+    const glBefore = glCounts();
+
+    const res = await correct({
+      batch_id: seedRow.batchId,
+      location_id: seedRow.locationId,
+      new_quantity_physical: 6,
+      reason: 'Damaged in the warehouse',
+    });
+
+    expect(res.status).toBe(200);
+
+    // Mirror reseated to the batch truth, not repaired by 40.
+    expect(state(seedRow)).toEqual({ binTotal: 6, batchTotal: 6, balanceQty: 6 });
+
+    // ONE movement, quantity -4 (never -44 or -40).
+    expect(countMovements(seedRow)).toBe(1);
+    const movement = db
+      .prepare(
+        `SELECT quantity, journal_entry_id, financial_value FROM stock_movements
+         WHERE item_id = ? AND reference_doctype = 'BATCH_RECONCILIATION'`
+      )
+      .get(seedRow.itemId) as { quantity: number; journal_entry_id: number | null; financial_value: number };
+    expect(movement.quantity).toBe(-4);
+    expect(movement.financial_value).toBe(8);
+
+    // Exactly ONE journal entry, and its amount covers the -4 only.
+    const glAfter = glCounts();
+    expect(glAfter.entries - glBefore.entries).toBe(1);
+    // The single entry covers the -4 only: 4 x unit_cost 2 = 8. The 40-unit
+    // stale repair is absent, so the amount is not 88 or 80.
+    const entry = db
+      .prepare('SELECT amount FROM journal_entries WHERE id = ?')
+      .get(movement.journal_entry_id) as { amount: number };
+    expect(entry.amount).toBe(8);
+  });
+
+  it.each([
+    ['missing', undefined],
+    ['empty', ''],
+    ['blank', '   '],
+    ['too long', 'x'.repeat(501)],
+  ])('a %s reason returns 4xx with no writes at all', async (_label, reason) => {
+    setFeatureEnabled(db, 'feature_batch_locations', false);
+    const seedRow = seed({ original: 10, bin: 10, balance: 10 });
+    const before = state(seedRow);
+    const movementsBefore = countMovements(seedRow);
+    const glBefore = glCounts();
+
+    const res = await correct({
+      batch_id: seedRow.batchId,
+      location_id: seedRow.locationId,
+      new_quantity_physical: 6,
+      reason: reason as unknown as string,
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/reason/i);
+
+    // Nothing written: bins, batch, mirror, movements, GL.
+    expect(binQuantities(seedRow.batchId)).toEqual([10]);
+    expect(state(seedRow)).toEqual(before);
+    expect(countMovements(seedRow)).toBe(movementsBefore);
+    expect(glCounts()).toEqual(glBefore);
+  });
+
+  it('an invalid gl_account returns 4xx with no writes', async () => {
+    setFeatureEnabled(db, 'feature_batch_locations', false);
+    const seedRow = seed({ original: 10, bin: 10, balance: 10 });
+    const before = state(seedRow);
+    const glBefore = glCounts();
+
+    const res = await correct({
+      batch_id: seedRow.batchId,
+      location_id: seedRow.locationId,
+      new_quantity_physical: 6,
+      gl_account: '9999',
+    });
+
+    expect(res.status).toBe(400);
+    expect(state(seedRow)).toEqual(before);
+    expect(glCounts()).toEqual(glBefore);
+  });
+
+  it('the caller can pick a 7200-family loss account, e.g. 7202 damaged goods', async () => {
+    setFeatureEnabled(db, 'feature_batch_locations', false);
+    const seedRow = seed({ original: 10, bin: 10, balance: 10 });
+
+    const res = await correct({
+      batch_id: seedRow.batchId,
+      location_id: seedRow.locationId,
+      new_quantity_physical: 6,
+      reason: 'Damaged in the warehouse',
+      gl_account: '7202',
+    });
+
+    expect(res.status).toBe(200);
+    const movement = db
+      .prepare(`SELECT journal_entry_id FROM stock_movements
+                WHERE item_id = ? AND reference_doctype = 'BATCH_RECONCILIATION'`)
+      .get(seedRow.itemId) as { journal_entry_id: number };
+    const entry = db
+      .prepare('SELECT debit_account, amount FROM journal_entries WHERE id = ?')
+      .get(movement.journal_entry_id) as { debit_account: string; amount: number };
+    // 7202 carries the text code 'damaged_goods_loss' (existing chart).
+    expect(entry.debit_account).toBe('damaged_goods_loss');
+    expect(entry.amount).toBe(8);
+  });
+
+  it('an INCREASE posts no loss and no journal entry (only removals are a loss)', async () => {
+    setFeatureEnabled(db, 'feature_batch_locations', false);
+    // Bin 4, original 10: the count goes UP to 10, which is not a loss.
+    const seedRow = seed({ original: 10, bin: 4, balance: 4 });
+    const glBefore = glCounts();
+
+    const res = await correct({
+      batch_id: seedRow.batchId,
+      location_id: seedRow.locationId,
+      new_quantity_physical: 10,
+      reason: 'Found during recount',
+    });
+
+    expect(res.status).toBe(200);
+    const movement = db
+      .prepare(`SELECT quantity, journal_entry_id FROM stock_movements
+                WHERE item_id = ? AND reference_doctype = 'BATCH_RECONCILIATION'`)
+      .get(seedRow.itemId) as { quantity: number; journal_entry_id: number | null };
+    expect(movement.quantity).toBe(6);
+    expect(movement.journal_entry_id).toBeNull();
+    expect(glCounts()).toEqual(glBefore);
+  });
+
+  it('a zero-unit-cost batch removes stock with no journal entry (nothing to value)', async () => {
+    setFeatureEnabled(db, 'feature_batch_locations', false);
+    const seedRow = seed({ original: 10, bin: 10, balance: 10, unitCost: 0 });
+    const glBefore = glCounts();
+
+    const res = await correct({
+      batch_id: seedRow.batchId,
+      location_id: seedRow.locationId,
+      new_quantity_physical: 6,
+    });
+
+    expect(res.status).toBe(200);
+    const movement = db
+      .prepare(`SELECT quantity, financial_value, journal_entry_id FROM stock_movements
+                WHERE item_id = ? AND reference_doctype = 'BATCH_RECONCILIATION'`)
+      .get(seedRow.itemId) as { quantity: number; financial_value: number; journal_entry_id: number | null };
+    expect(movement.quantity).toBe(-4);
+    expect(movement.financial_value).toBe(0);
+    // postLegacyStockEntry rejects a zero amount, so nothing is posted.
+    expect(movement.journal_entry_id).toBeNull();
+    expect(glCounts()).toEqual(glBefore);
+  });
+});
+
+describe('Decimal boundary: guard agrees with the persisted CHECK', () => {
+  // Values ABOVE 5 that the old +0.0005 slack let through to the CHECK.
+  const justOver = [5.0001, 5.0002, 5.0003, 5.0004, 5.0005];
+
+  it.each(justOver)(
+    'original 5, request %s -> clear 4xx, never a database 500, and zero writes',
+    async (requested) => {
+      setFeatureEnabled(db, 'feature_batch_locations', false);
+      const seedRow = seed({ original: 5, bin: 5, balance: 5 });
+      const before = state(seedRow);
+      const movementsBefore = countMovements(seedRow);
+      const glBefore = glCounts();
+
+      const res = await correct({
+        batch_id: seedRow.batchId,
+        location_id: seedRow.locationId,
+        new_quantity_physical: requested,
+      });
+
+      // 4xx, not the CHECK's 500.
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/quantity_original|exceed/i);
+      // The message must not be a raw SQLite error.
+      expect(res.body.error).not.toMatch(/CHECK constraint/i);
+
+      // Nothing written anywhere.
+      expect(binQuantities(seedRow.batchId)).toEqual([5]);
+      expect(state(seedRow)).toEqual(before);
+      expect(state(seedRow)).toEqual({ binTotal: 5, batchTotal: 5, balanceQty: 5 });
+      expect(countMovements(seedRow)).toBe(movementsBefore);
+      expect(glCounts()).toEqual(glBefore);
+    }
+  );
+
+  it('a request that equals the original exactly still succeeds (5 of 5)', async () => {
+    setFeatureEnabled(db, 'feature_batch_locations', false);
+    const seedRow = seed({ original: 5, bin: 5, balance: 5 });
+
+    const res = await correct({
+      batch_id: seedRow.batchId,
+      location_id: seedRow.locationId,
+      new_quantity_physical: 5,
+    });
+
+    expect(res.status).toBe(200);
+    expect(state(seedRow)).toEqual({ binTotal: 5, batchTotal: 5, balanceQty: 5 });
+  });
+
+  it('3-decimal rounding residue below the original is still accepted (5.000 -> 5)', async () => {
+    setFeatureEnabled(db, 'feature_batch_locations', false);
+    // 5.0000 arrives as 5. A value within the persisted precision must not be
+    // rejected, or the fix would break legitimate 3-decimal counts.
+    const seedRow = seed({ original: 5, bin: 5, balance: 5 });
+
+    const res = await correct({
+      batch_id: seedRow.batchId,
+      location_id: seedRow.locationId,
+      new_quantity_physical: 5.0,
+    });
+
+    expect(res.status).toBe(200);
+    expect(state(seedRow)).toEqual({ binTotal: 5, batchTotal: 5, balanceQty: 5 });
   });
 });

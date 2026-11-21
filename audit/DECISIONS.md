@@ -1923,3 +1923,62 @@ is counter repair, and **not** a stock movement.
   open.
 - **Do not change without Gull.** This policy is not to be altered without an
   explicit decision from Gull.
+
+### A real count change needs a reason and follows the write-off accounting (2026-11-22)
+
+**Decided by Gull.** When a reconciliation changes the real batch quantity, the
+user states WHY. The change is a loss (or a gain), not a silent edit.
+
+**Request contract** — `POST /api/inventory/batch-reconciliation/correct`:
+
+| Field | Required | Meaning |
+|---|---|---|
+| `batch_id` | yes | Batch to correct. |
+| `location_id` | yes | Bin in the batch's own warehouse. |
+| `new_quantity_physical` | yes | Counted quantity. Must not exceed `quantity_original`. |
+| `reason` | **yes** | 1–500 characters. Stored on the movement and the journal line. |
+| `gl_account` | no | A 7200-family loss account. Default `7200`. |
+
+**Response** now also returns `reason`, `gl_amount` and `journal_entry_id`.
+
+**Accounting.** The route reuses the existing write-off flow. It does not
+introduce a new mapping:
+
+- A **removal** posts Dr `<7200 family>` / Cr `inventory_asset`, at the batch's
+  own `unit_cost`, for the absolute real delta. `7200` carries the text code
+  `inventory_shrinkage`; `7202` carries `damaged_goods_loss`.
+- An **addition**, a zero delta, or a zero unit cost posts nothing. There is no
+  loss to value.
+- The movement keeps `movement_type = 'ADJUSTMENT'`, gains
+  `reference_doctype = 'BATCH_RECONCILIATION'`, and records
+  `[BATCH_RECONCILIATION] reason=… batch=… old -> new`.
+
+**The stale mirror is never a loss.** The mirror reseat is data
+synchronization. With mirror 50, batch 10 and a correction to 6:
+
+- the movement quantity is **-4**, never -44 or -40;
+- the journal amount is `4 × unit_cost`, never `44 × unit_cost`;
+- exactly **one** journal entry is written.
+
+**Validation.** A missing, empty, blank or over-500-character `reason` returns
+HTTP 400. So does an unknown or non-7200 `gl_account`. Both write nothing. The
+precision guard (below) still runs first.
+
+**Do not change without Gull.** This rule is not to be altered without an
+explicit decision from Gull.
+
+### Guard tolerance follows the persisted precision (2026-11-22)
+
+- **Problem.** The guard used a fixed `+ 0.0005` slack. That is wider than the
+  smallest difference the engine can tell apart: the columns are
+  `DECIMAL(15,3)`, so the step is `0.001`.
+- **Impact.** `quantity_original = 5` accepted a request of 5.0001 through
+  5.0005. The sum then reached the batch master and the CHECK
+  `quantity_remaining <= quantity_original` raised HTTP 500. Requests of 5.0009
+  and above were already rejected with 400.
+- **Fix.** Both the per-bin guard and the summed guard now compare a
+  ceiling at the persisted precision (`ceilQty`, built on `qtyEpsilon(3)`).
+  Any value the CHECK would reject is rejected as HTTP 400 before writes.
+- **Not a loosening.** Exact values still pass: `5 → 5`, and `4.9999 → 5`
+  (a count below the original). The guard now agrees with the database instead
+  of approximating it.
