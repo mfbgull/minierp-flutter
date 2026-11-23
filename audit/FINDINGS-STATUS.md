@@ -1,11 +1,49 @@
 # Audit findings status
 
+## Current state — 2026-11-23
+
+**Main.** `main` local is ahead of `origin/main` by one commit (`021f333`, a
+chmod-only commit: `run.sh` `100644` → `100755`). Everything else on main is
+pushed. Last pushed main is `96cb4ba`.
+
+**Open PRs.** Two, both drafts, both `MERGEABLE` against `main`:
+
+- `#51` `docs/pre134-void-draw-limitations` — docs-only. PR-event CI green
+  (server, flutter, fallow all pass). The push-event fallow failure is the known
+  base-ref artifact class (the force-push removed the old head, so the changed-file
+  set cannot be computed). Not a content verdict.
+- `#52` `fix/batch-reconciliation-parity` — **CI was failing on `fallow`.** The
+  branch grew `correctBatchReconciliation` to 222 lines / 24 cyclomatic / 24
+  cognitive, so the file's `complexity_high` count went 1 → 2 and the gate saw one
+  new finding (`createStockMovement` at 83 lines is the inherited one the gate
+  excludes). **Fixed locally** on `pr52-complexity` (`cc47df8`): the function is
+  split into `parseBatchReconcileRequest`, `loadBatchReconcileTargets`,
+  `reseatBatchMirrors`, and `postBatchReconcileLoss`. The handler keeps its exact
+  signature, status codes, and error strings (checked byte-identical).
+  `correctBatchReconciliation` is 222 → 34 lines and off the high-complexity list;
+  `fallow audit --base <merge-base>` now exits 0. Not yet pushed.
+
+**Superseding note on the 2026-11-18 correction below.** PR #5 is **merged**
+(`d8bf787`, 2026-11-21) — it is not open. No PR from this cycle remains open; #51
+and #52 are new work opened after it.
+
+**Commits on main since the ledger was last touched** (`d8bf787`):
+`c923689` (S-6, PR #48), `b25b4f4` (#49), `96cb4ba` (#50), `021f333` (chmod).
+The S-6 and owner-withdrawal stock fixes are therefore on main and recorded here
+for the first time.
+
+**Still open decisions.** Two `OPEN-DECISION` items in `audit/DECISIONS.md`
+await Gull: the F-3 dating choice (Option A same-date reversal vs Option B
+current-date) and F-1 (the two-step write-off product question). F-3 stays parked
+until the dating call is made.
+
 ## Review cycle state — 2026-11-16 (coordinator record)
 
 *(2026-11-18 correction: this 2026-11-16 record is superseded. Main is now
 `1f6a2905` (post PR #40). D21 merged via PR #3; the UX parks were cleared by
 merged PR #4 (`d1075cd2`) and F-3 by merged PR #9 (`29457260`) — no findings
-remain parked (see "Finding-tagged tests" below). Only PR #5 remains open.
+remain parked (see "Finding-tagged tests" below).
+*(2026-11-23: PR #5 merged as `d8bf787`; no cycle PR remains open.)*
 The text below is kept as a dated historical record.)*
 
 This section records the state of the GLM/PI review cycle. It is a status note,
@@ -1947,7 +1985,8 @@ situation of every existing install at migration time.
   the header comment updated in the same edit; PI must not edit it.
   PR5 remains LAST in merge order; PR10/S-4 deferred.
   *(2026-11-18 correction: superseded — PR #10 (S-3) merged as `d3a35510` and
-  S-4 merged via PR #40 as `1f6a2905`; only PR #5 remains open.)*
+  S-4 merged via PR #40 as `1f6a2905`; only PR #5 remained open. PR #5 itself
+  merged as `d8bf787` on 2026-11-21.)*
 
 - **PR9 COMPLETION (2026-11-18):** the PR9 assignment above is CLOSED. The
   F-3 fix line (`fix/f3-refund-void-original-date` @ `b209303a` — fix + the
