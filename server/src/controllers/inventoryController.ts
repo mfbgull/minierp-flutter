@@ -1358,110 +1358,190 @@ export function getBatchReconciliation(req: AuthRequest, res: Response): Respons
   }
 }
 
-export function correctBatchReconciliation(req: AuthRequest, res: Response): Response | void {
-  try {
-    const { batch_id, location_id, new_quantity_physical, reason, gl_account } = req.body as {
-      batch_id?: number; location_id?: number; new_quantity_physical?: number;
-      reason?: unknown; gl_account?: unknown;
+/** Inputs the correction needs after validation. `error` is set instead of
+ *  throwing, so the caller can answer the exact status the guard picked. */
+type BatchReconcileInput = {
+  batch_id: number;
+  location_id: number;
+  newQty: number;
+  reasonText: string;
+  requestedAccount: string;
+  oldQty: number;
+  diff: number;
+  unitCost: number;
+  value: number;
+  lossTextCode: string;
+  warehouseId: number;
+  itemId: number;
+  originalLimit: number;
+  movementDate: string;
+  userId: number;
+};
+
+type BatchReconcileParse =
+  | { ok: true; input: BatchReconcileInput }
+  | { ok: false; status: number; message: string };
+
+/** The 7200 loss-account check shared by validation and the write-off route.
+ *  Returns an error message, or null when the account is acceptable. */
+function lossAccountError(requestedAccount: string): string | null {
+  if (requestedAccount.length === 0) return null;
+  const account = db.prepare(`
+    SELECT c.id, c.code FROM chart_of_accounts c
+    WHERE c.code = ? AND c.type = 'expense'
+      AND (c.code = '7200' OR c.parent_id = (SELECT id FROM chart_of_accounts WHERE code = '7200'))
+  `).get(requestedAccount) as { id: number; code: string } | undefined;
+  return account ? null : `gl_account ${requestedAccount} is not a valid loss account under 7200`;
+}
+
+/** Resolve the loss text_code for the posting: the caller's 7200-child when it
+ *  names one, else the write-off family parent. */
+function resolveLossTextCode(requestedAccount: string): string {
+  if (requestedAccount.length === 0) return 'inventory_shrinkage';
+  const acct = db.prepare('SELECT text_code FROM chart_of_accounts WHERE code = ?').get(requestedAccount) as { text_code: string | null } | undefined;
+  return acct?.text_code ?? 'inventory_shrinkage';
+}
+
+/** Load the location, the batch, and the bin row, and enforce that they agree.
+ *  Every guard here is a read-only rejection; no write happens before it. */
+function loadBatchReconcileTargets(batch_id: number, location_id: number, newQty: number):
+  | { ok: true; warehouseId: number; itemId: number; oldQty: number; originalLimit: number }
+  | { ok: false; status: number; message: string } {
+  const locRow = db.prepare(`SELECT warehouse_id FROM locations WHERE id = ?`).get(location_id) as { warehouse_id: number } | undefined;
+  if (!locRow) {
+    return { ok: false, status: 404, message: 'Location not found' };
+  }
+
+  const batch = db.prepare(`SELECT item_id, warehouse_id FROM stock_batches WHERE id = ?`).get(batch_id) as { item_id: number; warehouse_id: number } | undefined;
+  if (!batch) {
+    return { ok: false, status: 404, message: 'Batch not found' };
+  }
+
+  // S-4 review: the location must belong to the batch's own warehouse.
+  // Otherwise the correction would write a movement and a stock_balances
+  // row in the wrong warehouse.
+  if (locRow.warehouse_id !== batch.warehouse_id) {
+    return { ok: false, status: 400, message: 'Location does not belong to the batch warehouse' };
+  }
+
+  // Re-implement with proper old value capture
+  const oldRow = db.prepare(`
+    SELECT quantity_physical FROM batch_stock_by_location WHERE batch_id = ? AND location_id = ?
+  `).get(batch_id, location_id) as { quantity_physical: number } | undefined;
+  // S-4 review: a correction adjusts an existing bin row. If none exists the
+  // UPDATE would match zero rows and the batch would not move, while the old
+  // code still pushed `newQty - 0` into stock_balances (phantom stock).
+  // Reject instead of inventing a row.
+  if (!oldRow) {
+    return { ok: false, status: 404, message: 'No stock at this batch and location' };
+  }
+
+  // Reconciliation brings the batch down to the physical count. It can never
+  // make the batch hold more than it was created with
+  // (stock_batches CHECK quantity_remaining <= quantity_original), so reject
+  // a count above the original here instead of letting SQLite throw a 500.
+  // Compare at the persisted precision (DECIMAL(15,3)), not with a fixed
+  // slack. A `+ 0.0005` tolerance is wider than the smallest value REAL can
+  // tell apart (qtyEpsilon(3) = 0.001), so 5.0001..5.0005 passed this guard
+  // and then tripped the CHECK as an HTTP 500. Ceil the REQUEST to the
+  // persisted precision so any value the CHECK would reject is rejected here
+  // (roundQty would round 5.0001 back down to 5 and let it through).
+  const originalQty = db.prepare('SELECT quantity_original FROM stock_batches WHERE id = ?').get(batch_id) as { quantity_original: number };
+  const originalLimit = roundQty(originalQty.quantity_original);
+  if (ceilQty(newQty) > originalLimit) {
+    return {
+      ok: false,
+      status: 400,
+      message: `new_quantity_physical (${newQty}) exceeds the batch quantity_original (${originalLimit})`
     };
-    const userId = req.user!.id;
+  }
 
-    if (!batch_id || location_id === undefined || new_quantity_physical === undefined) {
-      return res.status(400).json({ error: 'batch_id, location_id, and new_quantity_physical are required' });
+  return { ok: true, warehouseId: locRow.warehouse_id, itemId: batch.item_id, oldQty: oldRow.quantity_physical, originalLimit };
+}
+
+/** The batch's own unit cost, the same source the write-off flow uses. */
+function batchUnitCost(batch_id: number): number {
+  const row = db.prepare('SELECT unit_cost FROM stock_batches WHERE id = ?').get(batch_id) as { unit_cost: number | null };
+  return Number(row.unit_cost ?? 0);
+}
+
+/** Validate the request and load every row the correction needs.
+ *  Pure reads + policy checks; no writes. Split out of the controller so the
+ *  HTTP handler stays thin (fallow complexity gate, PR #52). */
+function parseBatchReconcileRequest(
+  body: { batch_id?: number; location_id?: number; new_quantity_physical?: number; reason?: unknown; gl_account?: unknown },
+  userId: number
+): BatchReconcileParse {
+  const { batch_id, location_id, new_quantity_physical, reason, gl_account } = body;
+
+  if (!batch_id || location_id === undefined || new_quantity_physical === undefined) {
+    return { ok: false, status: 400, message: 'batch_id, location_id, and new_quantity_physical are required' };
+  }
+
+  // Gull's product rule: a real count change must state WHY (loss, damage, or
+  // another reason). The real delta follows the existing inventory write-off
+  // loss accounting; the mirror-only stale repair never becomes a loss.
+  const reasonText = typeof reason === 'string' ? reason.trim() : '';
+  if (reasonText.length === 0 || reasonText.length > 500) {
+    return { ok: false, status: 400, message: 'reason is required (1-500 characters)' };
+  }
+  // Same account set and 7200 hierarchy check as the write-off route, so the
+  // reconciliation reuses the existing mapping instead of inventing one.
+  const requestedAccount = typeof gl_account === 'string' ? gl_account.trim() : '';
+  const accountError = lossAccountError(requestedAccount);
+  if (accountError) {
+    return { ok: false, status: 400, message: accountError };
+  }
+
+  const newQty = parseFloat(String(new_quantity_physical));
+  if (!Number.isFinite(newQty) || newQty < 0) {
+    return { ok: false, status: 400, message: 'new_quantity_physical must be a non-negative number' };
+  }
+
+  const targets = loadBatchReconcileTargets(batch_id, location_id, newQty);
+  if (!targets.ok) {
+    return targets;
+  }
+  const { warehouseId, itemId, oldQty, originalLimit } = targets;
+  const diff = newQty - oldQty;
+
+  // Money for the REAL delta only, at the batch's own unit cost (the same
+  // source the write-off flow uses). Value is rounded to currency precision.
+  const unitCost = batchUnitCost(batch_id);
+  const value = diff < 0 ? roundCurrency(Math.abs(diff) * unitCost) : 0;
+  const movementDate = new Date().toISOString().split('T')[0];
+
+  return {
+    ok: true,
+    input: {
+      batch_id,
+      location_id,
+      newQty,
+      reasonText,
+      requestedAccount,
+      oldQty,
+      diff,
+      unitCost,
+      value,
+      lossTextCode: resolveLossTextCode(requestedAccount),
+      warehouseId,
+      itemId,
+      originalLimit,
+      movementDate,
+      userId
     }
+  };
+}
 
-    // Gull's product rule: a real count change must state WHY (loss, damage, or
-    // another reason). The real delta follows the existing inventory write-off
-    // loss accounting; the mirror-only stale repair never becomes a loss.
-    const reasonText = typeof reason === 'string' ? reason.trim() : '';
-    if (reasonText.length === 0 || reasonText.length > 500) {
-      return res.status(400).json({ error: 'reason is required (1-500 characters)' });
-    }
-    // Same account set and 7200 hierarchy check as the write-off route, so the
-    // reconciliation reuses the existing mapping instead of inventing one.
-    const requestedAccount = typeof gl_account === 'string' ? gl_account.trim() : '';
-    if (requestedAccount.length > 0) {
-      const account = db.prepare(`
-        SELECT c.id, c.code FROM chart_of_accounts c
-        WHERE c.code = ? AND c.type = 'expense'
-          AND (c.code = '7200' OR c.parent_id = (SELECT id FROM chart_of_accounts WHERE code = '7200'))
-      `).get(requestedAccount) as { id: number; code: string } | undefined;
-      if (!account) {
-        return res.status(400).json({ error: `gl_account ${requestedAccount} is not a valid loss account under 7200` });
-      }
-    }
+/** Apply every write for the correction in one transaction. Returns the
+ *  journal entry id when the delta posted a loss, else null. */
+function applyBatchReconcileTransaction(input: BatchReconcileInput): number | null {
+  const {
+    batch_id, location_id, newQty, reasonText, oldQty, diff, unitCost, value,
+    lossTextCode, warehouseId, itemId, originalLimit, movementDate, userId
+  } = input;
 
-    const locRow = db.prepare(`SELECT warehouse_id FROM locations WHERE id = ?`).get(location_id) as { warehouse_id: number } | undefined;
-    if (!locRow) {
-      return res.status(404).json({ error: 'Location not found' });
-    }
-
-    const batch = db.prepare(`SELECT item_id, warehouse_id FROM stock_batches WHERE id = ?`).get(batch_id) as { item_id: number; warehouse_id: number } | undefined;
-    if (!batch) {
-      return res.status(404).json({ error: 'Batch not found' });
-    }
-
-    // S-4 review: the location must belong to the batch's own warehouse.
-    // Otherwise the correction would write a movement and a stock_balances
-    // row in the wrong warehouse.
-    if (locRow.warehouse_id !== batch.warehouse_id) {
-      return res.status(400).json({ error: 'Location does not belong to the batch warehouse' });
-    }
-
-    const newQty = parseFloat(String(new_quantity_physical));
-    if (!Number.isFinite(newQty) || newQty < 0) {
-      return res.status(400).json({ error: 'new_quantity_physical must be a non-negative number' });
-    }
-
-    // Re-implement with proper old value capture
-    const oldRow = db.prepare(`
-      SELECT quantity_physical FROM batch_stock_by_location WHERE batch_id = ? AND location_id = ?
-    `).get(batch_id, location_id) as { quantity_physical: number } | undefined;
-    // S-4 review: a correction adjusts an existing bin row. If none exists the
-    // UPDATE would match zero rows and the batch would not move, while the old
-    // code still pushed `newQty - 0` into stock_balances (phantom stock).
-    // Reject instead of inventing a row.
-    if (!oldRow) {
-      return res.status(404).json({ error: 'No stock at this batch and location' });
-    }
-
-    // Reconciliation brings the batch down to the physical count. It can never
-    // make the batch hold more than it was created with
-    // (stock_batches CHECK quantity_remaining <= quantity_original), so reject
-    // a count above the original here instead of letting SQLite throw a 500.
-    // Compare at the persisted precision (DECIMAL(15,3)), not with a fixed
-    // slack. A `+ 0.0005` tolerance is wider than the smallest value REAL can
-    // tell apart (qtyEpsilon(3) = 0.001), so 5.0001..5.0005 passed this guard
-    // and then tripped the CHECK as an HTTP 500. Ceil the REQUEST to the
-    // persisted precision so any value the CHECK would reject is rejected here
-    // (roundQty would round 5.0001 back down to 5 and let it through).
-    const originalQty = db.prepare('SELECT quantity_original FROM stock_batches WHERE id = ?').get(batch_id) as { quantity_original: number };
-    const originalLimit = roundQty(originalQty.quantity_original);
-    if (ceilQty(newQty) > originalLimit) {
-      return res.status(400).json({
-        error: `new_quantity_physical (${newQty}) exceeds the batch quantity_original (${originalLimit})`
-      });
-    }
-
-    const oldQty = oldRow.quantity_physical;
-    const diff = newQty - oldQty;
-
-    // Money for the REAL delta only, at the batch's own unit cost (the same
-    // source the write-off flow uses). Value is rounded to currency precision.
-    const batchCost = db.prepare('SELECT unit_cost FROM stock_batches WHERE id = ?').get(batch_id) as { unit_cost: number | null };
-    const unitCost = Number(batchCost.unit_cost ?? 0);
-    const value = diff < 0 ? roundCurrency(Math.abs(diff) * unitCost) : 0;
-    // Default to 7200 (inventory_shrinkage), the parent of the write-off loss
-    // family, unless the caller names a specific 7200-child account.
-    let lossTextCode = 'inventory_shrinkage';
-    if (requestedAccount.length > 0) {
-      const acct = db.prepare('SELECT text_code FROM chart_of_accounts WHERE code = ?').get(requestedAccount) as { text_code: string | null } | undefined;
-      if (acct?.text_code) lossTextCode = acct.text_code;
-    }
-    const movementDate = new Date().toISOString().split('T')[0];
-    let journalEntryIdOut: number | null = null;
-
-    db.transaction(() => {
+  return db.transaction(() => {
       db.prepare(`
         UPDATE batch_stock_by_location
         SET quantity_physical = ?, quantity_available = MAX(0, ? - quantity_reserved), updated_at = CURRENT_TIMESTAMP
@@ -1486,28 +1566,7 @@ export function correctBatchReconciliation(req: AuthRequest, res: Response): Res
 
       db.prepare(`UPDATE stock_batches SET quantity_remaining = ? WHERE id = ?`).run(totalPhysical.total, batch_id);
 
-      // S-4 (issue #15) + PR #40 follow-up: stock_balances.quantity is the
-      // item/warehouse mirror that every other stock write maintains. Every
-      // item is batch-tracked, so the batch truth IS the on-hand quantity:
-      // set the mirror to the sum of the batch rows of this item+warehouse
-      // instead of moving it by the correction delta. A delta update kept a
-      // stale residual (50 stayed 46) and made a drifted-low mirror drive
-      // quantity below zero, which the CHECK(quantity >= 0) rejected as a 500
-      // on a legitimate correction.
-      const itemId = batch.item_id;
-      const batchTotal = db.prepare(`
-        SELECT COALESCE(SUM(quantity_remaining), 0) AS total
-        FROM stock_batches
-        WHERE item_id = ? AND warehouse_id = ?
-      `).get(itemId, locRow.warehouse_id) as { total: number };
-      db.prepare(`
-        INSERT INTO stock_balances (item_id, warehouse_id, quantity, last_updated)
-        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-        ON CONFLICT(item_id, warehouse_id) DO UPDATE SET
-          quantity = excluded.quantity, last_updated = CURRENT_TIMESTAMP
-      `).run(itemId, locRow.warehouse_id, batchTotal.total);
-      StockMovementModel.syncStockBalancesExtension(itemId, locRow.warehouse_id, db);
-      StockMovementModel.refreshItemStockMirror(itemId, db);
+      reseatBatchMirrors(itemId, warehouseId);
 
       const movementNo = StockMovementModel.generateMovementNo(db);
       // The movement records the REAL batch delta (diff) and the operator's
@@ -1523,7 +1582,7 @@ export function correctBatchReconciliation(req: AuthRequest, res: Response): Res
       `).run(
         movementNo,
         itemId,
-        locRow.warehouse_id,
+        warehouseId,
         diff,
         // unit_cost comes from the batch itself, matching the write-off flow.
         unitCost,
@@ -1534,41 +1593,94 @@ export function correctBatchReconciliation(req: AuthRequest, res: Response): Res
         batch_id
       );
 
-      // Existing accounting flow: a REMOVAL posts Dr <loss 7200-family> /
-      // Cr inventory_asset at batch cost, exactly as the write-off route does.
-      // An addition is not a loss and posts nothing.
-      if (diff < 0 && value > 0) {
-        const journalEntryId = AccountingService.postLegacyStockEntry(db, {
-          referenceType: 'BATCH_RECONCILIATION',
-          referenceId: Number(movementInfo.lastInsertRowid),
-          entryDate: movementDate,
-          description:
-            `Stock removal: ${Math.abs(diff)} units @ ${unitCost} ` +
-            `(batch reconciliation ${batch_id}) — ${reasonText}`,
-          debitTextCode: lossTextCode,
-          creditTextCode: 'inventory_asset',
-          amount: value,
-          createdBy: userId
-        });
-        db.prepare(`
-          UPDATE stock_movements
-          SET financial_value = ?, financial_posted = TRUE, journal_entry_id = ?
-          WHERE id = ?
-        `).run(value, journalEntryId, Number(movementInfo.lastInsertRowid));
-        journalEntryIdOut = journalEntryId;
-      }
-    })();
+      return postBatchReconcileLoss({
+        diff, value, unitCost, lossTextCode, movementId: Number(movementInfo.lastInsertRowid),
+        batch_id, movementDate, reasonText, userId
+      });
+  })();
+}
+
+/** Set the item/warehouse stock mirrors from the batch truth, not from the
+ *  correction delta.
+ *
+ *  S-4 (issue #15) + PR #40 follow-up: stock_balances.quantity is the
+ *  item/warehouse mirror that every other stock write maintains. Every item is
+ *  batch-tracked, so the batch truth IS the on-hand quantity: set the mirror to
+ *  the sum of the batch rows of this item+warehouse instead of moving it by the
+ *  correction delta. A delta update kept a stale residual (50 stayed 46) and
+ *  made a drifted-low mirror drive quantity below zero, which the
+ *  CHECK(quantity >= 0) rejected as a 500 on a legitimate correction. */
+function reseatBatchMirrors(itemId: number, warehouseId: number): void {
+  const batchTotal = db.prepare(`
+    SELECT COALESCE(SUM(quantity_remaining), 0) AS total
+    FROM stock_batches
+    WHERE item_id = ? AND warehouse_id = ?
+  `).get(itemId, warehouseId) as { total: number };
+  db.prepare(`
+    INSERT INTO stock_balances (item_id, warehouse_id, quantity, last_updated)
+    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(item_id, warehouse_id) DO UPDATE SET
+      quantity = excluded.quantity, last_updated = CURRENT_TIMESTAMP
+  `).run(itemId, warehouseId, batchTotal.total);
+  StockMovementModel.syncStockBalancesExtension(itemId, warehouseId, db);
+  StockMovementModel.refreshItemStockMirror(itemId, db);
+}
+
+/** Post the loss journal for a removal and flag the movement as posted.
+ *
+ *  Existing accounting flow: a REMOVAL posts Dr <loss 7200-family> /
+ *  Cr inventory_asset at batch cost, exactly as the write-off route does.
+ *  An addition is not a loss and posts nothing, so this returns null. */
+function postBatchReconcileLoss(args: {
+  diff: number; value: number; unitCost: number; lossTextCode: string; movementId: number;
+  batch_id: number; movementDate: string; reasonText: string; userId: number;
+}): number | null {
+  const { diff, value, unitCost, lossTextCode, movementId, batch_id, movementDate, reasonText, userId } = args;
+  if (diff >= 0 || value <= 0) return null;
+
+  const journalEntryId = AccountingService.postLegacyStockEntry(db, {
+    referenceType: 'BATCH_RECONCILIATION',
+    referenceId: movementId,
+    entryDate: movementDate,
+    description:
+      `Stock removal: ${Math.abs(diff)} units @ ${unitCost} ` +
+      `(batch reconciliation ${batch_id}) — ${reasonText}`,
+    debitTextCode: lossTextCode,
+    creditTextCode: 'inventory_asset',
+    amount: value,
+    createdBy: userId
+  });
+  db.prepare(`
+    UPDATE stock_movements
+    SET financial_value = ?, financial_posted = TRUE, journal_entry_id = ?
+    WHERE id = ?
+  `).run(value, journalEntryId, movementId);
+  return journalEntryId;
+}
+
+export function correctBatchReconciliation(req: AuthRequest, res: Response): Response | void {
+  try {
+    const parsed = parseBatchReconcileRequest(
+      req.body as { batch_id?: number; location_id?: number; new_quantity_physical?: number; reason?: unknown; gl_account?: unknown },
+      req.user!.id
+    );
+    if (!parsed.ok) {
+      return res.status(parsed.status).json({ error: parsed.message });
+    }
+    const { input } = parsed;
+
+    const journalEntryId = applyBatchReconcileTransaction(input);
 
     return res.json({
       success: true,
-      batch_id,
-      location_id,
-      old_quantity: oldQty,
-      new_quantity: newQty,
-      diff,
-      reason: reasonText,
-      gl_amount: value,
-      journal_entry_id: journalEntryIdOut
+      batch_id: input.batch_id,
+      location_id: input.location_id,
+      old_quantity: input.oldQty,
+      new_quantity: input.newQty,
+      diff: input.diff,
+      reason: input.reasonText,
+      gl_amount: input.value,
+      journal_entry_id: journalEntryId
     });
   } catch (error: unknown) {
     // The summed guard runs inside the transaction, so the throw rolls back
