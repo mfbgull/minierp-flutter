@@ -185,20 +185,26 @@ function getLiveConsumption(db: Database.Database, withdrawalId: number): Consum
  * History fallback for documents posted before the consumption ledger: one
  * restore lot per outbound movement row, with no recorded bins.
  *
- * KNOWN LIMITATION (pre-134 documents only). An edit made before 134 left the
- * superseded outbound rows behind and recorded no new lot, so this fallback
- * cannot tell a live line from a superseded one. For those documents:
+ * KNOWN LIMITATION (pre-134 documents only). This fallback reads the outbound
+ * `stock_movements` rows and NOTHING else, so it has two defects:
  *
- * - void is correct: it reverses the summed outbound rows, which is what was
- *   actually consumed.
- * - a FURTHER edit after the upgrade reverses that same sum while the batch
- *   holds only the active amount, so it can fail the INV-21 CHECK and return
- *   500, or succeed on a batch with enough headroom and restore too much.
+ * 1. A document EDITED before 134 keeps its superseded outbound rows and has
+ *    no recorded lot, so it reverses the SUMMED rows. Void then tries to add
+ *    back more than the batch holds (4 superseded + 5 live = 9 into a batch of
+ *    10 holding 5). INV-21 `quantity_remaining <= quantity_original` rejects
+ *    it and the void returns 500. A further edit after the upgrade fails the
+ *    same way, or over-restores where the batch has headroom.
+ * 2. A document posted after 133 but before 134 has bin draw rows with a NULL
+ *    consumption_id. This fallback produces lots with no bins, so it never
+ *    reads those rows and restores to the warehouse DEFAULT bin instead of the
+ *    named bin that lost the units. Totals stay right, so the void returns 200
+ *    with stock in the wrong bin.
  *
- * Migration 134 does not backfill (the active lines are not recoverable) and
- * there is no runtime repair. Accepted 2026-11-21 because no production
+ * Both are accepted, not repaired: migration 134 does not backfill (the active
+ * lines are not recoverable) and there is no runtime repair. No production
  * deployment predates 134 and the dev database is disposable test data.
- * See audit/DECISIONS.md, "Owner-withdrawal pre-134 documents".
+ * Documents created or edited under 134 always have a lot, so neither defect
+ * applies to them. See audit/DECISIONS.md, "Owner-withdrawal pre-134".
  */
 function getConsumptionFromHistory(db: Database.Database, withdrawalNo: string): ConsumptionLot[] {
   return (db.prepare(`
@@ -270,14 +276,17 @@ function restoreConsumption(
   userId: number
 ): void {
   // Both absent = a document posted before migration 134. Its recorded state
-  // has no lot and no draw, so only lines never edited before 134 survive.
-  // See the pre-134 limitation in the history fallback below.
+  // has no lot, so nothing below can tell a live line from a superseded one
+  // and no bin draw is read. See the two pre-134 limitations on
+  // getConsumptionFromHistory below.
   const live = getLiveConsumption(db, withdrawalId);
   const lots = live.length > 0 ? live : getConsumptionFromHistory(db, withdrawalNo);
 
   // Draw rows written before migration 134 carry no lot id. Those batches keep
-  // the earlier rule "replay the batch's draw exactly once", so the reversal of
-  // a pre-134 document does not double-count a batch drawn by two lines.
+  // the earlier rule "replay the batch's draw exactly once", so a pre-134
+  // document does not double-count a batch drawn by two lines. Note this set is
+  // only reached for a 134 lot whose bin rows are missing; a document with no
+  // lot at all goes through getConsumptionFromHistory and restores to DEFAULT.
   const legacyDrawnOnce = new Set<number>();
 
   for (const lot of lots) {
