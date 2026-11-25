@@ -1615,3 +1615,123 @@ describe('expectAllInvariantsHold reaches invariant E', () => {
     expectAllInvariantsHold('after unbatched-balance cleanup');
   });
 });
+
+// ---------------------------------------------------------------------
+// Batch reconciliation overage: the money leg must keep A and E true.
+//
+// A count that finds MORE than the recorded bin quantity still changes the
+// balance-sheet inventory value, so it needs a balancing journal entry.
+// Before the fix the overage posted NO entry: stock_balances rose, the batch
+// value rose, but GL 1200 (Inventory) did not — Invariant E diverged by
+// exactly the overage value. This asserts both directions of the route.
+// ---------------------------------------------------------------------
+describe('batch reconciliation keeps the invariants', () => {
+  it('a count OVERAGE posts Dr inventory_asset / Cr inventory_correction and holds A + E', async () => {
+    const warehouseId = await getFirstWarehouseId();
+    const itemId = await createItemWithStock(0);
+    const unitCost = 5;
+    const originalQty = 10;          // the batch was created with 10
+    const remainingQty = 4;          // the recorded remaining amount is 4
+    const countedQty = 10;           // a count finds 10: +6 over the recorded 4
+    const overageValue = (countedQty - remainingQty) * unitCost;
+
+    const batch = db.prepare(`
+      INSERT INTO stock_batches (
+        batch_no, item_id, warehouse_id, source_type, source_id,
+        quantity_original, quantity_remaining, unit_cost, received_date
+      ) VALUES (?, ?, ?, 'OPENING', 0, ?, ?, ?, '2026-09-01')
+    `).run(`INV-RECON-${Date.now()}-${seq++}`, itemId, warehouseId, originalQty, remainingQty, unitCost);
+    const batchId = Number(batch.lastInsertRowid);
+    db.prepare(`INSERT INTO stock_balances (item_id, warehouse_id, quantity) VALUES (?, ?, ?)`)
+      .run(itemId, warehouseId, remainingQty);
+    StockMovementModel.syncBatchStockByLocationForNewBatch(batchId, warehouseId, remainingQty, db);
+    postOpeningInventoryGL(remainingQty * unitCost, `recon item ${itemId}`);
+
+    expectAllInvariantsHold('recon baseline');
+
+    const res = await request(app)
+      .post('/api/inventory/batch-reconciliation/correct')
+      .set('Cookie', token)
+      .send({
+        batch_id: batchId,
+        location_id: warehouseId,
+        new_quantity_physical: countedQty,
+        reason: 'count found more than recorded',
+      });
+    expect([200, 201]).toContain(res.status);
+
+    // The exact GL pair the overage must produce.
+    const entry = db.prepare(`
+      SELECT jl.debit, jl.credit, coa.code AS account_code
+      FROM journal_lines jl
+      JOIN chart_of_accounts coa ON coa.id = jl.account_id
+      WHERE jl.journal_entry_id = ?
+      ORDER BY jl.id
+    `).all(Number(res.body.journal_entry_id)) as Array<{ debit: number; credit: number; account_code: string }>;
+
+    const debitLine = entry.find((l) => l.debit > 0);
+    const creditLine = entry.find((l) => l.credit > 0);
+    if (!debitLine || !creditLine) throw new Error('overage must post one debit and one credit');
+    expect(debitLine!.account_code).toBe('1200');          // inventory_asset
+    expect(creditLine!.account_code).toBe('7100');         // inventory_correction
+    expect(debitLine!.debit).toBeCloseTo(overageValue, 2);
+    expect(creditLine!.credit).toBeCloseTo(overageValue, 2);
+
+    // Every invariant, including E (GL inventory == batch value).
+    expectAllInvariantsHold('after overage reconciliation');
+    const gl = glImbalances();
+    expect(gl.groups).toEqual([]);
+    expect(gl.totalDiff).toBeCloseTo(0, 2);
+  });
+
+  it('a count SHORTAGE still posts the loss leg and holds A + E', async () => {
+    const warehouseId = await getFirstWarehouseId();
+    const itemId = await createItemWithStock(0);
+    const unitCost = 5;
+    const originalQty = 10;
+    const countedQty = 4;            // -6
+    const lossValue = (originalQty - countedQty) * unitCost;
+
+    const batch = db.prepare(`
+      INSERT INTO stock_batches (
+        batch_no, item_id, warehouse_id, source_type, source_id,
+        quantity_original, quantity_remaining, unit_cost, received_date
+      ) VALUES (?, ?, ?, 'OPENING', 0, ?, ?, ?, '2026-09-01')
+    `).run(`INV-RECON-${Date.now()}-${seq++}`, itemId, warehouseId, originalQty, originalQty, unitCost);
+    const batchId = Number(batch.lastInsertRowid);
+    db.prepare(`INSERT INTO stock_balances (item_id, warehouse_id, quantity) VALUES (?, ?, ?)`)
+      .run(itemId, warehouseId, originalQty);
+    StockMovementModel.syncBatchStockByLocationForNewBatch(batchId, warehouseId, originalQty, db);
+    postOpeningInventoryGL(originalQty * unitCost, `recon item ${itemId}`);
+
+    expectAllInvariantsHold('recon baseline');
+
+    const res = await request(app)
+      .post('/api/inventory/batch-reconciliation/correct')
+      .set('Cookie', token)
+      .send({
+        batch_id: batchId,
+        location_id: warehouseId,
+        new_quantity_physical: countedQty,
+        reason: 'count found less than recorded',
+      });
+    expect([200, 201]).toContain(res.status);
+
+    const entry = db.prepare(`
+      SELECT jl.debit, jl.credit, coa.code AS account_code
+      FROM journal_lines jl
+      JOIN chart_of_accounts coa ON coa.id = jl.account_id
+      WHERE jl.journal_entry_id = ?
+      ORDER BY jl.id
+    `).all(Number(res.body.journal_entry_id)) as Array<{ debit: number; credit: number; account_code: string }>;
+
+    const debitLine = entry.find((l) => l.debit > 0);
+    const creditLine = entry.find((l) => l.credit > 0);
+    if (!debitLine || !creditLine) throw new Error('shortage must post one debit and one credit');
+    expect(creditLine!.account_code).toBe('1200');         // inventory_asset
+    expect(debitLine!.debit).toBeCloseTo(lossValue, 2);
+    expect(creditLine!.credit).toBeCloseTo(lossValue, 2);
+
+    expectAllInvariantsHold('after shortage reconciliation');
+  });
+});
