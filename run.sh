@@ -5,7 +5,24 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVER_DIR="$ROOT/server"
-FLUTTER="${FLUTTER:-/media/fawad/26F2EFA7F2EF7987/D/flutter/bin/flutter}"
+# Resolve the Flutter SDK: $FLUTTER wins, else the first flutter on PATH.
+resolve_flutter() {
+  if [ -n "${FLUTTER:-}" ]; then printf '%s\n' "$FLUTTER"; return; fi
+  if command -v flutter >/dev/null 2>&1; then command -v flutter; return; fi
+  for candidate in "$HOME/flutter/bin/flutter" "$HOME/snap/flutter/common/flutter/bin/flutter" \
+                   /opt/flutter/bin/flutter /usr/local/flutter/bin/flutter /usr/lib/flutter/bin/flutter; do
+    [ -x "$candidate" ] && { printf '%s\n' "$candidate"; return 0; }
+  done
+  return 0
+}
+
+FLUTTER="$(resolve_flutter)"
+if [ -z "$FLUTTER" ]; then
+  echo "✗ Flutter SDK not found." >&2
+  echo "  Install Flutter, or point at it explicitly:" >&2
+  echo "      FLUTTER=/path/to/flutter/bin/flutter $0" >&2
+  exit 1
+fi
 PORT="${PORT:-3011}"
 LOG="${SERVER_LOG:-/tmp/minierp-server.log}"
 HEALTH_URL="http://localhost:${PORT}/api/health"
