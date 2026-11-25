@@ -1865,3 +1865,120 @@ these old records. The dev database is disposable and its records are test data.
 - **Scope.** Comment-only correction to migration 134 and
   `server/src/models/OwnerWithdrawal.ts`. No logic change, no test change, no
   schema change. PR #50 stays a draft.
+
+## DECIDED — batch truth is the whole stock count for batch-managed items (2026-11-22)
+
+**Decision by Gull.** Every item is tracked in a batch. Therefore, for any
+item and warehouse, `stock_batches` is the **full** stock count and
+`stock_balances.quantity` must equal the sum of the batch quantities. An
+unbatched residual is **not** preserved: it is drift, and the reconciliation
+route must remove it.
+
+- **Scope.** `POST /api/inventory/batch-reconciliation/correct` sets
+  `stock_balances.quantity` to the sum of `stock_batches.quantity_remaining`
+  for the item and warehouse. It does not move the mirror by the correction
+  delta.
+- **Why the delta was wrong.** A delta keeps whatever residual the mirror
+  already had. Example: the mirror holds 50 and the batch total is 10. A
+  correction to 6 returned HTTP 200 but left the mirror at 46. The mirror never
+  converges on the batch truth.
+- **Why the delta also failed on legitimate input.** Example: the mirror holds
+  3 and the batch total is 10. A correction to 0 applied a delta of -10. The
+  update left `quantity = -7`, and the INV-21 CHECK `quantity >= 0` raised
+  HTTP 500 on a correct operator action.
+- **Out-of-range physical counts.** A physical count above
+  `stock_batches.quantity_original` now returns HTTP 400 with a clear message.
+  It does not reach the DB CHECK, which raised HTTP 500. The route writes
+  nothing in that case.
+- **Consequences.** Where a mirror and its batches disagree, the reconciliation
+  now shrinks or grows the mirror to the batch sum. The existing
+  `runStockCoverageReconciliation` startup repair uses the same rule: it trims
+  batch over-coverage and mints a RECON batch for under-coverage. The two agree.
+- **Unchanged.** `feature_batch_locations` stays default OFF, both stock stores
+  (`batch_stock_by_location` and `stock_balances`) still receive ungated writes,
+  and migration 127 is not renamed or touched.
+- **Reference.** PR #40 follow-up draft. Confirmed defects 1, 2 and 3.
+
+### Mirror-only resets are not stock movements (2026-11-22)
+
+**Clarified by Gull.** `stock_balances` is a derived mirror of the batch rows.
+The batch sum is the full physical truth. Therefore a reset of a stale mirror
+is counter repair, and **not** a stock movement.
+
+- **Example.** The mirror holds 50 and the batch total is 10. A correction to 6
+  writes a batch delta of **-4**. The mirror moves by **-40**, from 50 to 6.
+  Only the -4 is a real stock movement.
+- **Rule.** Do not post an extra GL or journal adjustment for the -40
+  mirror-only delta. The single reconciliation movement represents the -4. The
+  mirror reset is carried by the same movement, because the mirror is derived.
+- **Pinned by test.** `server/src/__tests__/batchReconcileBatchTruth.test.ts`,
+  "the movement and its GL entry record the real -4 batch correction, never the
+  -40 stale-mirror repair". It asserts one movement of -4 and no new journal
+  entry for the mirror delta.
+- **Current fact, not a new policy.** The route inserts its `stock_movements`
+  row directly and never calls the GL posting path, so the movement carries
+  `financial_value = 0` and `journal_entry_id = NULL`. That is pre-existing
+  behaviour on `origin/main`, not introduced by PR #52. The test pins it as it
+  is. Posting GL for a real batch correction is a separate decision and stays
+  open.
+- **Do not change without Gull.** This policy is not to be altered without an
+  explicit decision from Gull.
+
+### A real count change needs a reason and follows the write-off accounting (2026-11-22)
+
+**Decided by Gull.** When a reconciliation changes the real batch quantity, the
+user states WHY. The change is a loss (or a gain), not a silent edit.
+
+**Request contract** — `POST /api/inventory/batch-reconciliation/correct`:
+
+| Field | Required | Meaning |
+|---|---|---|
+| `batch_id` | yes | Batch to correct. |
+| `location_id` | yes | Bin in the batch's own warehouse. |
+| `new_quantity_physical` | yes | Counted quantity. Must not exceed `quantity_original`. |
+| `reason` | **yes** | 1–500 characters. Stored on the movement and the journal line. |
+| `gl_account` | no | A 7200-family loss account. Default `7200`. |
+
+**Response** now also returns `reason`, `gl_amount` and `journal_entry_id`.
+
+**Accounting.** The route reuses the existing write-off flow. It does not
+introduce a new mapping:
+
+- A **removal** posts Dr `<7200 family>` / Cr `inventory_asset`, at the batch's
+  own `unit_cost`, for the absolute real delta. `7200` carries the text code
+  `inventory_shrinkage`; `7202` carries `damaged_goods_loss`.
+- An **addition**, a zero delta, or a zero unit cost posts nothing. There is no
+  loss to value.
+- The movement keeps `movement_type = 'ADJUSTMENT'`, gains
+  `reference_doctype = 'BATCH_RECONCILIATION'`, and records
+  `[BATCH_RECONCILIATION] reason=… batch=… old -> new`.
+
+**The stale mirror is never a loss.** The mirror reseat is data
+synchronization. With mirror 50, batch 10 and a correction to 6:
+
+- the movement quantity is **-4**, never -44 or -40;
+- the journal amount is `4 × unit_cost`, never `44 × unit_cost`;
+- exactly **one** journal entry is written.
+
+**Validation.** A missing, empty, blank or over-500-character `reason` returns
+HTTP 400. So does an unknown or non-7200 `gl_account`. Both write nothing. The
+precision guard (below) still runs first.
+
+**Do not change without Gull.** This rule is not to be altered without an
+explicit decision from Gull.
+
+### Guard tolerance follows the persisted precision (2026-11-22)
+
+- **Problem.** The guard used a fixed `+ 0.0005` slack. That is wider than the
+  smallest difference the engine can tell apart: the columns are
+  `DECIMAL(15,3)`, so the step is `0.001`.
+- **Impact.** `quantity_original = 5` accepted a request of 5.0001 through
+  5.0005. The sum then reached the batch master and the CHECK
+  `quantity_remaining <= quantity_original` raised HTTP 500. Requests of 5.0009
+  and above were already rejected with 400.
+- **Fix.** Both the per-bin guard and the summed guard now compare a
+  ceiling at the persisted precision (`ceilQty`, built on `qtyEpsilon(3)`).
+  Any value the CHECK would reject is rejected as HTTP 400 before writes.
+- **Not a loosening.** Exact values still pass: `5 → 5`, and `4.9999 → 5`
+  (a count below the original). The guard now agrees with the database instead
+  of approximating it.

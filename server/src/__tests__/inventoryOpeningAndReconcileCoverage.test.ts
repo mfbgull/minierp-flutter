@@ -149,11 +149,12 @@ describe('correctBatchReconciliation', () => {
     };
   }
 
+  // PR #52: a reason is required for a real count change (Gull's product rule).
   const correct = (body: Record<string, unknown>) =>
     request(app)
       .post('/api/inventory/batch-reconciliation/correct')
       .set('Cookie', cookie)
-      .send(body);
+      .send({ reason: 'Recount adjustment', ...body });
 
   it('validates required fields, location, batch and quantity', async () => {
     const seed = seedBatch();
@@ -197,14 +198,19 @@ describe('correctBatchReconciliation', () => {
     });
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({
+    // PR #52: the response now also reports the reason it stored and what it
+    // accounted. -3 units at the batch unit cost (2) = 6.00 posted as a loss.
+    expect(res.body).toMatchObject({
       success: true,
       batch_id: seed.batchId,
       location_id: seed.locationId,
       old_quantity: 10,
       new_quantity: 7,
       diff: -3,
+      reason: 'Recount adjustment',
+      gl_amount: 6,
     });
+    expect(res.body.journal_entry_id).toEqual(expect.any(Number));
 
     const locationRow = db
       .prepare(
@@ -242,7 +248,9 @@ describe('correctBatchReconciliation', () => {
     status.mockReturnValue(res);
 
     correctBatchReconciliation(
-      { user: { id: 1 }, body: { batch_id: 1, location_id: 1, new_quantity_physical: 5 } } as unknown as Request,
+      // A valid reason is required first (PR #52), so the forced db.prepare
+      // failure is what this case actually exercises.
+      { user: { id: 1 }, body: { batch_id: 1, location_id: 1, new_quantity_physical: 5, reason: 'Recount adjustment' } } as unknown as Request,
       res
     );
     expect(status).toHaveBeenCalledWith(500);
