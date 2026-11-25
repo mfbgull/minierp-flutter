@@ -2,35 +2,40 @@
 
 ## Current state — 2026-11-23
 
-**Main.** `main` local is ahead of `origin/main` by one commit (`021f333`, a
-chmod-only commit: `run.sh` `100644` → `100755`). Everything else on main is
-pushed. Last pushed main is `96cb4ba`.
+**Main.** `main` and `origin/main` are both at `1eb2633`, the merge of PR #52
+(`Merge branch 'pr52-complexity'`). The chmod-only commit was renamed from
+`021f333` to `c562674` (`chore: make run.sh executable`) during the push.
 
-**Open PRs.** Two, both drafts, both `MERGEABLE` against `main`:
+**Open PRs.** One, a draft, `MERGEABLE` against `main`:
 
 - `#51` `docs/pre134-void-draw-limitations` — docs-only. PR-event CI green
   (server, flutter, fallow all pass). The push-event fallow failure is the known
   base-ref artifact class (the force-push removed the old head, so the changed-file
   set cannot be computed). Not a content verdict.
-- `#52` `fix/batch-reconciliation-parity` — **CI was failing on `fallow`.** The
-  branch grew `correctBatchReconciliation` to 222 lines / 24 cyclomatic / 24
-  cognitive, so the file's `complexity_high` count went 1 → 2 and the gate saw one
-  new finding (`createStockMovement` at 83 lines is the inherited one the gate
-  excludes). **Fixed locally** on `pr52-complexity` (`cc47df8`): the function is
-  split into `parseBatchReconcileRequest`, `loadBatchReconcileTargets`,
-  `reseatBatchMirrors`, and `postBatchReconcileLoss`. The handler keeps its exact
-  signature, status codes, and error strings (checked byte-identical).
-  `correctBatchReconciliation` is 222 → 34 lines and off the high-complexity list;
-  `fallow audit --base <merge-base>` now exits 0. Not yet pushed.
+
+**PR #52 (`fix/batch-reconciliation-parity`) — MERGED into main as `1eb2633`.**
+CI was failing on `fallow`: the branch grew `correctBatchReconciliation` to 222
+lines / 24 cyclomatic / 24 cognitive, so the file's `complexity_high` count went
+1 → 2 and the gate saw one new finding (`createStockMovement` at 83 lines is the
+inherited one the gate excludes). **Fixed** on `pr52-complexity` (`cc47df8`): the
+function is split into `parseBatchReconcileRequest`, `loadBatchReconcileTargets`,
+`reseatBatchMirrors`, and `postBatchReconcileLoss`. The handler keeps its exact
+signature, status codes, and error strings (checked byte-identical).
+`correctBatchReconciliation` is 222 → 34 lines and off the high-complexity list;
+`fallow audit --base <merge-base>` exits 0. All CI checks (server, flutter,
+fallow) pass on the pushed head. Merged to `main` after the full server suite
+ran locally (2479/2480; the one failure is the pre-existing `envHardening` local
+`NODE_ENV` check, which fails on `main` too) and the 41 affected stock/reconcile
+tests passed on the merge commit.
 
 **Superseding note on the 2026-11-18 correction below.** PR #5 is **merged**
-(`d8bf787`, 2026-11-21) — it is not open. No PR from this cycle remains open; #51
-and #52 are new work opened after it.
+(`d8bf787`, 2026-11-21) — it is not open. #51 is the only open PR from this cycle.
 
 **Commits on main since the ledger was last touched** (`d8bf787`):
-`c923689` (S-6, PR #48), `b25b4f4` (#49), `96cb4ba` (#50), `021f333` (chmod).
-The S-6 and owner-withdrawal stock fixes are therefore on main and recorded here
-for the first time.
+`c923689` (S-6, PR #48), `b25b4f4` (#49), `96cb4ba` (#50), `c562674` (chmod),
+`be877c7` (ledger state), `1eb2633` (PR #52 merge).
+The S-6, owner-withdrawal, and batch-reconciliation stock fixes are therefore on
+main and recorded here for the first time.
 
 **Still open decisions.** Two `OPEN-DECISION` items in `audit/DECISIONS.md`
 await Gull: the F-3 dating choice (Option A same-date reversal vs Option B
@@ -2003,7 +2008,7 @@ situation of every existing install at migration time.
 
 ## S-4 follow-up — three confirmed reconciliation defects (2026-11-22)
 
-**Status: FIXED in a draft PR, not merged.** Base `origin/main`
+**Status: FIXED and MERGED to main as `1eb2633` (PR #52).** Base `origin/main`
 `96cb4ba58d87d9793b108f58cd6c7d92d1557020`. PR #40 stays merged and unchanged.
 The decision that makes this a defect is recorded in
 [`audit/DECISIONS.md`](DECISIONS.md) ("batch truth is the whole stock count").
@@ -2040,7 +2045,7 @@ batch truth.
 
 ### PR #52 review — multi-bin guard gap (2026-11-22)
 
-**Status: FIXED in the same draft PR, not merged.**
+**Status: FIXED and MERGED to main as `1eb2633` (PR #52).**
 
 | # | Setup | Old result | New result |
 |---|---|---|---|
@@ -2068,7 +2073,7 @@ batch truth.
 
 ### PR #52 review round 2 — reason, accounting, and the decimal guard (2026-11-22)
 
-**Status: FIXED in the same draft PR, not merged.** Approved by Gull.
+**Status: FIXED and MERGED to main as `1eb2633` (PR #52).** Approved by Gull.
 
 | # | Setup | Old result | New result |
 |---|---|---|---|
