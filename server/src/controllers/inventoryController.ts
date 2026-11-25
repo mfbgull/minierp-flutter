@@ -1507,8 +1507,10 @@ function parseBatchReconcileRequest(
 
   // Money for the REAL delta only, at the batch's own unit cost (the same
   // source the write-off flow uses). Value is rounded to currency precision.
+  // An overage is money too: the higher inventory asset needs a balancing
+  // entry, exactly as the ADJUSTMENT posting in StockMovementModel does.
   const unitCost = batchUnitCost(batch_id);
-  const value = diff < 0 ? roundCurrency(Math.abs(diff) * unitCost) : 0;
+  const value = roundCurrency(Math.abs(diff) * unitCost);
   const movementDate = new Date().toISOString().split('T')[0];
 
   return {
@@ -1626,27 +1628,32 @@ function reseatBatchMirrors(itemId: number, warehouseId: number): void {
   StockMovementModel.refreshItemStockMirror(itemId, db);
 }
 
-/** Post the loss journal for a removal and flag the movement as posted.
+/** Post the journal for the real delta and flag the movement as posted.
  *
- *  Existing accounting flow: a REMOVAL posts Dr <loss 7200-family> /
- *  Cr inventory_asset at batch cost, exactly as the write-off route does.
- *  An addition is not a loss and posts nothing, so this returns null. */
+ *  Same account pairs as the ADJUSTMENT posting in StockMovementModel: a
+ *  REMOVAL posts Dr <loss 7200-family> / Cr inventory_asset at batch cost
+ *  (as the write-off route does); an OVERAGE posts Dr inventory_asset /
+ *  Cr inventory_correction, so a found quantity cannot raise the asset with
+ *  no balancing entry. A zero diff or zero value posts nothing. */
 function postBatchReconcileLoss(args: {
   diff: number; value: number; unitCost: number; lossTextCode: string; movementId: number;
   batch_id: number; movementDate: string; reasonText: string; userId: number;
 }): number | null {
   const { diff, value, unitCost, lossTextCode, movementId, batch_id, movementDate, reasonText, userId } = args;
-  if (diff >= 0 || value <= 0) return null;
+  if (diff === 0 || value <= 0) return null;
 
+  // Same account pair as the ADJUSTMENT posting in StockMovementModel: a
+  // removal is a loss, an overage raises the asset against inventory_correction.
+  const removal = diff < 0;
   const journalEntryId = AccountingService.postLegacyStockEntry(db, {
     referenceType: 'BATCH_RECONCILIATION',
     referenceId: movementId,
     entryDate: movementDate,
     description:
-      `Stock removal: ${Math.abs(diff)} units @ ${unitCost} ` +
+      `${removal ? 'Stock removal' : 'Stock addition'}: ${Math.abs(diff)} units @ ${unitCost} ` +
       `(batch reconciliation ${batch_id}) — ${reasonText}`,
-    debitTextCode: lossTextCode,
-    creditTextCode: 'inventory_asset',
+    debitTextCode: removal ? lossTextCode : 'inventory_asset',
+    creditTextCode: removal ? 'inventory_asset' : 'inventory_correction',
     amount: value,
     createdBy: userId
   });

@@ -588,10 +588,12 @@ describe('Reason and accounting on the REAL batch delta', () => {
     expect(entry.amount).toBe(8);
   });
 
-  it('an INCREASE posts no loss and no journal entry (only removals are a loss)', async () => {
+  it('an INCREASE posts Dr inventory_asset / Cr inventory_correction for the found value', async () => {
     setFeatureEnabled(db, 'feature_batch_locations', false);
-    // Bin 4, original 10: the count goes UP to 10, which is not a loss.
-    const seedRow = seed({ original: 10, bin: 4, balance: 4 });
+    // Bin 4, original 10: the count goes UP to 10. That is an overage, so the
+    // higher inventory asset needs a balancing entry (as the ADJUSTMENT posting
+    // in StockMovementModel does).
+    const seedRow = seed({ original: 10, bin: 4, balance: 4, unitCost: 2 });
     const glBefore = glCounts();
 
     const res = await correct({
@@ -603,12 +605,25 @@ describe('Reason and accounting on the REAL batch delta', () => {
 
     expect(res.status).toBe(200);
     const movement = db
-      .prepare(`SELECT quantity, journal_entry_id FROM stock_movements
+      .prepare(`SELECT quantity, financial_value, journal_entry_id FROM stock_movements
                 WHERE item_id = ? AND reference_doctype = 'BATCH_RECONCILIATION'`)
-      .get(seedRow.itemId) as { quantity: number; journal_entry_id: number | null };
+      .get(seedRow.itemId) as { quantity: number; financial_value: number; journal_entry_id: number | null };
     expect(movement.quantity).toBe(6);
-    expect(movement.journal_entry_id).toBeNull();
-    expect(glCounts()).toEqual(glBefore);
+    // 6 units @ 2 = 12 of found value.
+    expect(movement.financial_value).toBe(12);
+    expect(movement.journal_entry_id).not.toBeNull();
+
+    const entry = db
+      .prepare('SELECT debit_account, credit_account, amount FROM journal_entries WHERE id = ?')
+      .get(movement.journal_entry_id) as { debit_account: string; credit_account: string; amount: number };
+    expect(entry.debit_account).toBe('inventory_asset');
+    expect(entry.credit_account).toBe('inventory_correction');
+    expect(entry.amount).toBe(12);
+
+    // Exactly one balanced entry: two lines, one debit and one credit.
+    const glAfter = glCounts();
+    expect(glAfter.entries).toBe(glBefore.entries + 1);
+    expect(glAfter.lines).toBe(glBefore.lines + 2);
   });
 
   it('a zero-unit-cost batch removes stock with no journal entry (nothing to value)', async () => {
