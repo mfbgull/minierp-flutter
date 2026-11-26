@@ -4094,6 +4094,36 @@ abstract class AppLocalizations {
   /// **'Expected amount'**
   String get refundClaimStandaloneAmount;
 
+  /// No description provided for @refundClaimStandaloneSelectSupplier.
+  ///
+  /// In en, this message translates to:
+  /// **'Select supplier'**
+  String get refundClaimStandaloneSelectSupplier;
+
+  /// No description provided for @refundClaimStandaloneSupplierRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a supplier first'**
+  String get refundClaimStandaloneSupplierRequired;
+
+  /// No description provided for @refundClaimStandaloneAmountRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter an expected amount greater than zero'**
+  String get refundClaimStandaloneAmountRequired;
+
+  /// No description provided for @refundClaimStandaloneRecorded.
+  ///
+  /// In en, this message translates to:
+  /// **'Refund claim recorded'**
+  String get refundClaimStandaloneRecorded;
+
+  /// No description provided for @refundClaimStandaloneHint.
+  ///
+  /// In en, this message translates to:
+  /// **'A supplier owes money with no return behind it'**
+  String get refundClaimStandaloneHint;
+
   /// No description provided for @refundClaimRemainingPrefill.
   ///
   /// In en, this message translates to:

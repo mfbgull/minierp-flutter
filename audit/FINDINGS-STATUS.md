@@ -51,8 +51,10 @@ BOTH resolved, both by Gull on 2026-11-26:
   removed; three older guard-specific pins were rewritten because one of them
   was passing for the wrong reason.
 
-Still open in that list: items 3–5 (UX-5/UX-7 wording, audit-artifact policy,
-the ext4 move). None of them is money.
+Still open in that list: items 4–5 (audit-artifact policy, the ext4 move).
+Item 3 is closed in full: UX-7 (Urdu wording → دستبرد) and UX-5 (standalone
+claim screen → Option A, built and tested). None of the remaining items is
+money.
 
 ## Review cycle state — 2026-11-16 (coordinator record)
 
@@ -319,6 +321,11 @@ A (reversal on the original date) and F-1 → remove the guard, both decided by
 Gull and implemented in `c3655a1`. UX-7 (Urdu write-off wording → دستبرد) was
 also decided and implemented the same day. Still open: UX-5 (standalone claim
 screen — build or remove), the audit-artifact policy and the ext4 move.)*
+*(2026-11-26 correction 2: UX-5 is no longer open — Gull chose Option A (build
+the screen). Implemented in `lib/features/purchases/refund_claim_standalone_dialog.dart`
+plus a permission-gated button on the claims screen; pinned by
+`test/features/refund_claim_standalone_create_test.dart` (4/4). Still open: the
+audit-artifact policy and the ext4 move.)*
 
 ## Accounting audit revalidation — 2026-10-26–27
 

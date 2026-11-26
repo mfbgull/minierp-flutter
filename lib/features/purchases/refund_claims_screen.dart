@@ -27,6 +27,7 @@ import '../../widgets/pagination_bar.dart';
 import '../../widgets/status_badge.dart';
 import 'refund_claim_write_off_dialog.dart';
 import 'refund_claim_receipts_dialog.dart';
+import 'refund_claim_standalone_dialog.dart';
 import 'supplier_refund_dialog.dart';
 
 class RefundClaimsScreen extends ConsumerStatefulWidget {
@@ -83,6 +84,13 @@ class _RefundClaimsScreenState extends ConsumerState<RefundClaimsScreen> {
                   onPressed: () => ref.invalidate(provider),
                   icon: const Icon(Icons.refresh),
                 ),
+                if (user?.hasPermission('supplier_refunds', 'create') ??
+                    false)
+                  OutlinedButton.icon(
+                    onPressed: () => _recordStandaloneClaim(),
+                    icon: const Icon(Icons.receipt_long_outlined, size: 18),
+                    label: Text(l10n.refundClaimStandalone),
+                  ),
               ],
             ),
           ),
@@ -305,6 +313,16 @@ class _RefundClaimsScreenState extends ConsumerState<RefundClaimsScreen> {
     'PARTIAL' => Colors.orange.shade700,
     _ => theme.colorScheme.primary,
   };
+
+  /// UX-5: a supplier can owe money with no return behind it. The claim is a
+  /// receivable memo (no GL, no cash), so only the list and the refunds-due
+  /// figure need refreshing.
+  Future<void> _recordStandaloneClaim() async {
+    final created = await showRefundClaimStandaloneDialog(context);
+    if (!mounted || !created) return;
+    ref.invalidate(refundsDueProvider);
+    ref.invalidate(refundClaimsProvider(_claimsArgs));
+  }
 
   Future<void> _action(_ClaimAction action, RefundClaim claim) async {
     final l10n = AppLocalizations.of(context)!;

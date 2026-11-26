@@ -2122,6 +2122,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get refundClaimStandaloneAmount => 'Expected amount';
 
   @override
+  String get refundClaimStandaloneSelectSupplier => 'Select supplier';
+
+  @override
+  String get refundClaimStandaloneSupplierRequired => 'Select a supplier first';
+
+  @override
+  String get refundClaimStandaloneAmountRequired =>
+      'Enter an expected amount greater than zero';
+
+  @override
+  String get refundClaimStandaloneRecorded => 'Refund claim recorded';
+
+  @override
+  String get refundClaimStandaloneHint =>
+      'A supplier owes money with no return behind it';
+
+  @override
   String refundClaimRemainingPrefill(String amount) {
     return 'Remaining $amount';
   }

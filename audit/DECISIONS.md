@@ -1509,8 +1509,9 @@ keys, the remaining mutating-endpoint keys, and the first-deployment checklist.
 
 **OPEN-DECISION — proposals, not decisions taken.** Each needs Gull's call.
 **Resolved on 2026-11-26: item 1 (F-3 dating → Option A), item 2 (F-1 two-step
-write-off → remove the guard), and item 3's UX-7 half (Urdu write-off wording →
-دستبرد). Item 3's UX-5 half and items 4–5 remain open.**
+write-off → remove the guard), and all of item 3 (UX-7 Urdu write-off wording →
+دستبرد; UX-5 standalone claim screen → Option A, build it). Items 4–5 remain
+open.**
 
 1. **Money F-3 dating. — RESOLVED 2026-11-26, Gull: Option A.** PI escalated
    the discrepancy. Any decision must keep both accounting stores consistent.
@@ -1631,6 +1632,34 @@ write-off → remove the guard), and item 3's UX-7 half (Urdu write-off wording 
    suites (12 tests) pass; `flutter analyze` reports zero errors and zero
    warnings (18 pre-existing `material.dart` deprecation infos, none from this
    change); `node scripts/l10n-drift.js` exits 0 (gap 3 of cap 60).
+
+   **RESOLVED (2026-11-26, Gull): UX-5 — Option A, build the standalone claim
+   screen.** `POST /supplier-refunds/claims` and `createClaim` existed with no
+   caller, so the app could not record a claim that had no purchase return
+   behind it. The claims screen now carries a "Record refund claim" button,
+   gated by `supplier_refunds.create` — the same permission the server route
+   demands. It opens `refund_claim_standalone_dialog.dart`: pick the supplier
+   through the shared picker, enter the expected amount, confirm the date
+   (defaults to today, editable), save. On success the list and the refunds-due
+   memo are invalidated.
+   - The request carries an `Idempotency-Key` derived from the exact body sent
+     (`IdempotencyKeyCache(prefix: 'claim-standalone')`). A retry after a
+     timeout replays on the server; editing the amount or date rotates the key
+     into a new claim.
+   - A zero or missing amount and an unpicked supplier are refused in the
+     dialog before anything is sent, so the server's 400 is never the user's
+     feedback for an obvious typo.
+   - A claim is a receivable memo: it posts no GL and moves no cash. Cash
+     appears only when a REFUND_RECEIPT is recorded against it.
+   - Five new `refundClaimStandalone*` keys were added to `en.arb` and `ur.arb`
+     and the localizations regenerated (`l10n-drift` gap stays at 3 of cap 60).
+   - Red-first: `test/features/refund_claim_standalone_create_test.dart` failed
+     before the button existed with `Found 0 widgets with text "Record refund
+     claim"`, and its three dialog tests could not find "Acme Supplies" until
+     the picker was driven correctly. It now passes 4/4 (record, missing
+     amount, zero amount, permission-gated hidden). Seven dependent suites
+     (32 tests) pass. `flutter analyze` reports only the pre-existing
+     `material.dart` deprecation infos; `node scripts/l10n-drift.js` exits 0.
 4. **Audit-artifact policy.** The generator is a test side-effect; the JSON/PNG
    delta is date-only (two JSON lines, nine glyphs). The preferred fix is a
    deterministic test clock; `.gitignore` alone, `assume-unchanged`, and

@@ -121,6 +121,15 @@ Severity: MEDIUM — advertised capability not reachable; unused l10n strings.
 Suggested fix: either build the standalone claim screen or remove the strings
 until it exists.
 
+**RESOLVED (2026-11-26, Gull: Option A — build the screen).** The claims screen
+now has a "Record refund claim" button, shown only with `supplier_refunds.create`.
+It opens `refund_claim_standalone_dialog.dart`, which records supplier, date and
+expected amount against `POST /supplier-refunds/claims`, keyed from the exact
+body for idempotent retry. A zero or missing amount is refused in the dialog. A
+claim posts no GL and moves no cash; it is a receivable memo until a receipt
+settles it. Pinned by `test/features/refund_claim_standalone_create_test.dart`
+(4/4, red-first: the button was absent before the change).
+
 ### UX-6 — Raw enums and ISO dates embedded in sentences — MEDIUM
 
 - `purchasesRefundClaim` (en/ur) interpolates the raw status enum.
@@ -266,7 +275,7 @@ merge without fixing them or deleting them deliberately.
 | UX-6 (cash-blocker rows render the raw `reference_type` enum and raw ISO date in both languages) | Medium | `test/widgets/cash_blockers_localization_test.dart` | **CONFIRMED, parked, tagged** (`skip: true`, `RED-BY-DESIGN … UX-6`). Fails unmarked: `Found 1 widget with text containing receipt_overpayment`. |
 | UX-11 (failed option fetch renders as an empty picker, no message) | Medium | `test/features/sales_order_form_loading_test.dart` | **CONFIRMED, parked, tagged** (`skip: true`, `RED-BY-DESIGN … UX-11`). Fails unmarked: `Expected: at least one matching candidate / Actual: Found 0 widgets with text containing Failed`. |
 | UX-13 (flat discount above the line total passes local validation) | Medium | `test/features/sales_order_discount_validation_test.dart` | **CONFIRMED, parked, tagged** (`skip: true`, `RED-BY-DESIGN … UX-13`). Fails unmarked: `Expected: not null / Actual: <null>` on the discount field's `errorText`. |
-| UX-5 (product gap — standalone claim creation UI missing, `createClaim` has zero callers) | Medium | — | **UNCONFIRMED** — product decision (build the screen or remove the strings), not a defect. **(2026-11-18 correction: row label aligned with the UX-5 heading above; the earlier "wording of the write-off explanation" label described a different item — the write-off wording finding is UX-7.)** |
+| UX-5 (product gap — standalone claim creation UI missing, `createClaim` has zero callers) | Medium | `test/features/refund_claim_standalone_create_test.dart` | **RESOLVED 2026-11-26 by Gull — Option A (build the screen).** The claims screen now has a "Record refund claim" button, gated by `supplier_refunds.create`, and `refund_claim_standalone_dialog.dart` records supplier, date and expected amount against `POST /supplier-refunds/claims` with a body-derived Idempotency-Key. A zero/missing amount is refused in the dialog. Red first: `Found 0 widgets with text "Record refund claim"`; 4/4 after the change. Seven dependent suites (32 tests) green, `flutter analyze` only pre-existing `material.dart` infos, `l10n-drift` exit 0. **(2026-11-18 correction: row label aligned with the UX-5 heading above; the earlier "wording of the write-off explanation" label described a different item — the write-off wording finding is UX-7.)** |
 | UX-7 (Urdu wording) | Medium | `test/features/refund_claim_write_off_urdu_wording_test.dart` | **RESOLVED 2026-11-26 by Gull — Option B (دستبرد).** The four `ur.arb` write-off strings said معاف / معافی (forgive / forgiveness), which tells an Urdu-reading accountant the wrong thing: a write-off posts Dr 7300 Refund Write-offs / Cr AP, it does not forgive the claim. They now say دستبرد ("removal from the books"). Red first: the new test failed with `refundClaimWriteOff still reads as forgiveness: "معاف کریں"`, and passes 3/3 after the change. Five dependent widget/repository suites (12 tests) green, `flutter analyze` zero errors/warnings, `l10n-drift` exit 0. Evidence in `audit/DECISIONS.md`. |
 
 *(2026-11-18 correction to the four "parked, tagged" rows above: UX-3, UX-6, UX-11

@@ -2122,6 +2122,23 @@ class AppLocalizationsUr extends AppLocalizations {
   String get refundClaimStandaloneAmount => 'متوقع رقم';
 
   @override
+  String get refundClaimStandaloneSelectSupplier => 'سپلائر منتخب کریں';
+
+  @override
+  String get refundClaimStandaloneSupplierRequired => 'پہلے سپلائر منتخب کریں';
+
+  @override
+  String get refundClaimStandaloneAmountRequired =>
+      'صفر سے زیادہ متوقع رقم درج کریں';
+
+  @override
+  String get refundClaimStandaloneRecorded => 'ریفنڈ کلیم درج ہو گیا';
+
+  @override
+  String get refundClaimStandaloneHint =>
+      'سپلائر کا واجب الادا پیسہ، جس کے پیچھے کوئی واپسی نہیں';
+
+  @override
   String refundClaimRemainingPrefill(String amount) {
     return 'باقی $amount';
   }

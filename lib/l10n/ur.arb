@@ -766,6 +766,11 @@
   "refundClaimStandalone": "ریفنڈ کلیم درج کریں",
   "refundClaimStandaloneSupplier": "سپلائر",
   "refundClaimStandaloneAmount": "متوقع رقم",
+  "refundClaimStandaloneSelectSupplier": "سپلائر منتخب کریں",
+  "refundClaimStandaloneSupplierRequired": "پہلے سپلائر منتخب کریں",
+  "refundClaimStandaloneAmountRequired": "صفر سے زیادہ متوقع رقم درج کریں",
+  "refundClaimStandaloneRecorded": "ریفنڈ کلیم درج ہو گیا",
+  "refundClaimStandaloneHint": "سپلائر کا واجب الادا پیسہ، جس کے پیچھے کوئی واپسی نہیں",
   "refundClaimRemainingPrefill": "باقی {amount}",
   "@refundClaimRemainingPrefill": {
     "placeholders": {
