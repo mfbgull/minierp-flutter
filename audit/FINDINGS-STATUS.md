@@ -316,8 +316,9 @@ keys, and the first-deployment checklist (`audit/FIRST-DEPLOYMENT-CHECKLIST.md`)
 wording, audit-artifact policy, and the ext4 move.
 *(2026-11-26 correction: the two money items are no longer open — F-3 → Option
 A (reversal on the original date) and F-1 → remove the guard, both decided by
-Gull and implemented in `c3655a1`. UX-5/7 wording, the audit-artifact policy
-and the ext4 move remain open.)*
+Gull and implemented in `c3655a1`. UX-7 (Urdu write-off wording → دستبرد) was
+also decided and implemented the same day. Still open: UX-5 (standalone claim
+screen — build or remove), the audit-artifact policy and the ext4 move.)*
 
 ## Accounting audit revalidation — 2026-10-26–27
 

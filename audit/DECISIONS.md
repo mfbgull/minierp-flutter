@@ -1508,9 +1508,9 @@ settled and what is a proposal awaiting a product call.
 keys, the remaining mutating-endpoint keys, and the first-deployment checklist.
 
 **OPEN-DECISION — proposals, not decisions taken.** Each needs Gull's call.
-**Items 1 (F-3 dating → Option A) and 2 (F-1 two-step write-off → remove the
-guard) are RESOLVED, both 2026-11-26; see the RESOLVED note inside each.
-Items 3–5 remain open.**
+**Resolved on 2026-11-26: item 1 (F-3 dating → Option A), item 2 (F-1 two-step
+write-off → remove the guard), and item 3's UX-7 half (Urdu write-off wording →
+دستبرد). Item 3's UX-5 half and items 4–5 remain open.**
 
 1. **Money F-3 dating. — RESOLVED 2026-11-26, Gull: Option A.** PI escalated
    the discrepancy. Any decision must keep both accounting stores consistent.
@@ -1614,8 +1614,23 @@ Items 3–5 remain open.**
    - Evidence: `supplierRefundClaims.test.ts` 21/21; plus six dependent suites
      (69 tests) and three more (90 tests) green; `npm run typecheck` and full
      `npm run lint` clean. Full suites NOT rerun.
-3. **UX-5 / UX-7 wording.** The proposed user-facing strings need Gull's wording
-   approval before they land.
+3. **UX-5 / UX-7 wording. — UX-7 RESOLVED 2026-11-26, Gull: Option B
+   (دستبرد). UX-5 still open.** The proposed user-facing strings needed Gull's
+   wording approval before landing.
+
+   **RESOLVED (2026-11-26, Gull): UX-7 — the Urdu write-off strings now say
+   دستبرد (removal from the books) instead of معاف (forgive).** A write-off posts
+   Dr 7300 Refund Write-offs / Cr AP; it is an accounting write-down, never
+   forgiveness of the claim. Four `lib/l10n/ur.arb` values changed —
+   `refundClaimWriteOff`, `refundClaimWriteOffTitle`,
+   `refundClaimWriteOffReasonRequired`, `refundClaimWriteOffAdminOnly` — and
+   `lib/l10n/app_localizations_ur.dart` was regenerated. English keys are
+   untouched. Red-first: `test/features/refund_claim_write_off_urdu_wording_test.dart`
+   failed with `refundClaimWriteOff still reads as forgiveness: "معاف کریں"`
+   before the change and passes after it (3/3). Five dependent widget/repository
+   suites (12 tests) pass; `flutter analyze` reports zero errors and zero
+   warnings (18 pre-existing `material.dart` deprecation infos, none from this
+   change); `node scripts/l10n-drift.js` exits 0 (gap 3 of cap 60).
 4. **Audit-artifact policy.** The generator is a test side-effect; the JSON/PNG
    delta is date-only (two JSON lines, nine glyphs). The preferred fix is a
    deterministic test clock; `.gitignore` alone, `assume-unchanged`, and

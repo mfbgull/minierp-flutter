@@ -2057,21 +2057,21 @@ class AppLocalizationsUr extends AppLocalizations {
   String get refundClaimRecordReceipt => 'وصولی درج کریں';
 
   @override
-  String get refundClaimWriteOff => 'معاف کریں';
+  String get refundClaimWriteOff => 'رقم دستبرد کریں';
 
   @override
-  String get refundClaimWriteOffTitle => 'ریفنڈ کلیم معاف کریں';
+  String get refundClaimWriteOffTitle => 'ریفنڈ کلیم کی رقم دستبرد کریں';
 
   @override
   String get refundClaimWriteOffReason => 'وجہ';
 
   @override
   String get refundClaimWriteOffReasonRequired =>
-      'کلیم معاف کرنے کے لیے وجہ درکار ہے';
+      'کلیم کی رقم دستبرد کرنے کے لیے وجہ درکار ہے';
 
   @override
   String get refundClaimWriteOffAdminOnly =>
-      '1,000 روپے سے زیادہ معافی کے لیے مالک درکار ہے';
+      '1,000 روپے سے زیادہ کی رقم دستبرد کرنے کے لیے مالک درکار ہے';
 
   @override
   String get refundClaimWriteOffAmountInvalid => 'درست رقم درج کریں';
