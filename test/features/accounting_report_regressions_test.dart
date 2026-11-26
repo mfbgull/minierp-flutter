@@ -10,7 +10,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:minierp_app/core/utils/csv_export.dart';
-import 'package:minierp_app/core/utils/date_utils.dart';
 import 'package:minierp_app/core/utils/formatters.dart';
 import 'package:minierp_app/data/models/report.dart';
 import 'package:minierp_app/features/reports/balance_sheet_report_screen.dart';
@@ -118,7 +117,12 @@ void main() {
     });
     await tester.pumpWidget(
       buildTestable(
-        const Scaffold(body: SalaryPayDialog(employee: employee)),
+        Scaffold(
+          body: SalaryPayDialog(
+            employee: employee,
+            initialPaymentDate: auditStableDate,
+          ),
+        ),
         overrides: [
           employeeSalaryHistoryProvider(1).overrideWith((ref) async => [row]),
           employeeActiveLoansProvider(1).overrideWith((ref) => []),
@@ -128,16 +132,12 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField).first, '800');
     await tester.pumpAndSettle();
+    // The dialog opens on the pinned audit date, so what it renders is what
+    // the artifact records. No label rewriting: a wrong date would fail here
+    // instead of being masked.
     final texts = tester
         .widgetList<Text>(find.byType(Text))
         .map((w) => w.data ?? w.textSpan?.toPlainText() ?? '')
-        // The dialog derives its payment-date label from DateTime.now(); pin it
-        // to the committed audit date so the saved artifact is date-stable.
-        .map(
-          (t) => t == Formatters.date(isoDate(DateTime.now()))
-              ? auditStableToolbarDate
-              : t,
-        )
         .toList();
     File(
       'audit/accounting-audit/remediation/flutter-salary-carryover-widget.json',

@@ -38,9 +38,19 @@ Future<void> showSalaryPayDialog(
 }
 
 class SalaryPayDialog extends ConsumerStatefulWidget {
-  const SalaryPayDialog({super.key, required this.employee});
+  const SalaryPayDialog({
+    super.key,
+    required this.employee,
+    this.initialPaymentDate,
+  });
 
   final Employee employee;
+
+  /// The date the dialog opens on. Defaults to today, which is what the app
+  /// wants. The accounting audit tests pass a fixed date instead, so the
+  /// artifacts they write stay byte-stable from one run to the next
+  /// (audit/DECISIONS.md D26 item 4).
+  final DateTime? initialPaymentDate;
 
   @override
   ConsumerState<SalaryPayDialog> createState() => _SalaryPayDialogState();
@@ -70,7 +80,7 @@ class _SalaryPayDialogState extends ConsumerState<SalaryPayDialog> {
     _referenceController = TextEditingController();
     _notesController = TextEditingController();
     _loanDeductionController = TextEditingController();
-    _paymentDate = DateTime.now();
+    _paymentDate = widget.initialPaymentDate ?? DateTime.now();
     // The server defaults to `bank`; the reference dropdown leads with
     // the most common method.
     _paymentMethod = 'Bank Transfer';

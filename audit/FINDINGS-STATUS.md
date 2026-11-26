@@ -51,10 +51,11 @@ BOTH resolved, both by Gull on 2026-11-26:
   removed; three older guard-specific pins were rewritten because one of them
   was passing for the wrong reason.
 
-Still open in that list: items 4–5 (audit-artifact policy, the ext4 move).
+Still open in that list: item 5 (the ext4 move).
 Item 3 is closed in full: UX-7 (Urdu wording → دستبرد) and UX-5 (standalone
-claim screen → Option A, built and tested). None of the remaining items is
-money.
+claim screen → Option A, built and tested). Item 4 is closed too: the audit
+capture date is now an input to `SalaryPayDialog` and the label-rewriting step
+is gone. Only the ext4 move is left, and it is not money.
 
 ## Review cycle state — 2026-11-16 (coordinator record)
 
@@ -326,6 +327,14 @@ the screen). Implemented in `lib/features/purchases/refund_claim_standalone_dial
 plus a permission-gated button on the claims screen; pinned by
 `test/features/refund_claim_standalone_create_test.dart` (4/4). Still open: the
 audit-artifact policy and the ext4 move.)*
+*(2026-11-26 correction 3: the audit-artifact policy is no longer open — Gull
+chose Option B. `SalaryPayDialog` gained an `initialPaymentDate` parameter
+(defaults to today); the audit test passes a fixed date and the label-rewriting
+step is deleted. The rule, "an audit capture receives its date and never reads
+the clock", is recorded in `audit/DECISIONS.md` D26 item 4. Pinned by
+`test/features/salary_pay_dialog_fixed_date_test.dart`; no tracked artifact
+changed and the salary JSON was byte-stable across two runs. Still open: the
+ext4 move only.)*
 
 ## Accounting audit revalidation — 2026-10-26–27
 

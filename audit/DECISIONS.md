@@ -1509,9 +1509,10 @@ keys, the remaining mutating-endpoint keys, and the first-deployment checklist.
 
 **OPEN-DECISION — proposals, not decisions taken.** Each needs Gull's call.
 **Resolved on 2026-11-26: item 1 (F-3 dating → Option A), item 2 (F-1 two-step
-write-off → remove the guard), and all of item 3 (UX-7 Urdu write-off wording →
-دستبرد; UX-5 standalone claim screen → Option A, build it). Items 4–5 remain
-open.**
+write-off → remove the guard), all of item 3 (UX-7 Urdu write-off wording →
+دستبرد; UX-5 standalone claim screen → Option A, build it), and item 4
+(audit-artifact policy → Option B, the capture date is an input and the rule is
+written down). Item 5, the ext4 move, remains open.**
 
 1. **Money F-3 dating. — RESOLVED 2026-11-26, Gull: Option A.** PI escalated
    the discrepancy. Any decision must keep both accounting stores consistent.
@@ -1664,6 +1665,48 @@ open.**
    delta is date-only (two JSON lines, nine glyphs). The preferred fix is a
    deterministic test clock; `.gitignore` alone, `assume-unchanged`, and
    commit-once are not accepted as recurring-churn fixes. Gull selects the policy.
+
+   **RESOLVED (2026-11-26, Gull): Option B — the capture date is an input, and
+   the rule is written down.** Gull rejected a test-global fixed clock, because
+   the audit tests do not control every place the date is read. `SalaryPayDialog`
+   calls `DateTime.now()` directly, so faking the clock would need production
+   code changes, and a test-wired clock would leak into unrelated suites. Option
+   B fixes the one real leak and freezes the rule instead.
+
+   **The rule.** An audit capture test must RECEIVE its date. It must not read
+   the real clock, and it must not rewrite a real-clock label after the fact.
+   A widget that needs a fixed date takes it as a constructor parameter that
+   defaults to today; the app keeps the default and the test passes the fixed
+   date.
+
+   - `SalaryPayDialog` gained `initialPaymentDate` (`DateTime?`, defaults to
+     `DateTime.now()`). Nothing else in production changed, so the app behaves
+     exactly as before. `employees_screen.dart`, `employee_detail_dialog.dart`,
+     `payments_screen.dart` and `showSalaryPayDialog` are untouched.
+   - `test/features/accounting_report_regressions_test.dart` now passes
+     `auditStableDate` into the dialog and **the label-rewriting step is
+     deleted**. Previously the test replaced today's label with the frozen
+     string, so it was stable by lookup, not by rule: it hid a real regression
+     in that label and depended on the machine date never equalling Nov 15,
+     2026. The removed code was
+     `t == Formatters.date(isoDate(DateTime.now())) ? auditStableToolbarDate : t`.
+   - Red-first: `test/features/salary_pay_dialog_fixed_date_test.dart` failed
+     with `No named parameter with the name 'initialPaymentDate'` before the
+     parameter existed. It now passes, and the pin is date-independent: on the
+     frozen date itself the "machine date must not leak" assertion would fail
+     loudly instead of passing by accident.
+   - Evidence: `accounting_report_regressions_test.dart` 8/8, the new pin 1/1,
+     `money_submission_idempotency_test.dart` (the other `SalaryPayDialog`
+     caller in tests) 14/14. `flutter analyze` on the three touched files shows
+     only the pre-existing `material.dart` deprecation infos after one dead
+     import was removed. **No tracked audit artifact changed**, and
+     `flutter-salary-carryover-widget.json` hashed `43896a6e…` before and after
+     a second full run — byte-stable, as the policy requires.
+   - Scope note: the remaining `DateTime.now()` reads in `report_providers.dart`
+     and `company_report_screen.dart` are the app's real "today" and are not
+     audit captures. They stay. A future audit capture that needs a fixed date
+     follows the same rule: pass the date in, never read the clock.
+
 5. **ext4 move.** The NTFS→ext4 move for the repository volume
    (`audit/NTFS-TO-EXT4-PROPOSAL.md`). Operational timing and risk are Gull's call;
    PI's migration plan must not be executed before approval.
