@@ -6,7 +6,9 @@
  * no GL. Receipts post Dr cash/bank / Cr AP with reference_type
  * REFUND_RECEIPT and advance the claim EXPECTED → PARTIAL → RECEIVED.
  * Write-offs settle short-paid claims through Dr 7300 / Cr AP with a
- * mandatory reason; above Rs 1,000 they are owner (admin) only.
+ * mandatory reason; above Rs 1,000 they are owner (admin) only. A claim may be
+ * written off in several deliberate steps (F-1, Gull 2026-11-26): each step
+ * carries its own Idempotency-Key, and the remaining balance is the cap.
  */
 import { beforeAll, beforeEach, afterEach, describe, expect, it } from '@jest/globals';
 import bcrypt from 'bcrypt';
@@ -326,42 +328,114 @@ describe('PRET-002 supplier refund claims', () => {
     expectAllInvariantsHold('write-off posted');
   });
 
-  it('refuses a second write-off of the same claim on the GL layer (no double-post)', async () => {
+  it('a claim can be written off in two deliberate steps until it reaches zero', async () => {
+    await seedOpeningCash(500);
+    const info = await paidPurchaseWithReturn({ total: 100 });
+
+    // 30 of the 100 comes back as cash. Real money — never written off.
+    const part = await receipt({
+      refund_date: '2026-08-05', credit_note_id: info.creditNoteId, amount: 30,
+    }, 'c1111111-1111-4111-8111-111111111111');
+    expect(part.status).toBe(201);
+    const before = cashBankBalance();
+
+    // Step 1: give up on 25 of the 70 that is still missing.
+    const first = await request(app)
+      .post(`/api/supplier-refunds/claims/${info.claimId}/write-off`)
+      .set('Cookie', cookie)
+      .set('Idempotency-Key', 'c2222222-2222-4222-8222-222222222222')
+      .send({ amount: 25, reason: 'First step' });
+    expect(first.status).toBe(200);
+
+    const mid = db.prepare('SELECT * FROM supplier_refund_claims WHERE id = ?')
+      .get(info.claimId) as { status: string; written_off_amount: number };
+    expect(mid.status).toBe('PARTIAL');
+    expect(mid.written_off_amount).toBeCloseTo(25, 2);
+
+    // Step 2: finish the remaining 45. Each deliberate step carries its own
+    // Idempotency-Key, so a double-click of ONE step still cannot double-post.
+    const second = await request(app)
+      .post(`/api/supplier-refunds/claims/${info.claimId}/write-off`)
+      .set('Cookie', cookie)
+      .set('Idempotency-Key', 'c3333333-3333-4333-8333-333333333333')
+      .send({ amount: 45, reason: 'Second step' });
+    expect(second.status).toBe(200);
+
+    const done = db.prepare('SELECT * FROM supplier_refund_claims WHERE id = ?')
+      .get(info.claimId) as { status: string; written_off_amount: number };
+    expect(done.status).toBe('RECEIVED');
+    expect(done.written_off_amount).toBeCloseTo(70, 2);
+
+    // Two steps = two postings, and together they still balance at 70.
+    const totals = db.prepare(`
+      SELECT a.code, SUM(j.debit) AS debit, SUM(j.credit) AS credit
+      FROM journal_lines j JOIN chart_of_accounts a ON a.id = j.account_id
+      WHERE j.reference_type = 'REFUND_CLAIM_WRITE_OFF' AND j.voided = 0
+      GROUP BY a.code ORDER BY a.code
+    `).all() as Array<{ code: string; debit: number; credit: number }>;
+    expect(totals).toEqual([
+      { code: '2000', debit: 0, credit: 70 },
+      { code: '7300', debit: 70, credit: 0 },
+    ]);
+
+    // Write-offs never touch cash.
+    expect(cashBankBalance()).toBeCloseTo(before, 2);
+
+    // The cap still holds: nothing is missing any more, so a third attempt fails.
+    const third = await request(app)
+      .post(`/api/supplier-refunds/claims/${info.claimId}/write-off`)
+      .set('Cookie', cookie)
+      .set('Idempotency-Key', 'c4444444-4444-4444-8444-444444444444')
+      .send({ amount: 1, reason: 'Third step' });
+    expect(third.status).toBeGreaterThanOrEqual(400);
+
+    expectAllInvariantsHold('two-step write-off');
+  });
+
+  it('replays the SAME Idempotency-Key instead of posting twice (double-click protection)', async () => {
     await seedOpeningCash(500);
     const info = await paidPurchaseWithReturn({ total: 100 });
     await receipt({ refund_date: '2026-08-05', credit_note_id: info.creditNoteId, amount: 30 },
       'a1111111-1111-4111-8111-111111111111');
 
+    // A double-click sends the SAME key with the SAME body. That is a repeat
+    // of ONE deliberate step, not a second step, so it must not post again.
+    const key = 'a2222222-2222-4222-8222-222222222222';
     const first = await request(app)
       .post(`/api/supplier-refunds/claims/${info.claimId}/write-off`)
       .set('Cookie', cookie)
-      .set('Idempotency-Key', 'a2222222-2222-4222-8222-222222222222')
-      .send({ reason: 'First write-off' });
+      .set('Idempotency-Key', key)
+      .send({ amount: 25, reason: 'Double click' });
     expect(first.status).toBe(200);
 
-    // A DIFFERENT key, so this is not an idempotent replay: it is a real second
-    // attempt.
-    const second = await request(app)
+    const repeat = await request(app)
       .post(`/api/supplier-refunds/claims/${info.claimId}/write-off`)
       .set('Cookie', cookie)
-      .set('Idempotency-Key', 'a3333333-3333-4333-8333-333333333333')
-      .send({ reason: 'Second write-off' });
-    expect(second.status).toBeGreaterThanOrEqual(400);
+      .set('Idempotency-Key', key)
+      .send({ amount: 25, reason: 'Double click' });
+    expect(repeat.status).toBe(200);
+    expect(repeat.body.idempotentReplay).toBe(true);
 
+    // ONE posting (two lines), and the claim advanced by 25 exactly once.
     const posted = db.prepare(`
-      SELECT COUNT(DISTINCT j.reference_id) AS n FROM journal_lines j
+      SELECT COUNT(*) AS n FROM journal_lines j
       WHERE j.reference_type = 'REFUND_CLAIM_WRITE_OFF' AND j.voided = 0
     `).get() as { n: number };
-    expect(posted.n).toBe(1);
-    expectAllInvariantsHold('second write-off refused');
+    expect(posted.n).toBe(2);
+
+    const claim = db.prepare('SELECT written_off_amount, status FROM supplier_refund_claims WHERE id = ?')
+      .get(info.claimId) as { written_off_amount: number; status: string };
+    expect(claim.written_off_amount).toBeCloseTo(25, 2);
+    expect(claim.status).toBe('PARTIAL');
+    expectAllInvariantsHold('idempotent replay');
   });
 
-  it('runs the active-posting check inside the same transaction as the posting', () => {
-    // The double-post test above proves the OUTCOME. This proves the MECHANISM:
-    // the guard must run in the same transaction as the GL insert, or a second
-    // writer can slip between the check and the post (check-then-act race).
-    // Read the controller source and assert the call sits inside
-    // db.transaction(...), exactly as the D19/M1 fix pattern requires.
+  it('runs the remaining-balance cap inside the same transaction as the posting', () => {
+    // The two-step test proves the OUTCOME. This proves the MECHANISM: the
+    // cap must be evaluated in the same transaction as the GL insert, or a
+    // second writer can slip between the read and the post (check-then-act
+    // race) and push write-offs past what is missing. The controller must
+    // own the transaction, exactly as the D19/M1 fix pattern requires.
     const src = fs.readFileSync(
       path.join(__dirname, '..', 'controllers', 'supplierRefundClaimController.ts'),
       'utf8',
@@ -371,18 +445,25 @@ describe('PRET-002 supplier refund claims', () => {
     const modelCall = src.indexOf('SupplierRefundClaimModel.writeOff(', txnStart);
     expect(modelCall).toBeGreaterThan(txnStart);
 
-    // The model itself must call the guard before posting.
+    // Inside writeOff: re-read the claim, compute what is left, cap the
+    // amount, then post — in that order.
     const modelSrc = fs.readFileSync(
       path.join(__dirname, '..', 'models', 'SupplierRefundClaim.ts'),
       'utf8',
     );
-    const guard = modelSrc.indexOf("assertNoActivePosting(db, 'REFUND_CLAIM_WRITE_OFF'");
-    const post = modelSrc.indexOf("reference_type: 'REFUND_CLAIM_WRITE_OFF'", guard);
-    expect(guard).toBeGreaterThan(-1);
-    expect(post).toBeGreaterThan(guard);
+    const fnStart = modelSrc.indexOf('static writeOff(');
+    expect(fnStart).toBeGreaterThan(-1);
+    const readClaim = modelSrc.indexOf('const claim = this.getById(id, db)', fnStart);
+    const remaining = modelSrc.indexOf('const remaining = claimRemaining(claim)', readClaim);
+    const cap = modelSrc.indexOf('amount > remaining + 0.005', remaining);
+    const post = modelSrc.indexOf("reference_type: 'REFUND_CLAIM_WRITE_OFF'", cap);
+    expect(readClaim).toBeGreaterThan(fnStart);
+    expect(remaining).toBeGreaterThan(readClaim);
+    expect(cap).toBeGreaterThan(remaining);
+    expect(post).toBeGreaterThan(cap);
   });
 
-  it('refuses to post a second write-off when an active GL posting already exists', async () => {
+  it('caps total write-offs at the remaining balance, however many deliberate steps are used', async () => {
     await seedOpeningCash(500);
     const info = await paidPurchaseWithReturn({ total: 100 });
     await receipt({ refund_date: '2026-08-05', credit_note_id: info.creditNoteId, amount: 30 },
@@ -390,36 +471,29 @@ describe('PRET-002 supplier refund claims', () => {
 
     const adminUserId = (db.prepare("SELECT id FROM users WHERE username = 'admin'").get() as { id: number }).id;
 
-    // First write-off posts Dr 7300 / Cr AP and leaves one active posting.
-    SupplierRefundClaimModel.writeOff(info.claimId, adminUserId, { reason: 'first' }, db);
-    const after = db.prepare(`
-      SELECT COUNT(*) AS n FROM journal_lines
-      WHERE reference_type = 'REFUND_CLAIM_WRITE_OFF' AND reference_id = ? AND voided = 0
-    `).get(info.claimId) as { n: number };
-    expect(after.n).toBe(2);
+    // 70 is missing. Two deliberate steps: 40, then the last 30.
+    SupplierRefundClaimModel.writeOff(info.claimId, adminUserId, { amount: 40, reason: 'first step' }, db);
+    SupplierRefundClaimModel.writeOff(info.claimId, adminUserId, { amount: 30, reason: 'second step' }, db);
 
-    // Put the claim's balance back so the ONLY thing that can refuse a second
-    // write-off is the GL guard. Without this the status/remaining layer would
-    // refuse first and the test would pass for the wrong reason.
-    db.prepare('UPDATE supplier_refund_claims SET written_off_amount = 0 WHERE id = ?').run(info.claimId);
+    const claim = db.prepare('SELECT written_off_amount, status FROM supplier_refund_claims WHERE id = ?')
+      .get(info.claimId) as { written_off_amount: number; status: string };
+    expect(claim.written_off_amount).toBeCloseTo(70, 2);
+    expect(claim.status).toBe('RECEIVED');
 
-    // A second write-off must be refused BY writeOff itself (the GL guard),
-    // not by the balance rule, because an active posting already exists.
-    expect(() => SupplierRefundClaimModel.writeOff(info.claimId, adminUserId, { reason: 'second' }, db))
-      .toThrow(/active GL posting already exists/);
+    // Nothing is missing now, so ANY further attempt is refused — this is the
+    // control that replaces the old one-write-off guard.
+    expect(() => SupplierRefundClaimModel.writeOff(info.claimId, adminUserId, { reason: 'third' }, db))
+      .toThrow(/no remaining balance/);
 
-    // A reversal VOIDS the posting instead of deleting it, so once the earlier
-    // lines are voided the guard must allow the re-post.
-    db.prepare(`UPDATE journal_lines SET voided = 1
-      WHERE reference_type = 'REFUND_CLAIM_WRITE_OFF' AND reference_id = ?`).run(info.claimId);
-    expect(() => SupplierRefundClaimModel.writeOff(info.claimId, adminUserId, { reason: 'after reversal' }, db))
-      .not.toThrow();
-
-    // NOTE ON COVERAGE LIMIT: a true interleaved double-post (two connections,
-    // both reading `remaining` before either writes) is NOT reachable on this
-    // stack. better-sqlite3 is synchronous and SQLite allows one writer, so the
-    // second writer gets SQLITE_BUSY rather than a duplicate posting. This test
-    // proves the guard contract, not a reproduced race.
+    // The GL holds exactly the missing 70, never a rupee more than the claim.
+    const totals = db.prepare(`
+      SELECT COALESCE(SUM(j.debit), 0) AS debit, COALESCE(SUM(j.credit), 0) AS credit
+      FROM journal_lines j
+      WHERE j.reference_type = 'REFUND_CLAIM_WRITE_OFF' AND j.voided = 0
+    `).get() as { debit: number; credit: number };
+    expect(totals.debit).toBeCloseTo(70, 2);
+    expect(totals.credit).toBeCloseTo(70, 2);
+    expectAllInvariantsHold('cap holds across two steps');
   });
 
   it('write-offs above Rs 1,000 are refused to a non-owner even with write-off permission', async () => {

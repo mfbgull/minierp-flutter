@@ -281,12 +281,15 @@ export class SupplierRefundClaimModel {
 
     AccountingService.assertPeriodNotClosed(db, data.write_off_date || claim.claim_date, `Refund claim ${claim.claim_no}`);
 
-    // Two write-offs of the same claim, each with its own Idempotency-Key, would
-    // each post Dr 7300 / Cr AP. The claim row is re-read inside the caller's
-    // transaction, but that alone does not stop a second writer. One active
-    // posting per claim is the rule; a reversal voids and re-posts, so the
-    // check scopes to voided = 0.
-    AccountingService.assertNoActivePosting(db, 'REFUND_CLAIM_WRITE_OFF', id);
+    // F-1 decision (Gull, 2026-11-26): a claim MAY be written off in several
+    // deliberate steps, each with its own Idempotency-Key, until the missing
+    // balance reaches zero. The old `assertNoActivePosting` guard is removed.
+    // Double-submit protection now rests on two controls that already exist:
+    // the route REQUIRES an Idempotency-Key, so a repeated click replays the
+    // first response instead of posting again; and `remaining` is re-read above
+    // inside the caller's transaction, so write-offs can never add up to more
+    // than what is still missing. The GL therefore stays at or below the
+    // claim's own value.
 
     const writeOffAccount = AccountingService.getAccountByCode(db, '7300');
     if (!writeOffAccount) {

@@ -466,6 +466,21 @@ describe('PurchaseReturnModel', () => {
       `).get() as { debit: number; voided: number };
       expect(reversal.debit).toBe(40);
 
+      // F-3 decision (Gull, Option A): a void counter-entry carries the
+      // ORIGINAL document date, never "today". The GL lines of this return are
+      // voided at their own date below, so dating the ledger counter-entry
+      // today would split the two books for every day between the return and
+      // the void — the same as-of mismatch F-3 fixed for refund receipts.
+      const dates = db.prepare(`
+        SELECT sl.transaction_date AS void_date, cn.credit_date AS note_date
+        FROM supplier_ledger sl
+        JOIN credit_notes cn ON cn.credit_no = sl.reference_no
+        WHERE sl.transaction_type = 'CREDIT_NOTE_VOID' AND cn.id = ?
+      `).get(header.credit_note_id) as { void_date: string; note_date: string } | undefined;
+      expect(dates).toBeDefined();
+      expect(dates!.void_date).toBe('2026-08-01');
+      expect(dates!.void_date).toBe(dates!.note_date);
+
       // GL journal lines voided
       const journal = db.prepare(`
         SELECT * FROM journal_lines WHERE reference_type = 'PURCHASE_RETURN' AND reference_id = ?

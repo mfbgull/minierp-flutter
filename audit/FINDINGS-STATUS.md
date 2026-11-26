@@ -37,10 +37,22 @@ tests passed on the merge commit.
 The S-6, owner-withdrawal, and batch-reconciliation stock fixes are therefore on
 main and recorded here for the first time.
 
-**Still open decisions.** Two `OPEN-DECISION` items in `audit/DECISIONS.md`
-await Gull: the F-3 dating choice (Option A same-date reversal vs Option B
-current-date) and F-1 (the two-step write-off product question). F-3 stays parked
-until the dating call is made.
+**Still open decisions.** The two money items in `audit/DECISIONS.md` are now
+BOTH resolved, both by Gull on 2026-11-26:
+
+- **F-3 dating → Option A** (reversal on the original date). Its stale
+  OPEN-DECISION block was closed with the evidence, and the last money path
+  still dating a counter-entry "today" — `PurchaseReturn.voidReturn`'s
+  `CREDIT_NOTE_VOID` ledger row — was aligned the same day, red-first.
+- **F-1 two-step write-off → REMOVE the guard.** A claim may be written off in
+  several deliberate steps. Double-click protection now rests on the required
+  Idempotency-Key plus the unchanged remaining-balance cap. Red-first: the new
+  two-step test failed `Expected: 200 / Received: 400` before the guard was
+  removed; three older guard-specific pins were rewritten because one of them
+  was passing for the wrong reason.
+
+Still open in that list: items 3–5 (UX-5/UX-7 wording, audit-artifact policy,
+the ext4 move). None of them is money.
 
 ## Review cycle state — 2026-11-16 (coordinator record)
 

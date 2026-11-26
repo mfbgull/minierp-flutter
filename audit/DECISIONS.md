@@ -1507,11 +1507,15 @@ settled and what is a proposal awaiting a product call.
 **Deferred backlog preserved.** Stage-2 keys, D20, BUG-011, task 8.6, mobile
 keys, the remaining mutating-endpoint keys, and the first-deployment checklist.
 
-**OPEN-DECISION — proposals, not decisions taken.** Each needs Gull's call; none
-is settled here.
+**OPEN-DECISION — proposals, not decisions taken.** Each needs Gull's call.
+**Items 1 (F-3 dating → Option A) and 2 (F-1 two-step write-off → remove the
+guard) are RESOLVED, both 2026-11-26; see the RESOLVED note inside each.
+Items 3–5 remain open.**
 
-1. **Money F-3 dating.** PI escalated the discrepancy; **no dating implementation
-   exists.** Any decision must keep both accounting stores consistent.
+1. **Money F-3 dating. — RESOLVED 2026-11-26, Gull: Option A.** PI escalated
+   the discrepancy. Any decision must keep both accounting stores consistent.
+   (The note below was written 2026-11-16, when no dating implementation
+   existed yet. It is kept as the record of what was found.)
    **Correction on record (2026-11-16):** an earlier claim that the F-3 test
    "masks an HTTP 400 because the void request omits a mandatory
    `Idempotency-Key`" was **WRONG**. `POST /api/supplier-refunds/:id/void`
@@ -1526,7 +1530,8 @@ is settled here.
    returned `HTTP 200`, and the **first failing assertion is the as-of
    GL/subledger comparison** (`Expected 0, Received 3000`) — **not** a masked
    400. Adding a key is optional and does not change the handler. The F-3 test
-   now carries a header comment recording this; F-3 remains parked. Options:
+   now carries a header comment recording this; F-3 was parked at the time.
+   The options put to Gull were:
    - **Option A — same-date reversal** — align with the house primitive
      `ledgerUtils.reverseLedgerEntry`, whose correction is dated at the
      original row's `transaction_date`. The complete non-test writer inventory
@@ -1541,8 +1546,29 @@ is settled here.
    - **Option B — current-date GL and subledger reversal together**, preserving
      historical postings. Wider scope.
    A UTC-only adjustment does **not** resolve the as-of mismatch, so it is not a
-   standalone option. F-3 stays parked until this is decided.
-2. **F-1 (money review) — product choice, not an ambiguous finding ID.** F-1 is
+   standalone option.
+
+   **RESOLVED (2026-11-26, Gull): Option A — same-date reversal.** The full
+   decision record is in `## F3 — refund-claim void money-dating` below (Gull,
+   2026-11-17, msg_ca9008067d4f). The supplier-refund void landed in `e301300`
+   and merged via PR9 (`29457260`); the F-3 case is unparked and passes as an
+   ordinary regression.
+
+   One money path still dated its counter-entry "today" and is now aligned.
+   `PurchaseReturn.voidReturn` wrote the `CREDIT_NOTE_VOID` supplier-ledger row
+   at `new Date().toISOString()`, while the GL lines of the same return were
+   voided at their own date. Fixed 2026-11-26: the counter-entry now carries
+   `credit_notes.credit_date` (fallback `header.return_date`), plus a
+   closed-period assert on the date actually used. Red-first evidence: the new
+   assertion in `server/src/__tests__/purchaseReturn.test.ts` failed with
+   `Expected: "2026-08-01" / Received: "2026-11-26"` before the fix, and passed
+   after it. `server/src/__tests__/purchaseReturn.test.ts` 15/15 and six
+   dependent suites (116 tests) pass; `npm run typecheck` and `eslint` are
+   clean. The stock `movement_date` of the same void (`PurchaseReturn.ts:851`)
+   is deliberately NOT changed — stock dating is a separate product call, and
+   this decision covers money only.
+2. **F-1 (money review) — RESOLVED 2026-11-26, Gull: REMOVE the guard.**
+   (Product choice, not an ambiguous finding ID.) F-1 is
    a real, defined finding (`audit/GLM-REVIEW.md`, on `glm/audit-reviews`): a
    claim can never be written off in two steps. `writeOff` calls
    `assertNoActivePosting(db, 'REFUND_CLAIM_WRITE_OFF', id)`
@@ -1559,6 +1585,35 @@ is settled here.
      proposed two-step test is added and the `:329`/`:385` pins are updated.
    This is Gull's product call. It is **not** a question about which finding ID
    "F-1" refers to.
+
+   **RESOLVED (2026-11-26, Gull): the guard is REMOVED.** A claim may now be
+   written off in several deliberate steps until the missing balance reaches
+   zero. Gull's condition: the double-click protection moves to the
+   **Idempotency-Key**, which this route already requires
+   (`routes/supplierRefunds.ts:26` → `startRequiredIdempotentRequest` in
+   `supplierRefundClaimController.ts:158`). One key = one step: a repeated key
+   replays the first response and posts nothing new. A *second* step must carry
+   a new key. The remaining-balance cap is unchanged and still refuses any
+   total above what is missing (`SupplierRefundClaim.ts:276`), so the GL can
+   never exceed the claim's own value.
+
+   - Code: `assertNoActivePosting(db, 'REFUND_CLAIM_WRITE_OFF', id)` deleted
+     from `server/src/models/SupplierRefundClaim.ts` (was `:289`). The general
+     helper stays for `OWNER_CAPITAL` / `OWNER_WITHDRAWAL`.
+   - The `:218-219`-style docstring problem **dissolves**: "a smaller amount
+     leaves the claim PARTIAL" is now true.
+   - Tests, red-first: the new case
+     `'a claim can be written off in two deliberate steps until it reaches zero'`
+     was written first and failed with `Expected: 200 / Received: 400` on step
+     two, before the guard was removed.
+   - Three older pins were rewritten because they tested the guard, not the
+     behaviour: `:329` became the Idempotency-Key replay test (it had been
+     passing for the *wrong reason* — the cap, not the guard), `:359` now
+     proves the remaining cap sits inside the posting transaction, and `:385`
+     now proves the cap across two steps.
+   - Evidence: `supplierRefundClaims.test.ts` 21/21; plus six dependent suites
+     (69 tests) and three more (90 tests) green; `npm run typecheck` and full
+     `npm run lint` clean. Full suites NOT rerun.
 3. **UX-5 / UX-7 wording.** The proposed user-facing strings need Gull's wording
    approval before they land.
 4. **Audit-artifact policy.** The generator is a test side-effect; the JSON/PNG
@@ -1778,8 +1833,13 @@ remains a separate mechanism.
 - Implementation: assigned to PI on a fresh branch — SupplierRefund.ts + F3
   server regressions, real-HTTP red-first (as-of/date, closed-period guard,
   cash guard, invariants A–J), revert-proof.
-- Status: **DECIDED / implementation-pending** — NOT FIXED until evidence
-  (red-first tests + review land).
+- Status: **DECIDED (2026-11-17) → FIXED** (updated 2026-11-26). The earlier
+  "implementation-pending / NOT FIXED until evidence" status is superseded: the
+  fix landed in `e301300`, merged via PR9 (`29457260`, 2026-11-18), and the F-3
+  case runs unparked and green (re-run 2026-11-26: 3/3). The last money path
+  still dating a counter-entry "today" — `PurchaseReturn.voidReturn`'s
+  `CREDIT_NOTE_VOID` ledger row — was aligned on 2026-11-26 under this same
+  Option A decision, red-first (see OPEN-DECISION item 1 for the evidence).
 - Scope guards: no new current-date reversal feature/UI; existing tested
   candidates PR4/PR7/PR8 stay frozen.
 

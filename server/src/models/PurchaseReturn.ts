@@ -969,9 +969,19 @@ class PurchaseReturnModel {
         }
 
         const note = db.prepare(`SELECT * FROM credit_notes WHERE id = ?`)
-          .get(header.credit_note_id) as { credit_no: string; amount: number; supplier_id: number | null } | undefined;
+          .get(header.credit_note_id) as { credit_no: string; amount: number; supplier_id: number | null; credit_date: string | null } | undefined;
 
         if (note) {
+          // F-3 decision (Gull, Option A): the counter-entry carries the credit
+          // note's own document date, never "today". The GL lines of this
+          // return are voided at their own entry_date, so a today-dated ledger
+          // row would split the supplier ledger from the GL for every day
+          // between the return and the void. A legacy row without a credit_date
+          // falls back to the return date, which the guard above already holds
+          // open. Assert before any write so a closed period leaves no partial.
+          const voidDate = note.credit_date || header.return_date;
+          AccountingService.assertPeriodNotClosed(db, voidDate, `Credit note ${note.credit_no} void`);
+
           db.prepare(`
             UPDATE credit_notes SET status = 'VOIDED', voided_at = datetime('now'), voided_by = ? WHERE id = ?
           `).run(userId, header.credit_note_id);
@@ -980,7 +990,7 @@ class PurchaseReturnModel {
             // Debit restores the supplier balance (credit note had reduced it).
             SupplierLedgerModel.createEntry({
               supplier_id: note.supplier_id,
-              transaction_date: new Date().toISOString().split('T')[0],
+              transaction_date: voidDate,
               transaction_type: 'CREDIT_NOTE_VOID',
               reference_no: note.credit_no,
               debit: note.amount,
