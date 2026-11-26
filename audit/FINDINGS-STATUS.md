@@ -314,6 +314,10 @@ keys, and the first-deployment checklist (`audit/FIRST-DEPLOYMENT-CHECKLIST.md`)
 **OPEN-DECISION (proposals, not decisions taken).** Recorded in
 `audit/DECISIONS.md` D26: F-3 dating, F-1 semantics (money review), UX-5/7
 wording, audit-artifact policy, and the ext4 move.
+*(2026-11-26 correction: the two money items are no longer open — F-3 → Option
+A (reversal on the original date) and F-1 → remove the guard, both decided by
+Gull and implemented in `c3655a1`. UX-5/7 wording, the audit-artifact policy
+and the ext4 move remain open.)*
 
 ## Accounting audit revalidation — 2026-10-26–27
 
