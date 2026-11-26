@@ -6,8 +6,12 @@
  * process with NODE_ENV=production forced before the app is imported
  * (jest sets it to 'test' in-process).
  *
- * Note: the limiter config check reads the committed .env *if present*
- * (local dev); on CI the file is gitignored, so the child-process 429 test
+ * Note: the limiter config check reads the TEMPLATE that ships with the
+ * repo (`.env.example`), not the developer's local `.env`. `.env` is
+ * gitignored, so it never ships and its NODE_ENV is a local choice; guarding
+ * it only made the suite fail on any dev machine that sets development.
+ * The template is the artifact that reaches a deployment, so that is what
+ * must force a production-safe NODE_ENV. On CI the child-process 429 test
  * — which forces NODE_ENV itself — is the authoritative gate.
  */
 import { spawnSync } from 'child_process';
@@ -18,9 +22,12 @@ import os from 'os';
 const SERVER_ROOT = path.join(__dirname, '..', '..');
 
 describe('Rate limiters active under committed config (SEC-02)', () => {
-  it('committed server/.env (when present) sets NODE_ENV to a production-safe value', () => {
-    const envPath = path.join(SERVER_ROOT, '.env');
-    if (!fs.existsSync(envPath)) return; // CI: file is gitignored
+  it('the shipped .env.example sets NODE_ENV to a production-safe value', () => {
+    // `.env` is gitignored and never ships; `.env.example` is the tracked
+    // template a deployment copies. Guard that one, and always — it is in the
+    // repo, so there is no "absent" case to skip on.
+    const envPath = path.join(SERVER_ROOT, '.env.example');
+    if (!fs.existsSync(envPath)) return; // defensive: template missing (fork/repackage)
     const envFile = fs.readFileSync(envPath, 'utf8');
     const match = envFile.match(/^NODE_ENV=(.*)$/m);
     expect(match).not.toBeNull();
