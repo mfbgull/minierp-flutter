@@ -1508,11 +1508,12 @@ settled and what is a proposal awaiting a product call.
 keys, the remaining mutating-endpoint keys, and the first-deployment checklist.
 
 **OPEN-DECISION — proposals, not decisions taken.** Each needs Gull's call.
-**Resolved on 2026-11-26: item 1 (F-3 dating → Option A), item 2 (F-1 two-step
-write-off → remove the guard), all of item 3 (UX-7 Urdu write-off wording →
-دستبرد; UX-5 standalone claim screen → Option A, build it), and item 4
-(audit-artifact policy → Option B, the capture date is an input and the rule is
-written down). Item 5, the ext4 move, remains open.**
+**All five items are RESOLVED as of 2026-11-26.** Item 1 (F-3 dating → Option
+A), item 2 (F-1 two-step write-off → remove the guard), item 3 (UX-7 Urdu
+write-off wording → دستبرد; UX-5 standalone claim screen → Option A, build it),
+item 4 (audit-artifact policy → Option B, the capture date is an input and the
+rule is written down), and item 5 (ext4 move — already done, verified). No open
+decision remains in this record.**
 
 1. **Money F-3 dating. — RESOLVED 2026-11-26, Gull: Option A.** PI escalated
    the discrepancy. Any decision must keep both accounting stores consistent.
@@ -1710,6 +1711,24 @@ written down). Item 5, the ext4 move, remains open.**
 5. **ext4 move.** The NTFS→ext4 move for the repository volume
    (`audit/NTFS-TO-EXT4-PROPOSAL.md`). Operational timing and risk are Gull's call;
    PI's migration plan must not be executed before approval.
+
+   **RESOLVED (2026-11-26): the repo is already on ext4.** Gull reported it;
+   it was verified, not assumed. `findmnt -T .` shows `/home` on
+   `/dev/nvme0n1p8`, ext4. The old NTFS path no longer exists, and
+   `server/node_modules` is on the same ext4 mount. The proposed stall is gone:
+   `/proc/pressure/io` `avg300` fell from ~28% "some" / ~8% "full" to 2.81% /
+   0.94%. Two differences from the plan are recorded in the proposal file: the
+   chosen root is `/home/fawad/minierp`, not the suggested
+   `/home/fawad/repos/…`, and `database/` is not in this tree, so the
+   "keep the live DB with the tree" risk does not apply here. No audit file was
+   deleted; the proposal keeps its original text plus a closure section.
+
+   One loose end was found and fixed during closure: `scripts/check.sh` was
+   tracked mode `100644`, so `./scripts/check.sh` exited 126 and only
+   `bash scripts/check.sh` worked. Both `AGENTS.md` and the script's own usage
+   header call it as `scripts/check.sh`, and two recorded gates had already hit
+   exit 126. The mode is now `100755`. CI is unaffected: `.github/workflows/ci.yml`
+   does not call the script directly, so no gate changed.
 
 ## D27 — The PR #6 (stock S-2) review: correction trail (2026-11-16)
 

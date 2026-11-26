@@ -1,8 +1,44 @@
 # Proposal: move the repo off NTFS to ext4
 
-**Status: PROPOSAL ONLY. Nothing has been moved.**
+**Status: DONE (verified 2026-11-26). The move happened; this record is kept
+for the evidence trail. Nothing in the proposal is still to do.**
 
-## Where things live now
+## Closure (2026-11-26)
+
+Gull reported the repo is already on ext4. That was verified, not taken on
+trust:
+
+| Check | Result |
+|---|---|
+| `findmnt -T .` | `/home` → `/dev/nvme0n1p8`, **ext4**, `rw,relatime` |
+| Repo root | `/home/fawad/minierp` — on that mount |
+| Old NTFS path (`/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter`) | **does not exist** |
+| `server/node_modules` | ext4 (same mount) |
+| `core.filemode` | `true` — git honours the exec bit |
+
+The stall this proposal was written about is gone:
+
+| Measure | In the proposal | Measured 2026-11-26 |
+|---|---|---|
+| `/proc/pressure/io` `avg300` "some" | ~28% | 2.81% |
+| `/proc/pressure/io` `avg300` "full" | ~8% | 0.94% |
+
+Two differences from the plan are recorded so nobody looks for them later:
+
+- The chosen root is `/home/fawad/minierp`, not the `/home/fawad/repos/…` path
+  the proposal suggested. Both are on the same ext4 volume.
+- `database/` does not exist at the repo root. The dev database is not in this
+  tree, so the "keep the live DB with the tree" risk no longer applies here.
+
+One loose end found during closure and fixed in the same commit:
+`scripts/check.sh` was tracked mode `100644`, so `./scripts/check.sh` exited
+126 ("permission denied") and only `bash scripts/check.sh` worked. The mode is
+now `100755`, matching its own usage header and `AGENTS.md`. See
+`audit/FINDINGS-STATUS.md` for the two earlier gates that hit exit 126.
+
+The sections below are the original proposal text, unchanged.
+
+## Where things used to live
 
 | Path | Filesystem | Type | Mount |
 |---|---|---|---|

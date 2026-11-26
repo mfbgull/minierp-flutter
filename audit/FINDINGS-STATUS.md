@@ -55,7 +55,10 @@ Still open in that list: item 5 (the ext4 move).
 Item 3 is closed in full: UX-7 (Urdu wording → دستبرد) and UX-5 (standalone
 claim screen → Option A, built and tested). Item 4 is closed too: the audit
 capture date is now an input to `SalaryPayDialog` and the label-rewriting step
-is gone. Only the ext4 move is left, and it is not money.
+is gone. **Item 5 is also closed: the repo was already on ext4 — verified
+2026-11-26 (`findmnt` shows `/home` on `/dev/nvme0n1p8`, ext4; the old NTFS
+path is gone; IO pressure `avg300` fell from ~28% to 2.81%). No open decision
+remains in this record.**
 
 ## Review cycle state — 2026-11-16 (coordinator record)
 
@@ -335,6 +338,12 @@ the clock", is recorded in `audit/DECISIONS.md` D26 item 4. Pinned by
 `test/features/salary_pay_dialog_fixed_date_test.dart`; no tracked artifact
 changed and the salary JSON was byte-stable across two runs. Still open: the
 ext4 move only.)*
+*(2026-11-26 correction 4: the ext4 move is no longer open — the repo was
+already on ext4 and this was verified (`findmnt` → `/home` on `/dev/nvme0n1p8`,
+ext4; old NTFS path gone; IO pressure `avg300` 28% → 2.81%). `scripts/check.sh`
+was also tracked mode `100644`, so `./scripts/check.sh` exited 126; it is now
+`100755`. The proposal file keeps its text plus a closure section. **No open
+decision remains in `audit/DECISIONS.md` D26.**)*
 
 ## Accounting audit revalidation — 2026-10-26–27
 
