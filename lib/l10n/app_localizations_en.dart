@@ -5427,6 +5427,31 @@ class AppLocalizationsEn extends AppLocalizations {
   String get productionOverhead => 'Overhead Cost';
 
   @override
+  String get productionSettleOverhead => 'Settle overhead';
+
+  @override
+  String get productionSettleOverheadTitle => 'Settle production overhead';
+
+  @override
+  String get productionSettleOverheadHint =>
+      'Pay the labour, electricity or gas bill. The accrued part clears Accrued Production Overhead; anything paid above it books as an expense.';
+
+  @override
+  String get productionSettleOverheadAmount => 'Amount paid';
+
+  @override
+  String get productionSettleOverheadReference => 'Reference (optional)';
+
+  @override
+  String productionSettleOverheadPaid(String accrued, String excess) {
+    return 'Overhead settled: $accrued cleared, $excess booked as expense.';
+  }
+
+  @override
+  String get productionSettleOverheadError =>
+      'Enter an amount greater than zero.';
+
+  @override
   String get productionRawmaterialsWarehouse => 'Raw Materials Warehouse';
 
   @override

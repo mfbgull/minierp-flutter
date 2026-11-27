@@ -127,6 +127,8 @@ abstract final class ApiEndpoints {
   // `/api/productions` (`app.use('/api', productionRoutes)`).
   static const boms = '/boms';
   static const productions = '/productions';
+  // D30 — pay down account 2200 Accrued Production Overhead.
+  static const overheadSettle = '/accounting/overhead/settle';
   static const settings = '/settings';
   static const preferences = '/preferences';
   static const activityLog = '/activity-logs';

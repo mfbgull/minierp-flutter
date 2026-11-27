@@ -22,11 +22,24 @@ import { Response } from 'express';
 import { AuthRequest } from '../types';
 import db from '../config/database';
 import AccountingService from '../services/accountingService';
+import OverheadSettlementModel, { OverheadSettlementRow } from '../models/OverheadSettlement';
 import PeriodModel from '../models/Period';
 import ReportsModel from '../models/Reports';
+import { isValidPaymentMethod } from '../services/cashService';
 import { logCRUD, ActionType } from '../services/activityLogger';
 import logger from '../utils/logger';
 import { getQueryParam, getRouteParam } from '../utils/queryUtils';
+import { handleBusinessError } from '../utils/businessRuleError';
+import {
+  IDEMPOTENCY_KEY_HEADER,
+  IDEMPOTENCY_SCOPES,
+  IDEMPOTENCY_KEY_REQUIRED_MESSAGE,
+  IdempotencyConflictError,
+  beginIdempotentWrite,
+  claimIdempotencyKey,
+  hashRequestPayload,
+  normalizeIdempotencyKey,
+} from '../utils/idempotency';
 import {
   sendSuccess,
   sendCreated,
@@ -352,6 +365,106 @@ function closePeriod(req: AuthRequest, res: Response): void {
 }
 
 // ============================================================================
+// D30 — Overhead settlement
+// ============================================================================
+
+/**
+ * POST /api/accounting/overhead/settle  (D30 — "Settle overhead")
+ *
+ * Pays down account 2200 Accrued Production Overhead: Dr 2200 for the
+ * accrued part, Dr 6000 for any excess above it (Gull's Q3 answer B),
+ * Cr cash/bank for the whole payment. Validation and the mandatory
+ * Idempotency-Key live here; the split, the SQL and the cash-timeline
+ * guard live in OverheadSettlementModel (no raw SQL in controllers).
+ */
+function settleOverhead(req: AuthRequest, res: Response): void {
+  try {
+    const { settlement_date, amount, payment_method, reference_note } = req.body;
+    const userId = req.user?.id ?? null;
+
+    if (!settlement_date) {
+      sendBadRequest(res, 'Settlement date is required');
+      return;
+    }
+    const parsedAmount = typeof amount === 'number' ? amount : parseFloat(String(amount ?? ''));
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      sendBadRequest(res, 'Amount must be a positive number');
+      return;
+    }
+    if (!isValidPaymentMethod(payment_method)) {
+      sendBadRequest(res,
+        `Invalid payment_method "${String(payment_method)}" — use Cash, Bank, Easypaisa, JazzCash or Upaisa`);
+      return;
+    }
+    if (reference_note !== undefined && reference_note !== null && String(reference_note).length > 200) {
+      sendBadRequest(res, 'Reference note must be 200 characters or fewer');
+      return;
+    }
+
+    // D30: a retry after a lost response must not pay the bill twice. The
+    // key is mandatory, exactly as on the other canonical financial writes.
+    let idemKey: string | null;
+    try {
+      idemKey = normalizeIdempotencyKey(req.headers[IDEMPOTENCY_KEY_HEADER]);
+    } catch (keyError) {
+      res.status(400).json({ success: false, error: (keyError as Error).message });
+      return;
+    }
+    if (idemKey === null) {
+      res.status(400).json({ success: false, error: IDEMPOTENCY_KEY_REQUIRED_MESSAGE });
+      return;
+    }
+    const hash = hashRequestPayload(req.body);
+    const { replayId } = beginIdempotentWrite(db, IDEMPOTENCY_SCOPES.OVERHEAD_SETTLE, idemKey, hash);
+    if (replayId !== null) {
+      res.set('X-Idempotent-Replay', 'true');
+      sendCreated(res, OverheadSettlementModel.getById(db, replayId));
+      return;
+    }
+
+    let created: OverheadSettlementRow | undefined;
+    db.transaction(() => {
+      created = OverheadSettlementModel.create(db, {
+        settlement_date: String(settlement_date),
+        amount: parsedAmount,
+        payment_method: String(payment_method),
+        reference_note: reference_note === undefined || reference_note === null
+          ? undefined : String(reference_note),
+        created_by: userId ?? undefined,
+      });
+      // Claimed inside the same transaction: a refused settlement rolls the
+      // claim back with it, so the key stays usable for an honest retry.
+      claimIdempotencyKey(db, IDEMPOTENCY_SCOPES.OVERHEAD_SETTLE, idemKey!, hash, created.id);
+    })();
+
+    logCRUD(
+      ActionType.OVERHEAD_SETTLE,
+      'OverheadSettlement',
+      created!.id,
+      `Settled production overhead ${created!.settlement_no}: paid ${created!.amount_paid.toFixed(2)} ` +
+        `(accrued ${created!.accrued_amount.toFixed(2)}, excess ${created!.excess_amount.toFixed(2)}) via ${created!.payment_method}`,
+      userId ?? undefined,
+      {
+        settlement_no: created!.settlement_no,
+        amount_paid: created!.amount_paid,
+        accrued_amount: created!.accrued_amount,
+        excess_amount: created!.excess_amount,
+        payment_method: created!.payment_method,
+      }
+    );
+    req.activityLogged = true;
+
+    sendCreated(res, created);
+  } catch (error: unknown) {
+    if (error instanceof IdempotencyConflictError) {
+      sendConflict(res, error.message);
+      return;
+    }
+    handleBusinessError(res, error, 'Settle overhead', 'Failed to settle overhead');
+  }
+}
+
+// ============================================================================
 // Exports
 // ============================================================================
 
@@ -369,4 +482,6 @@ export default {
   getPeriod,
   openPeriod,
   closePeriod,
+  // D30 overhead settlement
+  settleOverhead,
 };

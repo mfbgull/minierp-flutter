@@ -180,6 +180,15 @@ export const zodBodySchemas = {
     payment_method: z.string().min(1).max(50),
     reference_no: z.string().max(100).optional(),
   }),
+  // D30 — settle production overhead. The amount may arrive as a string from
+  // a currency field, so it is a union here and positivity is checked in the
+  // controller, exactly like expenseCreate.
+  overheadSettle: z.object({
+    settlement_date: documentDate('settlement_date'),
+    amount: z.union([z.number().finite(), z.string().min(1).max(50)]),
+    payment_method: z.string().min(1).max(50),
+    reference_note: z.string().max(200).optional(),
+  }).passthrough(),
   supplierBill: z.object({
     supplier_id: z.number().int().positive(),
     bill_no: z.string().trim().min(1).max(150),

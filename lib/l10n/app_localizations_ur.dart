@@ -5427,6 +5427,30 @@ class AppLocalizationsUr extends AppLocalizations {
   String get productionOverhead => 'اضافی لاگت';
 
   @override
+  String get productionSettleOverhead => 'اضافی لاگت ادا کریں';
+
+  @override
+  String get productionSettleOverheadTitle => 'پیداوار کی اضافی لاگت ادا کریں';
+
+  @override
+  String get productionSettleOverheadHint =>
+      'مزدوری، بجلی یا گیس کا بل ادا کریں۔ جمع شدہ حصہ اضافی لاگت والے کھاتے کو خالی کرتا ہے؛ اس سے زیادہ ادائیگی خرچ کے طور پر درج ہوتی ہے۔';
+
+  @override
+  String get productionSettleOverheadAmount => 'ادا شدہ رقم';
+
+  @override
+  String get productionSettleOverheadReference => 'حوالہ (اختیاری)';
+
+  @override
+  String productionSettleOverheadPaid(String accrued, String excess) {
+    return 'اضافی لاگت ادا ہو گئی: $accrued کھاتے سے کم ہوئی، $excess خرچ کے طور پر درج ہوئی۔';
+  }
+
+  @override
+  String get productionSettleOverheadError => 'صفر سے زیادہ رقم درج کریں۔';
+
+  @override
   String get productionRawmaterialsWarehouse => 'خام مال کا گودام';
 
   @override

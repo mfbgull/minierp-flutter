@@ -852,6 +852,81 @@ export class AccountingService {
   }
 
   /**
+   * D30 — settle production overhead: Dr 2200 for the accrued part, Dr 6000
+   * for any excess above it (Gull's Q3 answer B), Cr cash/bank for the whole
+   * payment.
+   *
+   * The cost already sits inside the item's stock value, so only the excess
+   * is a new expense — debiting 6000 for the accrued part too would count the
+   * same electricity twice (once in the product, once in the P&L). Called
+   * inside the settlement transaction, after the document row exists.
+   */
+  static postOverheadSettlementEntry(
+    db: Database.Database,
+    args: {
+      settlementId: number;
+      settlementNo: string;
+      settlementDate: string;
+      amountPaid: number;
+      accruedAmount: number;
+      excessAmount: number;
+      paymentMethod?: string;
+      userId?: number | null;
+    }
+  ): PostedEntry {
+    if (!args.amountPaid || args.amountPaid <= 0) {
+      throw new Error('A settlement must pay a positive amount');
+    }
+    if (roundCurrency(args.accruedAmount + args.excessAmount) !== roundCurrency(args.amountPaid)) {
+      throw new Error('Settlement split does not add up to the amount paid');
+    }
+
+    const payable = AccountingService.getAccountByTextCode(db, 'production_overhead_payable');
+    if (!payable) {
+      throw new Error('Chart of accounts is missing required account: 2200 (Accrued Production Overhead)');
+    }
+    const cashCode = AccountingService._cashOrBankAccountCode(args.paymentMethod);
+    const cash = AccountingService.getAccountByCode(db, cashCode);
+    if (!cash) {
+      throw new Error(`Chart of accounts is missing required account: ${cashCode}`);
+    }
+
+    const lines: JournalLineInput[] = [];
+    if (args.accruedAmount > 0) {
+      lines.push({
+        account_id: payable.id,
+        debit: args.accruedAmount,
+        description: `Production overhead settled (${args.settlementNo})`,
+      });
+    }
+    if (args.excessAmount > 0) {
+      const opex = AccountingService.getAccountByCode(db, '6000');
+      if (!opex) {
+        throw new Error('Chart of accounts is missing required account: 6000 (Operating Expenses)');
+      }
+      lines.push({
+        account_id: opex.id,
+        debit: args.excessAmount,
+        description: `Overhead paid above the accrued estimate (${args.settlementNo})`,
+      });
+    }
+    lines.push({
+      account_id: cash.id,
+      credit: args.amountPaid,
+      description: `Overhead settlement paid via ${cashCode} (${args.settlementNo})`,
+    });
+
+    return AccountingService.postEntry(db, {
+      entry_date: args.settlementDate,
+      description: `Overhead settlement ${args.settlementNo} — ${args.amountPaid.toFixed(2)} (${cashCode})`,
+      reference_type: 'OVERHEAD_SETTLEMENT',
+      reference_id: args.settlementId,
+      created_by: args.userId,
+      lines,
+    });
+  }
+
+  /**
    * Credit-side account for a purchase: AP when bought on credit,
    * otherwise the cash/bank/wallet implied by the payment method.
    */

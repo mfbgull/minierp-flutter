@@ -112,6 +112,54 @@ class ProductionRepository {
 
   Future<ApiResult<void>> deleteProduction(int id) =>
       _api.delete('${ApiEndpoints.productions}/$id');
+
+  // ---- D30: overhead settlement ----
+
+  /// Pays down 2200 Accrued Production Overhead:
+  /// `POST /accounting/overhead/settle` → `{success, data}` envelope (201).
+  /// The server splits the amount — the accrued part clears 2200, the
+  /// excess books as an expense — so the response carries both parts.
+  ///
+  /// The envelope form (`postRaw` expects a bare body) matches every other
+  /// controller: they all answer through `sendCreated`/`sendSuccess`.
+  Future<ApiResult<OverheadSettlementResult>> settleOverhead(
+    Map<String, dynamic> body, {
+    required String idempotencyKey,
+  }) => _api.post(
+    ApiEndpoints.overheadSettle,
+    body: body,
+    headers: {'Idempotency-Key': idempotencyKey},
+    parse: (Object? json) => OverheadSettlementResult.fromJson(
+      json as Map<String, dynamic>,
+    ),
+  );
+}
+
+/// The server's answer to a settlement: how much of the payment cleared the
+/// accrued box and how much was booked as an expense above it.
+class OverheadSettlementResult {
+  const OverheadSettlementResult({
+    required this.id,
+    required this.settlementNo,
+    required this.amountPaid,
+    required this.accruedAmount,
+    required this.excessAmount,
+  });
+
+  factory OverheadSettlementResult.fromJson(Map<String, dynamic> json) =>
+      OverheadSettlementResult(
+        id: json['id'] as int,
+        settlementNo: json['settlement_no'] as String,
+        amountPaid: (json['amount_paid'] as num).toDouble(),
+        accruedAmount: (json['accrued_amount'] as num).toDouble(),
+        excessAmount: (json['excess_amount'] as num).toDouble(),
+      );
+
+  final int id;
+  final String settlementNo;
+  final double amountPaid;
+  final double accruedAmount;
+  final double excessAmount;
 }
 
 final productionRepositoryProvider = Provider<ProductionRepository>(

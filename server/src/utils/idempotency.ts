@@ -44,6 +44,7 @@ export const IDEMPOTENCY_SCOPES = {
   PAYMENT_SUPPLIER: 'payments.supplier',
   PAYMENT_ALLOCATE: 'payments.allocate',
   EXPENSE_CREATE: 'expenses.create',
+  OVERHEAD_SETTLE: 'accounting.overhead.settle',
   PURCHASE_RECORD: 'purchases.record',
   PURCHASE_ORDER_RECEIPT: 'purchase-orders.receipt',
   INVOICE_RETURN: 'invoices.return',

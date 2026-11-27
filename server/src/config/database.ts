@@ -2404,6 +2404,10 @@ export function applyPendingMigrations(): void {
     }
   });
 
+  // D30: the payment document that clears 2200 (Gull's "Settle overhead"),
+  // holding the accrued/excess split of one settlement.
+  runLedgered('add-overhead-settlements.sql');
+
   // D6: joint production. Output lines move to production_outputs so one
   // production can yield several items (mustard oil + mustard cake) with the
   // joint cost split by relative sales value. Backfills legacy single-output

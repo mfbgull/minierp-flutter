@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
+import '../../core/auth/auth_notifier.dart';
 import '../../core/utils/csv_export.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/models/production.dart';
@@ -15,6 +16,7 @@ import '../../widgets/date_range_picker.dart' show DateRangeFilter;
 import '../../widgets/screen_toolbar.dart';
 import 'production_detail_dialog.dart';
 import 'production_form_dialog.dart';
+import 'settle_overhead_dialog.dart';
 import 'production_providers.dart'
     show
         ProductionSort,
@@ -185,6 +187,18 @@ class _ProductionScreenState extends ConsumerState<ProductionScreen>
             ),
           ],
           primaryActions: [
+            // D30: paying the labour/electricity bill is an accounting write,
+            // so the button follows the same permission as the server route.
+            if (ref.watch(authProvider).user?.hasPermission(
+                  'accounting',
+                  'update',
+                ) ??
+                false)
+              TextButton.icon(
+                onPressed: () => SettleOverheadDialog.show(context),
+                icon: const Icon(Icons.request_quote_outlined, size: 18),
+                label: Text(l10n.productionSettleOverhead),
+              ),
             FilledButton.tonalIcon(
               onPressed: () => showProductionFormDialog(context),
               icon: const Icon(Icons.add, size: 18),

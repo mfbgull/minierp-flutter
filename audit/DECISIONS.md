@@ -1770,10 +1770,19 @@ trade-off is Gull's to own. Options:
 - **C — Encrypt the whole backup (database plus uploads).** Strongest; the restore
   runbook and `backupVerifySnapshot` change, and losing the key loses every backup.
 
-## D30 — Production overhead settlement: OPEN DISCUSSION (2026-11-27)
+**Status check (2026-11-27).** Gull read all three options and asked to **keep
+this item open** and decide it "later at some stage". No option is chosen, nothing
+is implemented, and the current behaviour stays as decided above (plain copies,
+`0700`/`0600` permissions only). This remains an **OPEN-DECISION** for Gull; the
+options above stay as written so nothing is lost. A coordinator recommendation was
+given with the explanation — **B** as the balance of protection against speed and
+key risk, **C** only if private photos or scans are also stored in the system —
+and is recorded as advice, not a decision.
 
-**Date.** 2026-11-27. **Status.** OPEN DISCUSSION — no decision taken. Gull
-asked for more talk before any code changes.
+## D30 — Production overhead settlement: DECIDED — Option A implemented (2026-11-27)
+
+**Date.** 2026-11-27. **Status.** DECIDED (Option A) and implemented; the
+discussion text below is kept as written, the decision follows it.
 
 **What Gull said.** The overhead he enters on a production run (labour tankhwa,
 electricity, gas) is always paid — usually at month end. In his view it should
@@ -1799,7 +1808,8 @@ date the money before it moved, which the app's cash-timeline guards exist to
 prevent, and one monthly bill settles many runs. The accrued box is the bridge
 between the two dates and returns to zero when paid (`Dr 2200 / Cr cash`).
 
-**Options on the table (not yet chosen).**
+**Options on the table (at discussion time; A was then chosen — see the
+decision below).**
 
 - **A — Add "Settle overhead".** At month end, pay an amount against 2200
   (`Dr 2200 / Cr cash`). The box empties; item costs stay correct. Small,
@@ -1810,6 +1820,52 @@ between the two dates and returns to zero when paid (`Dr 2200 / Cr cash`).
   grows forever and misstates what is actually owed.
 
 **Next step.** Gull to discuss and pick. No code has been changed for this item.
+
+**DECISION (2026-11-27) — Option A, implemented.** Gull chose **A — "Settle
+overhead"** and answered the three product questions:
+
+- **Q1** — Cash or Bank is chosen per payment. *(agreed)*
+- **Q2** — The amount is free text; one combined payment or one bill at a time.
+  *(agreed)*
+- **Q3** — **Option B**: paying more than the accrued box is allowed. The
+  accrued part clears 2200; the excess books as a normal expense. *(chosen)*
+
+**What shipped.**
+
+- `POST /api/accounting/overhead/settle` (permission `accounting:update`,
+  sensitive-operation limiter, **mandatory `Idempotency-Key`** with scope
+  `accounting.overhead.settle`). Body: `settlement_date`, `amount`,
+  `payment_method`, optional `reference_note`.
+- Posting, inside one transaction, after the document row exists:
+  `Dr 2200` for `accrued_amount`, `Dr 6000` for `excess_amount`,
+  `Cr cash/bank` for `amount_paid`; then the cash-timeline guard runs, so a
+  payment that would push cash negative on that or any later day is refused
+  with 409 and nothing is written. A closed period is refused by
+  `postEntry`'s existing period check.
+- `accrued_amount = min(amount, owed as of the settlement date)`,
+  `excess_amount = amount − accrued`. Only the excess is a new expense: the
+  accrued part already sits inside the item's stock value, so expensing it
+  again would double-count the cost.
+- New table `overhead_settlements` (migration
+  `add-overhead-settlements.sql`, registered in `config/database.ts`), numbered
+  `OHS-YYMM-NNNNN` from the shared atomic counter.
+- Flutter: **"Settle overhead"** button on the Manufacturing toolbar (shown
+  only with `accounting:update`), dialog with date, amount, Cash/Bank, note;
+  l10n keys in `en.arb` and `ur.arb`.
+- Red first: `server/src/__tests__/overheadSettlement.test.ts` (8 cases —
+  keyless refusal, bad method, non-positive amount, over-payment split,
+  plain settlement, keyed replay, cash-timeline refusal, closed period) all
+  failed with 404 before the route existed. `test/features/production/
+  settle_overhead_test.dart` drives the dialog.
+
+**Out of scope, deliberately.** No void/reversal of a settlement is shipped;
+if Gull wants one it follows `docs/REVERSAL-RULES.md` in its own change.
+
+**Side fix found while building this.** `RepositoryClient.post` /
+`postRaw` / `postEnvelope` passed `options: null` when a request had no
+headers; dio 5.11's `request()` then wraps a null `Options` and throws
+`type 'Null' is not a subtype of type 'Object'`, and every such POST surfaced
+as "Unexpected network error". All three now pass a typed `Options`.
 
 ## D27 — The PR #6 (stock S-2) review: correction trail (2026-11-16)
 

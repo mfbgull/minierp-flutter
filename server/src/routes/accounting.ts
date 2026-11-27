@@ -42,6 +42,18 @@ router.get('/accounts/balances', requirePermission('accounting', 'read'), accoun
 // GL vs operational balances per pairing)
 router.get('/reconciliation', requirePermission('accounting', 'read'), accountingController.getReconciliation);
 
+// ---- D30: overhead settlement ----------------------------------------------
+
+// POST /api/accounting/overhead/settle  (money movement; the mandatory
+// Idempotency-Key is enforced in the controller so a retry never pays twice)
+router.post(
+  '/overhead/settle',
+  requirePermission('accounting', 'update'),
+  validateZodBody(zodBodySchemas.overheadSettle),
+  sensitiveOperationLimiter,
+  accountingController.settleOverhead
+);
+
 // GET /api/accounting/accounts/:code
 router.get('/accounts/:code', requirePermission('accounting', 'read'), accountingController.getAccount);
 

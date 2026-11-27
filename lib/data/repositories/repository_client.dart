@@ -130,7 +130,7 @@ class RepositoryClient {
         () => _dio.post(
           path,
           data: body,
-          options: headers == null ? null : Options(headers: headers),
+          options: Options(headers: headers),
         ),
       ),
       parse,
@@ -256,11 +256,8 @@ class RepositoryClient {
   }) async {
     unawaited(_invalidateFor(path));
     final guarded = await _guard(
-      () => _dio.post(
-        path,
-        data: body,
-        options: headers == null ? null : Options(headers: headers),
-      ),
+      // Always a typed Options: see the note in [post] on dio 5.11.
+      () => _dio.post(path, data: body, options: Options(headers: headers)),
     );
     try {
       return guarded.map((response) {
@@ -345,11 +342,8 @@ class RepositoryClient {
     unawaited(_invalidateFor(path));
     return _parseRaw(
       _guard(
-        () => _dio.post(
-          path,
-          data: body,
-          options: headers == null ? null : Options(headers: headers),
-        ),
+        // Always a typed Options: see the note in [post] on dio 5.11.
+        () => _dio.post(path, data: body, options: Options(headers: headers)),
       ),
       parse,
     );

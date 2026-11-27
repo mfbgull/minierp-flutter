@@ -10538,6 +10538,48 @@ abstract class AppLocalizations {
   /// **'Overhead Cost'**
   String get productionOverhead;
 
+  /// No description provided for @productionSettleOverhead.
+  ///
+  /// In en, this message translates to:
+  /// **'Settle overhead'**
+  String get productionSettleOverhead;
+
+  /// No description provided for @productionSettleOverheadTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Settle production overhead'**
+  String get productionSettleOverheadTitle;
+
+  /// No description provided for @productionSettleOverheadHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay the labour, electricity or gas bill. The accrued part clears Accrued Production Overhead; anything paid above it books as an expense.'**
+  String get productionSettleOverheadHint;
+
+  /// No description provided for @productionSettleOverheadAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount paid'**
+  String get productionSettleOverheadAmount;
+
+  /// No description provided for @productionSettleOverheadReference.
+  ///
+  /// In en, this message translates to:
+  /// **'Reference (optional)'**
+  String get productionSettleOverheadReference;
+
+  /// Confirmation after a settlement. {accrued} cleared the liability, {excess} (possibly zero) was an expense above the estimate.
+  ///
+  /// In en, this message translates to:
+  /// **'Overhead settled: {accrued} cleared, {excess} booked as expense.'**
+  String productionSettleOverheadPaid(String accrued, String excess);
+
+  /// No description provided for @productionSettleOverheadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter an amount greater than zero.'**
+  String get productionSettleOverheadError;
+
   /// No description provided for @productionRawmaterialsWarehouse.
   ///
   /// In en, this message translates to:

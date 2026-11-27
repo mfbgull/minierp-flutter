@@ -1754,6 +1754,20 @@
   "productionNoinputs": "No input materials recorded for this run.",
   "productionOutputquantity": "Output Quantity",
   "productionOverhead": "Overhead Cost",
+  "productionSettleOverhead": "Settle overhead",
+  "productionSettleOverheadTitle": "Settle production overhead",
+  "productionSettleOverheadHint": "Pay the labour, electricity or gas bill. The accrued part clears Accrued Production Overhead; anything paid above it books as an expense.",
+  "productionSettleOverheadAmount": "Amount paid",
+  "productionSettleOverheadReference": "Reference (optional)",
+  "productionSettleOverheadPaid": "Overhead settled: {accrued} cleared, {excess} booked as expense.",
+  "@productionSettleOverheadPaid": {
+    "description": "Confirmation after a settlement. {accrued} cleared the liability, {excess} (possibly zero) was an expense above the estimate.",
+    "placeholders": {
+      "accrued": {"type": "String"},
+      "excess": {"type": "String"}
+    }
+  },
+  "productionSettleOverheadError": "Enter an amount greater than zero.",
   "productionRawmaterialsWarehouse": "Raw Materials Warehouse",
   "productionSaved": "Production recorded",
   "productionShortfallTitle": "Insufficient stock for these inputs",
