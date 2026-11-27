@@ -6,6 +6,13 @@
 (`Merge branch 'pr52-complexity'`). The chmod-only commit was renamed from
 `021f333` to `c562674` (`chore: make run.sh executable`) during the push.
 
+*(2026-11-27 correction: `main` and `origin/main` are now at `f5c498e`. D26 is
+fully closed — F-3, F-1, UX-7, UX-5, the audit-artifact policy and the ext4
+move. `scripts/check.sh` is now mode `100755`, so `./scripts/check.sh` works.
+The open-PR lists below could not be re-verified: `gh` is not installed on this
+machine and no feature branches remain locally or on the remote, so treat the
+PR numbers below as the 2026-11-18 record, not as current.)*
+
 **Open PRs.** One, a draft, `MERGEABLE` against `main`:
 
 - `#51` `docs/pre134-void-draw-limitations` — docs-only. PR-event CI green
@@ -516,7 +523,7 @@ Paths in evidence are repository files: models under `server/src/models/`, contr
 | BK-004 | GREEN | 73b6ccfc | auditRegression8 'two backups requested back to back both succeed' | Backup filename timestamps are second-granular, so two backups in the same second no longer collide. | Verified by targeted and full-suite runs. |
 | BK-005 | GREEN | 73b6ccfc | auditRegression8 BK-005 | `BACKUP_DIR` now overrides the backup location instead of always using `DB_DIR/backups`. | Verified by targeted and full-suite runs. |
 | BK-006 | GREEN | 73b6ccfc | (docs; reviewer checks) | The restore runbook no longer copies from the wrong `../backups/` path. It copies from `backups/`, verifies integrity on the copy first, moves the live DB aside into `pre-restore/`, and swaps in only after the check passes, so a bad backup cannot destroy the live database. `BACKUP_DIR` is documented. | Documentation only; reviewed by reading the runbook, the destructive procedure was not executed. |
-| BK-extra | NOT-FIXED | — | Source reasoning; later new | backupService.ts:91-137 backs up DB only; :58-82 lacks retention floor. Startup physical integrity/perms/encryption work has no acceptance proof. | D7 uploads and remaining backup hardening need independent regression9 coverage before fixes. |
+| BK-extra | PARTIAL — permissions FIXED 2026-11-27; encryption OPEN-DECISION | backupPermissions.test.ts (new, 1) | backupService.ts:91-137 backs up DB only; :58-82 lacks retention floor. Startup physical integrity/perms/encryption work has no acceptance proof. | ~~D7 uploads and remaining backup hardening need independent regression9 coverage before fixes.~~ **(2026-11-27 correction — the row was out of date against the source.)** Two claims no longer hold: backups also snapshot `server/uploads/` (`snapshotUploads`, D7) and retention has a floor (`pruneRetention`: 7 daily / 4 weekly, pinned by `auditRegression9` "prunes an uploads snapshot when its database backup is pruned"). `integrity_check` on the copy is implemented and tested. **The real gap was file permissions:** `VACUUM INTO` inherits the process umask, so the copy landed `0644` and the backup directory `0775` — readable by every account on the machine. Fixed: the backup directory and uploads snapshot are `0700` and the database copy is `0600`, set explicitly with `chmod` so the result does not depend on the umask. `chmod` failure is logged, not fatal, so a filesystem without POSIX modes cannot break a backup. Red-first: `backupPermissions.test.ts` failed with the three offenders (`backups mode=775`, `.db mode=644`, `.uploads mode=775`) before the fix; 6 backup suites / 45 tests green after it. **Still open:** encryption at rest is not implemented; whether backups must be encrypted is a product decision recorded in `audit/DECISIONS.md`. |
 | CODE-001 | GREEN (targeted verification) | — | clientValidationStatus.test.ts, businessErrorClassification.test.ts and dependent suites | Shared invoice validation uses typed business errors and checks customer/item existence before writes. Desktop/mobile line validation rejects invalid and nonfinite quantities; production business errors are mapped through handleBusinessError. Mounted regressions observed red, then green. Latest combined authority/validation run: 9 suites / 139 tests passed, including accounting invariants (2026-10-18). | Full implementation-phase checks pending. |
 | CODE-002 | GREEN (targeted verification) | — | authAuthority.test.ts, authAsync.test.ts, security.regression.test.ts, auditRegression7.test.ts | Access and refresh reload active account authority; assigned role takes precedence over legacy role; disabled/deleted accounts and refresh-as-access are rejected. Red: 10 failed / 1 passed. Green: 4 suites / 71 tests passed (2026-10-18). | Full implementation-phase checks pending; see REMAINING-ISSUES-2026-10-18.md. |
 | CODE-003 | GREEN (targeted verification) | — | passwordPolicy.test.ts, authAuthority.test.ts, databaseInitialization.test.ts, password_validation_test.dart | New password writes require 12 Unicode characters and at most 72 UTF-8 bytes. Bootstrap requires an explicit valid password in every environment. Assigned system Admin role governs profile, login, administration and access; custom role names cannot confer admin. Server regressions and 7 bootstrap checks passed; 3 widget regressions red then green. Typecheck, lint and Flutter analyze passed (2026-10-18). | Final visual QA and implementation-phase full suites pending. |
@@ -654,6 +661,21 @@ The hunk context had shifted because round5 inserted the closed-period guard int
 - `server/README.md` was amended by the patch to document `BACKUP_DIR` and the new document-download rules.
 
 ## Historical Phase 3 queue (superseded by the findings table)
+
+*(2026-11-27 correction: this queue was written before the main findings table
+was filled in, and it still read as open. It is superseded — the table above is
+authoritative. Each row's real state, checked against it:)*
+
+| Finding | Real state (2026-11-27) |
+|---|---|
+| AUTHZ-001 | **CLOSED.** GREEN in the table with proof `auditRegression9 AUTHZ-001 (3 cases)`, commit `0bbac98d`: a drift test walks `routes/`, `controllers/` and `middleware/` for every guarded permission code. |
+| REP-005 | **CLOSED.** GREEN with proof `auditRegression9 REP-005 (4 cases)`, commit `56205265`: `groupBy.aggregates` renders as SELECT items restricted to advertised fields. |
+| WO-002 | **CLOSED.** GREEN with proof `auditRegression9` WO-002 cases: the damaged write-off endpoint and Dr 7202 / Cr 1200 are covered. |
+| CODE-005..007 | **CLOSED.** GREEN (targeted verification) rows for CODE-005, 006 and 007 in the table. |
+| D6 joint-cost allocation | **DONE.** Kept below: the original text records what multi-output allocation covers. |
+| Phase 1 deviation (account 2200) | **CONFIRMED by Gull 2026-11-27.** The code hard-asserts the 2200 `Accrued Production Overhead` account at every boot (`verifyProductionOverheadPayableAccount`, `server/src/migrations/add-production-overhead-payable.sql`), so it is implemented and enforced, and Gull confirmed both the code and the name as correct. A related design point — how a production overhead accrual gets settled with cash — is under discussion, see `audit/DECISIONS.md` D30. |
+
+Original text, unchanged for the trail:
 
 These have no failing test because none was supplied. Per the rules each needs a test written
 and shown red before any fix, so they are NOT part of the green suite above:

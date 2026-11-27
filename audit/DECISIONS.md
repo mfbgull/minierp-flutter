@@ -1730,6 +1730,87 @@ decision remains in this record.**
    exit 126. The mode is now `100755`. CI is unaffected: `.github/workflows/ci.yml`
    does not call the script directly, so no gate changed.
 
+## D29 — Backup hardening: permissions fixed, encryption OPEN-DECISION (2026-11-27)
+
+**Date.** 2026-11-27. **Status.** PARTIALLY DECIDED. The permission half is an
+architecture call and is implemented. The encryption half is a product call and
+is **OPEN-DECISION** — it is not guessed.
+
+**Context.** The finding tracker row `BK-extra` said backups lack a retention
+floor and no physical integrity/perms/encryption proof. Checking it against the
+source showed most of that was already done and the row was stale (uploads
+snapshot since D7, retention floor 7 daily / 4 weekly, `integrity_check` on every
+copy, all tested). The one real gap was **file permissions**: `VACUUM INTO`
+inherits the process umask, so on this machine the backup landed `0644` and the
+backup directory `0775` — readable by every account on the box.
+
+**Decision taken (architecture, mine by the AGENTS.md split).** The backup
+directory and uploads snapshot are `0700`; the database copy is `0600`. The bits
+are set with `fs.chmodSync`, so the result does not depend on the umask the
+service runs under. A `chmod` failure is logged as a warning and swallowed: a
+filesystem without POSIX modes must not turn a good backup into a failed one.
+Owner access is unchanged, so pruning, download and delete still work.
+
+**Evidence.** Red-first `server/src/__tests__/backupPermissions.test.ts`: failed
+with three offenders (`backups mode=775`, `.db mode=644`, `.uploads mode=775`),
+passes after the fix. Six backup suites / 45 tests green. `npm run typecheck`
+clean; eslint clean on both touched files.
+
+**OPEN-DECISION — must backups be encrypted at rest?** Not implemented. A backup
+is a full copy of the books, and retention leaves copies on disk for weeks and
+copies them to other drives, so an unencrypted dump is the softest copy of the
+data. It also affects the restore path and the operator's key handling, and the
+trade-off is Gull's to own. Options:
+
+- **A — No encryption.** Accept it. `0600` permissions are the only control.
+  Simple to operate; anyone with disk access or a copy of the file reads the books.
+- **B — Encrypt the database copy only.** Wrap the `.db` in an encrypted
+  container after `integrity_check`; restore needs a passphrase. Protects the
+  biggest file; the uploads snapshot stays readable.
+- **C — Encrypt the whole backup (database plus uploads).** Strongest; the restore
+  runbook and `backupVerifySnapshot` change, and losing the key loses every backup.
+
+## D30 — Production overhead settlement: OPEN DISCUSSION (2026-11-27)
+
+**Date.** 2026-11-27. **Status.** OPEN DISCUSSION — no decision taken. Gull
+asked for more talk before any code changes.
+
+**What Gull said.** The overhead he enters on a production run (labour tankhwa,
+electricity, gas) is always paid — usually at month end. In his view it should
+not read as owed money; the cost is settled when the run is completed.
+
+**What the code does today (verified, not assumed).**
+
+- Production capitalises the overhead into the product: the pool sent to the
+  stock batches is `consumed materials + overhead` (`Production.ts`,
+  allocation by relative sales value), so the item's unit cost already includes
+  the labour/electricity/gas. This is the purpose Gull built the feature for.
+- The credit side of that capitalisation is 2200 `Accrued Production Overhead`
+  (`Production.ts:393`), posted only when `overhead_cost > 0`.
+- **Nothing ever debits 2200.** There is no payment screen for it and no manual
+  journal-entry screen anywhere in the app, so the box grows forever. This is the
+  real gap Gull reacted to.
+
+**Why the date matters (the coordinator's position, for the discussion).**
+There are two dates: when the cost is *used* (production day) and when cash
+*leaves* (tankhwa/bill day, month end). The cost belongs in the product on the
+production day; the cash moves later. Posting cash out on production day would
+date the money before it moved, which the app's cash-timeline guards exist to
+prevent, and one monthly bill settles many runs. The accrued box is the bridge
+between the two dates and returns to zero when paid (`Dr 2200 / Cr cash`).
+
+**Options on the table (not yet chosen).**
+
+- **A — Add "Settle overhead".** At month end, pay an amount against 2200
+  (`Dr 2200 / Cr cash`). The box empties; item costs stay correct. Small,
+  red-first feature; no change to how production posts.
+- **B — Change production to settle immediately.** Cash posts on the production
+  date. Rejected on the facts above unless Gull still wants it.
+- **C — Do nothing.** Leave 2200 as a permanent memo. Not viable long term: it
+  grows forever and misstates what is actually owed.
+
+**Next step.** Gull to discuss and pick. No code has been changed for this item.
+
 ## D27 — The PR #6 (stock S-2) review: correction trail (2026-11-16)
 
 **Date.** 2026-11-16. **Status.** DECIDED (review discipline; no product call).

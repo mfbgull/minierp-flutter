@@ -28,8 +28,33 @@ const DAILY_KEEP = 7;
 const WEEKLY_KEEP = 4;
 const INTERVAL_MS = 24 * 60 * 60 * 1000;
 
+/** Directory modes for anything under BACKUP_DIR (BK-extra). */
+const BACKUP_DIR_MODE = 0o700;
+/**
+ * Files are written 0600: a backup is a second full copy of the books, and
+ * `VACUUM INTO` otherwise inherits the process umask, which can make it
+ * readable by every account on the machine. `fs.chmodSync` sets the bits
+ * explicitly, so the result does not depend on the umask the service runs under.
+ */
+const BACKUP_FILE_MODE = 0o600;
+
+/**
+ * Restricts [target] to [mode], ignoring the process umask. Best effort: a
+ * filesystem that cannot carry POSIX modes (or a non-owner) must not turn a
+ * good backup into a failed one, so a chmod error is logged and swallowed.
+ */
+function restrict(target: string, mode: number): void {
+  try {
+    fs.chmodSync(target, mode);
+  } catch (err) {
+    logger.warn(`[Backup] could not set mode ${mode.toString(8)} on ${target}:`, err);
+  }
+}
+
 function ensureBackupDir(): void {
   fs.mkdirSync(BACKUP_DIR, { recursive: true });
+  // mkdirSync keeps an existing directory's mode; set the bit anyway.
+  restrict(BACKUP_DIR, BACKUP_DIR_MODE);
 }
 
 function lastBackupAgeMs(): number {
@@ -56,6 +81,7 @@ function snapshotUploads(backupPath: string): boolean {
   try {
     fs.rmSync(snapshot, { recursive: true, force: true });
     fs.mkdirSync(snapshot, { recursive: true });
+    restrict(snapshot, BACKUP_DIR_MODE);
     if (fs.existsSync(UPLOADS_DIR)) {
       fs.cpSync(UPLOADS_DIR, snapshot, { recursive: true });
     }
@@ -171,6 +197,8 @@ export function runBackup(opts?: RunBackupOptions): string | null {
     // Integrity check on the copy
     let res: unknown;
     try {
+      // Narrow the copy before it is opened or paired with its uploads.
+      restrict(target, BACKUP_FILE_MODE);
       const copy = new Database(target, { readonly: true });
       res = copy.pragma('integrity_check', { simple: true });
       copy.close();
