@@ -1903,6 +1903,45 @@ overhead"** and answered the three product questions:
 **Out of scope, deliberately.** No void/reversal of a settlement is shipped;
 if Gull wants one it follows `docs/REVERSAL-RULES.md` in its own change.
 
+**Follow-up: the three `fallow` findings D30's push introduced (2026-11-28).**
+The D30 push (`64da45f`) turned the `fallow` CI job red with three findings in
+code this feature added. All three are now resolved.
+
+1. `accountingService.ts:864 postOverheadSettlementEntry` — "unused class
+   member". **False positive, baselined.** The method has a real caller at
+   `models/OverheadSettlement.ts:102` and its body executes (Istanbul statement
+   hits = 5 on lines 877–919). The cause is the one already recorded in D14:
+   `unused-class-members` cannot resolve an owning class exported as
+   `export default AccountingService;`, and it does not follow static-method
+   calls across files; fallow's own trace attributes the members to a
+   pseudo-class literally named `default` and says the verdict "depends on
+   cross-file member-access resolution". I reproduced this in isolation with
+   three files (`accountingService.ts` + `OverheadSettlement.ts` + any entry):
+   the call at line 102 is not counted. I falsified every other hypothesis
+   (call shape, closure / transaction nesting, default vs named import, caller
+   directory, entry-glob membership, file reachability, member count, caller
+   count, coverage / `fnMap`, doc comments, name collisions, `node_modules`
+   presence, config): none is the cause. Resolution matches the 24 other
+   `accountingService` static methods already baselined: a new
+   `unused-class-member:...:AccountingService:postOverheadSettlementEntry`
+   entry in `audit/fallow-baselines/dead-code.json`, exactly as D14 chose
+   (baseline, not a suppression comment).
+2. `accountingController.ts:380 settleOverhead` — 18 cyclomatic / 16 cognitive /
+   86 lines. **Fixed by extraction, no behaviour change.** Validation moved to
+   `parseSettleOverheadBody` and the mandatory-key block to
+   `beginSettleOverheadIdempotency`; both send their own 400 and return `null`,
+   so the endpoint branches once per helper. Fallow now reports zero complexity
+   findings for the file; the 8 `overheadSettlement.test.ts` cases still pass
+   unchanged.
+3. `overheadSettlement.test.ts:117` — a 162-line `describe`. **Fixed by
+   splitting** into four top-level blocks (request validation, posting, guard
+   refusals, idempotency), each with its own `beforeAll`, largest now 65 lines.
+   Test order is preserved (validation → posting → refusals → idempotency), so
+   the replay case still sees the three settlements it counts.
+
+Evidence: `npx fallow@3.34.1 audit --base 64da45f~1` → "No issues in 40 changed
+files", exit 0; `scripts/check.sh --quick` → exit 0.
+
 **Side fix found while building this.** `RepositoryClient.post` /
 `postRaw` / `postEnvelope` passed `options: null` when a request had no
 headers; dio 5.11's `request()` then wraps a null `Options` and throws

@@ -71,6 +71,7 @@
     "unused-class-member:server/src/services/accountingService.ts:AccountingService:postExpenseEntry",
     "unused-class-member:server/src/services/accountingService.ts:AccountingService:postGoodsReceiptEntry",
     "unused-class-member:server/src/services/accountingService.ts:AccountingService:postInvoiceEntry",
+    "unused-class-member:server/src/services/accountingService.ts:AccountingService:postOverheadSettlementEntry",
     "unused-class-member:server/src/services/accountingService.ts:AccountingService:postOwnerCapitalEntry",
     "unused-class-member:server/src/services/accountingService.ts:AccountingService:postOwnerWithdrawalCashEntry",
     "unused-class-member:server/src/services/accountingService.ts:AccountingService:postOwnerWithdrawalGoodsEntry",

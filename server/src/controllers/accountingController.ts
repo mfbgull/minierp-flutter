@@ -368,6 +368,76 @@ function closePeriod(req: AuthRequest, res: Response): void {
 // D30 — Overhead settlement
 // ============================================================================
 
+interface SettleOverheadBody {
+  settlementDate: string;
+  amount: number;
+  paymentMethod: string;
+  referenceNote: string | undefined;
+}
+
+/**
+ * Validate the settle-overhead body. Sends the 400 itself and returns null
+ * when the request is malformed, so the caller only branches once.
+ */
+function parseSettleOverheadBody(req: AuthRequest, res: Response): SettleOverheadBody | null {
+  const { settlement_date, amount, payment_method, reference_note } = req.body;
+
+  if (!settlement_date) {
+    sendBadRequest(res, 'Settlement date is required');
+    return null;
+  }
+  const parsedAmount = typeof amount === 'number' ? amount : parseFloat(String(amount ?? ''));
+  if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+    sendBadRequest(res, 'Amount must be a positive number');
+    return null;
+  }
+  if (!isValidPaymentMethod(payment_method)) {
+    sendBadRequest(res,
+      `Invalid payment_method "${String(payment_method)}" — use Cash, Bank, Easypaisa, JazzCash or Upaisa`);
+    return null;
+  }
+  if (reference_note !== undefined && reference_note !== null && String(reference_note).length > 200) {
+    sendBadRequest(res, 'Reference note must be 200 characters or fewer');
+    return null;
+  }
+
+  return {
+    settlementDate: String(settlement_date),
+    amount: parsedAmount,
+    paymentMethod: String(payment_method),
+    referenceNote: reference_note === undefined || reference_note === null
+      ? undefined : String(reference_note),
+  };
+}
+
+interface OverheadIdempotency {
+  idemKey: string;
+  hash: string;
+  /** Non-null when this request replays a stored response. */
+  replayId: number | null;
+}
+
+/**
+ * Resolve the mandatory Idempotency-Key for a settle-overhead write.
+ * Sends the 400 itself and returns null when the key is missing or malformed.
+ */
+function beginSettleOverheadIdempotency(req: AuthRequest, res: Response): OverheadIdempotency | null {
+  let idemKey: string | null;
+  try {
+    idemKey = normalizeIdempotencyKey(req.headers[IDEMPOTENCY_KEY_HEADER]);
+  } catch (keyError) {
+    res.status(400).json({ success: false, error: (keyError as Error).message });
+    return null;
+  }
+  if (idemKey === null) {
+    res.status(400).json({ success: false, error: IDEMPOTENCY_KEY_REQUIRED_MESSAGE });
+    return null;
+  }
+  const hash = hashRequestPayload(req.body);
+  const { replayId } = beginIdempotentWrite(db, IDEMPOTENCY_SCOPES.OVERHEAD_SETTLE, idemKey, hash);
+  return { idemKey, hash, replayId };
+}
+
 /**
  * POST /api/accounting/overhead/settle  (D30 — "Settle overhead")
  *
@@ -379,62 +449,33 @@ function closePeriod(req: AuthRequest, res: Response): void {
  */
 function settleOverhead(req: AuthRequest, res: Response): void {
   try {
-    const { settlement_date, amount, payment_method, reference_note } = req.body;
     const userId = req.user?.id ?? null;
 
-    if (!settlement_date) {
-      sendBadRequest(res, 'Settlement date is required');
-      return;
-    }
-    const parsedAmount = typeof amount === 'number' ? amount : parseFloat(String(amount ?? ''));
-    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
-      sendBadRequest(res, 'Amount must be a positive number');
-      return;
-    }
-    if (!isValidPaymentMethod(payment_method)) {
-      sendBadRequest(res,
-        `Invalid payment_method "${String(payment_method)}" — use Cash, Bank, Easypaisa, JazzCash or Upaisa`);
-      return;
-    }
-    if (reference_note !== undefined && reference_note !== null && String(reference_note).length > 200) {
-      sendBadRequest(res, 'Reference note must be 200 characters or fewer');
-      return;
-    }
+    const body = parseSettleOverheadBody(req, res);
+    if (!body) return;
 
     // D30: a retry after a lost response must not pay the bill twice. The
     // key is mandatory, exactly as on the other canonical financial writes.
-    let idemKey: string | null;
-    try {
-      idemKey = normalizeIdempotencyKey(req.headers[IDEMPOTENCY_KEY_HEADER]);
-    } catch (keyError) {
-      res.status(400).json({ success: false, error: (keyError as Error).message });
-      return;
-    }
-    if (idemKey === null) {
-      res.status(400).json({ success: false, error: IDEMPOTENCY_KEY_REQUIRED_MESSAGE });
-      return;
-    }
-    const hash = hashRequestPayload(req.body);
-    const { replayId } = beginIdempotentWrite(db, IDEMPOTENCY_SCOPES.OVERHEAD_SETTLE, idemKey, hash);
-    if (replayId !== null) {
+    const idempotency = beginSettleOverheadIdempotency(req, res);
+    if (!idempotency) return;
+    if (idempotency.replayId !== null) {
       res.set('X-Idempotent-Replay', 'true');
-      sendCreated(res, OverheadSettlementModel.getById(db, replayId));
+      sendCreated(res, OverheadSettlementModel.getById(db, idempotency.replayId));
       return;
     }
 
     let created: OverheadSettlementRow | undefined;
     db.transaction(() => {
       created = OverheadSettlementModel.create(db, {
-        settlement_date: String(settlement_date),
-        amount: parsedAmount,
-        payment_method: String(payment_method),
-        reference_note: reference_note === undefined || reference_note === null
-          ? undefined : String(reference_note),
+        settlement_date: body.settlementDate,
+        amount: body.amount,
+        payment_method: body.paymentMethod,
+        reference_note: body.referenceNote,
         created_by: userId ?? undefined,
       });
       // Claimed inside the same transaction: a refused settlement rolls the
       // claim back with it, so the key stays usable for an honest retry.
-      claimIdempotencyKey(db, IDEMPOTENCY_SCOPES.OVERHEAD_SETTLE, idemKey!, hash, created.id);
+      claimIdempotencyKey(db, IDEMPOTENCY_SCOPES.OVERHEAD_SETTLE, idempotency.idemKey, idempotency.hash, created.id);
     })();
 
     logCRUD(

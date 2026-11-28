@@ -114,11 +114,16 @@ function lineFor(lines: SettleLine[], code: string): SettleLine | undefined {
   return lines.find((l) => l.code === code);
 }
 
-describe('D30 — Settle overhead (Dr 2200 / Cr cash, over-payment split)', () => {
+/** Every block logs in once; the suite shares one seeded database. */
+async function login(): Promise<string> {
+  return getAuthCookie();
+}
+
+describe('D30 — Settle overhead: request validation', () => {
   let authCookie: string;
 
   beforeAll(async () => {
-    authCookie = await getAuthCookie();
+    authCookie = await login();
   });
 
   it('rejects a keyless settlement with 400', async () => {
@@ -147,6 +152,14 @@ describe('D30 — Settle overhead (Dr 2200 / Cr cash, over-payment split)', () =
       .set('Idempotency-Key', key())
       .send({ settlement_date: '2026-11-27', amount: 0, payment_method: 'Cash' });
     expect(res.status).toBe(400);
+  });
+});
+
+describe('D30 — Settle overhead: posting', () => {
+  let authCookie: string;
+
+  beforeAll(async () => {
+    authCookie = await login();
   });
 
   it('splits an over-payment: accrued clears 2200, the excess books as expense', async () => {
@@ -206,36 +219,13 @@ describe('D30 — Settle overhead (Dr 2200 / Cr cash, over-payment split)', () =
 
     expect(owedOverhead()).toBe(owed - 1500);
   });
+});
 
-  it('replays a keyed retry instead of paying twice', async () => {
-    accrueOverhead(1000, '2026-11-07');
-    fundAccount('1000', 1000, '2026-11-08');
-    const owed = owedOverhead();
-    const k = key();
-    const body = { settlement_date: '2026-11-27', amount: 100, payment_method: 'Cash' };
+describe('D30 — Settle overhead: guard refusals', () => {
+  let authCookie: string;
 
-    const first = await request(app).post(SETTLE).set('Cookie', authCookie)
-      .set('Idempotency-Key', k).send(body);
-    expect(first.status).toBe(201);
-    const firstId = (first.body as { data: { id: number } }).data.id;
-
-    const second = await request(app).post(SETTLE).set('Cookie', authCookie)
-      .set('Idempotency-Key', k).send(body);
-    expect(second.status).toBe(201);
-    expect((second.body as { data: { id: number } }).data.id).toBe(firstId);
-
-    // Exactly one settlement for this payment: three payments happened in
-    // this suite before it (over-payment, plain settlement, this one).
-    const count = db.prepare(`
-      SELECT COUNT(*) n FROM overhead_settlements WHERE settlement_no LIKE 'OHS-%'
-    `).get() as { n: number };
-    expect(count.n).toBe(3);
-    const one = db.prepare(`
-      SELECT COUNT(*) n FROM journal_entries
-      WHERE reference_type = 'OVERHEAD_SETTLEMENT' AND reference_id = ?
-    `).get(firstId) as { n: number };
-    expect(one.n).toBe(1);
-    expect(owedOverhead()).toBe(owed - 100);
+  beforeAll(async () => {
+    authCookie = await login();
   });
 
   it('refuses a settlement that would drive the cash balance negative', async () => {
@@ -274,5 +264,44 @@ describe('D30 — Settle overhead (Dr 2200 / Cr cash, over-payment split)', () =
       WHERE reference_type = 'OVERHEAD_SETTLEMENT' AND entry_date = '2026-09-15'
     `).get() as { n: number };
     expect(rows.n).toBe(0);
+  });
+});
+
+describe('D30 — Settle overhead: idempotency', () => {
+  let authCookie: string;
+
+  beforeAll(async () => {
+    authCookie = await login();
+  });
+
+  it('replays a keyed retry instead of paying twice', async () => {
+    accrueOverhead(1000, '2026-11-07');
+    fundAccount('1000', 1000, '2026-11-08');
+    const owed = owedOverhead();
+    const k = key();
+    const body = { settlement_date: '2026-11-27', amount: 100, payment_method: 'Cash' };
+
+    const first = await request(app).post(SETTLE).set('Cookie', authCookie)
+      .set('Idempotency-Key', k).send(body);
+    expect(first.status).toBe(201);
+    const firstId = (first.body as { data: { id: number } }).data.id;
+
+    const second = await request(app).post(SETTLE).set('Cookie', authCookie)
+      .set('Idempotency-Key', k).send(body);
+    expect(second.status).toBe(201);
+    expect((second.body as { data: { id: number } }).data.id).toBe(firstId);
+
+    // Exactly one settlement for this payment: three payments happened in
+    // this suite before it (over-payment, plain settlement, this one).
+    const count = db.prepare(`
+      SELECT COUNT(*) n FROM overhead_settlements WHERE settlement_no LIKE 'OHS-%'
+    `).get() as { n: number };
+    expect(count.n).toBe(3);
+    const one = db.prepare(`
+      SELECT COUNT(*) n FROM journal_entries
+      WHERE reference_type = 'OVERHEAD_SETTLEMENT' AND reference_id = ?
+    `).get(firstId) as { n: number };
+    expect(one.n).toBe(1);
+    expect(owedOverhead()).toBe(owed - 100);
   });
 });
