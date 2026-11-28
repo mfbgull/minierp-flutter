@@ -402,6 +402,9 @@ Every in-repo client (Flutter desktop, POS) already sends a key on these
 writes. Keys are derived from the request body, so an unchanged retry reuses
 the key and an edited payload rotates it.
 
+For the full route inventory, including the unkeyed routes and their state
+guards, see `docs/IDEMPOTENCY-INVENTORY.md`.
+
 ## Invoices
 
 ### GET /invoices
