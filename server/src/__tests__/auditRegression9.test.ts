@@ -4,7 +4,7 @@ import request from 'supertest';
 import app from '../app';
 import db, { seedDefaultPermissions } from '../config/database';
 import { createItem, getAuthCookie, purchaseStock } from './helpers/invoiceReturnSpec';
-import { runBackup, deleteBackupFile } from '../services/backupService';
+import { runBackup, deleteBackupFile, uploadsSnapshotPathFor } from '../services/backupService';
 
 const balance = (code: string): number => {
   const row = db.prepare<[string], { balance: number }>(`
@@ -417,8 +417,9 @@ describe('D7: backups cover server/uploads/', () => {
       const target = runBackup({ trigger: 'manual' });
       expect(target).not.toBeNull();
 
-      const dbBase = path.basename(target as string); // erp-<stamp>.db
-      const snapshot = path.join(path.dirname(target as string), dbBase.replace(/\.db$/, '.uploads'));
+      // The snapshot name derives from the backup name, whichever form it
+      // has: erp-<stamp>.db or the encrypted erp-<stamp>.db.enc.
+      const snapshot = uploadsSnapshotPathFor(target as string);
       expect(fs.existsSync(snapshot)).toBe(true);
       expect(fs.existsSync(path.join(snapshot, 'employees', markerName))).toBe(true);
 
@@ -432,12 +433,11 @@ describe('D7: backups cover server/uploads/', () => {
   });
 
   it('prunes an uploads snapshot when its database backup is pruned', () => {
-    // Two backups with a marker far in the past must both disappear: the .db
-    // by retention, the .uploads because its partner is gone.
+    // Two backups with a marker far in the past must both disappear: the
+    // database copy by retention, the .uploads because its partner is gone.
     const target = runBackup({ trigger: 'manual' });
     expect(target).not.toBeNull();
-    const dbBase = path.basename(target as string);
-    const snapshot = path.join(path.dirname(target as string), dbBase.replace(/\.db$/, '.uploads'));
+    const snapshot = uploadsSnapshotPathFor(target as string);
     expect(fs.existsSync(snapshot)).toBe(true);
 
     const past = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000);
@@ -453,11 +453,10 @@ describe('D7: backups cover server/uploads/', () => {
   it('deleting a backup removes its uploads snapshot too', () => {
     const target = runBackup({ trigger: 'manual' });
     expect(target).not.toBeNull();
-    const dbBase = path.basename(target as string);
-    const snapshot = path.join(path.dirname(target as string), dbBase.replace(/\.db$/, '.uploads'));
+    const snapshot = uploadsSnapshotPathFor(target as string);
     expect(fs.existsSync(snapshot)).toBe(true);
 
-    expect(deleteBackupFile(dbBase)).toBe(true);
+    expect(deleteBackupFile(path.basename(target as string))).toBe(true);
     expect(fs.existsSync(snapshot)).toBe(false);
   });
 });

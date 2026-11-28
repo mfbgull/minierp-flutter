@@ -13,12 +13,12 @@
  * and the group keeps the same access it has on the database file, so the
  * service can still prune and read what it wrote.
  *
- * Scope note: encryption is NOT covered here and is NOT implemented; whether
- * backups must be encrypted at rest is an open product decision, recorded in
- * audit/DECISIONS.md.
+ * Scope note: encryption at rest is covered separately by
+ * backupEncryption.test.ts (D29 option B, Gull 2026-11-28): the database copy
+ * is an encrypted container, and this test checks that container's mode too.
  */
 import fs from 'fs';
-import { BACKUP_DIR, runBackup } from '../services/backupService';
+import { BACKUP_DIR, runBackup, uploadsSnapshotPathFor } from '../services/backupService';
 
 /** True when the group/other bits allow a read (or more) by another account. */
 function readableByOthers(stat: fs.Stats): boolean {
@@ -31,7 +31,10 @@ describe('BK-extra: a backup is not readable by other accounts', () => {
     const target = runBackup({ trigger: 'manual' });
     expect(target).not.toBeNull();
     const backupPath = target as string;
-    const snapshot = backupPath.replace(/\.db$/, '.uploads');
+    const snapshot = uploadsSnapshotPathFor(backupPath);
+    // Guard against the derivation silently matching the backup itself.
+    expect(snapshot).not.toBe(backupPath);
+    expect(snapshot.endsWith('.uploads')).toBe(true);
 
     const offenders: string[] = [];
     for (const p of [BACKUP_DIR, backupPath, snapshot]) {

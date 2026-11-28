@@ -1730,11 +1730,12 @@ decision remains in this record.**
    exit 126. The mode is now `100755`. CI is unaffected: `.github/workflows/ci.yml`
    does not call the script directly, so no gate changed.
 
-## D29 — Backup hardening: permissions fixed, encryption OPEN-DECISION (2026-11-27)
+## D29 — Backup hardening: permissions fixed, encryption DECIDED — Option B (2026-11-27 / 2026-11-28)
 
-**Date.** 2026-11-27. **Status.** PARTIALLY DECIDED. The permission half is an
-architecture call and is implemented. The encryption half is a product call and
-is **OPEN-DECISION** — it is not guessed.
+**Date.** 2026-11-27. **Status.** DECIDED. The permission half was an
+architecture call and is implemented. The encryption half was a product call;
+Gull chose **Option B on 2026-11-28** and it is implemented. The original
+OPEN-DECISION discussion is kept below as written, followed by the decision.
 
 **Context.** The finding tracker row `BK-extra` said backups lack a retention
 floor and no physical integrity/perms/encryption proof. Checking it against the
@@ -1778,6 +1779,47 @@ options above stay as written so nothing is lost. A coordinator recommendation w
 given with the explanation — **B** as the balance of protection against speed and
 key risk, **C** only if private photos or scans are also stored in the system —
 and is recorded as advice, not a decision.
+
+**DECISION (Gull, 2026-11-28) — Option B, database copy only.** Wrap only the
+`.db` copy in an encrypted container after `integrity_check`. The uploads
+snapshot stays plain. Restore needs a passphrase.
+
+**What was built (architecture, mine by the AGENTS.md split).**
+
+- **Key:** `BACKUP_ENCRYPTION_KEY`. The server and every operator script read
+  the same value, so one setting covers the scheduler, `npm run db:backup` and
+  the restore tools.
+- **Rule when no key is set:** the backup is still taken, as a plain `.db`, and
+  the server logs `NOT encrypted: BACKUP_ENCRYPTION_KEY is not set`. A missing
+  backup is worse than an unprotected one, so a deployment that has not set the
+  key is never worse off than before — but it is never silently unprotected
+  either.
+- **Rule when encryption fails:** fail closed. The partial container and the
+  plain copy are removed and the backup returns no file (route 500). An
+  unencrypted copy must not survive a request for encryption.
+- **Format:** AES-256-GCM container, magic `ERPENC01`, fresh random salt per
+  file, chunked I/O, `0600`. One implementation (`server/scripts/lib/backup-crypto.js`)
+  shared by the server and the CLI, so a file written by one is readable by the
+  other.
+- **Tools:** `npm run db:decrypt` writes a plain database from a container and
+  verifies it; `verify-backup.js` and `restore-smoke.js` accept `.db` and
+  `.db.enc` and exit 1 when the key is missing for an encrypted file.
+- **Key loss is permanent and is in the runbook:** `server/.env.example` and
+  `server/README.md` both say there is no back door, and that rotating the key
+  does not re-encrypt old backups.
+
+**Evidence.** Red-first `server/src/__tests__/backupEncryption.test.ts`: 3 of 6
+cases failed before the implementation, 6/6 green after. Nine backup suites /
+61 tests green. Manual end-to-end smoke on a real dev-db copy: with a key the
+CLI writes `erp-backup-*.db.enc` (`ERPENC01`, `0600`, no plain leftover),
+`verify-backup` and `restore-smoke` pass, `decrypt-backup` exits 0 on the right
+key and 1 on a wrong key or a missing key; without a key the CLI writes a plain
+`.db` and prints the warning. `npm run typecheck`, `npm run build` and eslint
+clean on all touched files.
+
+**Note (pre-existing, not caused by this change):** snapshots leave 0-byte
+`-wal` and `-shm` sidecars beside the backup file. The encryption path now
+removes them; the plaintext path is untouched and remains as it was.
 
 ## D30 — Production overhead settlement: DECIDED — Option A implemented (2026-11-27)
 

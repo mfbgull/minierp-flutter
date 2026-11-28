@@ -59,7 +59,11 @@ describe('admin backup endpoints', () => {
     expect(res.body.success).toBe(true);
 
     fileName = res.body.data.fileName;
-    expect(fileName).toMatch(/^erp-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.db$/);
+    // Option B: the manual backup is an encrypted container, never a plain
+    // SQLite file. The optional suffix is the same-second collision form.
+    expect(fileName).toMatch(
+      /^erp-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}(?:-\d+)?\.db\.enc$/
+    );
     expect(fs.existsSync(path.join(BACKUP_DIR, fileName))).toBe(true);
     // Staleness marker for the nightly scheduler must be maintained.
     expect(fs.existsSync(path.join(BACKUP_DIR, '.last_backup'))).toBe(true);

@@ -18,7 +18,8 @@ class BackupFile {
     createdAt: asString(json['createdAt']) ?? '',
   );
 
-  /// Generated filename, e.g. `erp-2026-08-25T10-30-00.db`.
+  /// Generated filename, e.g. `erp-2026-08-25T10-30-00.db` — or
+  /// `erp-2026-08-25T10-30-00.db.enc` when backup encryption is enabled.
   final String name;
   final int sizeBytes;
   /// ISO timestamp of the file's mtime.

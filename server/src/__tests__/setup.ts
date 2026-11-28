@@ -8,6 +8,10 @@ process.env.JWT_SECRET = 'test-jwt-secret-for-integration-tests-only';
 process.env.JWT_EXPIRY = '24h';
 process.env.DEFAULT_ADMIN_PASSWORD = 'test-admin-password-secure-2026';
 process.env.TEST_ADMIN_PASSWORD = 'test-admin-password-secure-2026';
+// D29 option B: backups are encrypted at rest, so every suite that takes a
+// backup exercises the production path. The plaintext branch (no key) is
+// covered by backupEncryption.test.ts, which drops the key for one case.
+process.env.BACKUP_ENCRYPTION_KEY = 'test-backup-encryption-key-2026';
 
 // 2. Suppress express-rate-limit IPv6 console.error BEFORE importing rate limiter
 const originalConsoleError = console.error;

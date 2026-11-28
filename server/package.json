@@ -13,6 +13,7 @@
     "lint": "eslint . --quiet",
     "verify:reversal-rules": "ts-node --transpile-only scripts/verify-reversal-rules.ts",
     "db:backup": "node scripts/backup-db.js",
+    "db:decrypt": "node scripts/decrypt-backup.js",
     "db:verify-backup": "node scripts/verify-backup.js",
     "gl:dedupe-po": "node scripts/dedupe-po.js",
     "gl:backfill-ledger-dates": "node scripts/backfill-ledger-dates.js",

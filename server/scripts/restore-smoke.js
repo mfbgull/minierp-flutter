@@ -13,6 +13,11 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const Database = require('better-sqlite3');
+const { isEncryptedFileSync, decryptFileSync, backupPassphrase } = require('./lib/backup-crypto');
+
+// Same .env the server reads, so the passphrase is available without the
+// operator having to export it by hand.
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const backupPath = process.argv[2];
 if (!backupPath || !fs.existsSync(backupPath)) {
@@ -21,7 +26,21 @@ if (!backupPath || !fs.existsSync(backupPath)) {
 }
 
 const tmp = path.join(os.tmpdir(), `restored-smoke-${Date.now()}.db`);
-fs.copyFileSync(backupPath, tmp);
+if (isEncryptedFileSync(backupPath)) {
+  const passphrase = backupPassphrase();
+  if (!passphrase) {
+    console.error('[restore-smoke] backup is encrypted but BACKUP_ENCRYPTION_KEY is not set');
+    process.exit(1);
+  }
+  decryptFileSync(backupPath, tmp, passphrase);
+  console.log('[restore-smoke] decrypted container before smoke test');
+} else {
+  fs.copyFileSync(backupPath, tmp);
+}
+// A decrypted copy must not outlive the run, even on a crash.
+process.on('exit', () => {
+  try { fs.rmSync(tmp, { force: true }); } catch { /* best effort */ }
+});
 
 let db;
 try {

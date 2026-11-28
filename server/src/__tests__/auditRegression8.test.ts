@@ -152,7 +152,9 @@ describe('BK-002 / BK-003 / BK-004: backup API behaviour', () => {
   it('every backup the list shows (including CLI-named files) can be downloaded and deleted', async () => {
     const made = await request(app).post('/api/admin/backup').set('Cookie', adminCookie).send({});
     const source = path.join(backupDir(), made.body.data.fileName);
-    const cliName = 'erp-backup-2026-01-01T00-00-00.db';
+    // Same container bytes under the CLI's own name form: the list must not
+    // care which of the two generated shapes a file has (BK-003/004).
+    const cliName = 'erp-backup-2026-01-01T00-00-00.db.enc';
     fs.copyFileSync(source, path.join(backupDir(), cliName));
     const list = await request(app).get('/api/admin/backup').set('Cookie', adminCookie);
     const names = (list.body.data.backups as Array<{ name: string }>).map((b) => b.name);
@@ -196,7 +198,9 @@ describe('BK-001 / BK-005: backup location handling', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "reg8-o'brien-"));
     const { result } = runIsolated({ DATABASE_PATH: dir });
     expect(result).not.toBeNull();
-    expect(fs.readdirSync(path.join(dir, 'backups')).some((f) => f.endsWith('.db'))).toBe(true);
+    expect(
+      fs.readdirSync(path.join(dir, 'backups')).some((f) => /\.db(\.enc)?$/.test(f))
+    ).toBe(true);
     fs.rmSync(dir, { recursive: true, force: true });
   }, 60000);
 
@@ -205,7 +209,7 @@ describe('BK-001 / BK-005: backup location handling', () => {
     const elsewhere = fs.mkdtempSync(path.join(os.tmpdir(), 'reg8-offsite-'));
     const { result } = runIsolated({ DATABASE_PATH: dir, BACKUP_DIR: elsewhere });
     expect(result).not.toBeNull();
-    expect(fs.readdirSync(elsewhere).some((f) => /^erp-.*\.db$/.test(f))).toBe(true);
+    expect(fs.readdirSync(elsewhere).some((f) => /^erp-.*\.db(\.enc)?$/.test(f))).toBe(true);
     fs.rmSync(dir, { recursive: true, force: true });
     fs.rmSync(elsewhere, { recursive: true, force: true });
   }, 60000);

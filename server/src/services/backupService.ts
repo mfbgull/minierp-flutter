@@ -3,7 +3,9 @@
  *
  * - Nightly in-process timer; fires on boot if the last backup is > 24h old.
  * - wal_checkpoint(TRUNCATE) before copying; VACUUM INTO for a consistent
- *   snapshot; integrity_check on the copy; retention prune (7 daily / 4 weekly).
+ *   snapshot; integrity_check on the copy; the copy is then wrapped in an
+ *   encrypted container (D29 option B, database copy only); retention prune
+ *   (7 daily / 4 weekly).
  */
 import fs from 'fs';
 import path from 'path';
@@ -13,6 +15,9 @@ import logger from '../utils/logger';
 import { ActionType } from './activityLogger';
 import { pruneIdempotencyKeys } from '../utils/idempotency';
 import { resolveUploadsDir } from '../utils/serverRoot';
+// D29 option B: same container format the operator scripts use, so a
+// backup written by the server can be decrypted by `decrypt-backup.js`.
+import { backupPassphrase, encryptFileSync } from '../../scripts/lib/backup-crypto';
 
 // Take the resolved dir from config/database so backups always land beside the
 // erp.db this process opened, instead of re-deriving it with other arithmetic.
@@ -51,6 +56,14 @@ function restrict(target: string, mode: number): void {
   }
 }
 
+/** Removes a plaintext snapshot together with its WAL sidecars, which would
+ *  otherwise be left behind as orphans of a file that no longer exists. */
+function removePlainCopy(plainPath: string): void {
+  fs.rmSync(plainPath, { force: true });
+  fs.rmSync(`${plainPath}-wal`, { force: true });
+  fs.rmSync(`${plainPath}-shm`, { force: true });
+}
+
 function ensureBackupDir(): void {
   fs.mkdirSync(BACKUP_DIR, { recursive: true });
   // mkdirSync keeps an existing directory's mode; set the bit anyway.
@@ -65,11 +78,12 @@ function lastBackupAgeMs(): number {
 
 /**
  * The uploads snapshot that belongs to a given database backup file:
- * erp-<stamp>.db -> erp-<stamp>.uploads (same directory, same identity, so a
- * restore finds the matching files by name alone).
+ * erp-<stamp>.db -> erp-<stamp>.uploads, and erp-<stamp>.db.enc ->
+ * erp-<stamp>.uploads (same directory, same identity, so a restore finds
+ * the matching files by name alone whichever form the copy has).
  */
 export function uploadsSnapshotPathFor(backupPath: string): string {
-  return backupPath.replace(/\.db$/, '.uploads');
+  return backupPath.replace(/\.db(?:\.enc)?$/, '.uploads');
 }
 
 /**
@@ -101,8 +115,12 @@ function pruneOrphanedUploads(): void {
   if (!fs.existsSync(BACKUP_DIR)) return;
   for (const name of fs.readdirSync(BACKUP_DIR)) {
     if (!name.endsWith('.uploads')) continue;
-    const partner = path.join(BACKUP_DIR, `${name.slice(0, -'.uploads'.length)}.db`);
-    if (fs.existsSync(partner)) continue;
+    const base = name.slice(0, -'.uploads'.length);
+    // The partner may be a plain `.db` (a backup taken before encryption, or
+    // one taken while no key was configured) or an encrypted `.db.enc`.
+    const plain = path.join(BACKUP_DIR, `${base}.db`);
+    const container = path.join(BACKUP_DIR, `${base}.db.enc`);
+    if (fs.existsSync(plain) || fs.existsSync(container)) continue;
     fs.rmSync(path.join(BACKUP_DIR, name), { recursive: true, force: true });
     logger.info(`[Backup] pruned orphaned uploads ${name}`);
   }
@@ -120,7 +138,9 @@ export interface BackupFileInfo {
 // Accepts both the in-app form (erp-<ts>.db) and the CLI form (erp-backup-<ts>.db),
 // plus a numeric suffix for backups taken within the same second, so everything
 // the list shows can also be downloaded, deleted and pruned consistently (BK-003/004).
-const BACKUP_NAME_RE = /^erp-(?:backup-)?\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}(?:-\d+)?\.db$/;
+// A `.db.enc` suffix marks an encrypted container (D29 option B); plain `.db`
+// names stay valid so backups taken before encryption remain restorable.
+const BACKUP_NAME_RE = /^erp-(?:backup-)?\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}(?:-\d+)?\.db(?:\.enc)?$/;
 
 /**
  * Absolute path of an existing backup file, or null when the name is not
@@ -179,9 +199,11 @@ export function runBackup(opts?: RunBackupOptions): string | null {
 
     const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     // Second-resolution names collide when two backups are taken together; pick
-    // a free name instead of letting VACUUM INTO fail (BK-004).
+    // a free name instead of letting VACUUM INTO fail (BK-004). Both forms are
+    // checked, or a container from the same second would be truncated by the
+    // encryption step below.
     let target = path.join(BACKUP_DIR, `erp-${stamp}.db`);
-    for (let n = 1; fs.existsSync(target); n++) {
+    for (let n = 1; fs.existsSync(target) || fs.existsSync(`${target}.enc`); n++) {
       target = path.join(BACKUP_DIR, `erp-${stamp}-${n}.db`);
     }
     // A single quote in the path (e.g. C:\Users\O'Brien\...) would end the SQL
@@ -212,6 +234,37 @@ export function runBackup(opts?: RunBackupOptions): string | null {
       return null;
     }
 
+    // D29 option B (Gull, 2026-11-28): wrap the database copy in an
+    // encrypted container now that it is proven sound. The uploads snapshot
+    // stays plain — that is the split he chose — and the plaintext copy is
+    // removed, so the only thing left on disk is the container.
+    const passphrase = backupPassphrase();
+    if (passphrase) {
+      const container = `${target}.enc`;
+      try {
+        encryptFileSync(target, container, passphrase);
+        restrict(container, BACKUP_FILE_MODE);
+        removePlainCopy(target);
+        target = container;
+      } catch (err) {
+        // Fail closed: an unencrypted copy must not survive a request for
+        // encryption, and a partial container must not look like a backup.
+        fs.rmSync(container, { force: true });
+        removePlainCopy(target);
+        logger.error('[Backup] encryption FAILED — no backup written:', err);
+        return null;
+      }
+    } else {
+      // The deployment has not configured a key. The backup is still taken
+      // (a missing backup is worse than an unprotected one), but never
+      // silently: this line is the only thing standing between a plain
+      // backup and someone assuming it is locked.
+      logger.warn(
+        '[Backup] NOT encrypted: BACKUP_ENCRYPTION_KEY is not set. '
+        + 'Anyone who reads the file can open it.'
+      );
+    }
+
     fs.utimesSync(target, new Date(), new Date());
     // D7: pair the database snapshot with the files it references.
     snapshotUploads(target);
@@ -222,7 +275,8 @@ export function runBackup(opts?: RunBackupOptions): string | null {
     pruneOrphanedUploads();
 
     try {
-      const description = `${triggerLabel} backup ${path.basename(target)} (integrity ok)`;
+      const description = `${triggerLabel} backup ${path.basename(target)} `
+        + `(integrity ok${passphrase ? ', encrypted' : ', NOT encrypted'})`;
       if (opts?.userId) {
         db.prepare(`INSERT INTO activity_log (user_id, action, entity_type, description) VALUES (?, ?, ?, ?)`)
           .run(opts.userId, ActionType.BACKUP_CREATE, 'Database', description);

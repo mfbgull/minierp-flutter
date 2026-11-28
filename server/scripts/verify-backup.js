@@ -18,6 +18,11 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const Database = require('better-sqlite3');
+const { isEncryptedFileSync, decryptFileSync, backupPassphrase } = require('./lib/backup-crypto');
+
+// Same .env the server reads, so the passphrase is available without the
+// operator having to export it by hand.
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const backupPath = process.argv[2];
 if (!backupPath || !fs.existsSync(backupPath)) {
@@ -27,13 +32,30 @@ if (!backupPath || !fs.existsSync(backupPath)) {
 
 // Copy to a temp path so verification never touches the snapshot. A
 // snapshot written by better-sqlite3's .backup() has no WAL sidecars,
-// but copy them if present so a raw-file copy still sees the tail.
+// but copy them if present so a raw-file copy still sees the tail. An
+// encrypted container is decrypted into the same temp path instead: what is
+// verified is exactly what a restore would produce.
 const tmp = path.join(os.tmpdir(), `restore-verify-${Date.now()}.db`);
-fs.copyFileSync(backupPath, tmp);
-for (const ext of ['-wal', '-shm']) {
-  const side = backupPath + ext;
-  if (fs.existsSync(side)) fs.copyFileSync(side, tmp + ext);
+const encrypted = isEncryptedFileSync(backupPath);
+if (encrypted) {
+  const passphrase = backupPassphrase();
+  if (!passphrase) {
+    console.error('[restore-verify] backup is encrypted but BACKUP_ENCRYPTION_KEY is not set');
+    process.exit(1);
+  }
+  decryptFileSync(backupPath, tmp, passphrase);
+  console.log('[restore-verify] decrypted container for verification');
+} else {
+  fs.copyFileSync(backupPath, tmp);
+  for (const ext of ['-wal', '-shm']) {
+    const side = backupPath + ext;
+    if (fs.existsSync(side)) fs.copyFileSync(side, tmp + ext);
+  }
 }
+// A decrypted copy must not outlive the run, even on a crash.
+process.on('exit', () => {
+  try { fs.rmSync(tmp, { force: true }); } catch { /* best effort */ }
+});
 
 const db = new Database(tmp, { readonly: true });
 const failures = [];

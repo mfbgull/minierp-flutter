@@ -8,6 +8,9 @@
  *
  * Output: server/database/backups/erp-backup-<timestamp>.db
  *   - PRAGMA integrity_check runs on the finished snapshot
+ *   - when BACKUP_ENCRYPTION_KEY is set the snapshot is then wrapped in an
+ *     encrypted container and the plain file is removed (D29 option B), so
+ *     the output is erp-backup-<timestamp>.db.enc
  *   - keeps the newest MAX_BACKUPS files, prunes older ones
  *   - exit code 0 on success, 1 on any failure
  *
@@ -17,6 +20,11 @@ const fs = require('fs');
 const path = require('path');
 const Database = require('better-sqlite3');
 const { verifySnapshotAt } = require('./lib/backup-verify');
+const { backupPassphrase, encryptFileSync } = require('./lib/backup-crypto');
+
+// Read the same .env the server reads, so BACKUP_ENCRYPTION_KEY (and any
+// other setting) behaves identically for the CLI and for the scheduler.
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const MAX_BACKUPS = 30;
 
@@ -86,14 +94,39 @@ function verifySnapshot() {
   console.log('[db:backup] integrity_check: ok');
 }
 
+/** Wraps the verified snapshot in an encrypted container, or warns loudly. */
+function encryptSnapshot() {
+  const passphrase = backupPassphrase();
+  if (!passphrase) {
+    console.warn('[db:backup] WARNING: BACKUP_ENCRYPTION_KEY is not set — the backup is NOT encrypted.');
+    return backupPath;
+  }
+  const container = `${backupPath}.enc`;
+  try {
+    encryptFileSync(backupPath, container, passphrase);
+    // The snapshot's WAL sidecars belong to the file that just went away.
+    removeQuietly(backupPath);
+    removeQuietly(`${backupPath}-wal`);
+    removeQuietly(`${backupPath}-shm`);
+  } catch (err) {
+    // Fail closed: never leave a plain copy behind after asking for encryption.
+    removeQuietly(container);
+    removeQuietly(backupPath);
+    fail(`encryption failed: ${snapshotErrorMessage(err)}`);
+  }
+  console.log('[db:backup] encrypted container written');
+  return container;
+}
+
 async function run() {
   await createSnapshot();
   verifySnapshot();
-  const bytes = fs.statSync(backupPath).size;
+  const finalPath = encryptSnapshot();
+  const bytes = fs.statSync(finalPath).size;
 
-  // Prune to the newest MAX_BACKUPS snapshots.
+  // Prune to the newest MAX_BACKUPS snapshots (plain or encrypted).
   const backups = fs.readdirSync(backupDir)
-    .filter((f) => /^erp-backup-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.db$/.test(f))
+    .filter((f) => /^erp-backup-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.db(\.enc)?$/.test(f))
     .sort()
     .reverse();
   for (const stale of backups.slice(MAX_BACKUPS)) {
