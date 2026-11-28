@@ -96,8 +96,11 @@ class _SettleOverheadDialogState extends ConsumerState<SettleOverheadDialog> {
         );
         Navigator.of(context).pop();
         // The toast belongs to the screen behind the dialog, so it is shown
-        // from the ancestor context that opened the dialog.
-        showAppToast(widget.messengerContext, message);
+        // from the ancestor context that opened the dialog. That context does
+        // not belong to this State, so this State's `mounted` says nothing
+        // about it — it is guarded on its own.
+        final messenger = widget.messengerContext;
+        if (messenger.mounted) showAppToast(messenger, message);
       case ApiFailure(:final error):
         setState(() {
           _busy = false;
